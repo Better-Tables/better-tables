@@ -454,7 +454,7 @@ describe('NumberFilterInput', () => {
 
     render(<NumberFilterInput {...propsWithCurrency} />);
 
-    expect(screen.getByDisplayValue('1234.56')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('$1,234.56')).toBeInTheDocument();
     expect(screen.getByText('$')).toBeInTheDocument();
   });
 
