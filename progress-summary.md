@@ -5,7 +5,7 @@
 **Better Tables** is a comprehensive React table library designed to provide type-safe, declarative configuration for complex data tables with advanced filtering, sorting, and pagination capabilities. Built on an adapter pattern to work with any database or API.
 
 ### Key Features
-- **Type-safe column definitions** with fluent builders
+- **Type-safe column definitions** with fluent builders ✅
 - **Database-agnostic** through adapter pattern  
 - **Advanced filtering** with 5 filter types and 20+ operators
 - **Server-side and client-side** strategies
@@ -13,6 +13,9 @@
 - **Built-in UI components** with customizable themes
 - **URL state persistence** for shareable filtered views
 - **Bulk operations** and export functionality
+
+### 🎉 Recent Milestone
+**Column Builder System Complete** - The core user-facing API is now fully implemented with 6 type-specific builders, comprehensive validation, and a rich fluent API that serves as the foundation for all table configurations.
 
 ---
 
@@ -34,18 +37,29 @@
 - [x] **Utility Types**: Common types for events, validation, rendering, and configuration
 
 ### 3. **Type Safety & Testing** ✅
-- [x] **Comprehensive Type Tests**: 53 tests covering all type definitions
+- [x] **Comprehensive Type Tests**: 81 tests covering all type definitions and implementations
 - [x] **Column Definition Tests**: Validation of column builders, renderers, and validation rules
 - [x] **Filter System Tests**: All filter operators and configurations tested
 - [x] **Adapter Interface Tests**: Complete adapter functionality testing
 - [x] **Table Configuration Tests**: Features, bulk actions, and configuration validation
 - [x] **Utility Type Tests**: Pagination, sorting, and common type validation
+- [x] **Column Builder Tests**: 28 tests covering all builder types and factory functions
 
 ### 4. **Code Quality** ✅
 - [x] **ESLint Compliance**: All files pass strict ESLint rules
 - [x] **TypeScript Compliance**: No TypeScript errors across the codebase
 - [x] **Test Coverage**: Comprehensive type testing with expectTypeOf assertions
 - [x] **Import Organization**: Clean imports with no unused dependencies
+
+### 5. **Column Builder System** ✅
+- [x] **Base ColumnBuilder**: Implemented core fluent API with 13 configuration methods
+- [x] **Type-Specific Builders**: Created 6 specialized builders (Text, Number, Date, Option, MultiOption, Boolean)
+- [x] **Column Factory**: Implemented createColumnBuilder factory with type-safe builder selection
+- [x] **Validation System**: Comprehensive validation ensuring required fields and preventing duplicates
+- [x] **Testing**: 28 comprehensive tests covering all builders and factory functions
+- [x] **Fluent API**: Rich configuration options including formatting, filtering, rendering, and validation
+- [x] **Type Safety**: Full TypeScript inference with proper error handling
+- [x] **Documentation**: Complete demo file with real-world examples
 
 ---
 
@@ -58,12 +72,12 @@ better-tables/
 │   ├── core/                    # @better-tables/core - Main library
 │   │   ├── src/
 │   │   │   ├── types/          # ✅ Complete type definitions
-│   │   │   ├── builders/       # 🔄 Column builders (placeholder)
+│   │   │   ├── builders/       # ✅ Column builders with fluent API
 │   │   │   ├── managers/       # 🔄 State managers (placeholder)
 │   │   │   ├── components/     # 🔄 UI components (placeholder)
 │   │   │   ├── hooks/          # 🔄 React hooks (placeholder)
 │   │   │   └── utils/          # 🔄 Utilities (placeholder)
-│   │   └── tests/              # ✅ Comprehensive type tests
+│   │   └── tests/              # ✅ Comprehensive testing (81 tests)
 │   ├── adapters/               # 🔄 Database adapters (planned)
 │   ├── ui/                     # 🔄 UI package (planned)
 │   └── pro/                    # 🔄 Commercial features (planned)
@@ -99,19 +113,13 @@ better-tables/
 
 ### Phase 1: Core Implementation (Next 2-4 weeks)
 
-#### **Column Builder System** 🔄
-- [ ] Implement base `ColumnBuilder` class
-- [ ] Create type-specific builders (`TextColumnBuilder`, `NumberColumnBuilder`, etc.)
-- [ ] Add fluent API methods (`.searchable()`, `.range()`, `.options()`)
-- [ ] Implement validation and error handling
-- [ ] Add column builder tests
 
 #### **Filter System Implementation** 🔄
 - [ ] Implement `FilterManager` class
 - [ ] Create filter operator definitions and validation
 - [ ] Build filter input components for each type
 - [ ] Add filter serialization/deserialization
-- [ ] Implement URL state persistence
+- [ ] Implement optional URL state persistence
 
 #### **State Management** 🔄
 - [ ] Implement table state store with Zustand
@@ -250,9 +258,9 @@ pnpm type-check
 
 ## 🚀 Next Immediate Actions
 
-1. **Start Column Builder Implementation** - Begin with the core column builder pattern
-2. **Set up Basic Table Component** - Create the main React component structure
-3. **Implement Filter Manager** - Core filtering logic and state management
+1. **Implement Filter Manager** - Core filtering logic and state management
+2. **Create State Management System** - Implement table state store with Zustand
+3. **Set up Basic Table Component** - Create the main React component structure
 4. **Create First Adapter** - Start with in-memory adapter for testing
 5. **Add Basic UI Components** - Simple table rendering without advanced features
 
