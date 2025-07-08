@@ -1,7 +1,7 @@
 // React components will be exported from here
+export * from './filter-bar';
+export * from './filter-inputs';
 // export * from './table';
-// export * from './filter-bar';
-// export * from './filter-inputs';
 // export * from './table-header';
 // export * from './table-body';
 // export * from './table-footer';

@@ -1,16 +1,16 @@
-import type { 
-  FilterState, 
-  FilterOperator, 
-  FilterOperatorDefinition,
-  FilterConfig,
-  FilterOption 
-} from '../types/filter';
+import type { FilterState, FilterOperator, FilterOperatorDefinition } from '../types/filter';
 import type { ColumnDefinition, ColumnType } from '../types/column';
+import {
+  getOperatorDefinition,
+  getDefaultOperatorsForType,
+  createOperatorRegistry,
+  getAllOperators,
+} from '../types/filter-operators';
 
 /**
  * Event types for filter manager
  */
-export type FilterManagerEvent = 
+export type FilterManagerEvent =
   | { type: 'filter_added'; filter: FilterState }
   | { type: 'filter_updated'; columnId: string; filter: FilterState }
   | { type: 'filter_removed'; columnId: string }
@@ -53,331 +53,10 @@ export class FilterManager<TData = any> {
   private subscribers: FilterManagerSubscriber[] = [];
   private operatorDefinitions: Map<FilterOperator, FilterOperatorDefinition> = new Map();
 
-  constructor(
-    columns: ColumnDefinition<TData>[],
-    initialFilters: FilterState[] = []
-  ) {
+  constructor(columns: ColumnDefinition<TData>[], initialFilters: FilterState[] = []) {
     this.columns = columns;
-    this.initializeOperatorDefinitions();
+    this.operatorDefinitions = createOperatorRegistry(getAllOperators());
     this.setFilters(initialFilters);
-  }
-
-  /**
-   * Initialize default operator definitions
-   */
-  private initializeOperatorDefinitions(): void {
-    // Text operators
-    this.operatorDefinitions.set('contains', {
-      key: 'contains',
-      label: 'Contains',
-      description: 'Contains the specified text',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'string'
-    });
-
-    this.operatorDefinitions.set('equals', {
-      key: 'equals',
-      label: 'Equals',
-      description: 'Exactly matches the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && values[0] != null
-    });
-
-    this.operatorDefinitions.set('startsWith', {
-      key: 'startsWith',
-      label: 'Starts with',
-      description: 'Starts with the specified text',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'string'
-    });
-
-    this.operatorDefinitions.set('endsWith', {
-      key: 'endsWith',
-      label: 'Ends with',
-      description: 'Ends with the specified text',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'string'
-    });
-
-    this.operatorDefinitions.set('isEmpty', {
-      key: 'isEmpty',
-      label: 'Is empty',
-      description: 'Is empty or null',
-      valueCount: 0,
-      supportsNull: true,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isNotEmpty', {
-      key: 'isNotEmpty',
-      label: 'Is not empty',
-      description: 'Is not empty and not null',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    // Number operators
-    this.operatorDefinitions.set('notEquals', {
-      key: 'notEquals',
-      label: 'Not equals',
-      description: 'Does not equal the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'number'
-    });
-
-    this.operatorDefinitions.set('greaterThan', {
-      key: 'greaterThan',
-      label: 'Greater than',
-      description: 'Greater than the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'number'
-    });
-
-    this.operatorDefinitions.set('greaterThanOrEqual', {
-      key: 'greaterThanOrEqual',
-      label: 'Greater than or equal',
-      description: 'Greater than or equal to the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'number'
-    });
-
-    this.operatorDefinitions.set('lessThan', {
-      key: 'lessThan',
-      label: 'Less than',
-      description: 'Less than the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'number'
-    });
-
-    this.operatorDefinitions.set('lessThanOrEqual', {
-      key: 'lessThanOrEqual',
-      label: 'Less than or equal',
-      description: 'Less than or equal to the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && typeof values[0] === 'number'
-    });
-
-    this.operatorDefinitions.set('between', {
-      key: 'between',
-      label: 'Between',
-      description: 'Between two values (inclusive)',
-      valueCount: 2,
-      supportsNull: false,
-      validate: (values) => values.length === 2 && values.every(v => typeof v === 'number')
-    });
-
-    this.operatorDefinitions.set('notBetween', {
-      key: 'notBetween',
-      label: 'Not between',
-      description: 'Not between two values',
-      valueCount: 2,
-      supportsNull: false,
-      validate: (values) => values.length === 2 && values.every(v => typeof v === 'number')
-    });
-
-    // Date operators
-    this.operatorDefinitions.set('is', {
-      key: 'is',
-      label: 'Is',
-      description: 'Is the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && values[0] != null
-    });
-
-    this.operatorDefinitions.set('isNot', {
-      key: 'isNot',
-      label: 'Is not',
-      description: 'Is not the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && values[0] != null
-    });
-
-    this.operatorDefinitions.set('before', {
-      key: 'before',
-      label: 'Before',
-      description: 'Before the specified date',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && values[0] instanceof Date
-    });
-
-    this.operatorDefinitions.set('after', {
-      key: 'after',
-      label: 'After',
-      description: 'After the specified date',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1 && values[0] instanceof Date
-    });
-
-    // Date preset operators
-    this.operatorDefinitions.set('isToday', {
-      key: 'isToday',
-      label: 'Is today',
-      description: 'Is today',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isYesterday', {
-      key: 'isYesterday',
-      label: 'Is yesterday',
-      description: 'Is yesterday',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isThisWeek', {
-      key: 'isThisWeek',
-      label: 'Is this week',
-      description: 'Is this week',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isThisMonth', {
-      key: 'isThisMonth',
-      label: 'Is this month',
-      description: 'Is this month',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isThisYear', {
-      key: 'isThisYear',
-      label: 'Is this year',
-      description: 'Is this year',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    // Option operators
-    this.operatorDefinitions.set('isAnyOf', {
-      key: 'isAnyOf',
-      label: 'Is any of',
-      description: 'Is any of the specified values',
-      valueCount: 'variable',
-      supportsNull: false,
-      validate: (values) => values.length >= 1
-    });
-
-    this.operatorDefinitions.set('isNoneOf', {
-      key: 'isNoneOf',
-      label: 'Is none of',
-      description: 'Is none of the specified values',
-      valueCount: 'variable',
-      supportsNull: false,
-      validate: (values) => values.length >= 1
-    });
-
-    // Multi-option operators
-    this.operatorDefinitions.set('includes', {
-      key: 'includes',
-      label: 'Includes',
-      description: 'Includes the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1
-    });
-
-    this.operatorDefinitions.set('excludes', {
-      key: 'excludes',
-      label: 'Excludes',
-      description: 'Excludes the specified value',
-      valueCount: 1,
-      supportsNull: false,
-      validate: (values) => values.length === 1
-    });
-
-    this.operatorDefinitions.set('includesAny', {
-      key: 'includesAny',
-      label: 'Includes any',
-      description: 'Includes any of the specified values',
-      valueCount: 'variable',
-      supportsNull: false,
-      validate: (values) => values.length >= 1
-    });
-
-    this.operatorDefinitions.set('includesAll', {
-      key: 'includesAll',
-      label: 'Includes all',
-      description: 'Includes all of the specified values',
-      valueCount: 'variable',
-      supportsNull: false,
-      validate: (values) => values.length >= 1
-    });
-
-    this.operatorDefinitions.set('excludesAny', {
-      key: 'excludesAny',
-      label: 'Excludes any',
-      description: 'Excludes any of the specified values',
-      valueCount: 'variable',
-      supportsNull: false,
-      validate: (values) => values.length >= 1
-    });
-
-    this.operatorDefinitions.set('excludesAll', {
-      key: 'excludesAll',
-      label: 'Excludes all',
-      description: 'Excludes all of the specified values',
-      valueCount: 'variable',
-      supportsNull: false,
-      validate: (values) => values.length >= 1
-    });
-
-    // Boolean operators
-    this.operatorDefinitions.set('isTrue', {
-      key: 'isTrue',
-      label: 'Is true',
-      description: 'Is true',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isFalse', {
-      key: 'isFalse',
-      label: 'Is false',
-      description: 'Is false',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isNull', {
-      key: 'isNull',
-      label: 'Is null',
-      description: 'Is null or undefined',
-      valueCount: 0,
-      supportsNull: true,
-      validate: (values) => values.length === 0
-    });
-
-    this.operatorDefinitions.set('isNotNull', {
-      key: 'isNotNull',
-      label: 'Is not null',
-      description: 'Is not null or undefined',
-      valueCount: 0,
-      supportsNull: false,
-      validate: (values) => values.length === 0
-    });
   }
 
   /**
@@ -414,7 +93,7 @@ export class FilterManager<TData = any> {
     }
 
     const existingIndex = this.filters.findIndex(f => f.columnId === filter.columnId);
-    
+
     if (existingIndex >= 0) {
       this.filters[existingIndex] = filter;
       this.notifySubscribers({ type: 'filter_updated', columnId: filter.columnId, filter });
@@ -443,7 +122,7 @@ export class FilterManager<TData = any> {
     if (index >= 0) {
       const updatedFilter = { ...this.filters[index], ...updates };
       const validation = this.validateFilter(updatedFilter);
-      
+
       if (!validation.valid) {
         throw new Error(`Invalid filter update for column ${columnId}: ${validation.error}`);
       }
@@ -503,7 +182,10 @@ export class FilterManager<TData = any> {
     }
 
     if (filter.type !== column.type) {
-      return { valid: false, error: `Filter type ${filter.type} doesn't match column type ${column.type}` };
+      return {
+        valid: false,
+        error: `Filter type ${filter.type} doesn't match column type ${column.type}`,
+      };
     }
 
     const operatorDef = this.operatorDefinitions.get(filter.operator);
@@ -513,7 +195,10 @@ export class FilterManager<TData = any> {
 
     // Check if operator is allowed for this column
     if (column.filter?.operators && !column.filter.operators.includes(filter.operator)) {
-      return { valid: false, error: `Operator ${filter.operator} not allowed for column ${filter.columnId}` };
+      return {
+        valid: false,
+        error: `Operator ${filter.operator} not allowed for column ${filter.columnId}`,
+      };
     }
 
     // Validate operator value requirements
@@ -521,8 +206,14 @@ export class FilterManager<TData = any> {
       return { valid: false, error: `Operator ${filter.operator} requires no values` };
     }
 
-    if (typeof operatorDef.valueCount === 'number' && filter.values.length !== operatorDef.valueCount) {
-      return { valid: false, error: `Operator ${filter.operator} requires exactly ${operatorDef.valueCount} values` };
+    if (
+      typeof operatorDef.valueCount === 'number' &&
+      filter.values.length !== operatorDef.valueCount
+    ) {
+      return {
+        valid: false,
+        error: `Operator ${filter.operator} requires exactly ${operatorDef.valueCount} values`,
+      };
     }
 
     if (operatorDef.valueCount === 'variable' && filter.values.length === 0) {
@@ -556,7 +247,8 @@ export class FilterManager<TData = any> {
       return [];
     }
 
-    const allowedOperators = column.filter?.operators || this.getDefaultOperatorsForType(column.type);
+    const allowedOperators =
+      column.filter?.operators || this.getDefaultOperatorsForType(column.type);
     return allowedOperators
       .map(op => this.operatorDefinitions.get(op))
       .filter(Boolean) as FilterOperatorDefinition[];
@@ -566,40 +258,14 @@ export class FilterManager<TData = any> {
    * Get default operators for a column type
    */
   getDefaultOperatorsForType(type: ColumnType): FilterOperator[] {
-    switch (type) {
-      case 'text':
-      case 'url':
-      case 'email':
-      case 'phone':
-        return ['contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'];
-      
-      case 'number':
-      case 'currency':
-      case 'percentage':
-        return ['equals', 'notEquals', 'greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual', 'between', 'notBetween'];
-      
-      case 'date':
-        return ['is', 'isNot', 'before', 'after', 'isToday', 'isYesterday', 'isThisWeek', 'isThisMonth', 'isThisYear'];
-      
-      case 'boolean':
-        return ['isTrue', 'isFalse', 'isNull', 'isNotNull'];
-      
-      case 'option':
-        return ['is', 'isNot', 'isAnyOf', 'isNoneOf'];
-      
-      case 'multiOption':
-        return ['includes', 'excludes', 'includesAny', 'includesAll', 'excludesAny', 'excludesAll'];
-      
-      default:
-        return ['equals', 'notEquals', 'isNull', 'isNotNull'];
-    }
+    return getDefaultOperatorsForType(type);
   }
 
   /**
    * Get operator definition
    */
   getOperatorDefinition(operator: FilterOperator): FilterOperatorDefinition | undefined {
-    return this.operatorDefinitions.get(operator);
+    return getOperatorDefinition(operator);
   }
 
   /**
@@ -639,8 +305,8 @@ export class FilterManager<TData = any> {
         operator: filter.operator,
         values: filter.values,
         ...(filter.includeNull && { includeNull: filter.includeNull }),
-        ...(options.includeMeta && filter.meta && { meta: filter.meta })
-      }))
+        ...(options.includeMeta && filter.meta && { meta: filter.meta }),
+      })),
     };
 
     return JSON.stringify(data, null, options.compress ? 0 : 2);
@@ -671,12 +337,13 @@ export class FilterManager<TData = any> {
     const stats = {
       totalFilters: this.filters.length,
       filtersByType: {} as Record<ColumnType, number>,
-      filtersByOperator: {} as Record<FilterOperator, number>
+      filtersByOperator: {} as Record<FilterOperator, number>,
     };
 
     this.filters.forEach(filter => {
       stats.filtersByType[filter.type] = (stats.filtersByType[filter.type] || 0) + 1;
-      stats.filtersByOperator[filter.operator] = (stats.filtersByOperator[filter.operator] || 0) + 1;
+      stats.filtersByOperator[filter.operator] =
+        (stats.filtersByOperator[filter.operator] || 0) + 1;
     });
 
     return stats;
@@ -688,4 +355,4 @@ export class FilterManager<TData = any> {
   clone(): FilterManager<TData> {
     return new FilterManager(this.columns, this.filters);
   }
-} 
+}
