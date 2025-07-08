@@ -3,6 +3,53 @@ import type { NumberFilterInputProps } from './types';
 import { useDebounce } from '../../hooks/use-debounce';
 
 /**
+ * Currency symbol to ISO code mapping
+ */
+const CURRENCY_SYMBOL_TO_CODE: Record<string, string> = {
+  '$': 'USD',
+  '€': 'EUR',
+  '£': 'GBP',
+  '¥': 'JPY',
+  '₹': 'INR',
+  '₽': 'RUB',
+  '₩': 'KRW',
+  '¢': 'USD', // cents
+  'C$': 'CAD',
+  'A$': 'AUD',
+  'NZ$': 'NZD',
+  'HK$': 'HKD',
+  'S$': 'SGD',
+  '₪': 'ILS',
+  '₺': 'TRY',
+  '₴': 'UAH',
+  '₵': 'GHS',
+  '₡': 'CRC',
+  '₦': 'NGN',
+  '₨': 'PKR',
+  '₱': 'PHP',
+  '₫': 'VND',
+  '₲': 'PYG',
+  '₳': 'ARS',
+  '₸': 'KZT',
+  '₼': 'AZN',
+  '₾': 'GEL',
+  '＄': 'USD', // full-width dollar sign
+};
+
+/**
+ * Convert currency symbol to ISO code
+ */
+function getCurrencyCode(currency: string): string {
+  // If it's already a valid ISO code (3 letters), return as-is
+  if (/^[A-Z]{3}$/.test(currency)) {
+    return currency;
+  }
+  
+  // Otherwise, look up the symbol
+  return CURRENCY_SYMBOL_TO_CODE[currency] || 'USD';
+}
+
+/**
  * Basic number filter input component
  */
 export const NumberFilterInput: React.FC<NumberFilterInputProps> = ({
@@ -186,9 +233,10 @@ function formatDisplayValue(
 
   switch (format) {
     case 'currency':
+      const currencyCode = getCurrencyCode(currency || 'USD');
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: currency || 'USD',
+        currency: currencyCode,
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       }).format(value);
