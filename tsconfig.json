@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "@better-tables/core": ["./packages/core/src"],
+      "@better-tables/ui": ["./packages/ui/src"],
+      "@better-tables/drizzle": ["./packages/adapters/drizzle/src"],
+      "@better-tables/rest": ["./packages/adapters/rest/src"],
+      "@better-tables/memory": ["./packages/adapters/memory/src"],
+      "@better-tables/pro": ["./packages/pro/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next"]
+} 
