@@ -8,6 +8,9 @@ coverage
 *.lcov
 .nyc_output
 
+# Temporary files
+_temp*
+
 # Next.js
 .next/
 out/

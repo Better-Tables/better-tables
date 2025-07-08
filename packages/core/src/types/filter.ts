@@ -4,6 +4,8 @@ import type { IconComponent } from './common';
 
 /**
  * Filter operators available for different column types
+ * NOTE: This must stay in sync with centralized filter operator definitions
+ * in filter-operators.ts. Tests ensure consistency.
  */
 export type FilterOperator = 
   // Text operators
@@ -14,7 +16,7 @@ export type FilterOperator =
   | 'isEmpty'
   | 'isNotEmpty'
   
-  // Number operators
+  // Number operators  
   | 'notEquals'
   | 'greaterThan'
   | 'greaterThanOrEqual'
@@ -49,6 +51,8 @@ export type FilterOperator =
   // Boolean operators
   | 'isTrue'
   | 'isFalse'
+  
+  // Universal operators (available for most types)
   | 'isNull'
   | 'isNotNull';
 
@@ -164,9 +168,9 @@ export interface FilterComponentProps<TValue = any> {
 /**
  * Filter operator definition
  */
-export interface FilterOperatorDefinition {
+export interface FilterOperatorDefinition<TOperator extends string = FilterOperator> {
   /** Operator key */
-  key: FilterOperator;
+  key: TOperator;
   
   /** Display label */
   label: string;

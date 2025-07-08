@@ -4,5 +4,5 @@
 // export * from './use-sorting';
 // export * from './use-pagination';
 // export * from './use-selection';
-// export * from './use-debounce';
+export * from './use-debounce';
 // export * from './use-table-state'; 
