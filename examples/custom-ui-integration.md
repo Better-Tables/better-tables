@@ -1,0 +1,434 @@
+# Using Better Tables Without the UI Package
+
+Better Tables is designed to be UI-agnostic. While we provide beautiful components through `@better-tables/ui`, you can easily integrate with your own UI components or any UI library.
+
+## Core Concepts
+
+The `@better-tables/core` package provides all the logic and state management you need:
+
+- **Column Definitions**: Type-safe column configuration
+- **Filter Management**: Complete filter state and logic
+- **Adapters**: Database/API integration
+- **Hooks**: React hooks for easy integration
+
+## Basic Example with Custom UI
+
+```tsx
+import { useTable, createColumnBuilder, FilterManager } from '@better-tables/core';
+import { createDrizzleAdapter } from '@better-tables/drizzle';
+
+// 1. Define your columns
+const cb = createColumnBuilder<User>();
+
+const columns = [
+  cb.text()
+    .id('name')
+    .displayName('Name')
+    .accessor(user => user.name)
+    .searchable()
+    .build(),
+    
+  cb.option()
+    .id('status')
+    .displayName('Status')
+    .accessor(user => user.status)
+    .options([
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' }
+    ])
+    .build(),
+];
+
+// 2. Create your adapter
+const adapter = createDrizzleAdapter({
+  db: database,
+  table: users,
+});
+
+// 3. Use the table hook
+function MyCustomTable() {
+  const { 
+    data, 
+    loading, 
+    error,
+    filterManager,
+    paginationManager 
+  } = useTable({
+    config: {
+      columns,
+      adapter,
+      features: {
+        filtering: true,
+        pagination: true,
+      }
+    }
+  });
+
+  return (
+    <div>
+      {/* Your custom filter UI */}
+      <MyCustomFilters 
+        filters={filterManager.getFilters()}
+        onAddFilter={filterManager.addFilter}
+        onRemoveFilter={filterManager.removeFilter}
+        onUpdateFilter={filterManager.updateFilter}
+      />
+      
+      {/* Your custom table UI */}
+      <table>
+        <thead>
+          <tr>
+            {columns.map(column => (
+              <th key={column.id}>{column.displayName}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(row => (
+            <tr key={row.id}>
+              {columns.map(column => (
+                <td key={column.id}>
+                  {column.accessor(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+## Integration with Material-UI
+
+```tsx
+import { TextField, Select, MenuItem, Chip } from '@mui/material';
+import { useFilters } from '@better-tables/core';
+
+function MaterialUIFilters({ columns }) {
+  const { filters, addFilter, removeFilter, updateFilter } = useFilters(columns);
+  
+  return (
+    <div>
+      {/* Active Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {filters.map(filter => {
+          const column = columns.find(c => c.id === filter.columnId);
+          return (
+            <Chip
+              key={filter.columnId}
+              label={`${column.displayName}: ${filter.values.join(', ')}`}
+              onDelete={() => removeFilter(filter.columnId)}
+            />
+          );
+        })}
+      </div>
+      
+      {/* Add Filter Dropdown */}
+      <Select
+        value=""
+        onChange={(e) => {
+          const columnId = e.target.value;
+          const column = columns.find(c => c.id === columnId);
+          addFilter({
+            columnId,
+            type: column.type,
+            operator: getDefaultOperator(column.type),
+            values: []
+          });
+        }}
+      >
+        {columns
+          .filter(col => col.filterable && !filters.find(f => f.columnId === col.id))
+          .map(column => (
+            <MenuItem key={column.id} value={column.id}>
+              {column.displayName}
+            </MenuItem>
+          ))}
+      </Select>
+      
+      {/* Filter Inputs */}
+      {filters.map(filter => {
+        const column = columns.find(c => c.id === filter.columnId);
+        
+        if (column.type === 'text') {
+          return (
+            <TextField
+              key={filter.columnId}
+              label={column.displayName}
+              value={filter.values[0] || ''}
+              onChange={(e) => updateFilter(filter.columnId, {
+                values: [e.target.value]
+              })}
+            />
+          );
+        }
+        
+        if (column.type === 'option') {
+          return (
+            <Select
+              key={filter.columnId}
+              value={filter.values[0] || ''}
+              onChange={(e) => updateFilter(filter.columnId, {
+                values: [e.target.value]
+              })}
+            >
+              {column.filter.options.map(option => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          );
+        }
+        
+        // Add more filter types as needed
+      })}
+    </div>
+  );
+}
+```
+
+## Integration with Ant Design
+
+```tsx
+import { Input, Select, Tag, Button } from 'antd';
+import { FilterOutlined } from '@ant-design/icons';
+
+function AntDesignFilters({ columns, filterManager }) {
+  const filters = filterManager.getFilters();
+  
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {/* Active Filters */}
+      {filters.map(filter => {
+        const column = columns.find(c => c.id === filter.columnId);
+        return (
+          <Tag 
+            key={filter.columnId}
+            closable
+            onClose={() => filterManager.removeFilter(filter.columnId)}
+          >
+            {column.displayName}: {filter.values.join(', ')}
+          </Tag>
+        );
+      })}
+      
+      {/* Add Filter Button */}
+      <Select
+        placeholder={<><FilterOutlined /> Add Filter</>}
+        style={{ width: 200 }}
+        onChange={(columnId) => {
+          const column = columns.find(c => c.id === columnId);
+          filterManager.addFilter({
+            columnId,
+            type: column.type,
+            operator: 'contains',
+            values: []
+          });
+        }}
+      >
+        {columns
+          .filter(col => col.filterable)
+          .map(column => (
+            <Select.Option key={column.id} value={column.id}>
+              {column.displayName}
+            </Select.Option>
+          ))}
+      </Select>
+    </div>
+  );
+}
+```
+
+## Vanilla JavaScript Example
+
+```tsx
+// For non-React applications
+import { FilterManager, createAdapter } from '@better-tables/core';
+
+class VanillaTableFilter {
+  constructor(columns, adapter) {
+    this.columns = columns;
+    this.adapter = adapter;
+    this.filterManager = new FilterManager(columns);
+    
+    // Subscribe to filter changes
+    this.filterManager.subscribe(this.onFiltersChange.bind(this));
+  }
+  
+  async onFiltersChange(filters) {
+    // Fetch new data when filters change
+    const result = await this.adapter.fetchData({
+      filters,
+      pagination: { page: 1, limit: 20 }
+    });
+    
+    this.renderTable(result.data);
+  }
+  
+  renderFilterUI() {
+    const container = document.getElementById('filters');
+    
+    // Render add filter button
+    const select = document.createElement('select');
+    select.addEventListener('change', (e) => {
+      const columnId = e.target.value;
+      if (columnId) {
+        this.filterManager.addFilter({
+          columnId,
+          type: this.getColumnType(columnId),
+          operator: 'contains',
+          values: []
+        });
+      }
+    });
+    
+    // Add column options
+    this.columns
+      .filter(col => col.filterable)
+      .forEach(column => {
+        const option = document.createElement('option');
+        option.value = column.id;
+        option.textContent = column.displayName;
+        select.appendChild(option);
+      });
+    
+    container.appendChild(select);
+    
+    // Render active filters
+    this.filterManager.getFilters().forEach(filter => {
+      this.renderFilterInput(filter);
+    });
+  }
+  
+  renderFilterInput(filter) {
+    const column = this.columns.find(c => c.id === filter.columnId);
+    const input = document.createElement('input');
+    
+    input.type = 'text';
+    input.placeholder = `Filter ${column.displayName}...`;
+    input.value = filter.values[0] || '';
+    
+    input.addEventListener('input', (e) => {
+      this.filterManager.updateFilter(filter.columnId, {
+        values: [e.target.value]
+      });
+    });
+    
+    document.getElementById('filter-inputs').appendChild(input);
+  }
+}
+```
+
+## Advanced Integration Tips
+
+### 1. Custom Filter Components
+
+Create your own filter input components that work with Better Tables:
+
+```tsx
+// Custom date range picker
+function CustomDateRangePicker({ filter, onChange }) {
+  return (
+    <MyDateRangePicker
+      startDate={filter.values[0]}
+      endDate={filter.values[1]}
+      onChange={(start, end) => {
+        onChange({
+          ...filter,
+          values: [start, end]
+        });
+      }}
+    />
+  );
+}
+```
+
+### 2. Filter Persistence
+
+Save and restore filters:
+
+```tsx
+// Save filters to localStorage
+const saveFilters = (filters) => {
+  localStorage.setItem('table-filters', JSON.stringify(filters));
+};
+
+// Restore filters on load
+const savedFilters = JSON.parse(localStorage.getItem('table-filters') || '[]');
+filterManager.setFilters(savedFilters);
+```
+
+### 3. URL State Sync
+
+Keep filters in sync with URL:
+
+```tsx
+import { useSearchParams } from 'react-router-dom';
+
+function useURLFilters(filterManager) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Load filters from URL on mount
+  useEffect(() => {
+    const urlFilters = searchParams.get('filters');
+    if (urlFilters) {
+      filterManager.deserialize(urlFilters);
+    }
+  }, []);
+  
+  // Update URL when filters change
+  useEffect(() => {
+    const unsubscribe = filterManager.subscribe((filters) => {
+      if (filters.length > 0) {
+        searchParams.set('filters', filterManager.serialize());
+      } else {
+        searchParams.delete('filters');
+      }
+      setSearchParams(searchParams);
+    });
+    
+    return unsubscribe;
+  }, [filterManager]);
+}
+```
+
+## Type-Safe Filter Values
+
+Better Tables provides full TypeScript support for filter values:
+
+```tsx
+// The filter values are typed based on column type
+const textFilter: FilterState = {
+  columnId: 'name',
+  type: 'text',
+  operator: 'contains',
+  values: ['John'] // string[]
+};
+
+const numberFilter: FilterState = {
+  columnId: 'age',
+  type: 'number',
+  operator: 'between',
+  values: [18, 65] // number[]
+};
+
+const dateFilter: FilterState = {
+  columnId: 'createdAt',
+  type: 'date',
+  operator: 'after',
+  values: [new Date()] // Date[]
+};
+```
+
+## Summary
+
+Better Tables provides complete flexibility in how you build your UI:
+
+1. **Use our UI package** (`@better-tables/ui`) for a ready-to-use solution with shadcn/ui
+2. **Integrate with your existing UI library** using our hooks and managers
+3. **Build completely custom UI** while leveraging our filter logic and type safety
+
+The core package handles all the complex logic, leaving you free to create the perfect UI for your application. 
