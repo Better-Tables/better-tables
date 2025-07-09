@@ -86,7 +86,7 @@ export function MyTable() {
       <FilterBar 
         columns={columns}
         filters={filterManager.getFilters()}
-        onFiltersChange={filterManager.updateFilters}
+        onFiltersChange={filterManager.setFilters}
       />
       <Table data={data} columns={columns} />
     </>
