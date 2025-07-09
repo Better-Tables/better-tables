@@ -4,8 +4,16 @@ import * as React from 'react';
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFilterValidation } from '@/hooks/use-filter-validation';
+import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { 
+  getNumberInputConfig, 
+  parseFormattedNumber, 
+  validateNumberInput,
+  getFormattedPlaceholder,
+  getNumberInputStep,
+  formatNumber
+} from '@/lib/number-format-utils';
 
 export interface NumberFilterInputProps<TData = any> {
   /** Filter state */
@@ -24,12 +32,18 @@ export function NumberFilterInput<TData = any>({
   onChange,
   disabled = false,
 }: NumberFilterInputProps<TData>) {
+  // Get number input configuration from column
+  const numberConfig = React.useMemo(() => 
+    getNumberInputConfig(column.type, column.meta), 
+    [column.type, column.meta]
+  );
+
   const [values, setValues] = React.useState(() => {
     const filterValues = filter.values || [];
     return {
-      single: filterValues[0] || '',
-      min: filterValues[0] || '',
-      max: filterValues[1] || '',
+      single: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
+      min: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
+      max: filterValues[1] ? formatNumber(filterValues[1], numberConfig) : '',
     };
   });
   
@@ -40,17 +54,17 @@ export function NumberFilterInput<TData = any>({
   const validationValues = React.useMemo(() => {
     if (needsNoValues) return [];
     if (needsTwoValues) {
-      const min = parseFloat(values.min);
-      const max = parseFloat(values.max);
+      const min = parseFormattedNumber(values.min, numberConfig);
+      const max = parseFormattedNumber(values.max, numberConfig);
       const validValues = [];
-      if (!isNaN(min)) validValues.push(min);
-      if (!isNaN(max)) validValues.push(max);
+      if (min !== null) validValues.push(min);
+      if (max !== null) validValues.push(max);
       return validValues;
     } else {
-      const single = parseFloat(values.single);
-      return !isNaN(single) ? [single] : [];
+      const single = parseFormattedNumber(values.single, numberConfig);
+      return single !== null ? [single] : [];
     }
-  }, [values, needsTwoValues, needsNoValues]);
+  }, [values, needsTwoValues, needsNoValues, numberConfig]);
   
   // Validate the current values
   const validation = useFilterValidation({
@@ -59,33 +73,72 @@ export function NumberFilterInput<TData = any>({
     values: validationValues,
     immediate: validationValues.length > 0 || needsNoValues,
   });
+
+  // Additional number-specific validation
+  const numberValidation = React.useMemo(() => {
+    if (needsNoValues) return { isValid: true };
+    
+    if (needsTwoValues) {
+      const minValidation = validateNumberInput(values.min, numberConfig);
+      const maxValidation = validateNumberInput(values.max, numberConfig);
+      
+      if (!minValidation.isValid) return minValidation;
+      if (!maxValidation.isValid) return maxValidation;
+      
+      // Check if min <= max
+      const minNum = parseFormattedNumber(values.min, numberConfig);
+      const maxNum = parseFormattedNumber(values.max, numberConfig);
+      if (minNum !== null && maxNum !== null && minNum > maxNum) {
+        return { isValid: false, error: 'Minimum value must be less than or equal to maximum value' };
+      }
+    } else {
+      return validateNumberInput(values.single, numberConfig);
+    }
+    
+    return { isValid: true };
+  }, [values, needsNoValues, needsTwoValues, numberConfig]);
+
+  // Combined validation
+  const finalValidation = React.useMemo(() => {
+    if (!validation.isValid) return validation;
+    if (!numberValidation.isValid) return numberValidation;
+    return { isValid: true };
+  }, [validation, numberValidation]);
   
   // Update parent when values change
   React.useEffect(() => {
     if (needsNoValues) {
       onChange([]);
     } else if (needsTwoValues) {
-      const min = parseFloat(values.min);
-      const max = parseFloat(values.max);
+      const min = parseFormattedNumber(values.min, numberConfig);
+      const max = parseFormattedNumber(values.max, numberConfig);
       const newValues = [];
-      if (!isNaN(min)) newValues.push(min);
-      if (!isNaN(max)) newValues.push(max);
+      if (min !== null) newValues.push(min);
+      if (max !== null) newValues.push(max);
       onChange(newValues);
     } else {
-      const single = parseFloat(values.single);
-      onChange(!isNaN(single) ? [single] : []);
+      const single = parseFormattedNumber(values.single, numberConfig);
+      onChange(single !== null ? [single] : []);
     }
-  }, [values, onChange, needsTwoValues, needsNoValues]);
+  }, [values, onChange, needsTwoValues, needsNoValues, numberConfig]);
   
   // Sync local values when filter values change externally
   React.useEffect(() => {
     const filterValues = filter.values || [];
     setValues({
-      single: filterValues[0] || '',
-      min: filterValues[0] || '',
-      max: filterValues[1] || '',
+      single: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
+      min: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
+      max: filterValues[1] ? formatNumber(filterValues[1], numberConfig) : '',
     });
-  }, [filter.values]);
+  }, [filter.values, numberConfig]);
+  
+  // Keyboard navigation
+  const keyboardNavigation = useKeyboardNavigation({
+    onEscape: () => {
+      // Clear current input on escape
+      setValues(prev => ({ ...prev, single: '', min: '', max: '' }));
+    },
+  });
   
   const handleSingleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues(prev => ({ ...prev, single: e.target.value }));
@@ -118,13 +171,16 @@ export function NumberFilterInput<TData = any>({
               type="number"
               value={values.min}
               onChange={handleMinChange}
-              placeholder="0"
-              min={column.filter?.min}
-              max={column.filter?.max}
+              onKeyDown={keyboardNavigation.onKeyDown}
+              placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Min value' })}
+              min={numberConfig.min}
+              max={numberConfig.max}
+              step={getNumberInputStep(numberConfig)}
               disabled={disabled}
               className={cn(
-                !validation.isValid && values.min && "border-destructive focus-visible:ring-destructive"
+                !finalValidation.isValid && values.min && "border-destructive focus-visible:ring-destructive"
               )}
+              {...keyboardNavigation.ariaAttributes}
             />
           </div>
           <div className="space-y-1">
@@ -133,18 +189,21 @@ export function NumberFilterInput<TData = any>({
               type="number"
               value={values.max}
               onChange={handleMaxChange}
-              placeholder="100"
-              min={column.filter?.min}
-              max={column.filter?.max}
+              onKeyDown={keyboardNavigation.onKeyDown}
+              placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Max value' })}
+              min={numberConfig.min}
+              max={numberConfig.max}
+              step={getNumberInputStep(numberConfig)}
               disabled={disabled}
               className={cn(
-                !validation.isValid && values.max && "border-destructive focus-visible:ring-destructive"
+                !finalValidation.isValid && values.max && "border-destructive focus-visible:ring-destructive"
               )}
+              {...keyboardNavigation.ariaAttributes}
             />
           </div>
         </div>
-        {!validation.isValid && validation.error && validationValues.length > 0 && (
-          <p className="text-sm text-destructive">{validation.error}</p>
+        {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (
+          <p className="text-sm text-destructive">{finalValidation.error}</p>
         )}
       </div>
     );
@@ -157,16 +216,19 @@ export function NumberFilterInput<TData = any>({
         type="number"
         value={values.single}
         onChange={handleSingleChange}
-        placeholder={`Enter ${column.displayName}...`}
-        min={column.filter?.min}
-        max={column.filter?.max}
+        onKeyDown={keyboardNavigation.onKeyDown}
+        placeholder={getFormattedPlaceholder(numberConfig)}
+        min={numberConfig.min}
+        max={numberConfig.max}
+        step={getNumberInputStep(numberConfig)}
         disabled={disabled}
         className={cn(
-          !validation.isValid && values.single && "border-destructive focus-visible:ring-destructive"
+          !finalValidation.isValid && values.single && "border-destructive focus-visible:ring-destructive"
         )}
+        {...keyboardNavigation.ariaAttributes}
       />
-      {!validation.isValid && validation.error && validationValues.length > 0 && (
-        <p className="text-sm text-destructive">{validation.error}</p>
+      {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (
+        <p className="text-sm text-destructive">{finalValidation.error}</p>
       )}
     </div>
   );

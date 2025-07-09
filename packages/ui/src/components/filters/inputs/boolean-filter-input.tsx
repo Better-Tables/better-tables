@@ -57,7 +57,7 @@ export function BooleanFilterInput<TData = any>({
   };
   
   return (
-    <div className="text-sm text-muted-foreground">
+    <div className={`text-sm text-muted-foreground ${disabled ? 'opacity-50' : ''}`}>
       {getDescription()}
     </div>
   );

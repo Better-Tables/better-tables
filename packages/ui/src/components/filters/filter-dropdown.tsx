@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
+import { useKeyboardNavigation, useFilterDropdownNavigation } from '@/hooks';
 
 export interface FilterDropdownProps<TData = any> {
   /** Available columns to filter */
@@ -149,10 +150,39 @@ export function FilterDropdown<TData = any>({
     }
     onOpenChange?.(false);
   }, [disabled, onSelect, onSearchChange, onOpenChange]);
+
+  // Keyboard navigation for dropdown
+  const dropdownNavigation = useFilterDropdownNavigation(
+    open || false,
+    () => onOpenChange?.(true),
+    () => onOpenChange?.(false),
+    (index) => {
+      // Find the column at the given index
+      const allColumns = groupedColumns.reduce((acc, group) => acc.concat(group.columns), [] as ColumnDefinition<TData>[]);
+      const column = allColumns[index];
+      if (column) {
+        handleSelect(column.id);
+      }
+    }
+  );
+
+  // Enhanced keyboard navigation
+  const keyboardNavigation = useKeyboardNavigation({
+    onEscape: () => onOpenChange?.(false),
+    onEnter: () => {
+      if (!open) {
+        onOpenChange?.(true);
+      }
+    },
+    shortcuts: {
+      'Ctrl+k': () => onOpenChange?.(true),
+      'Ctrl+f': () => onOpenChange?.(true),
+    },
+  });
   
   // Command content component for reuse
   const CommandContent = (
-    <Command>
+    <Command onKeyDown={dropdownNavigation.handleKeyDown}>
       {searchable && (
         <CommandInput
           placeholder={searchPlaceholder}
@@ -195,7 +225,9 @@ export function FilterDropdown<TData = any>({
     return (
       <Dialog open={open} onOpenChange={disabled ? undefined : onOpenChange}>
         <DialogTrigger asChild disabled={disabled}>
-          {children}
+          <div onKeyDown={keyboardNavigation.onKeyDown} {...keyboardNavigation.ariaAttributes}>
+            {children}
+          </div>
         </DialogTrigger>
         <DialogContent className="max-w-sm backdrop-blur-sm">
           <DialogHeader>
@@ -212,7 +244,9 @@ export function FilterDropdown<TData = any>({
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
       <PopoverTrigger asChild disabled={disabled}>
-        {children}
+        <div onKeyDown={keyboardNavigation.onKeyDown} {...keyboardNavigation.ariaAttributes}>
+          {children}
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
         {CommandContent}
