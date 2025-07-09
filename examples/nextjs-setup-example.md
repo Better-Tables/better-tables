@@ -170,7 +170,7 @@ export default function UsersPage() {
       <FilterBar
         columns={columns}
         filters={filterManager.getFilters()}
-        onFiltersChange={filterManager.updateFilters}
+        onFiltersChange={filterManager.setFilters}
         className="mb-6"
       />
       
