@@ -13,6 +13,7 @@ export * from './components/ui/separator';
 export * from './components/ui/switch';
 export * from './components/ui/checkbox';
 export * from './components/ui/calendar';
+export * from './components/ui/skeleton';
 
 // Export all filter components
 export * from './components/filters/filter-bar';
@@ -31,11 +32,11 @@ export * from './components/filters/inputs/boolean-filter-input';
 export * from './components/filters/inputs/option-filter-input';
 export * from './components/filters/inputs/multi-option-filter-input';
 
-// Export table components (to be created)
-// export * from './components/table/table';
-// export * from './components/table/table-header';
-// export * from './components/table/table-body';
-// export * from './components/table/table-footer';
+// Export table components
+export * from './components/table/table';
+export * from './components/table/empty-state';
+export * from './components/table/error-state';
+export * from './components/table/table-pagination';
 
 // Export hooks
 export * from './hooks'; 

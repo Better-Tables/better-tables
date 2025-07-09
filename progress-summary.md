@@ -85,6 +85,7 @@
 - [x] **Keyboard Navigation** - Implement keyboard navigation and accessibility features for filter dropdowns and inputs
 - [x] **Enhanced Number Formatting** - Add number formatting, decimal places, and currency support in NumberFilterInput based on column type
 - [x] **Date Range Presets** - Add date range presets (today, this week, last 30 days) in DateFilterInput
+- [x] **Filter Dropdown** - Add filter dropdown with group support and keyboard navigation
 
 ---
 
@@ -147,15 +148,14 @@ better-tables/
 - [ ] **Bulk Filter Actions** - Add bulk filter actions (clear all, apply preset, export filters) in FilterBar component - premium feature?
 - [ ] **Filter Search Highlighting** - Implement search term highlighting in filter dropdowns and option lists - premium feature?
 - [ ] **Custom Filter Components** - Support custom filter components through column.filter.customComponent configuration - premium feature?
-- [ ] **Filter Groups UI** - Enhance FilterDropdown to properly display filter groups - should  be a paged approach with back button and not collapsible
 - [ ] **Filter Presets** - Add filter presets/saved filters functionality for commonly used filter combinations - premium feature?
+- [ ] **Column Resizing and Reordering** - Add column resizing and reordering functionality to the table component - premium feature?
+- [ ] **Virtual Scrolling** - Add virtual scrolling functionality to the table component - premium feature?
+- [ ] **Filter Export/Import** - Implement filter configuration export/import functionality for sharing filter setups - premium feature?
 
 ### **Lower Priority - Polish & Advanced**
 - [ ] **Filter Tests** - Create comprehensive unit tests for all filter components and their interactions
-- [ ] **Filter Export/Import** - Implement filter configuration export/import functionality for sharing filter setups - premium feature?
 - [ ] **Filter Documentation** - Create comprehensive documentation and examples for all filter components and configurations
-- [ ] **Column Resizing and Reordering** - Add column resizing and reordering functionality to the table component - premium feature?
-- [ ] **Virtual Scrolling** - Add virtual scrolling functionality to the table component - premium feature?
 - [ ] **Filter Tooltips** - Add helpful tooltips and descriptions for filter operators and complex filters
 
 ### **Next Major Phase - Core Table Implementation**
