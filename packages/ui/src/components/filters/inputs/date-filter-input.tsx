@@ -6,12 +6,14 @@ import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { CalendarIcon, Clock } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
-import { useFilterValidation } from '@/hooks/use-filter-validation';
+import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
 import { formatDateWithConfig, formatDateRange } from '@/lib/date-utils';
+import { getDatePresetConfig, getCommonPresets, type DatePreset } from '@/lib/date-presets';
 
 export interface DateFilterInputProps<TData = any> {
   /** Filter state */
@@ -53,6 +55,29 @@ export function DateFilterInput<TData = any>({
       relativeOptions: format?.relativeOptions,
     };
   }, [column.meta?.dateFormat]);
+
+  // Get date preset configuration
+  const presetConfig = React.useMemo(() => 
+    getDatePresetConfig(column.meta), 
+    [column.meta]
+  );
+
+  // Get presets to show
+  const presets = React.useMemo(() => {
+    if (presetConfig.presets && presetConfig.presets.length > 0) {
+      return presetConfig.presets.slice(0, presetConfig.maxPresets || 12);
+    }
+    return getCommonPresets();
+  }, [presetConfig]);
+
+  // Keyboard navigation
+  const keyboardNavigation = useKeyboardNavigation({
+    onEscape: () => {
+      // Clear dates on escape
+      setSingleDate(undefined);
+      setDateRange(undefined);
+    },
+  });
 
   const [singleDate, setSingleDate] = React.useState<Date | undefined>(() => {
     return filter.values[0] ? new Date(filter.values[0]) : undefined;
@@ -118,6 +143,42 @@ export function DateFilterInput<TData = any>({
     }
   }, [filter.values, needsDateRange]);
 
+  // Handle preset selection
+  const handlePresetSelect = React.useCallback((preset: DatePreset) => {
+    const range = preset.getRange();
+    
+    if (needsDateRange) {
+      setDateRange({ from: range.from, to: range.to });
+    } else {
+      // For single date, use the from date
+      setSingleDate(range.from);
+    }
+  }, [needsDateRange]);
+
+  // Preset component
+  const PresetButtons = React.memo(() => (
+    <div className="flex flex-col gap-1 p-2">
+      <div className="flex items-center gap-2 mb-2">
+        <Clock className="h-4 w-4 text-muted-foreground" />
+        <Label className="text-xs font-medium text-muted-foreground">Quick Select</Label>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        {presets.map((preset) => (
+          <Button
+            key={preset.id}
+            variant="ghost"
+            size="sm"
+            onClick={() => handlePresetSelect(preset)}
+            className="justify-start text-xs h-8 px-2 py-1"
+            title={preset.description}
+          >
+            {preset.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  ));
+
   if (needsNoValues) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -140,6 +201,8 @@ export function DateFilterInput<TData = any>({
                 !validation.isValid && validationValues.length > 0 && 'border-destructive',
               )}
               disabled={disabled}
+              onKeyDown={keyboardNavigation.onKeyDown}
+              {...keyboardNavigation.ariaAttributes}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {dateRange?.from ? (
@@ -150,15 +213,19 @@ export function DateFilterInput<TData = any>({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={dateRange?.from}
-              selected={dateRange}
-              onSelect={disabled ? undefined : setDateRange}
-              numberOfMonths={2}
-              disabled={disabled}
-            />
+            <div className="flex">
+              <PresetButtons />
+              <Separator orientation="vertical" className="h-auto" />
+              <Calendar
+                autoFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={disabled ? undefined : setDateRange}
+                numberOfMonths={2}
+                disabled={disabled}
+              />
+            </div>
           </PopoverContent>
         </Popover>
         {!validation.isValid && validation.error && validationValues.length > 0 && (
@@ -181,6 +248,8 @@ export function DateFilterInput<TData = any>({
               !validation.isValid && validationValues.length > 0 && 'border-destructive',
             )}
             disabled={disabled}
+            onKeyDown={keyboardNavigation.onKeyDown}
+            {...keyboardNavigation.ariaAttributes}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {singleDate ? (
@@ -191,13 +260,17 @@ export function DateFilterInput<TData = any>({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={singleDate}
-            onSelect={disabled ? undefined : setSingleDate}
-            initialFocus
-            disabled={disabled}
-          />
+          <div className="flex">
+            <PresetButtons />
+            <Separator orientation="vertical" className="h-auto" />
+            <Calendar
+              mode="single"
+              selected={singleDate}
+              onSelect={disabled ? undefined : setSingleDate}
+              initialFocus
+              disabled={disabled}
+            />
+          </div>
         </PopoverContent>
       </Popover>
       {!validation.isValid && validation.error && validationValues.length > 0 && (
