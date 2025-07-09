@@ -82,6 +82,9 @@
 - [x] **Performance Optimizations**: React.memo, useCallback, and useMemo throughout filter components
 - [x] **Disabled State Handling**: Proper disabled prop propagation across all components
 - [x] **Production Polish**: Removed debug code, fixed lint issues, clean TypeScript implementation
+- [x] **Keyboard Navigation** - Implement keyboard navigation and accessibility features for filter dropdowns and inputs
+- [x] **Enhanced Number Formatting** - Add number formatting, decimal places, and currency support in NumberFilterInput based on column type
+- [x] **Date Range Presets** - Add date range presets (today, this week, last 30 days) in DateFilterInput
 
 ---
 
@@ -139,11 +142,6 @@ better-tables/
 ---
 
 ## 📋 Current TODO List - Remaining Filter Features
-
-### **High Priority - Filter Enhancements** 
-- [ ] **Keyboard Navigation** - Implement keyboard navigation and accessibility features for filter dropdowns and inputs
-- [ ] **Enhanced Number Formatting** - Add number formatting, decimal places, and currency support in NumberFilterInput based on column type
-- [ ] **Date Range Presets** - Add date range presets (today, this week, last 30 days) in DateFilterInput
 
 ### **Medium Priority - Advanced Features**
 - [ ] **Bulk Filter Actions** - Add bulk filter actions (clear all, apply preset, export filters) in FilterBar component - premium feature?

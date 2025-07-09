@@ -253,13 +253,12 @@ export class FilterURLSerializer {
   }
 
   /**
-   * Simple compression using run-length encoding for repeated patterns
+   * Safe compression using key shortening only
    */
   private static compressData(str: string): string {
-    // Simple compression - just remove repetitive patterns for now
-    // In a real implementation, you'd use a proper compression library
+    // Only use safe key shortening - this provides significant URL length reduction
+    // without the risk of data corruption from run-length encoding
     return str
-      .replace(/(.)\1{3,}/g, (match, char) => `${char}*${match.length}`)
       .replace(/("columnId")/g, '"c"')
       .replace(/("type")/g, '"t"')
       .replace(/("operator")/g, '"o"')
@@ -269,11 +268,11 @@ export class FilterURLSerializer {
   }
 
   /**
-   * Decompress data
+   * Decompress data by reversing key shortening
    */
   private static decompressData(str: string): string {
+    // Only reverse the safe key shortening - no unsafe run-length decoding
     return str
-      .replace(/(.)\*(\d+)/g, (char, count) => char.repeat(parseInt(count)))
       .replace(/("c")/g, '"columnId"')
       .replace(/("t")/g, '"type"')
       .replace(/("o")/g, '"operator"')
