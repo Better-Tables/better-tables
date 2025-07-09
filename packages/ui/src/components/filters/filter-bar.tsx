@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import type { ColumnDefinition, FilterState, FilterGroup, FilterOperator, ColumnType } from '@better-tables/core';
+import type { ColumnDefinition, FilterState, FilterGroup } from '@better-tables/core';
+import { getDefaultOperatorsForType } from '@better-tables/core';
 import { cn } from '@/lib/utils';
 import { FilterButton } from './filter-button';
 import { FilterDropdown } from './filter-dropdown';
@@ -118,7 +119,7 @@ export function FilterBar<TData = any>({
     const newFilter: FilterState = {
       columnId,
       type: column.type,
-      operator: getDefaultOperator(column.type),
+      operator: getDefaultOperatorsForType(column.type)[0], // Use first default operator from core
       values: [],
     };
 
@@ -239,23 +240,4 @@ export function FilterBar<TData = any>({
   );
 }
 
-function getDefaultOperator(columnType: ColumnType): FilterOperator {
-  switch (columnType) {
-    case 'text':
-      return 'contains';
-    case 'number':
-    case 'currency':
-    case 'percentage':
-      return 'equals';
-    case 'date':
-      return 'is';
-    case 'boolean':
-      return 'isTrue';
-    case 'option':
-      return 'is';
-    case 'multiOption':
-      return 'includes';
-    default:
-      return 'equals';
-  }
-}
+// Default operator logic moved to core package - use getDefaultOperatorsForType()[0]
