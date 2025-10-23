@@ -1,10 +1,9 @@
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   TableConfig,
   ColumnDefinition,
   FilterState,
   PaginationState,
-  FetchDataParams,
 } from '@better-tables/core';
 import { FilterBar } from '../filters/filter-bar';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table';
@@ -16,14 +15,26 @@ import { cn } from '../../lib/utils';
 
 /**
  * UI-specific props for the BetterTable component
- * Business logic is handled by TableConfig from core
+ * Data fetching is handled by parent component
  */
 export interface BetterTableProps<TData = any> extends TableConfig<TData> {
+  /** Table data */
+  data: TData[];
+
+  /** Loading state */
+  loading?: boolean;
+
+  /** Error state */
+  error?: Error | null;
+
   /** Current filter state */
   filters?: FilterState[];
 
   /** Filter change handler */
   onFiltersChange?: (filters: FilterState[]) => void;
+
+  /** Total number of items (for pagination) */
+  totalCount?: number;
 
   /** Current pagination state */
   paginationState?: PaginationState;
@@ -44,24 +55,32 @@ export interface BetterTableProps<TData = any> extends TableConfig<TData> {
 
   /** Custom empty message override */
   emptyMessage?: string;
+
+  /** Retry handler for error state */
+  onRetry?: () => void;
 }
 
 export function BetterTable<TData = any>({
-  // Core table config
+  // Core table config (minus adapter)
   id,
   name,
   columns,
-  adapter,
   features = {},
   rowConfig,
   emptyState,
   loadingState,
   errorState,
 
+  // Data props (handled by parent)
+  data,
+  loading = false,
+  error = null,
+  totalCount,
+
   // UI-specific props
   filters = [],
   onFiltersChange,
-  paginationState = { page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrev: false },
+  paginationState,
   onPageChange,
   onPageSizeChange,
   selectedRows = new Set(),
@@ -69,6 +88,7 @@ export function BetterTable<TData = any>({
   className,
   onRowClick,
   emptyMessage,
+  onRetry,
   ...props
 }: BetterTableProps<TData>) {
   const {
@@ -77,14 +97,6 @@ export function BetterTable<TData = any>({
     pagination: paginationEnabled = true,
     rowSelection = false,
   } = features;
-
-  // State for data fetching
-  const [data, setData] = useState<TData[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Note: FilterManager is created and managed by core, not UI
-  // The adapter handles all filter logic server-side
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
@@ -134,34 +146,6 @@ export function BetterTable<TData = any>({
   const handleClearFilters = useCallback(() => {
     onFiltersChange?.([]);
   }, [onFiltersChange]);
-
-  // Fetch data using adapter
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const params: FetchDataParams = {
-          pagination: { page: paginationState.page, limit: paginationState.limit },
-          filters,
-          // TODO: Add sorting params when implemented
-        };
-
-        const result = await adapter.fetchData(params);
-        setData(result.data);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch data'));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [adapter, filters, paginationState.page, paginationState.limit]);
-
-  // Data is already filtered by the adapter
-  const filteredData = data;
 
   // Render loading state
   if (loading) {
@@ -215,31 +199,36 @@ export function BetterTable<TData = any>({
   if (error) {
     return (
       <div className={cn('space-y-4', className)}>
-        <ErrorState error={error} />
-      </div>
-    );
-  }
-
-  // Render empty state
-  if (filteredData.length === 0) {
-    return (
-      <div className={cn('space-y-4', className)}>
-        {filtering && (
-          <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
-        )}
-        <EmptyState
-          message={emptyMessage || emptyState?.description || 'No data available'}
-          hasFilters={filters.length > 0}
-          onClearFilters={handleClearFilters}
+        <ErrorState 
+          error={error} 
+          onRetry={onRetry}
+          title={errorState?.title}
         />
       </div>
     );
   }
 
+  // Render empty state
+  if (data.length === 0) {
+    return (
+      <div className={cn('space-y-4', className)}>
+        {filtering && (
+          <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
+        )}
+                  <EmptyState
+            message={emptyMessage || emptyState?.description || 'No data available'}
+            hasFilters={filters.length > 0}
+            onClearFilters={handleClearFilters}
+            icon={emptyState?.icon as React.ComponentType<any>}
+          />
+      </div>
+    );
+  }
+
   const allSelected =
-    filteredData.length > 0 &&
-    filteredData.every((row, index) => selectedRows.has(getRowId(row, index)));
-  const someSelected = filteredData.some((row, index) => selectedRows.has(getRowId(row, index)));
+    data.length > 0 &&
+    data.every((row, index) => selectedRows.has(getRowId(row, index)));
+  const someSelected = data.some((row, index) => selectedRows.has(getRowId(row, index)));
 
   return (
     <div className={cn('space-y-4', className)} {...props}>
@@ -282,7 +271,7 @@ export function BetterTable<TData = any>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.map((row, index) => {
+            {data.map((row, index) => {
               const rowId = getRowId(row, index);
               const isSelected = selectedRows.has(rowId);
 
@@ -301,7 +290,7 @@ export function BetterTable<TData = any>({
                         type="checkbox"
                         checked={isSelected}
                         onChange={e => handleRowSelection(rowId, e.target.checked)}
-                        className="rounded border-gray-300 text-primary focus:ring-proper"
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
                       />
                     </TableCell>
                   )}
@@ -343,7 +332,7 @@ export function BetterTable<TData = any>({
           onPageChange={onPageChange}
           pageSize={paginationState.limit}
           onPageSizeChange={onPageSizeChange}
-          totalItems={paginationState.totalPages * paginationState.limit}
+          totalItems={totalCount ?? paginationState.totalPages * paginationState.limit}
         />
       )}
     </div>

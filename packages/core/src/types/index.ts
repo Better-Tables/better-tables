@@ -5,4 +5,6 @@ export * from './filter-operators';
 export * from './adapter';
 export * from './pagination';
 export * from './sorting';
+export * from './selection';
+export * from './virtualization';
 export * from './common';

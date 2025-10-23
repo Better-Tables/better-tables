@@ -37,6 +37,7 @@ export * from './components/table/table';
 export * from './components/table/empty-state';
 export * from './components/table/error-state';
 export * from './components/table/table-pagination';
+export * from './components/table/virtualized-table';
 
 // Export hooks
 export * from './hooks'; 
