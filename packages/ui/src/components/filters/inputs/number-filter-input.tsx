@@ -1,19 +1,19 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
-import { cn } from '@/lib/utils';
-import { 
-  getNumberInputConfig, 
-  parseFormattedNumber, 
-  validateNumberInput,
+import {
+  formatNumber,
   getFormattedPlaceholder,
+  getNumberInputConfig,
   getNumberInputStep,
-  formatNumber
+  parseFormattedNumber,
+  validateNumberInput,
 } from '@/lib/number-format-utils';
+import { cn } from '@/lib/utils';
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import * as React from 'react';
 
 export interface NumberFilterInputProps<TData = any> {
   /** Filter state */
@@ -33,8 +33,8 @@ export function NumberFilterInput<TData = any>({
   disabled = false,
 }: NumberFilterInputProps<TData>) {
   // Get number input configuration from column
-  const numberConfig = React.useMemo(() => 
-    getNumberInputConfig(column.type, column.meta), 
+  const numberConfig = React.useMemo(
+    () => getNumberInputConfig(column.type, column.meta),
     [column.type, column.meta]
   );
 
@@ -46,10 +46,10 @@ export function NumberFilterInput<TData = any>({
       max: filterValues[1] ? formatNumber(filterValues[1], numberConfig) : '',
     };
   });
-  
+
   const needsTwoValues = filter.operator === 'between' || filter.operator === 'notBetween';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
-  
+
   // Prepare values for validation
   const validationValues = React.useMemo(() => {
     if (needsNoValues) return [];
@@ -65,7 +65,7 @@ export function NumberFilterInput<TData = any>({
       return single !== null ? [single] : [];
     }
   }, [values, needsTwoValues, needsNoValues, numberConfig]);
-  
+
   // Validate the current values
   const validation = useFilterValidation({
     filter,
@@ -77,24 +77,27 @@ export function NumberFilterInput<TData = any>({
   // Additional number-specific validation
   const numberValidation = React.useMemo(() => {
     if (needsNoValues) return { isValid: true };
-    
+
     if (needsTwoValues) {
       const minValidation = validateNumberInput(values.min, numberConfig);
       const maxValidation = validateNumberInput(values.max, numberConfig);
-      
+
       if (!minValidation.isValid) return minValidation;
       if (!maxValidation.isValid) return maxValidation;
-      
+
       // Check if min <= max
       const minNum = parseFormattedNumber(values.min, numberConfig);
       const maxNum = parseFormattedNumber(values.max, numberConfig);
       if (minNum !== null && maxNum !== null && minNum > maxNum) {
-        return { isValid: false, error: 'Minimum value must be less than or equal to maximum value' };
+        return {
+          isValid: false,
+          error: 'Minimum value must be less than or equal to maximum value',
+        };
       }
     } else {
       return validateNumberInput(values.single, numberConfig);
     }
-    
+
     return { isValid: true };
   }, [values, needsNoValues, needsTwoValues, numberConfig]);
 
@@ -104,7 +107,7 @@ export function NumberFilterInput<TData = any>({
     if (!numberValidation.isValid) return numberValidation;
     return { isValid: true };
   }, [validation, numberValidation]);
-  
+
   // Update parent when values change
   React.useEffect(() => {
     if (needsNoValues) {
@@ -121,7 +124,7 @@ export function NumberFilterInput<TData = any>({
       onChange(single !== null ? [single] : []);
     }
   }, [values, onChange, needsTwoValues, needsNoValues, numberConfig]);
-  
+
   // Sync local values when filter values change externally
   React.useEffect(() => {
     const filterValues = filter.values || [];
@@ -131,35 +134,33 @@ export function NumberFilterInput<TData = any>({
       max: filterValues[1] ? formatNumber(filterValues[1], numberConfig) : '',
     });
   }, [filter.values, numberConfig]);
-  
+
   // Keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({
     onEscape: () => {
       // Clear current input on escape
-      setValues(prev => ({ ...prev, single: '', min: '', max: '' }));
+      setValues((prev) => ({ ...prev, single: '', min: '', max: '' }));
     },
   });
-  
+
   const handleSingleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValues(prev => ({ ...prev, single: e.target.value }));
+    setValues((prev) => ({ ...prev, single: e.target.value }));
   };
-  
+
   const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValues(prev => ({ ...prev, min: e.target.value }));
+    setValues((prev) => ({ ...prev, min: e.target.value }));
   };
-  
+
   const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValues(prev => ({ ...prev, max: e.target.value }));
+    setValues((prev) => ({ ...prev, max: e.target.value }));
   };
-  
+
   if (needsNoValues) {
     return (
-      <div className="text-sm text-muted-foreground">
-        This filter doesn't require a value.
-      </div>
+      <div className="text-sm text-muted-foreground">This filter doesn't require a value.</div>
     );
   }
-  
+
   if (needsTwoValues) {
     return (
       <div className="space-y-3">
@@ -178,7 +179,9 @@ export function NumberFilterInput<TData = any>({
               step={getNumberInputStep(numberConfig)}
               disabled={disabled}
               className={cn(
-                !finalValidation.isValid && values.min && "border-destructive focus-visible:ring-destructive"
+                !finalValidation.isValid &&
+                  values.min &&
+                  'border-destructive focus-visible:ring-destructive'
               )}
               {...keyboardNavigation.ariaAttributes}
             />
@@ -196,7 +199,9 @@ export function NumberFilterInput<TData = any>({
               step={getNumberInputStep(numberConfig)}
               disabled={disabled}
               className={cn(
-                !finalValidation.isValid && values.max && "border-destructive focus-visible:ring-destructive"
+                !finalValidation.isValid &&
+                  values.max &&
+                  'border-destructive focus-visible:ring-destructive'
               )}
               {...keyboardNavigation.ariaAttributes}
             />
@@ -208,7 +213,7 @@ export function NumberFilterInput<TData = any>({
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">Value</Label>
@@ -223,7 +228,9 @@ export function NumberFilterInput<TData = any>({
         step={getNumberInputStep(numberConfig)}
         disabled={disabled}
         className={cn(
-          !finalValidation.isValid && values.single && "border-destructive focus-visible:ring-destructive"
+          !finalValidation.isValid &&
+            values.single &&
+            'border-destructive focus-visible:ring-destructive'
         )}
         {...keyboardNavigation.ariaAttributes}
       />
@@ -232,4 +239,4 @@ export function NumberFilterInput<TData = any>({
       )}
     </div>
   );
-} 
+}

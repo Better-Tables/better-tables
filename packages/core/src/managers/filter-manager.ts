@@ -1,10 +1,10 @@
-import type { FilterState, FilterOperator, FilterOperatorDefinition } from '../types/filter';
 import type { ColumnDefinition, ColumnType } from '../types/column';
+import type { FilterOperator, FilterOperatorDefinition, FilterState } from '../types/filter';
 import {
-  getOperatorDefinition,
-  getDefaultOperatorsForType,
   createOperatorRegistry,
   getAllOperators,
+  getDefaultOperatorsForType,
+  getOperatorDefinition,
 } from '../types/filter-operators';
 
 /**
@@ -70,7 +70,7 @@ export class FilterManager<TData = any> {
    * Set filters (replaces all existing filters)
    */
   setFilters(filters: FilterState[]): void {
-    const validFilters = filters.filter(filter => {
+    const validFilters = filters.filter((filter) => {
       const validation = this.validateFilter(filter);
       if (!validation.valid) {
         console.warn(`Invalid filter for column ${filter.columnId}: ${validation.error}`);
@@ -92,7 +92,7 @@ export class FilterManager<TData = any> {
       throw new Error(`Invalid filter for column ${filter.columnId}: ${validation.error}`);
     }
 
-    const existingIndex = this.filters.findIndex(f => f.columnId === filter.columnId);
+    const existingIndex = this.filters.findIndex((f) => f.columnId === filter.columnId);
 
     if (existingIndex >= 0) {
       this.filters[existingIndex] = filter;
@@ -107,7 +107,7 @@ export class FilterManager<TData = any> {
    * Remove a filter by column ID
    */
   removeFilter(columnId: string): void {
-    const index = this.filters.findIndex(f => f.columnId === columnId);
+    const index = this.filters.findIndex((f) => f.columnId === columnId);
     if (index >= 0) {
       this.filters.splice(index, 1);
       this.notifySubscribers({ type: 'filter_removed', columnId });
@@ -118,7 +118,7 @@ export class FilterManager<TData = any> {
    * Update filter values or operator
    */
   updateFilter(columnId: string, updates: Partial<FilterState>): void {
-    const index = this.filters.findIndex(f => f.columnId === columnId);
+    const index = this.filters.findIndex((f) => f.columnId === columnId);
     if (index >= 0) {
       const updatedFilter = { ...this.filters[index], ...updates };
       const validation = this.validateFilter(updatedFilter);
@@ -144,35 +144,35 @@ export class FilterManager<TData = any> {
    * Get filter for specific column
    */
   getFilter(columnId: string): FilterState | undefined {
-    return this.filters.find(f => f.columnId === columnId);
+    return this.filters.find((f) => f.columnId === columnId);
   }
 
   /**
    * Check if column has active filter
    */
   hasFilter(columnId: string): boolean {
-    return this.filters.some(f => f.columnId === columnId);
+    return this.filters.some((f) => f.columnId === columnId);
   }
 
   /**
    * Get all filtered column IDs
    */
   getFilteredColumnIds(): string[] {
-    return this.filters.map(f => f.columnId);
+    return this.filters.map((f) => f.columnId);
   }
 
   /**
    * Get filters by column type
    */
   getFiltersByType(type: ColumnType): FilterState[] {
-    return this.filters.filter(f => f.type === type);
+    return this.filters.filter((f) => f.type === type);
   }
 
   /**
    * Validate a filter against column definitions and operator rules
    */
   validateFilter(filter: FilterState): FilterValidationResult {
-    const column = this.columns.find(c => c.id === filter.columnId);
+    const column = this.columns.find((c) => c.id === filter.columnId);
     if (!column) {
       return { valid: false, error: `Column ${filter.columnId} not found` };
     }
@@ -242,7 +242,7 @@ export class FilterManager<TData = any> {
    * Get available operators for a column
    */
   getAvailableOperators(columnId: string): FilterOperatorDefinition[] {
-    const column = this.columns.find(c => c.id === columnId);
+    const column = this.columns.find((c) => c.id === columnId);
     if (!column || !column.filterable) {
       return [];
     }
@@ -250,7 +250,7 @@ export class FilterManager<TData = any> {
     const allowedOperators =
       column.filter?.operators || this.getDefaultOperatorsForType(column.type);
     return allowedOperators
-      .map(op => this.operatorDefinitions.get(op))
+      .map((op) => this.operatorDefinitions.get(op))
       .filter(Boolean) as FilterOperatorDefinition[];
   }
 
@@ -285,7 +285,7 @@ export class FilterManager<TData = any> {
    * Notify all subscribers of filter changes
    */
   private notifySubscribers(event: FilterManagerEvent): void {
-    this.subscribers.forEach(callback => {
+    this.subscribers.forEach((callback) => {
       try {
         callback(event);
       } catch (error) {
@@ -299,7 +299,7 @@ export class FilterManager<TData = any> {
    */
   serialize(options: FilterSerializationOptions = {}): string {
     const data = {
-      filters: this.filters.map(filter => ({
+      filters: this.filters.map((filter) => ({
         columnId: filter.columnId,
         type: filter.type,
         operator: filter.operator,
@@ -340,7 +340,7 @@ export class FilterManager<TData = any> {
       filtersByOperator: {} as Record<FilterOperator, number>,
     };
 
-    this.filters.forEach(filter => {
+    this.filters.forEach((filter) => {
       stats.filtersByType[filter.type] = (stats.filtersByType[filter.type] || 0) + 1;
       stats.filtersByOperator[filter.operator] =
         (stats.filtersByOperator[filter.operator] || 0) + 1;

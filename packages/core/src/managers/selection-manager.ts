@@ -1,9 +1,9 @@
-import type { 
-  SelectionState, 
-  SelectionConfig, 
-  SelectionMode, 
-  SelectionValidationResult, 
-  SelectionStats 
+import type {
+  SelectionConfig,
+  SelectionMode,
+  SelectionState,
+  SelectionStats,
+  SelectionValidationResult,
 } from '../types/selection';
 
 /**
@@ -42,11 +42,17 @@ export class SelectionManager<TData = any> {
       maxSelections: undefined,
       preserveSelection: false,
       showSelectAll: true,
-      getRowId: (row: any) => row.id || row._id || String(row),
+      getRowId: (row: unknown) => {
+        if (typeof row === 'object' && row !== null) {
+          const obj = row as Record<string, unknown>;
+          return String(obj.id || obj._id || row);
+        }
+        return String(row);
+      },
       isSelectable: () => true,
-      ...config
+      ...config,
     };
-    
+
     this.selectionState.mode = this.config.mode || 'multiple';
     this.setAvailableRows(availableRows);
   }
@@ -72,7 +78,7 @@ export class SelectionManager<TData = any> {
    * Get selected rows
    */
   getSelectedRows(): TData[] {
-    return this.availableRows.filter(row => 
+    return this.availableRows.filter((row) =>
       this.selectionState.selectedIds.has(this.getRowId(row))
     );
   }
@@ -82,24 +88,24 @@ export class SelectionManager<TData = any> {
    */
   setAvailableRows(rows: TData[]): void {
     this.availableRows = rows;
-    
+
     if (!this.config.preserveSelection) {
       // Clear selection when rows change
       this.clearSelection();
     } else {
       // Filter out selected IDs that are no longer available
-      const availableIds = new Set(rows.map(row => this.getRowId(row)));
+      const availableIds = new Set(rows.map((row) => this.getRowId(row)));
       const filteredIds = new Set(
-        Array.from(this.selectionState.selectedIds).filter(id => availableIds.has(id))
+        Array.from(this.selectionState.selectedIds).filter((id) => availableIds.has(id))
       );
-      
+
       if (filteredIds.size !== this.selectionState.selectedIds.size) {
         this.selectionState.selectedIds = filteredIds;
         this.updateSelectionState();
         this.notifySubscribers({ type: 'selection_replaced', selectedIds: filteredIds });
       }
     }
-    
+
     this.updateSelectionState();
   }
 
@@ -117,7 +123,7 @@ export class SelectionManager<TData = any> {
     }
 
     const wasSelected = this.selectionState.selectedIds.has(rowId);
-    
+
     if (this.config.mode === 'single') {
       // Single selection - clear others first
       this.selectionState.selectedIds.clear();
@@ -125,7 +131,7 @@ export class SelectionManager<TData = any> {
 
     this.selectionState.selectedIds.add(rowId);
     this.updateSelectionState();
-    
+
     if (!wasSelected) {
       this.notifySubscribers({ type: 'row_selected', rowId, selected: true });
     }
@@ -147,13 +153,13 @@ export class SelectionManager<TData = any> {
    */
   toggleRow(rowId: string): void {
     const isSelected = this.selectionState.selectedIds.has(rowId);
-    
+
     if (isSelected) {
       this.deselectRow(rowId);
     } else {
       this.selectRow(rowId);
     }
-    
+
     this.notifySubscribers({ type: 'selection_toggled', rowId, selected: !isSelected });
   }
 
@@ -165,7 +171,7 @@ export class SelectionManager<TData = any> {
       return;
     }
 
-    const validIds = rowIds.filter(id => {
+    const validIds = rowIds.filter((id) => {
       const validation = this.validateSelection(id, true);
       if (!validation.valid) {
         console.warn(`Invalid selection for row ${id}: ${validation.error}`);
@@ -180,7 +186,7 @@ export class SelectionManager<TData = any> {
       this.selectionState.selectedIds.add(validIds[0]);
     } else {
       // Multiple selection
-      validIds.forEach(id => this.selectionState.selectedIds.add(id));
+      validIds.forEach((id) => this.selectionState.selectedIds.add(id));
     }
 
     this.updateSelectionState();
@@ -191,11 +197,11 @@ export class SelectionManager<TData = any> {
    * Deselect multiple rows
    */
   deselectRows(rowIds: string[]): void {
-    const deselectedIds = rowIds.filter(id => this.selectionState.selectedIds.has(id));
-    
-    deselectedIds.forEach(id => this.selectionState.selectedIds.delete(id));
+    const deselectedIds = rowIds.filter((id) => this.selectionState.selectedIds.has(id));
+
+    deselectedIds.forEach((id) => this.selectionState.selectedIds.delete(id));
     this.updateSelectionState();
-    
+
     if (deselectedIds.length > 0) {
       this.notifySubscribers({ type: 'rows_selected', rowIds: deselectedIds, selected: false });
     }
@@ -209,11 +215,9 @@ export class SelectionManager<TData = any> {
       return;
     }
 
-    const selectableRows = this.availableRows.filter(row => 
-      this.config.isSelectable!(row)
-    );
+    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable!(row));
 
-    selectableRows.forEach(row => {
+    selectableRows.forEach((row) => {
       this.selectionState.selectedIds.add(this.getRowId(row));
     });
 
@@ -289,10 +293,8 @@ export class SelectionManager<TData = any> {
    * Get selection statistics
    */
   getSelectionStats(): SelectionStats {
-    const selectableRows = this.availableRows.filter(row => 
-      this.config.isSelectable!(row)
-    );
-    
+    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable!(row));
+
     const selectedCount = this.selectionState.selectedIds.size;
     const totalCount = selectableRows.length;
     const allSelected = totalCount > 0 && selectedCount === totalCount;
@@ -323,7 +325,7 @@ export class SelectionManager<TData = any> {
       return { valid: false, error: 'Selection is disabled' };
     }
 
-    const row = this.availableRows.find(r => this.getRowId(r) === rowId);
+    const row = this.availableRows.find((r) => this.getRowId(r) === rowId);
     if (!row) {
       return { valid: false, error: `Row with ID ${rowId} not found` };
     }
@@ -339,10 +341,13 @@ export class SelectionManager<TData = any> {
 
     if (selecting && this.config.maxSelections) {
       const currentCount = this.selectionState.selectedIds.size;
-      if (currentCount >= this.config.maxSelections && !this.selectionState.selectedIds.has(rowId)) {
-        return { 
-          valid: false, 
-          error: `Maximum selections reached (${this.config.maxSelections})` 
+      if (
+        currentCount >= this.config.maxSelections &&
+        !this.selectionState.selectedIds.has(rowId)
+      ) {
+        return {
+          valid: false,
+          error: `Maximum selections reached (${this.config.maxSelections})`,
         };
       }
     }
@@ -354,13 +359,11 @@ export class SelectionManager<TData = any> {
    * Update selection state metadata
    */
   private updateSelectionState(): void {
-    const selectableRows = this.availableRows.filter(row => 
-      this.config.isSelectable!(row)
-    );
-    
+    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable!(row));
+
     const selectedCount = this.selectionState.selectedIds.size;
     const totalCount = selectableRows.length;
-    
+
     this.selectionState.allSelected = totalCount > 0 && selectedCount === totalCount;
     this.selectionState.someSelected = selectedCount > 0 && selectedCount < totalCount;
   }
@@ -378,7 +381,7 @@ export class SelectionManager<TData = any> {
   updateConfig(config: Partial<SelectionConfig>): void {
     this.config = { ...this.config, ...config };
     this.selectionState.mode = this.config.mode || 'multiple';
-    
+
     // Validate current selection against new config
     if (this.config.mode === 'none') {
       this.clearSelection();
@@ -388,7 +391,10 @@ export class SelectionManager<TData = any> {
       this.selectionState.selectedIds.clear();
       this.selectionState.selectedIds.add(firstId);
       this.updateSelectionState();
-    } else if (this.config.maxSelections && this.selectionState.selectedIds.size > this.config.maxSelections) {
+    } else if (
+      this.config.maxSelections &&
+      this.selectionState.selectedIds.size > this.config.maxSelections
+    ) {
       // Trim to max selections
       const ids = Array.from(this.selectionState.selectedIds);
       this.selectionState.selectedIds = new Set(ids.slice(0, this.config.maxSelections));
@@ -413,7 +419,7 @@ export class SelectionManager<TData = any> {
    * Notify all subscribers of selection changes
    */
   private notifySubscribers(event: SelectionManagerEvent): void {
-    this.subscribers.forEach(callback => {
+    this.subscribers.forEach((callback) => {
       try {
         callback(event);
       } catch (error) {
@@ -433,4 +439,4 @@ export class SelectionManager<TData = any> {
     };
     return cloned;
   }
-} 
+}

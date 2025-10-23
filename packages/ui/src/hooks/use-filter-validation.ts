@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { validateOperatorValues } from '@better-tables/core';
+import { useMemo } from 'react';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -29,21 +29,21 @@ export function useFilterValidation({
   immediate = true,
 }: UseFilterValidationOptions): ValidationResult {
   // Memoize expensive calculations
-  const isNumericType = useMemo(() => 
-    column.type === 'number' || column.type === 'currency' || column.type === 'percentage',
+  const isNumericType = useMemo(
+    () => column.type === 'number' || column.type === 'currency' || column.type === 'percentage',
     [column.type]
   );
-  
-  const isOptionType = useMemo(() => 
-    column.type === 'option' || column.type === 'multiOption',
+
+  const isOptionType = useMemo(
+    () => column.type === 'option' || column.type === 'multiOption',
     [column.type]
   );
-  
-  const validOptions = useMemo(() => 
-    column.filter?.options?.map(opt => opt.value) || [],
+
+  const validOptions = useMemo(
+    () => column.filter?.options?.map((opt) => opt.value) || [],
     [column.filter?.options]
   );
-  
+
   return useMemo(() => {
     // Skip validation if not immediate
     if (!immediate) {
@@ -55,7 +55,10 @@ export function useFilterValidation({
     if (operatorValidation !== true) {
       return {
         isValid: false,
-        error: typeof operatorValidation === 'string' ? operatorValidation : 'Invalid values for this operator',
+        error:
+          typeof operatorValidation === 'string'
+            ? operatorValidation
+            : 'Invalid values for this operator',
       };
     }
 
@@ -74,10 +77,10 @@ export function useFilterValidation({
 
     // Validate against column constraints (e.g., min/max for numbers)
     if (isNumericType) {
-      const numericValues = values.filter(v => typeof v === 'number');
-      
+      const numericValues = values.filter((v) => typeof v === 'number');
+
       if (column.filter?.min !== undefined) {
-        const belowMin = numericValues.filter(v => v < column.filter!.min!);
+        const belowMin = numericValues.filter((v) => v < column.filter!.min!);
         if (belowMin.length > 0) {
           return {
             isValid: false,
@@ -87,7 +90,7 @@ export function useFilterValidation({
       }
 
       if (column.filter?.max !== undefined) {
-        const aboveMax = numericValues.filter(v => v > column.filter!.max!);
+        const aboveMax = numericValues.filter((v) => v > column.filter!.max!);
         if (aboveMax.length > 0) {
           return {
             isValid: false,
@@ -99,8 +102,8 @@ export function useFilterValidation({
 
     // Validate options for option/multiOption filters
     if (isOptionType && validOptions.length > 0) {
-      const invalidValues = values.filter(v => !validOptions.includes(v));
-      
+      const invalidValues = values.filter((v) => !validOptions.includes(v));
+
       if (invalidValues.length > 0) {
         return {
           isValid: false,
@@ -111,4 +114,4 @@ export function useFilterValidation({
 
     return { isValid: true };
   }, [filter.operator, values, column, immediate, isNumericType, isOptionType, validOptions]);
-} 
+}

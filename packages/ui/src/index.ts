@@ -40,4 +40,4 @@ export * from './components/table/table-pagination';
 export * from './components/table/virtualized-table';
 
 // Export hooks
-export * from './hooks'; 
+export * from './hooks';

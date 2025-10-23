@@ -1,18 +1,18 @@
-import { describe, it, expect, expectTypeOf } from 'vitest';
-import { 
-  createColumnBuilder, 
-  column, 
-  typed, 
-  validateColumns, 
-  quickColumn,
-  ColumnBuilder,
-  TextColumnBuilder,
-  NumberColumnBuilder,
-  DateColumnBuilder,
-  OptionColumnBuilder,
-  MultiOptionColumnBuilder,
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import {
   BooleanColumnBuilder,
+  ColumnBuilder,
   type ColumnFactory,
+  DateColumnBuilder,
+  MultiOptionColumnBuilder,
+  NumberColumnBuilder,
+  OptionColumnBuilder,
+  TextColumnBuilder,
+  column,
+  createColumnBuilder,
+  quickColumn,
+  typed,
+  validateColumns,
 } from '../../src/builders';
 import type { ColumnDefinition } from '../../src/types/column';
 
@@ -33,7 +33,7 @@ describe('Column Builder System', () => {
   describe('Base ColumnBuilder', () => {
     it('should create a column builder with required methods', () => {
       const builder = new ColumnBuilder<TestUser, string>('text');
-      
+
       expect(builder).toBeDefined();
       expect(typeof builder.id).toBe('function');
       expect(typeof builder.displayName).toBe('function');
@@ -43,11 +43,11 @@ describe('Column Builder System', () => {
 
     it('should build a valid column definition', () => {
       const builder = new ColumnBuilder<TestUser, string>('text');
-      
+
       const column = builder
         .id('name')
         .displayName('Full Name')
-        .accessor(user => user.name)
+        .accessor((user) => user.name)
         .build();
 
       expect(column).toEqual({
@@ -65,19 +65,21 @@ describe('Column Builder System', () => {
 
     it('should throw error for missing required fields', () => {
       const builder = new ColumnBuilder<TestUser, string>('text');
-      
+
       expect(() => builder.build()).toThrow('Column ID is required');
       expect(() => builder.id('test').build()).toThrow('Column display name is required');
-      expect(() => builder.id('test').displayName('Test').build()).toThrow('Column accessor is required');
+      expect(() => builder.id('test').displayName('Test').build()).toThrow(
+        'Column accessor is required'
+      );
     });
 
     it('should configure column properties correctly', () => {
       const builder = new ColumnBuilder<TestUser, string>('text');
-      
+
       const column = builder
         .id('name')
         .displayName('Full Name')
-        .accessor(user => user.name)
+        .accessor((user) => user.name)
         .sortable(false)
         .filterable(false)
         .resizable(false)
@@ -100,28 +102,33 @@ describe('Column Builder System', () => {
   describe('TextColumnBuilder', () => {
     it('should create a text column builder', () => {
       const builder = new TextColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('name')
         .displayName('Name')
-        .accessor(user => user.name)
+        .accessor((user) => user.name)
         .searchable()
         .build();
 
       expect(column.type).toBe('text');
       expect(column.filter?.operators).toEqual([
-        'contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'
+        'contains',
+        'equals',
+        'startsWith',
+        'endsWith',
+        'isEmpty',
+        'isNotEmpty',
       ]);
       expect(column.filter?.debounce).toBe(300);
     });
 
     it('should configure text-specific options', () => {
       const builder = new TextColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('email')
         .displayName('Email')
-        .accessor(user => user.email)
+        .accessor((user) => user.email)
         .asEmail()
         .truncate({ maxLength: 50 })
         .transform('lowercase')
@@ -140,11 +147,11 @@ describe('Column Builder System', () => {
   describe('NumberColumnBuilder', () => {
     it('should create a number column builder', () => {
       const builder = new NumberColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('age')
         .displayName('Age')
-        .accessor(user => user.age)
+        .accessor((user) => user.age)
         .range(0, 120)
         .build();
 
@@ -152,18 +159,24 @@ describe('Column Builder System', () => {
       expect(column.filter?.min).toBe(0);
       expect(column.filter?.max).toBe(120);
       expect(column.filter?.operators).toEqual([
-        'equals', 'notEquals', 'greaterThan', 'greaterThanOrEqual', 
-        'lessThan', 'lessThanOrEqual', 'between', 'notBetween'
+        'equals',
+        'notEquals',
+        'greaterThan',
+        'greaterThanOrEqual',
+        'lessThan',
+        'lessThanOrEqual',
+        'between',
+        'notBetween',
       ]);
     });
 
     it('should configure as currency', () => {
       const builder = new NumberColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('score')
         .displayName('Score')
-        .accessor(user => user.score)
+        .accessor((user) => user.score)
         .currency({ currency: 'EUR', locale: 'en-GB' })
         .build();
 
@@ -179,11 +192,11 @@ describe('Column Builder System', () => {
 
     it('should configure as percentage', () => {
       const builder = new NumberColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('score')
         .displayName('Score')
-        .accessor(user => user.score)
+        .accessor((user) => user.score)
         .percentage({ format: 'percentage' })
         .build();
 
@@ -195,11 +208,11 @@ describe('Column Builder System', () => {
   describe('DateColumnBuilder', () => {
     it('should create a date column builder', () => {
       const builder = new DateColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('createdAt')
         .displayName('Created At')
-        .accessor(user => user.createdAt)
+        .accessor((user) => user.createdAt)
         .format('yyyy-MM-dd')
         .build();
 
@@ -209,11 +222,11 @@ describe('Column Builder System', () => {
 
     it('should configure date-specific options', () => {
       const builder = new DateColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('createdAt')
         .displayName('Created At')
-        .accessor(user => user.createdAt)
+        .accessor((user) => user.createdAt)
         .dateTime({ timeZone: 'America/New_York' })
         .relative()
         .build();
@@ -227,7 +240,7 @@ describe('Column Builder System', () => {
   describe('OptionColumnBuilder', () => {
     it('should create an option column builder', () => {
       const builder = new OptionColumnBuilder<TestUser>();
-      
+
       const options = [
         { value: 'active', label: 'Active', color: 'green' },
         { value: 'inactive', label: 'Inactive', color: 'red' },
@@ -236,7 +249,7 @@ describe('Column Builder System', () => {
       const column = builder
         .id('status')
         .displayName('Status')
-        .accessor(user => user.status)
+        .accessor((user) => user.status)
         .options(options)
         .build();
 
@@ -247,11 +260,11 @@ describe('Column Builder System', () => {
 
     it('should configure predefined status options', () => {
       const builder = new OptionColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('status')
         .displayName('Status')
-        .accessor(user => user.status)
+        .accessor((user) => user.status)
         .status([
           { value: 'active', label: 'Active', color: 'green' },
           { value: 'inactive', label: 'Inactive', color: 'red' },
@@ -265,7 +278,7 @@ describe('Column Builder System', () => {
   describe('MultiOptionColumnBuilder', () => {
     it('should create a multi-option column builder', () => {
       const builder = new MultiOptionColumnBuilder<TestUser>();
-      
+
       const options = [
         { value: 'vip', label: 'VIP' },
         { value: 'lead', label: 'Lead' },
@@ -274,20 +287,25 @@ describe('Column Builder System', () => {
       const column = builder
         .id('tags')
         .displayName('Tags')
-        .accessor(user => user.tags)
+        .accessor((user) => user.tags)
         .options(options)
         .build();
 
       expect(column.type).toBe('multiOption');
       expect(column.filter?.options).toEqual(options);
       expect(column.filter?.operators).toEqual([
-        'includes', 'excludes', 'includesAny', 'includesAll', 'excludesAny', 'excludesAll'
+        'includes',
+        'excludes',
+        'includesAny',
+        'includesAll',
+        'excludesAny',
+        'excludesAll',
       ]);
     });
 
     it('should configure tags with validation', () => {
       const builder = new MultiOptionColumnBuilder<TestUser>();
-      
+
       const options = [
         { value: 'vip', label: 'VIP' },
         { value: 'lead', label: 'Lead' },
@@ -296,7 +314,7 @@ describe('Column Builder System', () => {
       const column = builder
         .id('tags')
         .displayName('Tags')
-        .accessor(user => user.tags)
+        .accessor((user) => user.tags)
         .tags(options, { maxTags: 5, allowCreate: true })
         .build();
 
@@ -308,11 +326,11 @@ describe('Column Builder System', () => {
   describe('BooleanColumnBuilder', () => {
     it('should create a boolean column builder', () => {
       const builder = new BooleanColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('isActive')
         .displayName('Is Active')
-        .accessor(user => user.isActive)
+        .accessor((user) => user.isActive)
         .booleanFilter()
         .build();
 
@@ -322,11 +340,11 @@ describe('Column Builder System', () => {
 
     it('should configure boolean display formats', () => {
       const builder = new BooleanColumnBuilder<TestUser>();
-      
+
       const column = builder
         .id('isActive')
         .displayName('Is Active')
-        .accessor(user => user.isActive)
+        .accessor((user) => user.isActive)
         .activeInactive()
         .build();
 
@@ -339,7 +357,7 @@ describe('Column Builder System', () => {
   describe('Column Factory', () => {
     it('should create a typed column factory', () => {
       const cb = createColumnBuilder<TestUser>();
-      
+
       expectTypeOf(cb).toMatchTypeOf<ColumnFactory<TestUser>>();
       expect(typeof cb.text).toBe('function');
       expect(typeof cb.number).toBe('function');
@@ -351,17 +369,19 @@ describe('Column Builder System', () => {
 
     it('should create columns with proper types', () => {
       const cb = createColumnBuilder<TestUser>();
-      
-      const textColumn = cb.text()
+
+      const textColumn = cb
+        .text()
         .id('name')
         .displayName('Name')
-        .accessor(user => user.name)
+        .accessor((user) => user.name)
         .build();
 
-      const numberColumn = cb.number()
+      const numberColumn = cb
+        .number()
         .id('age')
         .displayName('Age')
-        .accessor(user => user.age)
+        .accessor((user) => user.age)
         .build();
 
       expect(textColumn.type).toBe('text');
@@ -369,10 +389,11 @@ describe('Column Builder System', () => {
     });
 
     it('should work with global column factory', () => {
-      const textColumn = column.text()
+      const textColumn = column
+        .text()
         .id('name')
         .displayName('Name')
-        .accessor((data: any) => data.name)
+        .accessor((data: TestUser) => data.name)
         .build();
 
       expect(textColumn.type).toBe('text');
@@ -380,11 +401,12 @@ describe('Column Builder System', () => {
 
     it('should work with typed alias', () => {
       const cb = typed<TestUser>();
-      
-      const column = cb.text()
+
+      const column = cb
+        .text()
         .id('name')
         .displayName('Name')
-        .accessor(user => user.name)
+        .accessor((user) => user.name)
         .build();
 
       expect(column.type).toBe('text');
@@ -394,10 +416,20 @@ describe('Column Builder System', () => {
   describe('Column Validation', () => {
     it('should validate column definitions', () => {
       const cb = createColumnBuilder<TestUser>();
-      
+
       const validColumns = [
-        cb.text().id('name').displayName('Name').accessor(user => user.name).build(),
-        cb.number().id('age').displayName('Age').accessor(user => user.age).build(),
+        cb
+          .text()
+          .id('name')
+          .displayName('Name')
+          .accessor((user) => user.name)
+          .build(),
+        cb
+          .number()
+          .id('age')
+          .displayName('Age')
+          .accessor((user) => user.age)
+          .build(),
       ];
 
       const validation = validateColumns(validColumns);
@@ -414,15 +446,27 @@ describe('Column Builder System', () => {
       const validation = validateColumns(invalidColumns);
       expect(validation.valid).toBe(false);
       expect(validation.errors).toContain("Column at index 0 is missing required 'id' field");
-      expect(validation.errors).toContain("Column at index 1 is missing required 'displayName' field");
+      expect(validation.errors).toContain(
+        "Column at index 1 is missing required 'displayName' field"
+      );
     });
 
     it('should detect duplicate column IDs', () => {
       const cb = createColumnBuilder<TestUser>();
-      
+
       const columnsWithDuplicates = [
-        cb.text().id('name').displayName('Name').accessor(user => user.name).build(),
-        cb.text().id('name').displayName('Full Name').accessor(user => user.name).build(),
+        cb
+          .text()
+          .id('name')
+          .displayName('Name')
+          .accessor((user) => user.name)
+          .build(),
+        cb
+          .text()
+          .id('name')
+          .displayName('Full Name')
+          .accessor((user) => user.name)
+          .build(),
       ];
 
       const validation = validateColumns(columnsWithDuplicates);
@@ -433,11 +477,7 @@ describe('Column Builder System', () => {
 
   describe('Quick Column Helper', () => {
     it('should create a quick column with defaults', () => {
-      const column = quickColumn<TestUser, string>(
-        'name',
-        'Full Name',
-        user => user.name
-      );
+      const column = quickColumn<TestUser, string>('name', 'Full Name', (user) => user.name);
 
       expect(column.id).toBe('name');
       expect(column.displayName).toBe('Full Name');
@@ -447,12 +487,11 @@ describe('Column Builder System', () => {
     });
 
     it('should create a quick column with options', () => {
-      const column = quickColumn<TestUser, number>(
-        'age',
-        'Age',
-        user => user.age,
-        { type: 'number', width: 100, sortable: false }
-      );
+      const column = quickColumn<TestUser, number>('age', 'Age', (user) => user.age, {
+        type: 'number',
+        width: 100,
+        sortable: false,
+      });
 
       expect(column.id).toBe('age');
       expect(column.type).toBe('number');
@@ -464,16 +503,17 @@ describe('Column Builder System', () => {
   describe('Type Safety', () => {
     it('should maintain type safety with accessor functions', () => {
       const cb = createColumnBuilder<TestUser>();
-      
+
       // This should compile without errors
-      const column = cb.text()
+      const column = cb
+        .text()
         .id('name')
         .displayName('Name')
-        .accessor(user => user.name) // TypeScript should infer user as TestUser
+        .accessor((user) => user.name) // TypeScript should infer user as TestUser
         .build();
 
       expect(column.accessor).toBeDefined();
-      
+
       // Test that accessor returns the correct type
       const testUser: TestUser = {
         id: '1',
@@ -494,14 +534,15 @@ describe('Column Builder System', () => {
 
     it('should maintain type safety with column definitions', () => {
       const cb = createColumnBuilder<TestUser>();
-      
-      const column = cb.text()
+
+      const column = cb
+        .text()
         .id('name')
         .displayName('Name')
-        .accessor(user => user.name)
+        .accessor((user) => user.name)
         .build();
 
       expectTypeOf(column).toMatchTypeOf<ColumnDefinition<TestUser, string>>();
     });
   });
-}); 
+});

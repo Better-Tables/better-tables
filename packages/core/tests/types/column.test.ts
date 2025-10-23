@@ -1,12 +1,12 @@
-import { describe, it, expect, expectTypeOf } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
-  ColumnDefinition,
-  ColumnType,
   CellRendererProps,
+  ColumnDefinition,
+  ColumnOrder,
+  ColumnType,
+  ColumnVisibility,
   HeaderRendererProps,
   ValidationRule,
-  ColumnVisibility,
-  ColumnOrder,
 } from '../../src/types';
 
 describe('Column Types', () => {
@@ -82,7 +82,8 @@ describe('Column Types', () => {
         accessor: (row) => row.value,
         type: 'text',
         cellRenderer: ({ value, row: _row, column: _column }) => `Custom: ${value}`,
-        headerRenderer: ({ column, isSorted: _isSorted, sortDirection: _sortDirection }) => `Header: ${column.displayName}`,
+        headerRenderer: ({ column, isSorted: _isSorted, sortDirection: _sortDirection }) =>
+          `Header: ${column.displayName}`,
       };
 
       expectTypeOf(column.cellRenderer).toEqualTypeOf<
@@ -139,7 +140,7 @@ describe('Column Types', () => {
   describe('HeaderRendererProps', () => {
     it('should have correct structure', () => {
       type TestData = { id: string };
-      
+
       const props: HeaderRendererProps<TestData> = {
         column: {
           id: 'id',
@@ -172,8 +173,8 @@ describe('Column Types', () => {
 
     it('should type ColumnOrder correctly', () => {
       const order: ColumnOrder = ['name', 'email', 'phone'];
-      
+
       expectTypeOf(order).toEqualTypeOf<string[]>();
     });
   });
-}); 
+});

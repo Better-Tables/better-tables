@@ -1,15 +1,15 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterState, FilterGroup } from '@better-tables/core';
-import { getDefaultOperatorsForType } from '@better-tables/core';
-import { cn } from '@/lib/utils';
-import { FilterButton } from './filter-button';
-import { FilterDropdown } from './filter-dropdown';
-import { ActiveFilters } from './active-filters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { ColumnDefinition, FilterGroup, FilterState } from '@better-tables/core';
+import { getDefaultOperatorsForType } from '@better-tables/core';
+import { Search, X } from 'lucide-react';
+import * as React from 'react';
+import { ActiveFilters } from './active-filters';
+import { FilterButton } from './filter-button';
+import { FilterDropdown } from './filter-dropdown';
 
 export interface FilterBarTheme {
   /** Container styling */
@@ -92,48 +92,58 @@ export function FilterBar<TData = any>({
 
   // Get filterable columns
   const filterableColumns = React.useMemo(
-    () => columns.filter(col => col.filterable !== false),
-    [columns],
+    () => columns.filter((col) => col.filterable !== false),
+    [columns]
   );
 
   // Get columns that don't already have a filter
   const availableColumns = React.useMemo(() => {
-    const filtered = filterableColumns.filter(col => !filters.find(f => f.columnId === col.id));
-    
+    const filtered = filterableColumns.filter((col) => !filters.find((f) => f.columnId === col.id));
+
     // Apply search filter if searchable
     if (!searchable || !searchTerm) return filtered;
-    
-    return filtered.filter(column =>
-      column.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      column.id.toLowerCase().includes(searchTerm.toLowerCase())
+
+    return filtered.filter(
+      (column) =>
+        column.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        column.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [filterableColumns, filters, searchable, searchTerm]);
 
   // Check if we've reached max filters
   const hasReachedMaxFilters = maxFilters !== undefined && filters.length >= maxFilters;
 
-  const handleAddFilter = React.useCallback((columnId: string) => {
-    const column = columns.find(col => col.id === columnId);
-    if (!column || hasReachedMaxFilters) return;
+  const handleAddFilter = React.useCallback(
+    (columnId: string) => {
+      const column = columns.find((col) => col.id === columnId);
+      if (!column || hasReachedMaxFilters) return;
 
-    const newFilter: FilterState = {
-      columnId,
-      type: column.type,
-      operator: getDefaultOperatorsForType(column.type)[0], // Use first default operator from core
-      values: [],
-    };
+      const newFilter: FilterState = {
+        columnId,
+        type: column.type,
+        operator: getDefaultOperatorsForType(column.type)[0], // Use first default operator from core
+        values: [],
+      };
 
-    onFiltersChange([...filters, newFilter]);
-    setIsDropdownOpen(false);
-  }, [columns, hasReachedMaxFilters, filters, onFiltersChange]);
+      onFiltersChange([...filters, newFilter]);
+      setIsDropdownOpen(false);
+    },
+    [columns, hasReachedMaxFilters, filters, onFiltersChange]
+  );
 
-  const handleRemoveFilter = React.useCallback((columnId: string) => {
-    onFiltersChange(filters.filter(f => f.columnId !== columnId));
-  }, [filters, onFiltersChange]);
+  const handleRemoveFilter = React.useCallback(
+    (columnId: string) => {
+      onFiltersChange(filters.filter((f) => f.columnId !== columnId));
+    },
+    [filters, onFiltersChange]
+  );
 
-  const handleUpdateFilter = React.useCallback((columnId: string, updates: Partial<FilterState>) => {
-    onFiltersChange(filters.map(f => (f.columnId === columnId ? { ...f, ...updates } : f)));
-  }, [filters, onFiltersChange]);
+  const handleUpdateFilter = React.useCallback(
+    (columnId: string, updates: Partial<FilterState>) => {
+      onFiltersChange(filters.map((f) => (f.columnId === columnId ? { ...f, ...updates } : f)));
+    },
+    [filters, onFiltersChange]
+  );
 
   const handleClearAll = React.useCallback(() => {
     // Only clear non-protected filters
@@ -142,14 +152,14 @@ export function FilterBar<TData = any>({
   }, [filters, isFilterProtected, onFiltersChange]);
 
   const hasFilters = React.useMemo(() => filters.length > 0, [filters.length]);
-  
-  const hasRemovableFilters = React.useMemo(() => 
-    isFilterProtected ? filters.some(f => !isFilterProtected(f)) : hasFilters,
+
+  const hasRemovableFilters = React.useMemo(
+    () => (isFilterProtected ? filters.some((f) => !isFilterProtected(f)) : hasFilters),
     [filters, isFilterProtected, hasFilters]
   );
 
-  const isAddFilterDisabled = React.useMemo(() => 
-    disabled || availableColumns.length === 0 || hasReachedMaxFilters,
+  const isAddFilterDisabled = React.useMemo(
+    () => disabled || availableColumns.length === 0 || hasReachedMaxFilters,
     [disabled, availableColumns.length, hasReachedMaxFilters]
   );
 
@@ -202,7 +212,7 @@ export function FilterBar<TData = any>({
                   hasFilters={hasFilters}
                   disabled={isAddFilterDisabled}
                   label={addFilterLabel}
-                  className={cn("w-full sm:w-auto", theme?.addButton)}
+                  className={cn('w-full sm:w-auto', theme?.addButton)}
                 />
               </FilterDropdown>
             </div>
@@ -224,12 +234,12 @@ export function FilterBar<TData = any>({
 
         {/* Clear All Button */}
         {showClearAll && hasRemovableFilters && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleClearAll}
             disabled={disabled}
-            className={cn("h-8 px-2 lg:px-3 w-full sm:w-auto", theme?.clearButton)}
+            className={cn('h-8 px-2 lg:px-3 w-full sm:w-auto', theme?.clearButton)}
           >
             <X className="mr-1 h-4 w-4" />
             Clear all

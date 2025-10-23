@@ -1,23 +1,26 @@
-import { useMemo, useCallback } from 'react';
 import {
-  TableConfig,
-  ColumnDefinition,
   FilterState,
   PaginationState,
+  SortDirection,
+  SortingState,
+  TableConfig,
 } from '@better-tables/core';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+import { getFormatterForType } from '../../lib/format-utils';
+import { cn } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { TablePagination } from './table-pagination';
-import { cn } from '../../lib/utils';
 
 /**
  * UI-specific props for the BetterTable component
  * Data fetching is handled by parent component
  */
-export interface BetterTableProps<TData = any> extends TableConfig<TData> {
+export interface BetterTableProps<TData = unknown> extends TableConfig<TData> {
   /** Table data */
   data: TData[];
 
@@ -32,6 +35,12 @@ export interface BetterTableProps<TData = any> extends TableConfig<TData> {
 
   /** Filter change handler */
   onFiltersChange?: (filters: FilterState[]) => void;
+
+  /** Current sorting state */
+  sortingState?: SortingState;
+
+  /** Callback when sorting changes */
+  onSortingChange?: (sorting: SortingState) => void;
 
   /** Total number of items (for pagination) */
   totalCount?: number;
@@ -60,15 +69,12 @@ export interface BetterTableProps<TData = any> extends TableConfig<TData> {
   onRetry?: () => void;
 }
 
-export function BetterTable<TData = any>({
+export function BetterTable<TData = unknown>({
   // Core table config (minus adapter)
-  id,
-  name,
   columns,
   features = {},
   rowConfig,
   emptyState,
-  loadingState,
   errorState,
 
   // Data props (handled by parent)
@@ -80,6 +86,8 @@ export function BetterTable<TData = any>({
   // UI-specific props
   filters = [],
   onFiltersChange,
+  sortingState = [],
+  onSortingChange,
   paginationState,
   onPageChange,
   onPageSizeChange,
@@ -93,7 +101,7 @@ export function BetterTable<TData = any>({
 }: BetterTableProps<TData>) {
   const {
     filtering = true,
-    // sorting = true, // TODO: Implement sorting functionality
+    sorting = true,
     pagination: paginationEnabled = true,
     rowSelection = false,
   } = features;
@@ -108,7 +116,35 @@ export function BetterTable<TData = any>({
     (newFilters: FilterState[]) => {
       onFiltersChange?.(newFilters);
     },
-    [onFiltersChange],
+    [onFiltersChange]
+  );
+
+  // Handle sorting changes
+  const handleSortingChange = useCallback(
+    (columnId: string) => {
+      if (!onSortingChange) return;
+
+      const currentSort = sortingState.find((s) => s.columnId === columnId);
+      let newSorting: SortingState;
+
+      if (currentSort) {
+        // Cycle through: asc -> desc -> none
+        if (currentSort.direction === 'asc') {
+          newSorting = sortingState.map((s) =>
+            s.columnId === columnId ? { ...s, direction: 'desc' as SortDirection } : s
+          );
+        } else {
+          // Remove from sorting
+          newSorting = sortingState.filter((s) => s.columnId !== columnId);
+        }
+      } else {
+        // Add new sort (asc)
+        newSorting = [...sortingState, { columnId, direction: 'asc' as SortDirection }];
+      }
+
+      onSortingChange(newSorting);
+    },
+    [sortingState, onSortingChange]
   );
 
   // Handle row selection
@@ -124,7 +160,7 @@ export function BetterTable<TData = any>({
       }
       onRowSelectionChange(newSelected);
     },
-    [selectedRows, onRowSelectionChange],
+    [selectedRows, onRowSelectionChange]
   );
 
   // Handle select all
@@ -139,7 +175,7 @@ export function BetterTable<TData = any>({
         onRowSelectionChange(new Set());
       }
     },
-    [data, getRowId, onRowSelectionChange],
+    [data, getRowId, onRowSelectionChange]
   );
 
   // Clear filters handler
@@ -166,7 +202,7 @@ export function BetterTable<TData = any>({
                     <Skeleton className="h-4 w-4" />
                   </TableHead>
                 )}
-                {columns.map(column => (
+                {columns.map((column) => (
                   <TableHead key={column.id}>
                     <Skeleton className="h-4 w-[100px]" />
                   </TableHead>
@@ -175,13 +211,13 @@ export function BetterTable<TData = any>({
             </TableHeader>
             <TableBody>
               {Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={index}>
+                <TableRow key={`skeleton-row-${index}`}>
                   {rowSelection && (
                     <TableCell>
                       <Skeleton className="h-4 w-4" />
                     </TableCell>
                   )}
-                  {columns.map(column => (
+                  {columns.map((column) => (
                     <TableCell key={column.id}>
                       <Skeleton className="h-4 w-[100px]" />
                     </TableCell>
@@ -199,11 +235,7 @@ export function BetterTable<TData = any>({
   if (error) {
     return (
       <div className={cn('space-y-4', className)}>
-        <ErrorState 
-          error={error} 
-          onRetry={onRetry}
-          title={errorState?.title}
-        />
+        <ErrorState error={error} onRetry={onRetry} title={errorState?.title} />
       </div>
     );
   }
@@ -215,19 +247,18 @@ export function BetterTable<TData = any>({
         {filtering && (
           <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
         )}
-                  <EmptyState
-            message={emptyMessage || emptyState?.description || 'No data available'}
-            hasFilters={filters.length > 0}
-            onClearFilters={handleClearFilters}
-            icon={emptyState?.icon as React.ComponentType<any>}
-          />
+        <EmptyState
+          message={emptyMessage || emptyState?.description || 'No data available'}
+          hasFilters={filters.length > 0}
+          onClearFilters={handleClearFilters}
+          icon={emptyState?.icon as React.ComponentType<unknown>}
+        />
       </div>
     );
   }
 
   const allSelected =
-    data.length > 0 &&
-    data.every((row, index) => selectedRows.has(getRowId(row, index)));
+    data.length > 0 && data.every((row, index) => selectedRows.has(getRowId(row, index)));
   const someSelected = data.some((row, index) => selectedRows.has(getRowId(row, index)));
 
   return (
@@ -245,29 +276,54 @@ export function BetterTable<TData = any>({
                   <input
                     type="checkbox"
                     checked={allSelected}
-                    ref={ref => {
+                    ref={(ref) => {
                       if (ref) ref.indeterminate = someSelected && !allSelected;
                     }}
-                    onChange={e => handleSelectAll(e.target.checked)}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
                     className="rounded border-gray-300 text-primary focus:ring-primary"
                   />
                 </TableHead>
               )}
-              {columns.map(column => (
-                <TableHead
-                  key={column.id}
-                  className={cn(
-                    column.align === 'center' && 'text-center',
-                    column.align === 'right' && 'text-right',
-                  )}
-                >
-                  {column.headerRenderer ? (
-                    column.headerRenderer({ column })
-                  ) : (
-                    <span>{column.displayName}</span>
-                  )}
-                </TableHead>
-              ))}
+              {columns.map((column) => {
+                const currentSort = sortingState.find((s) => s.columnId === column.id);
+                const isSortable = sorting && column.sortable !== false;
+
+                return (
+                  <TableHead
+                    key={column.id}
+                    className={cn(
+                      column.align === 'center' && 'text-center',
+                      column.align === 'right' && 'text-right',
+                      isSortable && 'cursor-pointer hover:bg-muted/50'
+                    )}
+                    onClick={isSortable ? () => handleSortingChange(column.id) : undefined}
+                  >
+                    {column.headerRenderer ? (
+                      column.headerRenderer({
+                        column,
+                        isSorted: !!currentSort,
+                        sortDirection: currentSort?.direction,
+                        onSort: isSortable ? () => handleSortingChange(column.id) : undefined,
+                      })
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{column.displayName}</span>
+                        {isSortable && (
+                          <div className="flex flex-col">
+                            {currentSort?.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : currentSort?.direction === 'desc' ? (
+                              <ArrowDown className="h-3 w-3" />
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3 opacity-50" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -289,12 +345,12 @@ export function BetterTable<TData = any>({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={e => handleRowSelection(rowId, e.target.checked)}
+                        onChange={(e) => handleRowSelection(rowId, e.target.checked)}
                         className="rounded border-gray-300 text-primary focus:ring-primary"
                       />
                     </TableCell>
                   )}
-                  {columns.map(column => {
+                  {columns.map((column) => {
                     const value = column.accessor(row);
 
                     return (
@@ -302,7 +358,7 @@ export function BetterTable<TData = any>({
                         key={column.id}
                         className={cn(
                           column.align === 'center' && 'text-center',
-                          column.align === 'right' && 'text-right',
+                          column.align === 'right' && 'text-right'
                         )}
                       >
                         {column.cellRenderer ? (
@@ -313,7 +369,7 @@ export function BetterTable<TData = any>({
                             rowIndex: index,
                           })
                         ) : (
-                          <span>{formatValue(value, column)}</span>
+                          <span>{getFormatterForType(column.type, value, column.meta)}</span>
                         )}
                       </TableCell>
                     );
@@ -337,20 +393,4 @@ export function BetterTable<TData = any>({
       )}
     </div>
   );
-}
-
-// Helper function to format values // todo: remove this we have helpers
-function formatValue(value: any, column: ColumnDefinition): string {
-  if (value == null) return '';
-
-  switch (column.type) {
-    case 'date':
-      return new Date(value).toLocaleDateString();
-    case 'number':
-    case 'currency':
-    case 'percentage':
-      return typeof value === 'number' ? value.toString() : String(value);
-    default:
-      return String(value);
-  }
 }

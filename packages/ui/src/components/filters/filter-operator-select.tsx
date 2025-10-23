@@ -1,8 +1,5 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterOperator } from '@better-tables/core';
-import { getOperatorsForType } from '@better-tables/core';
 import {
   Select,
   SelectContent,
@@ -10,6 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { ColumnDefinition, FilterOperator } from '@better-tables/core';
+import { getOperatorsForType } from '@better-tables/core';
+import * as React from 'react';
 
 export interface FilterOperatorSelectProps<TData = any> {
   /** Column definition */
@@ -31,14 +31,12 @@ export function FilterOperatorSelect<TData = any>({
   // Get available operators for this column type
   const operators = React.useMemo(() => {
     const availableOperators = getOperatorsForType(column.type);
-    
+
     // If column has custom operators defined, use those instead
     if (column.filter?.operators && column.filter.operators.length > 0) {
-      return availableOperators.filter(op => 
-        column.filter!.operators!.includes(op.key)
-      );
+      return availableOperators.filter((op) => column.filter!.operators!.includes(op.key));
     }
-    
+
     return availableOperators;
   }, [column.type, column.filter?.operators]);
 
@@ -55,9 +53,7 @@ export function FilterOperatorSelect<TData = any>({
               <div>
                 <div className="font-medium">{operator.label}</div>
                 {operator.description && (
-                  <div className="text-xs text-muted-foreground">
-                    {operator.description}
-                  </div>
+                  <div className="text-xs text-muted-foreground">{operator.description}</div>
                 )}
               </div>
             </SelectItem>
@@ -66,4 +62,4 @@ export function FilterOperatorSelect<TData = any>({
       </Select>
     </div>
   );
-} 
+}

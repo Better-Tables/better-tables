@@ -1,0 +1,627 @@
+# @better-tables/ui - Filter Components Reference
+
+## Overview
+
+The Better Tables UI package provides a comprehensive set of React components for building advanced data table interfaces. The filter components offer a complete filtering solution with type-safe inputs, validation, and accessibility features.
+
+## Table of Contents
+
+- [Filter Components Overview](#filter-components-overview)
+- [FilterBar](#filterbar)
+- [ActiveFilters](#activefilters)
+- [FilterDropdown](#filterdropdown)
+- [Filter Input Components](#filter-input-components)
+- [Styling and Theming](#styling-and-theming)
+- [Accessibility](#accessibility)
+- [Usage Examples](#usage-examples)
+
+## Filter Components Overview
+
+The filter system consists of several interconnected components:
+
+- **FilterBar**: Main container component that orchestrates all filtering functionality
+- **ActiveFilters**: Displays currently active filters as removable badges
+- **FilterDropdown**: Column selection dropdown with search and grouping
+- **FilterValueInput**: Type-specific input components for different data types
+- **FilterOperatorSelect**: Operator selection dropdown
+- **IncludeUnknownControl**: Toggle for including null/undefined values
+
+### Component Hierarchy
+
+```
+FilterBar
+├── FilterDropdown (column selection)
+│   ├── Command (searchable list)
+│   └── FilterGroup (optional grouping)
+├── ActiveFilters (active filter display)
+│   └── FilterBadge (individual filter)
+│       ├── FilterOperatorSelect
+│       ├── FilterValueInput
+│       └── RemoveButton
+└── CustomFilters (optional custom components)
+```
+
+## FilterBar
+
+The main container component that provides the complete filtering interface.
+
+### Props
+
+```typescript
+interface FilterBarProps<TData = any> {
+  columns: ColumnDefinition<TData>[];
+  filters: FilterState[];
+  onFiltersChange: (filters: FilterState[]) => void;
+  groups?: FilterGroup[];
+  theme?: FilterBarTheme;
+  disabled?: boolean;
+  maxFilters?: number;
+  showAddFilter?: boolean;
+  showClearAll?: boolean;
+  showGroups?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  className?: string;
+  customFilters?: React.ReactNode[];
+  addFilterLabel?: string;
+  isFilterProtected?: (filter: FilterState) => boolean;
+}
+```
+
+### Features
+
+- **Column Selection**: Dropdown with searchable column list
+- **Filter Groups**: Optional grouping of columns for organization
+- **Active Filter Display**: Shows current filters as removable badges
+- **Custom Filters**: Support for additional custom filter components
+- **Accessibility**: Full keyboard navigation and screen reader support
+- **Responsive Design**: Mobile-optimized layout with horizontal scrolling
+
+### Usage Example
+
+```typescript
+import { FilterBar } from '@better-tables/ui';
+
+function MyTable() {
+  const [filters, setFilters] = useState<FilterState[]>([]);
+  
+  return (
+    <FilterBar
+      columns={columns}
+      filters={filters}
+      onFiltersChange={setFilters}
+      groups={filterGroups}
+      showAddFilter={true}
+      showClearAll={true}
+      searchable={true}
+      searchPlaceholder="Search columns..."
+      customFilters={[
+        <CustomSearchFilter key="search" />
+      ]}
+    />
+  );
+}
+```
+
+### Theme Configuration
+
+```typescript
+interface FilterBarTheme {
+  container?: string;
+  header?: string;
+  addButton?: string;
+  clearButton?: string;
+  searchInput?: string;
+  group?: string;
+  groupHeader?: string;
+  columnList?: string;
+  columnItem?: string;
+  activeFilters?: string;
+}
+```
+
+## ActiveFilters
+
+Displays currently active filters as interactive badges with edit and remove functionality.
+
+### Props
+
+```typescript
+interface ActiveFiltersProps<TData = any> {
+  columns: ColumnDefinition<TData>[];
+  filters: FilterState[];
+  onUpdateFilter: (columnId: string, updates: Partial<FilterState>) => void;
+  onRemoveFilter: (columnId: string) => void;
+  isFilterProtected?: (filter: FilterState) => boolean;
+  disabled?: boolean;
+  className?: string;
+}
+```
+
+### Features
+
+- **Filter Badges**: Each filter displayed as an interactive badge
+- **Inline Editing**: Click to edit operator and values
+- **Protected Filters**: Support for filters that cannot be removed
+- **Responsive Layout**: Horizontal scrolling on mobile, flex-wrap on desktop
+- **Value Formatting**: Proper formatting based on column type and configuration
+
+### Filter Badge Features
+
+Each filter badge includes:
+
+- **Column Name**: Display name of the filtered column
+- **Operator**: Current filter operator with dropdown to change
+- **Values**: Formatted display of filter values
+- **Remove Button**: X button to remove the filter (unless protected)
+- **Edit Mode**: Click to enter edit mode for operator/value changes
+
+### Usage Example
+
+```typescript
+import { ActiveFilters } from '@better-tables/ui';
+
+function FilterDisplay() {
+  const handleUpdateFilter = (columnId: string, updates: Partial<FilterState>) => {
+    // Update filter logic
+  };
+  
+  const handleRemoveFilter = (columnId: string) => {
+    // Remove filter logic
+  };
+  
+  const isProtected = (filter: FilterState) => {
+    return filter.meta?.protected === true;
+  };
+  
+  return (
+    <ActiveFilters
+      columns={columns}
+      filters={filters}
+      onUpdateFilter={handleUpdateFilter}
+      onRemoveFilter={handleRemoveFilter}
+      isFilterProtected={isProtected}
+    />
+  );
+}
+```
+
+## FilterDropdown
+
+Provides a searchable dropdown for selecting columns to filter.
+
+### Props
+
+```typescript
+interface FilterDropdownProps<TData = any> {
+  columns: ColumnDefinition<TData>[];
+  groups?: FilterGroup[];
+  onSelect: (columnId: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  searchTerm?: string;
+  onSearchChange?: (search: string) => void;
+  disabled?: boolean;
+  emptyMessage?: string;
+}
+```
+
+### Features
+
+- **Searchable List**: Type-ahead search through available columns
+- **Grouping Support**: Optional grouping of columns for organization
+- **Mobile Optimization**: Responsive design with mobile-specific interactions
+- **Keyboard Navigation**: Full keyboard support for accessibility
+- **Empty States**: Proper handling of no results scenarios
+
+### Usage Example
+
+```typescript
+import { FilterDropdown } from '@better-tables/ui';
+
+function ColumnSelector() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const handleSelect = (columnId: string) => {
+    // Handle column selection
+    setIsOpen(false);
+  };
+  
+  return (
+    <FilterDropdown
+      columns={columns}
+      groups={filterGroups}
+      onSelect={handleSelect}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      searchable={true}
+      searchPlaceholder="Search columns..."
+      searchTerm={searchTerm}
+      onSearchChange={setSearchTerm}
+    >
+      <Button>Add Filter</Button>
+    </FilterDropdown>
+  );
+}
+```
+
+## Filter Input Components
+
+Type-specific input components for different data types with validation and formatting.
+
+### TextFilterInput
+
+For text-based filtering with debouncing and validation.
+
+```typescript
+interface TextFilterInputProps<TData = any> {
+  filter: FilterState;
+  column: ColumnDefinition<TData>;
+  onChange: (values: any[]) => void;
+  disabled?: boolean;
+}
+```
+
+**Features:**
+- Debounced input to prevent excessive updates
+- Dynamic placeholder based on operator
+- Validation with error display
+- Support for empty/not-empty operators
+
+### NumberFilterInput
+
+For numeric filtering with formatting and range support.
+
+```typescript
+interface NumberFilterInputProps<TData = any> {
+  filter: FilterState;
+  column: ColumnDefinition<TData>;
+  onChange: (values: any[]) => void;
+  disabled?: boolean;
+}
+```
+
+**Features:**
+- Single value or range input based on operator
+- Number formatting (currency, percentage, etc.)
+- Min/max validation
+- Step controls for precision
+
+### DateFilterInput
+
+For date filtering with calendar picker and presets.
+
+```typescript
+interface DateFilterInputProps<TData = any> {
+  filter: FilterState;
+  column: ColumnDefinition<TData>;
+  onChange: (values: any[]) => void;
+  disabled?: boolean;
+}
+```
+
+**Features:**
+- Calendar picker for date selection
+- Date range picker for between operators
+- Preset buttons (Today, Yesterday, This Week, etc.)
+- Custom date formatting
+- Time picker support
+
+### OptionFilterInput
+
+For single-select filtering with searchable dropdown.
+
+```typescript
+interface OptionFilterInputProps<TData = any> {
+  filter: FilterState;
+  column: ColumnDefinition<TData>;
+  onChange: (values: any[]) => void;
+  disabled?: boolean;
+}
+```
+
+**Features:**
+- Searchable option dropdown
+- Async option loading
+- Color-coded options
+- Multi-select support for "any of" operators
+
+### MultiOptionFilterInput
+
+For multi-select filtering with tag-like interface.
+
+```typescript
+interface MultiOptionFilterInputProps<TData = any> {
+  filter: FilterState;
+  column: ColumnDefinition<TData>;
+  onChange: (values: any[]) => void;
+  disabled?: boolean;
+}
+```
+
+**Features:**
+- Multi-select dropdown with search
+- Tag/chip display of selected values
+- Min/max selection limits
+- Async option loading
+
+### BooleanFilterInput
+
+For boolean filtering with toggle controls.
+
+```typescript
+interface BooleanFilterInputProps<TData = any> {
+  filter: FilterState;
+  column: ColumnDefinition<TData>;
+  onChange: (values: any[]) => void;
+  disabled?: boolean;
+}
+```
+
+**Features:**
+- Toggle buttons for true/false/null
+- Custom labels and colors
+- Icon support
+- Null value handling
+
+## Styling and Theming
+
+### CSS Classes
+
+All components use Tailwind CSS classes with consistent naming:
+
+```css
+/* Filter Bar */
+.filter-bar-container { }
+.filter-bar-header { }
+.filter-bar-add-button { }
+.filter-bar-clear-button { }
+
+/* Active Filters */
+.active-filters-container { }
+.filter-badge { }
+.filter-badge-protected { }
+.filter-badge-edit-mode { }
+
+/* Filter Dropdown */
+.filter-dropdown-trigger { }
+.filter-dropdown-content { }
+.filter-dropdown-search { }
+.filter-dropdown-list { }
+
+/* Filter Inputs */
+.filter-input-container { }
+.filter-input-label { }
+.filter-input-field { }
+.filter-input-error { }
+```
+
+### Theme Customization
+
+Components support theme customization through CSS custom properties:
+
+```css
+:root {
+  --filter-primary: hsl(var(--primary));
+  --filter-secondary: hsl(var(--secondary));
+  --filter-muted: hsl(var(--muted));
+  --filter-border: hsl(var(--border));
+  --filter-input: hsl(var(--input));
+  --filter-ring: hsl(var(--ring));
+}
+```
+
+### Responsive Design
+
+Components are fully responsive with mobile-first design:
+
+- **Mobile (< 768px)**: Horizontal scrolling, full-width inputs
+- **Tablet (768px - 1024px)**: Flexible layout, optimized spacing
+- **Desktop (> 1024px)**: Full feature set, compact layout
+
+## Accessibility
+
+### Keyboard Navigation
+
+All components support full keyboard navigation:
+
+- **Tab**: Navigate between interactive elements
+- **Enter/Space**: Activate buttons and select options
+- **Arrow Keys**: Navigate dropdowns and lists
+- **Escape**: Close dropdowns and cancel operations
+- **Home/End**: Jump to first/last items in lists
+
+### Screen Reader Support
+
+Components include proper ARIA attributes:
+
+```typescript
+// Example ARIA implementation
+<div
+  role="combobox"
+  aria-expanded={isOpen}
+  aria-haspopup="listbox"
+  aria-label="Select column to filter"
+>
+  <input
+    role="searchbox"
+    aria-label="Search columns"
+    aria-describedby="search-help"
+  />
+  <ul role="listbox" aria-label="Available columns">
+    {columns.map(column => (
+      <li
+        key={column.id}
+        role="option"
+        aria-selected={selectedId === column.id}
+      >
+        {column.displayName}
+      </li>
+    ))}
+  </ul>
+</div>
+```
+
+### Focus Management
+
+Proper focus management ensures good UX:
+
+- Focus returns to trigger after closing dropdowns
+- Focus moves to newly created filter inputs
+- Focus is trapped within modal dialogs
+- Focus indicators are clearly visible
+
+## Usage Examples
+
+### Basic Filter Implementation
+
+```typescript
+import React, { useState } from 'react';
+import { FilterBar } from '@better-tables/ui';
+import { FilterManager } from '@better-tables/core';
+
+function MyTable() {
+  const [filters, setFilters] = useState<FilterState[]>([]);
+  const filterManager = new FilterManager(columns, filters);
+  
+  const handleFiltersChange = (newFilters: FilterState[]) => {
+    setFilters(newFilters);
+    // Update table data based on filters
+  };
+  
+  return (
+    <div className="space-y-4">
+      <FilterBar
+        columns={columns}
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        showAddFilter={true}
+        showClearAll={true}
+        searchable={true}
+      />
+      {/* Table component */}
+    </div>
+  );
+}
+```
+
+### Advanced Filter with Groups
+
+```typescript
+import React, { useState } from 'react';
+import { FilterBar } from '@better-tables/ui';
+
+function AdvancedTable() {
+  const [filters, setFilters] = useState<FilterState[]>([]);
+  
+  const filterGroups: FilterGroup[] = [
+    {
+      id: 'personal',
+      label: 'Personal Information',
+      columns: ['name', 'email', 'phone'],
+      icon: UserIcon,
+    },
+    {
+      id: 'work',
+      label: 'Work Information',
+      columns: ['department', 'role', 'salary'],
+      icon: BriefcaseIcon,
+    },
+  ];
+  
+  const isFilterProtected = (filter: FilterState) => {
+    return filter.meta?.protected === true;
+  };
+  
+  return (
+    <FilterBar
+      columns={columns}
+      filters={filters}
+      onFiltersChange={setFilters}
+      groups={filterGroups}
+      showGroups={true}
+      isFilterProtected={isFilterProtected}
+      customFilters={[
+        <GlobalSearchFilter key="search" />,
+        <SavedFiltersDropdown key="saved" />,
+      ]}
+    />
+  );
+}
+```
+
+### Custom Filter Component
+
+```typescript
+import React from 'react';
+import { FilterBar } from '@better-tables/ui';
+
+function GlobalSearchFilter() {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  return (
+    <div className="flex items-center space-x-2">
+      <SearchIcon className="h-4 w-4 text-muted-foreground" />
+      <Input
+        placeholder="Search all columns..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-64"
+      />
+    </div>
+  );
+}
+
+function MyTableWithSearch() {
+  return (
+    <FilterBar
+      columns={columns}
+      filters={filters}
+      onFiltersChange={setFilters}
+      customFilters={[
+        <GlobalSearchFilter key="search" />
+      ]}
+    />
+  );
+}
+```
+
+### Filter with URL Persistence
+
+```typescript
+import React, { useEffect, useState } from 'react';
+import { FilterBar } from '@better-tables/ui';
+import { FilterURLSerializer } from '@better-tables/core';
+
+function TableWithURLState() {
+  const [filters, setFilters] = useState<FilterState[]>(() => {
+    // Load initial filters from URL
+    return FilterURLSerializer.getFromURL();
+  });
+  
+  // Update URL when filters change
+  useEffect(() => {
+    FilterURLSerializer.setInURL(filters);
+  }, [filters]);
+  
+  return (
+    <FilterBar
+      columns={columns}
+      filters={filters}
+      onFiltersChange={setFilters}
+    />
+  );
+}
+```
+
+## Related Documentation
+
+- [Core Types API Reference](../core/TYPES_API_REFERENCE.md)
+- [Core Managers API Reference](../core/MANAGERS_API_REFERENCE.md)
+- [Table Components Reference](./TABLE_COMPONENTS_REFERENCE.md)
+- [Hooks Reference](./HOOKS_REFERENCE.md)
+- [Styling Guide](./STYLING_GUIDE.md)

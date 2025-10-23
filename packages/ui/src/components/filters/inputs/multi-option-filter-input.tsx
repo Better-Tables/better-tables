@@ -1,11 +1,8 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Command,
   CommandEmpty,
@@ -14,14 +11,13 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { X, ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFilterValidation } from '@/hooks/use-filter-validation';
+import { cn } from '@/lib/utils';
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { ChevronDown, X } from 'lucide-react';
+import * as React from 'react';
 
 export interface MultiOptionFilterInputProps<TData = any> {
   /** Filter state */
@@ -45,7 +41,7 @@ export function MultiOptionFilterInput<TData = any>({
   const selectedValues = filter.values || [];
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
-  
+
   // Validate the current values
   const validation = useFilterValidation({
     filter,
@@ -53,32 +49,39 @@ export function MultiOptionFilterInput<TData = any>({
     values: selectedValues,
     immediate: selectedValues.length > 0 || needsNoValues,
   });
-  
-  const handleToggleOption = React.useCallback((value: string, checked: boolean) => {
-    if (checked) {
-      onChange([...selectedValues, value]);
-    } else {
-      onChange(selectedValues.filter(v => v !== value));
-    }
-  }, [selectedValues, onChange]);
-  
-  const handleRemoveValue = React.useCallback((value: string) => {
-    onChange(selectedValues.filter(v => v !== value));
-  }, [selectedValues, onChange]);
-  
+
+  const handleToggleOption = React.useCallback(
+    (value: string, checked: boolean) => {
+      if (checked) {
+        onChange([...selectedValues, value]);
+      } else {
+        onChange(selectedValues.filter((v) => v !== value));
+      }
+    },
+    [selectedValues, onChange]
+  );
+
+  const handleRemoveValue = React.useCallback(
+    (value: string) => {
+      onChange(selectedValues.filter((v) => v !== value));
+    },
+    [selectedValues, onChange]
+  );
+
   const handleClearAll = React.useCallback(() => {
     onChange([]);
   }, [onChange]);
-  
+
   const filteredOptions = React.useMemo(() => {
     if (!search) return options;
     const searchLower = search.toLowerCase();
-    return options.filter(option =>
-      option.label.toLowerCase().includes(searchLower) ||
-      option.value.toLowerCase().includes(searchLower)
+    return options.filter(
+      (option) =>
+        option.label.toLowerCase().includes(searchLower) ||
+        option.value.toLowerCase().includes(searchLower)
     );
   }, [options, search]);
-  
+
   if (needsNoValues) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -86,7 +89,7 @@ export function MultiOptionFilterInput<TData = any>({
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -103,17 +106,23 @@ export function MultiOptionFilterInput<TData = any>({
           </Button>
         )}
       </div>
-      
+
       {/* Selected Values */}
       {selectedValues.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {selectedValues.map(value => {
-            const option = options.find(opt => opt.value === value);
-            const Icon = option?.icon;
+          {selectedValues.map((value) => {
+            const option = options.find((opt) => opt.value === value);
+            const icon = option?.icon;
             return (
-              <Badge key={value} variant="secondary" className={cn("text-xs", "flex items-center gap-1")}>
-                {Icon && (
-                  <span className="mr-1"><Icon /></span>
+              <Badge
+                key={value}
+                variant="secondary"
+                className={cn('text-xs', 'flex items-center gap-1')}
+              >
+                {icon && (
+                  <span className="mr-1">
+                    <Icon />
+                  </span>
                 )}
                 {option?.label || value}
                 <Button
@@ -130,7 +139,7 @@ export function MultiOptionFilterInput<TData = any>({
           })}
         </div>
       )}
-      
+
       {/* Option Selection Dropdown */}
       <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
         <PopoverTrigger asChild>
@@ -139,16 +148,13 @@ export function MultiOptionFilterInput<TData = any>({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "w-full justify-between",
-              !validation.isValid && selectedValues.length > 0 && "border-destructive"
+              'w-full justify-between',
+              !validation.isValid && selectedValues.length > 0 && 'border-destructive'
             )}
             disabled={disabled}
           >
             <span className="text-sm text-muted-foreground">
-              {selectedValues.length > 0 
-                ? `${selectedValues.length} selected`
-                : 'Add options...'
-              }
+              {selectedValues.length > 0 ? `${selectedValues.length} selected` : 'Add options...'}
             </span>
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -163,9 +169,9 @@ export function MultiOptionFilterInput<TData = any>({
             <CommandList>
               <CommandEmpty>No options found.</CommandEmpty>
               <CommandGroup>
-                {filteredOptions.map(option => {
+                {filteredOptions.map((option) => {
                   const isSelected = selectedValues.includes(option.value);
-                  const Icon = option.icon;
+                  const icon = option.icon;
                   return (
                     <CommandItem
                       key={option.value}
@@ -177,7 +183,11 @@ export function MultiOptionFilterInput<TData = any>({
                         onChange={() => {}} // Handled by CommandItem onSelect
                       />
                       <div className="flex items-center gap-2 flex-1">
-                        {Icon && <span><Icon /></span>}
+                        {icon && (
+                          <span>
+                            <Icon />
+                          </span>
+                        )}
                         <span>{option.label}</span>
                         {option.count !== undefined && (
                           <span className="text-xs text-muted-foreground ml-auto">
@@ -198,4 +208,4 @@ export function MultiOptionFilterInput<TData = any>({
       )}
     </div>
   );
-} 
+}

@@ -1,9 +1,9 @@
-import type { FilterState, FilterOption } from './filter';
+import type { ColumnType } from './column';
+import type { DataEvent } from './common';
+import type { FilterOption, FilterState } from './filter';
+import type { FilterOperator } from './filter';
 import type { PaginationParams } from './pagination';
 import type { SortingParams } from './sorting';
-import type { ColumnType } from './column';
-import type { FilterOperator } from './filter';
-import type { DataEvent } from './common';
 
 /**
  * Parameters for fetching data
@@ -25,13 +25,13 @@ export interface FetchDataParams {
   columns?: string[];
 
   /** Additional parameters */
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 /**
  * Result from data fetching
  */
-export interface FetchDataResult<TData = any> {
+export interface FetchDataResult<TData = unknown> {
   /** Data items */
   data: TData[];
 
@@ -51,7 +51,7 @@ export interface FetchDataResult<TData = any> {
   faceted?: Record<string, Map<string, number>>;
 
   /** Additional metadata */
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -71,7 +71,7 @@ export interface ExportParams {
   includeHeaders?: boolean;
 
   /** Additional options */
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 /**
@@ -91,7 +91,7 @@ export interface ExportResult {
 /**
  * Table adapter interface
  */
-export interface TableAdapter<TData = any> {
+export interface TableAdapter<TData = unknown> {
   /** Fetch data with filtering, sorting, and pagination */
   fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
 
@@ -181,7 +181,7 @@ export interface AdapterFeatures {
  */
 export interface AdapterConfig {
   /** Connection configuration */
-  connection?: any;
+  connection?: Record<string, unknown>;
 
   /** Caching configuration */
   cache?: {

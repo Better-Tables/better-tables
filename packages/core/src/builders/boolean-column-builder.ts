@@ -4,7 +4,7 @@ import { ColumnBuilder } from './column-builder';
 /**
  * Boolean column builder with boolean-specific methods
  */
-export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, boolean> {
+export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, boolean> {
   constructor() {
     super('boolean');
   }
@@ -23,16 +23,18 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
   /**
    * Configure boolean filtering
    */
-  booleanFilter(options: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Custom validation for boolean values */
-    validation?: (value: boolean) => boolean | string;
-    /** Default value for null/undefined */
-    defaultValue?: boolean;
-  } = {}): this {
+  booleanFilter(
+    options: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Custom validation for boolean values */
+      validation?: (value: boolean) => boolean | string;
+      /** Default value for null/undefined */
+      defaultValue?: boolean;
+    } = {}
+  ): this {
     const { includeNull = false, validation, defaultValue } = options;
-    
+
     const filterConfig: FilterConfig<boolean> = {
       operators: ['isTrue', 'isFalse', 'isNull', 'isNotNull'],
       includeNull,
@@ -40,49 +42,51 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig };
-    
+
     if (defaultValue !== undefined) {
       this.config.meta = {
         ...this.config.meta,
         defaultValue,
       };
     }
-    
+
     return this;
   }
 
   /**
    * Configure display format for boolean values
    */
-  displayFormat(format: {
-    /** How to display boolean values (default: 'checkbox') */
-    type: 'checkbox' | 'switch' | 'badge' | 'icon' | 'text';
-    /** Text to show for true values (default: 'Yes') */
-    trueText?: string;
-    /** Text to show for false values (default: 'No') */
-    falseText?: string;
-    /** Text to show for null/undefined values (default: 'N/A') */
-    nullText?: string;
-    /** Color for true values (default: 'green') */
-    trueColor?: string;
-    /** Color for false values (default: 'red') */
-    falseColor?: string;
-    /** Color for null values (default: 'gray') */
-    nullColor?: string;
-    /** Whether to show icons for boolean values (default: true) */
-    showIcons?: boolean;
-  } = { type: 'checkbox' }): this {
-    const { 
-      type = 'checkbox', 
-      trueText = 'Yes', 
-      falseText = 'No', 
+  displayFormat(
+    format: {
+      /** How to display boolean values (default: 'checkbox') */
+      type: 'checkbox' | 'switch' | 'badge' | 'icon' | 'text';
+      /** Text to show for true values (default: 'Yes') */
+      trueText?: string;
+      /** Text to show for false values (default: 'No') */
+      falseText?: string;
+      /** Text to show for null/undefined values (default: 'N/A') */
+      nullText?: string;
+      /** Color for true values (default: 'green') */
+      trueColor?: string;
+      /** Color for false values (default: 'red') */
+      falseColor?: string;
+      /** Color for null values (default: 'gray') */
+      nullColor?: string;
+      /** Whether to show icons for boolean values (default: true) */
+      showIcons?: boolean;
+    } = { type: 'checkbox' }
+  ): this {
+    const {
+      type = 'checkbox',
+      trueText = 'Yes',
+      falseText = 'No',
       nullText = 'N/A',
       trueColor = 'green',
       falseColor = 'red',
       nullColor = 'gray',
-      showIcons = true 
+      showIcons = true,
     } = format;
-    
+
     this.config.meta = {
       ...this.config.meta,
       display: {
@@ -102,26 +106,28 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
   /**
    * Configure as yes/no column
    */
-  yesNo(options: {
-    /** Text for true values (default: 'Yes') */
-    yesText?: string;
-    /** Text for false values (default: 'No') */
-    noText?: string;
-    /** Whether to show as badges (default: false) */
-    showBadges?: boolean;
-    /** Color for yes values (default: 'green') */
-    yesColor?: string;
-    /** Color for no values (default: 'red') */
-    noColor?: string;
-  } = {}): this {
-    const { 
-      yesText = 'Yes', 
-      noText = 'No', 
+  yesNo(
+    options: {
+      /** Text for true values (default: 'Yes') */
+      yesText?: string;
+      /** Text for false values (default: 'No') */
+      noText?: string;
+      /** Whether to show as badges (default: false) */
+      showBadges?: boolean;
+      /** Color for yes values (default: 'green') */
+      yesColor?: string;
+      /** Color for no values (default: 'red') */
+      noColor?: string;
+    } = {}
+  ): this {
+    const {
+      yesText = 'Yes',
+      noText = 'No',
       showBadges = false,
       yesColor = 'green',
-      noColor = 'red' 
+      noColor = 'red',
     } = options;
-    
+
     this.displayFormat({
       type: showBadges ? 'badge' : 'text',
       trueText: yesText,
@@ -129,33 +135,35 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
       trueColor: yesColor,
       falseColor: noColor,
     });
-    
+
     return this;
   }
 
   /**
    * Configure as active/inactive column
    */
-  activeInactive(options: {
-    /** Text for active values (default: 'Active') */
-    activeText?: string;
-    /** Text for inactive values (default: 'Inactive') */
-    inactiveText?: string;
-    /** Whether to show as badges (default: true) */
-    showBadges?: boolean;
-    /** Color for active values (default: 'green') */
-    activeColor?: string;
-    /** Color for inactive values (default: 'gray') */
-    inactiveColor?: string;
-  } = {}): this {
-    const { 
-      activeText = 'Active', 
-      inactiveText = 'Inactive', 
+  activeInactive(
+    options: {
+      /** Text for active values (default: 'Active') */
+      activeText?: string;
+      /** Text for inactive values (default: 'Inactive') */
+      inactiveText?: string;
+      /** Whether to show as badges (default: true) */
+      showBadges?: boolean;
+      /** Color for active values (default: 'green') */
+      activeColor?: string;
+      /** Color for inactive values (default: 'gray') */
+      inactiveColor?: string;
+    } = {}
+  ): this {
+    const {
+      activeText = 'Active',
+      inactiveText = 'Inactive',
       showBadges = true,
       activeColor = 'green',
-      inactiveColor = 'gray' 
+      inactiveColor = 'gray',
     } = options;
-    
+
     this.displayFormat({
       type: showBadges ? 'badge' : 'text',
       trueText: activeText,
@@ -163,33 +171,35 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
       trueColor: activeColor,
       falseColor: inactiveColor,
     });
-    
+
     return this;
   }
 
   /**
    * Configure as enabled/disabled column
    */
-  enabledDisabled(options: {
-    /** Text for enabled values (default: 'Enabled') */
-    enabledText?: string;
-    /** Text for disabled values (default: 'Disabled') */
-    disabledText?: string;
-    /** Whether to show as badges (default: true) */
-    showBadges?: boolean;
-    /** Color for enabled values (default: 'green') */
-    enabledColor?: string;
-    /** Color for disabled values (default: 'red') */
-    disabledColor?: string;
-  } = {}): this {
-    const { 
-      enabledText = 'Enabled', 
-      disabledText = 'Disabled', 
+  enabledDisabled(
+    options: {
+      /** Text for enabled values (default: 'Enabled') */
+      enabledText?: string;
+      /** Text for disabled values (default: 'Disabled') */
+      disabledText?: string;
+      /** Whether to show as badges (default: true) */
+      showBadges?: boolean;
+      /** Color for enabled values (default: 'green') */
+      enabledColor?: string;
+      /** Color for disabled values (default: 'red') */
+      disabledColor?: string;
+    } = {}
+  ): this {
+    const {
+      enabledText = 'Enabled',
+      disabledText = 'Disabled',
       showBadges = true,
       enabledColor = 'green',
-      disabledColor = 'red' 
+      disabledColor = 'red',
     } = options;
-    
+
     this.displayFormat({
       type: showBadges ? 'badge' : 'text',
       trueText: enabledText,
@@ -197,27 +207,29 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
       trueColor: enabledColor,
       falseColor: disabledColor,
     });
-    
+
     return this;
   }
 
   /**
    * Configure as checkbox display
    */
-  checkbox(options: {
-    /** Whether checkbox is interactive (default: false) */
-    interactive?: boolean;
-    /** Callback when checkbox state changes */
-    onChange?: (value: boolean, rowData: TData) => void;
-    /** Whether to show label (default: false) */
-    showLabel?: boolean;
-    /** Custom label text */
-    label?: string;
-  } = {}): this {
+  checkbox(
+    options: {
+      /** Whether checkbox is interactive (default: false) */
+      interactive?: boolean;
+      /** Callback when checkbox state changes */
+      onChange?: (value: boolean, rowData: TData) => void;
+      /** Whether to show label (default: false) */
+      showLabel?: boolean;
+      /** Custom label text */
+      label?: string;
+    } = {}
+  ): this {
     const { interactive = false, onChange, showLabel = false, label } = options;
-    
+
     this.displayFormat({ type: 'checkbox' });
-    
+
     this.config.meta = {
       ...this.config.meta,
       checkbox: {
@@ -227,29 +239,31 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
         label,
       },
     };
-    
+
     return this;
   }
 
   /**
    * Configure as switch display
    */
-  switch(options: {
-    /** Whether switch is interactive (default: false) */
-    interactive?: boolean;
-    /** Callback when switch state changes */
-    onChange?: (value: boolean, rowData: TData) => void;
-    /** Whether to show label (default: false) */
-    showLabel?: boolean;
-    /** Custom label text */
-    label?: string;
-    /** Size of the switch (default: 'medium') */
-    size?: 'small' | 'medium' | 'large';
-  } = {}): this {
+  switch(
+    options: {
+      /** Whether switch is interactive (default: false) */
+      interactive?: boolean;
+      /** Callback when switch state changes */
+      onChange?: (value: boolean, rowData: TData) => void;
+      /** Whether to show label (default: false) */
+      showLabel?: boolean;
+      /** Custom label text */
+      label?: string;
+      /** Size of the switch (default: 'medium') */
+      size?: 'small' | 'medium' | 'large';
+    } = {}
+  ): this {
     const { interactive = false, onChange, showLabel = false, label, size = 'medium' } = options;
-    
+
     this.displayFormat({ type: 'switch' });
-    
+
     this.config.meta = {
       ...this.config.meta,
       switch: {
@@ -260,47 +274,49 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
         size,
       },
     };
-    
+
     return this;
   }
 
   /**
    * Configure as icon display
    */
-  iconDisplay(options: {
-    /** Icon to show for true values */
-    trueIcon?: string;
-    /** Icon to show for false values */
-    falseIcon?: string;
-    /** Icon to show for null values */
-    nullIcon?: string;
-    /** Color for true icon (default: 'green') */
-    trueColor?: string;
-    /** Color for false icon (default: 'red') */
-    falseColor?: string;
-    /** Color for null icon (default: 'gray') */
-    nullColor?: string;
-    /** Size of the icons (default: 'medium') */
-    size?: 'small' | 'medium' | 'large';
-  } = {}): this {
-    const { 
-      trueIcon = 'check', 
-      falseIcon = 'x', 
+  iconDisplay(
+    options: {
+      /** Icon to show for true values */
+      trueIcon?: string;
+      /** Icon to show for false values */
+      falseIcon?: string;
+      /** Icon to show for null values */
+      nullIcon?: string;
+      /** Color for true icon (default: 'green') */
+      trueColor?: string;
+      /** Color for false icon (default: 'red') */
+      falseColor?: string;
+      /** Color for null icon (default: 'gray') */
+      nullColor?: string;
+      /** Size of the icons (default: 'medium') */
+      size?: 'small' | 'medium' | 'large';
+    } = {}
+  ): this {
+    const {
+      trueIcon = 'check',
+      falseIcon = 'x',
       nullIcon = 'minus',
       trueColor = 'green',
       falseColor = 'red',
       nullColor = 'gray',
-      size = 'medium' 
+      size = 'medium',
     } = options;
-    
-    this.displayFormat({ 
+
+    this.displayFormat({
       type: 'icon',
       trueColor,
       falseColor,
       nullColor,
       showIcons: true,
     });
-    
+
     this.config.meta = {
       ...this.config.meta,
       iconDisplay: {
@@ -310,7 +326,7 @@ export class BooleanColumnBuilder<TData = any> extends ColumnBuilder<TData, bool
         size,
       },
     };
-    
+
     return this;
   }
-} 
+}

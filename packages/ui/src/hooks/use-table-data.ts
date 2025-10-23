@@ -1,25 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { 
-  TableAdapter, 
-  FetchDataParams, 
-  FetchDataResult, 
-  FilterState, 
-  PaginationState 
+import type {
+  FetchDataParams,
+  FetchDataResult,
+  FilterState,
+  PaginationState,
+  TableAdapter,
 } from '@better-tables/core';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface UseTableDataOptions<TData = any> {
   /** Table adapter for data fetching */
   adapter: TableAdapter<TData>;
-  
+
   /** Current filters */
   filters?: FilterState[];
-  
+
   /** Current pagination state */
   pagination?: PaginationState;
-  
+
   /** Additional fetch parameters */
   params?: Record<string, any>;
-  
+
   /** Whether to fetch data automatically */
   enabled?: boolean;
 }
@@ -27,29 +27,29 @@ export interface UseTableDataOptions<TData = any> {
 export interface UseTableDataResult<TData = any> {
   /** Table data */
   data: TData[];
-  
+
   /** Loading state */
   loading: boolean;
-  
+
   /** Error state */
   error: Error | null;
-  
+
   /** Total count of items */
   totalCount: number;
-  
+
   /** Pagination information */
   paginationInfo: FetchDataResult<TData>['pagination'] | null;
-  
+
   /** Manually trigger a refetch */
   refetch: () => Promise<void>;
-  
+
   /** Clear error state */
   clearError: () => void;
 }
 
 /**
  * Hook for fetching table data with proper cleanup and error handling
- * 
+ *
  * @example
  * ```tsx
  * const { data, loading, error, totalCount, refetch } = useTableData({
@@ -57,7 +57,7 @@ export interface UseTableDataResult<TData = any> {
  *   filters,
  *   pagination: paginationState,
  * });
- * 
+ *
  * return (
  *   <BetterTable
  *     data={data}
@@ -84,11 +84,13 @@ export function useTableData<TData = any>({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [totalCount, setTotalCount] = useState(0);
-  const [paginationInfo, setPaginationInfo] = useState<FetchDataResult<TData>['pagination'] | null>(null);
+  const [paginationInfo, setPaginationInfo] = useState<FetchDataResult<TData>['pagination'] | null>(
+    null
+  );
 
   const fetchData = useCallback(async () => {
     if (!enabled) return;
-    
+
     const abortController = new AbortController();
     setLoading(true);
     setError(null);
@@ -108,7 +110,7 @@ export function useTableData<TData = any>({
       }
 
       const result = await adapter.fetchData(fetchParams);
-      
+
       if (!abortController.signal.aborted) {
         setData(result.data);
         setTotalCount(result.total);
@@ -162,11 +164,11 @@ export function useTableData<TData = any>({
 
 /**
  * Example implementation with React Query (for reference)
- * 
+ *
  * @example
  * ```tsx
  * import { useQuery } from '@tanstack/react-query';
- * 
+ *
  * export function useTableDataWithQuery<TData = any>({
  *   adapter,
  *   filters = [],
@@ -191,7 +193,7 @@ export function useTableData<TData = any>({
  *     staleTime: 5 * 60 * 1000, // 5 minutes
  *     gcTime: 10 * 60 * 1000, // 10 minutes
  *   });
- * 
+ *
  *   return {
  *     data: result?.data ?? [],
  *     loading: isLoading,
@@ -203,4 +205,4 @@ export function useTableData<TData = any>({
  *   };
  * }
  * ```
- */ 
+ */

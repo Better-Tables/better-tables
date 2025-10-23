@@ -4,7 +4,7 @@ import { ColumnBuilder } from './column-builder';
 /**
  * Option column builder for single-select dropdown columns
  */
-export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, string> {
+export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string> {
   constructor() {
     super('option');
   }
@@ -12,18 +12,21 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
   /**
    * Set available options for the column
    */
-  options(options: FilterOption[], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Custom validation for option values */
-    validation?: (value: string) => boolean | string;
-    /** Whether to allow searching through options (default: true) */
-    searchable?: boolean;
-    /** Placeholder text for the option selector */
-    placeholder?: string;
-  } = {}): this {
+  options(
+    options: FilterOption[],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Custom validation for option values */
+      validation?: (value: string) => boolean | string;
+      /** Whether to allow searching through options (default: true) */
+      searchable?: boolean;
+      /** Placeholder text for the option selector */
+      placeholder?: string;
+    } = {}
+  ): this {
     const { includeNull = false, validation, searchable = true, placeholder } = config;
-    
+
     const filterConfig: FilterConfig<string> = {
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
       options,
@@ -57,26 +60,29 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
   /**
    * Load options from an async source
    */
-  asyncOptions(optionsLoader: () => Promise<FilterOption[]>, config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Custom validation for option values */
-    validation?: (value: string) => boolean | string;
-    /** Whether to allow searching through options (default: true) */
-    searchable?: boolean;
-    /** Placeholder text for the option selector */
-    placeholder?: string;
-    /** Loading placeholder text */
-    loadingPlaceholder?: string;
-  } = {}): this {
-    const { 
-      includeNull = false, 
-      validation, 
-      searchable = true, 
-      placeholder, 
-      loadingPlaceholder = 'Loading options...' 
+  asyncOptions(
+    optionsLoader: () => Promise<FilterOption[]>,
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Custom validation for option values */
+      validation?: (value: string) => boolean | string;
+      /** Whether to allow searching through options (default: true) */
+      searchable?: boolean;
+      /** Placeholder text for the option selector */
+      placeholder?: string;
+      /** Loading placeholder text */
+      loadingPlaceholder?: string;
+    } = {}
+  ): this {
+    const {
+      includeNull = false,
+      validation,
+      searchable = true,
+      placeholder,
+      loadingPlaceholder = 'Loading options...',
     } = config;
-    
+
     const filterConfig: FilterConfig<string> = {
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
       includeNull,
@@ -100,26 +106,29 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
   /**
    * Configure as status column with predefined status options
    */
-  status(statuses: Array<{
-    value: string;
-    label: string;
-    color: string;
-  }>, config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Default status value */
-    defaultValue?: string;
-  } = {}): this {
+  status(
+    statuses: Array<{
+      value: string;
+      label: string;
+      color: string;
+    }>,
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Default status value */
+      defaultValue?: string;
+    } = {}
+  ): this {
     const { includeNull = false, defaultValue } = config;
-    
-    const statusOptions: FilterOption[] = statuses.map(status => ({
+
+    const statusOptions: FilterOption[] = statuses.map((status) => ({
       value: status.value,
       label: status.label,
       color: status.color,
     }));
 
     this.options(statusOptions, { includeNull });
-    
+
     this.config.meta = {
       ...this.config.meta,
       status: {
@@ -133,26 +142,29 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
   /**
    * Configure as priority column with predefined priority options
    */
-  priority(priorities: Array<{
-    value: string;
-    label: string;
-    color: string;
-    order: number;
-  }> = [
-    { value: 'low', label: 'Low', color: 'gray', order: 1 },
-    { value: 'medium', label: 'Medium', color: 'yellow', order: 2 },
-    { value: 'high', label: 'High', color: 'red', order: 3 },
-  ], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Default priority value */
-    defaultValue?: string;
-  } = {}): this {
+  priority(
+    priorities: Array<{
+      value: string;
+      label: string;
+      color: string;
+      order: number;
+    }> = [
+      { value: 'low', label: 'Low', color: 'gray', order: 1 },
+      { value: 'medium', label: 'Medium', color: 'yellow', order: 2 },
+      { value: 'high', label: 'High', color: 'red', order: 3 },
+    ],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Default priority value */
+      defaultValue?: string;
+    } = {}
+  ): this {
     const { includeNull = false, defaultValue } = config;
-    
+
     const priorityOptions: FilterOption[] = priorities
       .sort((a, b) => a.order - b.order)
-      .map(priority => ({
+      .map((priority) => ({
         value: priority.value,
         label: priority.label,
         color: priority.color,
@@ -160,7 +172,7 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
       }));
 
     this.options(priorityOptions, { includeNull });
-    
+
     this.config.meta = {
       ...this.config.meta,
       priority: {
@@ -175,18 +187,21 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
   /**
    * Configure as category column
    */
-  category(categories: FilterOption[], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Whether to allow searching through categories (default: true) */
-    searchable?: boolean;
-    /** Whether to show category icons (default: true) */
-    showIcons?: boolean;
-  } = {}): this {
+  category(
+    categories: FilterOption[],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Whether to allow searching through categories (default: true) */
+      searchable?: boolean;
+      /** Whether to show category icons (default: true) */
+      showIcons?: boolean;
+    } = {}
+  ): this {
     const { includeNull = false, searchable = true, showIcons = true } = config;
-    
+
     this.options(categories, { includeNull, searchable });
-    
+
     this.config.meta = {
       ...this.config.meta,
       category: {
@@ -199,16 +214,18 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
   /**
    * Enable option badges/chips display
    */
-  showBadges(config: {
-    /** Badge variant (default: 'default') */
-    variant?: 'default' | 'secondary' | 'destructive' | 'outline';
-    /** Whether to show option colors (default: true) */
-    showColors?: boolean;
-    /** Whether to show option icons (default: true) */
-    showIcons?: boolean;
-  } = {}): this {
+  showBadges(
+    config: {
+      /** Badge variant (default: 'default') */
+      variant?: 'default' | 'secondary' | 'destructive' | 'outline';
+      /** Whether to show option colors (default: true) */
+      showColors?: boolean;
+      /** Whether to show option icons (default: true) */
+      showIcons?: boolean;
+    } = {}
+  ): this {
     const { variant = 'default', showColors = true, showIcons = true } = config;
-    
+
     this.config.meta = {
       ...this.config.meta,
       display: {
@@ -220,4 +237,4 @@ export class OptionColumnBuilder<TData = any> extends ColumnBuilder<TData, strin
     };
     return this;
   }
-} 
+}

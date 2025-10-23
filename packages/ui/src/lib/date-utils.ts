@@ -1,4 +1,4 @@
-import { format, formatRelative, formatDistance } from 'date-fns';
+import { format, formatDistance, formatRelative } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 
 export interface DateFormatConfig {
@@ -27,29 +27,29 @@ export function formatDateWithConfig(
     if (config.showRelative) {
       const now = new Date();
       const options = config.relativeOptions;
-      
+
       if (options?.style === 'short') {
         return formatDistance(date, now, { addSuffix: true, locale: enUS });
       }
-      
+
       return formatRelative(date, now, { locale: enUS });
     }
 
     // Handle standard date formatting
     const formatString = config.format || (config.showTime ? 'PPpp' : 'PPP');
-    
+
     // Use date-fns format with locale support
     let formattedDate = format(date, formatString, {
       locale: enUS, // For now, we'll use enUS. Later we can add locale support
     });
-    
+
     // Add timezone information if configured
     if (config.timeZone && config.showTime) {
-      const timeZoneShort = config.timeZone === 'UTC' ? 'UTC' : 
-                           config.timeZone.split('/').pop() || config.timeZone;
+      const timeZoneShort =
+        config.timeZone === 'UTC' ? 'UTC' : config.timeZone.split('/').pop() || config.timeZone;
       formattedDate += ` (${timeZoneShort})`;
     }
-    
+
     return formattedDate;
   } catch (error) {
     console.warn('Error formatting date:', error);
@@ -97,23 +97,25 @@ export function formatDateRange(
   config: DateFormatConfig
 ): string {
   if (!from) return '';
-  
+
   const formatString = getDateRangeFormat(config);
-  
+
   try {
     if (!to) {
       return format(from, formatString, { locale: enUS });
     }
-    
+
     // If same day, show only one date
     if (isSameDay(from, to)) {
       return format(from, formatString, { locale: enUS });
     }
-    
+
     // Different days, show range
-    return `${format(from, formatString, { locale: enUS })} - ${format(to, formatString, { locale: enUS })}`;
+    return `${format(from, formatString, { locale: enUS })} - ${format(to, formatString, {
+      locale: enUS,
+    })}`;
   } catch (error) {
     console.warn('Error formatting date range:', error);
     return `${from.toLocaleDateString()}${to ? ` - ${to.toLocaleDateString()}` : ''}`;
   }
-} 
+}

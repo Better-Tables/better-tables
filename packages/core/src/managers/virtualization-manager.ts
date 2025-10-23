@@ -1,12 +1,12 @@
 import type {
-  VirtualizationConfig,
-  VirtualizationState,
-  VirtualRowItem,
-  VirtualColumnItem,
+  RowMeasurement,
   ScrollInfo,
   ScrollToOptions,
-  RowMeasurement,
+  VirtualColumnItem,
+  VirtualRowItem,
+  VirtualizationConfig,
   VirtualizationMetrics,
+  VirtualizationState,
   VirtualizationValidationResult,
 } from '../types/virtualization';
 
@@ -15,7 +15,11 @@ import type {
  */
 export type VirtualizationManagerEvent =
   | { type: 'scroll'; scrollInfo: ScrollInfo }
-  | { type: 'virtual_items_changed'; virtualRows: VirtualRowItem[]; virtualColumns: VirtualColumnItem[] }
+  | {
+      type: 'virtual_items_changed';
+      virtualRows: VirtualRowItem[];
+      virtualColumns: VirtualColumnItem[];
+    }
   | { type: 'row_measured'; rowIndex: number; height: number }
   | { type: 'viewport_changed'; startIndex: number; endIndex: number }
   | { type: 'total_size_changed'; totalHeight: number; totalWidth: number }
@@ -66,8 +70,8 @@ export class VirtualizationManager {
 
   private subscribers: VirtualizationManagerSubscriber[] = [];
   private rowMeasurements: Map<number, RowMeasurement> = new Map();
-  private totalRows: number = 0;
-  private totalColumns: number = 0;
+  private totalRows = 0;
+  private totalColumns = 0;
   private resizeObserver: ResizeObserver | null = null;
   private performanceMetrics: VirtualizationMetrics = {
     renderedRows: 0,
@@ -82,7 +86,7 @@ export class VirtualizationManager {
     },
   };
 
-  constructor(config: Partial<VirtualizationConfig> = {}, totalRows: number = 0, totalColumns: number = 0) {
+  constructor(config: Partial<VirtualizationConfig> = {}, totalRows = 0, totalColumns = 0) {
     this.config = { ...this.config, ...config };
     this.totalRows = totalRows;
     this.totalColumns = totalColumns;
@@ -118,9 +122,12 @@ export class VirtualizationManager {
   updateScroll(scrollInfo: Partial<ScrollInfo>): void {
     const prevScrollInfo = this.state.scrollInfo;
     this.state.scrollInfo = { ...prevScrollInfo, ...scrollInfo };
-    
+
     this.updateVirtualItems();
-    this.notifySubscribers({ type: 'scroll', scrollInfo: this.state.scrollInfo });
+    this.notifySubscribers({
+      type: 'scroll',
+      scrollInfo: this.state.scrollInfo,
+    });
   }
 
   /**
@@ -129,10 +136,10 @@ export class VirtualizationManager {
   updateItemCounts(totalRows: number, totalColumns: number = this.totalColumns): void {
     const prevTotalRows = this.totalRows;
     const prevTotalColumns = this.totalColumns;
-    
+
     this.totalRows = totalRows;
     this.totalColumns = totalColumns;
-    
+
     if (prevTotalRows !== totalRows || prevTotalColumns !== totalColumns) {
       this.calculateTotalSize();
       this.updateVirtualItems();
@@ -155,13 +162,13 @@ export class VirtualizationManager {
 
     // Update measurement cache
     this.rowMeasurements.set(rowIndex, measurement);
-    
+
     // Recalculate positions for this and subsequent rows
     this.recalculateRowPositions(rowIndex);
-    
+
     // Update virtual items if this affects visible range
     this.updateVirtualItems();
-    
+
     this.notifySubscribers({ type: 'row_measured', rowIndex, height });
   }
 
@@ -184,10 +191,12 @@ export class VirtualizationManager {
           targetScrollTop = rowMeasurement.start + offset;
           break;
         case 'center':
-          targetScrollTop = rowMeasurement.start + (rowMeasurement.height - containerHeight) / 2 + offset;
+          targetScrollTop =
+            rowMeasurement.start + (rowMeasurement.height - containerHeight) / 2 + offset;
           break;
         case 'end':
-          targetScrollTop = rowMeasurement.start - (containerHeight - rowMeasurement.height) + offset;
+          targetScrollTop =
+            rowMeasurement.start - (containerHeight - rowMeasurement.height) + offset;
           break;
         case 'auto':
           // Only scroll if row is not visible
@@ -219,7 +228,10 @@ export class VirtualizationManager {
         case 'auto':
           if (columnStart < this.state.scrollInfo.scrollLeft) {
             targetScrollLeft = columnStart + offset;
-          } else if (columnStart + columnWidth > this.state.scrollInfo.scrollLeft + containerWidth) {
+          } else if (
+            columnStart + columnWidth >
+            this.state.scrollInfo.scrollLeft + containerWidth
+          ) {
             targetScrollLeft = columnStart + columnWidth - containerWidth + offset;
           }
           break;
@@ -228,8 +240,14 @@ export class VirtualizationManager {
 
     // Update scroll position
     this.updateScroll({
-      scrollTop: Math.max(0, Math.min(targetScrollTop, this.state.totalHeight - this.state.scrollInfo.clientHeight)),
-      scrollLeft: Math.max(0, Math.min(targetScrollLeft, this.state.totalWidth - this.state.scrollInfo.clientWidth)),
+      scrollTop: Math.max(
+        0,
+        Math.min(targetScrollTop, this.state.totalHeight - this.state.scrollInfo.clientHeight)
+      ),
+      scrollLeft: Math.max(
+        0,
+        Math.min(targetScrollLeft, this.state.totalWidth - this.state.scrollInfo.clientWidth)
+      ),
     });
   }
 
@@ -243,12 +261,12 @@ export class VirtualizationManager {
     }
 
     // Calculate estimated measurement
-    const height = this.config.getRowHeight 
+    const height = this.config.getRowHeight
       ? this.config.getRowHeight(rowIndex)
       : this.config.defaultRowHeight;
 
     const start = this.calculateRowStart(rowIndex);
-    
+
     return {
       index: rowIndex,
       height,
@@ -264,19 +282,19 @@ export class VirtualizationManager {
    */
   private calculateRowStart(rowIndex: number): number {
     let start = 0;
-    
+
     for (let i = 0; i < rowIndex; i++) {
       const measurement = this.rowMeasurements.get(i);
       if (measurement) {
         start += measurement.height;
       } else {
-        const height = this.config.getRowHeight 
+        const height = this.config.getRowHeight
           ? this.config.getRowHeight(i)
           : this.config.defaultRowHeight;
         start += height;
       }
     }
-    
+
     return start;
   }
 
@@ -290,7 +308,7 @@ export class VirtualizationManager {
       measurement.start = this.calculateRowStart(fromIndex);
       measurement.end = measurement.start + measurement.height;
     }
-    
+
     // Recalculate total height
     this.calculateTotalSize();
   }
@@ -300,35 +318,35 @@ export class VirtualizationManager {
    */
   private calculateTotalSize(): void {
     let totalHeight = 0;
-    
+
     // Calculate total height using measured heights where available
     for (let i = 0; i < this.totalRows; i++) {
       const measurement = this.rowMeasurements.get(i);
       if (measurement) {
         totalHeight += measurement.height;
       } else {
-        const height = this.config.getRowHeight 
+        const height = this.config.getRowHeight
           ? this.config.getRowHeight(i)
           : this.config.defaultRowHeight;
         totalHeight += height;
       }
     }
-    
+
     const totalWidth = this.config.horizontalVirtualization
       ? this.totalColumns * (this.config.defaultColumnWidth || 150)
       : this.config.containerWidth || 800;
 
     const prevTotalHeight = this.state.totalHeight;
     const prevTotalWidth = this.state.totalWidth;
-    
+
     this.state.totalHeight = totalHeight;
     this.state.totalWidth = totalWidth;
-    
+
     if (prevTotalHeight !== totalHeight || prevTotalWidth !== totalWidth) {
-      this.notifySubscribers({ 
-        type: 'total_size_changed', 
-        totalHeight, 
-        totalWidth 
+      this.notifySubscribers({
+        type: 'total_size_changed',
+        totalHeight,
+        totalWidth,
       });
     }
   }
@@ -342,8 +360,11 @@ export class VirtualizationManager {
 
     // Calculate visible row range
     const startRowIndex = this.findRowIndexByPosition(scrollTop);
-    const endRowIndex = Math.min(this.totalRows - 1, this.findRowIndexByPosition(scrollTop + clientHeight - 1));
-    
+    const endRowIndex = Math.min(
+      this.totalRows - 1,
+      this.findRowIndexByPosition(scrollTop + clientHeight - 1)
+    );
+
     // Add overscan
     const overscanStartIndex = Math.max(0, startRowIndex - overscan);
     const overscanEndIndex = Math.min(this.totalRows - 1, endRowIndex + overscan);
@@ -362,7 +383,7 @@ export class VirtualizationManager {
     }
 
     // Calculate visible column range (if horizontal virtualization enabled)
-    let virtualColumns: VirtualColumnItem[] = [];
+    const virtualColumns: VirtualColumnItem[] = [];
     let startColumnIndex = 0;
     let endColumnIndex = this.totalColumns - 1;
 
@@ -392,7 +413,7 @@ export class VirtualizationManager {
     // Update state
     const prevStartIndex = this.state.startIndex;
     const prevEndIndex = this.state.endIndex;
-    
+
     this.state.virtualRows = virtualRows;
     this.state.virtualColumns = virtualColumns;
     this.state.startIndex = startRowIndex;
@@ -401,17 +422,17 @@ export class VirtualizationManager {
     this.state.endColumnIndex = endColumnIndex;
 
     // Notify subscribers
-    this.notifySubscribers({ 
-      type: 'virtual_items_changed', 
-      virtualRows, 
-      virtualColumns 
+    this.notifySubscribers({
+      type: 'virtual_items_changed',
+      virtualRows,
+      virtualColumns,
     });
 
     if (prevStartIndex !== startRowIndex || prevEndIndex !== endRowIndex) {
-      this.notifySubscribers({ 
-        type: 'viewport_changed', 
-        startIndex: startRowIndex, 
-        endIndex: endRowIndex 
+      this.notifySubscribers({
+        type: 'viewport_changed',
+        startIndex: startRowIndex,
+        endIndex: endRowIndex,
       });
     }
 
@@ -435,7 +456,8 @@ export class VirtualizationManager {
 
       if (position >= measurement.start && position < measurement.end) {
         return mid;
-      } else if (position < measurement.start) {
+      }
+      if (position < measurement.start) {
         high = mid - 1;
       } else {
         low = mid + 1;
@@ -454,13 +476,14 @@ export class VirtualizationManager {
         for (const entry of entries) {
           const element = entry.target as HTMLElement;
           const rowIndex = parseInt(element.dataset.rowIndex || '0', 10);
-          
-          if (!isNaN(rowIndex)) {
+
+          if (!Number.isNaN(rowIndex)) {
             const height = entry.contentRect.height;
             const previousMeasurement = this.rowMeasurements.get(rowIndex);
             const previousHeight = previousMeasurement?.height || this.config.defaultRowHeight;
-            
-            if (Math.abs(height - previousHeight) > 1) { // Only update if significant change
+
+            if (Math.abs(height - previousHeight) > 1) {
+              // Only update if significant change
               this.measureRow(rowIndex, height);
             }
           }
@@ -494,7 +517,7 @@ export class VirtualizationManager {
   private updatePerformanceMetrics(): void {
     const renderedRows = this.state.virtualRows.length;
     const renderedColumns = this.state.virtualColumns.length || 1;
-    
+
     this.performanceMetrics = {
       renderedRows,
       renderedColumns,
@@ -504,7 +527,7 @@ export class VirtualizationManager {
       averageRenderTime: 0, // To be implemented with actual render timing
       memoryUsage: {
         domNodes: renderedRows * renderedColumns,
-        estimatedKB: (renderedRows * renderedColumns * 0.5), // Rough estimate
+        estimatedKB: renderedRows * renderedColumns * 0.5, // Rough estimate
       },
     };
   }
@@ -550,7 +573,10 @@ export class VirtualizationManager {
       this.updateVirtualItems();
     }
 
-    this.notifySubscribers({ type: 'configuration_updated', config: this.config });
+    this.notifySubscribers({
+      type: 'configuration_updated',
+      config: this.config,
+    });
   }
 
   /**
@@ -611,13 +637,13 @@ export class VirtualizationManager {
    * Notify all subscribers of virtualization changes
    */
   private notifySubscribers(event: VirtualizationManagerEvent): void {
-    this.subscribers.forEach(callback => {
+    for (const callback of this.subscribers) {
       try {
         callback(event);
       } catch (error) {
         console.error('Error in virtualization manager subscriber:', error);
       }
-    });
+    }
   }
 
   /**
@@ -663,12 +689,12 @@ export class VirtualizationManager {
    */
   clone(): VirtualizationManager {
     const cloned = new VirtualizationManager(this.config, this.totalRows, this.totalColumns);
-    
+
     // Copy measurements
     this.rowMeasurements.forEach((measurement, index) => {
       cloned.rowMeasurements.set(index, { ...measurement });
     });
-    
+
     // Copy state
     cloned.state = {
       ...this.state,
@@ -676,7 +702,7 @@ export class VirtualizationManager {
       virtualColumns: [...this.state.virtualColumns],
       scrollInfo: { ...this.state.scrollInfo },
     };
-    
+
     return cloned;
   }
-} 
+}

@@ -2,7 +2,21 @@
  * Date range presets for filter inputs
  */
 
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears, addDays } from 'date-fns';
+import {
+  addDays,
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  endOfYear,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+  subDays,
+  subMonths,
+  subWeeks,
+  subYears,
+} from 'date-fns';
 
 export interface DatePreset {
   /** Unique identifier for the preset */
@@ -234,25 +248,30 @@ export const DEFAULT_DATE_PRESETS: DatePreset[] = [
 /**
  * Get presets grouped by category
  */
-export function getGroupedPresets(presets: DatePreset[] = DEFAULT_DATE_PRESETS): Record<string, DatePreset[]> {
+export function getGroupedPresets(
+  presets: DatePreset[] = DEFAULT_DATE_PRESETS
+): Record<string, DatePreset[]> {
   const grouped: Record<string, DatePreset[]> = {};
-  
-  presets.forEach(preset => {
+
+  presets.forEach((preset) => {
     const category = preset.category || 'relative';
     if (!grouped[category]) {
       grouped[category] = [];
     }
     grouped[category].push(preset);
   });
-  
+
   return grouped;
 }
 
 /**
  * Get preset by ID
  */
-export function getPresetById(id: string, presets: DatePreset[] = DEFAULT_DATE_PRESETS): DatePreset | undefined {
-  return presets.find(preset => preset.id === id);
+export function getPresetById(
+  id: string,
+  presets: DatePreset[] = DEFAULT_DATE_PRESETS
+): DatePreset | undefined {
+  return presets.find((preset) => preset.id === id);
 }
 
 /**
@@ -331,31 +350,28 @@ export function findMatchingPreset(
   to: Date,
   presets: DatePreset[] = DEFAULT_DATE_PRESETS
 ): DatePreset | undefined {
-  return presets.find(preset => {
+  return presets.find((preset) => {
     const range = preset.getRange();
-    return (
-      range.from.getTime() === from.getTime() &&
-      range.to.getTime() === to.getTime()
-    );
+    return range.from.getTime() === from.getTime() && range.to.getTime() === to.getTime();
   });
 }
 
 /**
  * Format preset label with date range
  */
-export function formatPresetLabel(preset: DatePreset, showDates: boolean = false): string {
+export function formatPresetLabel(preset: DatePreset, showDates = false): string {
   if (!showDates) {
     return preset.label;
   }
-  
+
   const range = preset.getRange();
   const fromStr = range.from.toLocaleDateString();
   const toStr = range.to.toLocaleDateString();
-  
+
   if (fromStr === toStr) {
     return `${preset.label} (${fromStr})`;
   }
-  
+
   return `${preset.label} (${fromStr} - ${toStr})`;
 }
 
@@ -414,4 +430,4 @@ export function getDatePresetConfig(columnMeta?: Record<string, any>): DatePrese
   }
 
   return config;
-} 
+}

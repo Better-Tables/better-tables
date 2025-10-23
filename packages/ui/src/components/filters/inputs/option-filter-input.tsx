@@ -1,6 +1,7 @@
 'use client';
 
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -9,11 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useFilterValidation } from '@/hooks/use-filter-validation';
 import { cn } from '@/lib/utils';
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { X } from 'lucide-react';
 
 export interface OptionFilterInputProps<TData = any> {
   /** Filter state */
@@ -37,7 +37,7 @@ export function OptionFilterInput<TData = any>({
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
 
   const selectedValues = filter.values || [];
-  
+
   // Validate the current values
   const validation = useFilterValidation({
     filter,
@@ -52,13 +52,13 @@ export function OptionFilterInput<TData = any>({
 
   const handleMultipleToggle = (value: string) => {
     const newValues = selectedValues.includes(value)
-      ? selectedValues.filter(v => v !== value)
+      ? selectedValues.filter((v) => v !== value)
       : [...selectedValues, value];
     onChange(newValues);
   };
 
   const handleRemoveValue = (value: string) => {
-    onChange(selectedValues.filter(v => v !== value));
+    onChange(selectedValues.filter((v) => v !== value));
   };
 
   if (needsNoValues) {
@@ -77,11 +77,15 @@ export function OptionFilterInput<TData = any>({
         {/* Selected Values */}
         {selectedValues.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {selectedValues.map(value => {
-              const option = options.find(opt => opt.value === value);
+            {selectedValues.map((value) => {
+              const option = options.find((opt) => opt.value === value);
               return (
                 <Badge key={value} variant="secondary" className="text-xs">
-                  {option?.icon && <span className="mr-1"><option.icon /></span>}
+                  {option?.icon && (
+                    <span className="mr-1">
+                      <option.icon />
+                    </span>
+                  )}
                   {option?.label || value}
                   <Button
                     variant="ghost"
@@ -100,20 +104,28 @@ export function OptionFilterInput<TData = any>({
 
         {/* Option Selection */}
         <Select onValueChange={handleMultipleToggle} disabled={disabled}>
-          <SelectTrigger className={cn(
-            !validation.isValid && selectedValues.length > 0 && "border-destructive focus:ring-destructive"
-          )}>
+          <SelectTrigger
+            className={cn(
+              !validation.isValid &&
+                selectedValues.length > 0 &&
+                'border-destructive focus:ring-destructive'
+            )}
+          >
             <SelectValue placeholder="Add option..." />
           </SelectTrigger>
           <SelectContent>
-            {options.map(option => (
+            {options.map((option) => (
               <SelectItem
                 key={option.value}
                 value={option.value}
                 disabled={selectedValues.includes(option.value)}
               >
                 <div className="flex items-center gap-2">
-                  {option.icon && <span><option.icon /></span>}
+                  {option.icon && (
+                    <span>
+                      <option.icon />
+                    </span>
+                  )}
                   <span>{option.label}</span>
                   {option.count !== undefined && (
                     <span className="text-xs text-muted-foreground">({option.count})</span>
@@ -134,17 +146,29 @@ export function OptionFilterInput<TData = any>({
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">Select Option</Label>
-      <Select value={selectedValues[0] || ''} onValueChange={handleSingleSelect} disabled={disabled}>
-        <SelectTrigger className={cn(
-          !validation.isValid && selectedValues.length > 0 && "border-destructive focus:ring-destructive"
-        )}>
+      <Select
+        value={selectedValues[0] || ''}
+        onValueChange={handleSingleSelect}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          className={cn(
+            !validation.isValid &&
+              selectedValues.length > 0 &&
+              'border-destructive focus:ring-destructive'
+          )}
+        >
           <SelectValue placeholder="Choose an option..." />
         </SelectTrigger>
         <SelectContent>
-          {options.map(option => (
+          {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               <div className="flex items-center gap-2">
-                {option.icon && <span><option.icon /></span>}
+                {option.icon && (
+                  <span>
+                    <option.icon />
+                  </span>
+                )}
                 <span>{option.label}</span>
                 {option.count !== undefined && (
                   <span className="text-xs text-muted-foreground">({option.count})</span>

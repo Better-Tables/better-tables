@@ -1,21 +1,21 @@
-import { describe, it, expect, expectTypeOf } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
+  // Common types
+  BaseConfig,
+  DataEvent,
+  EventHandler,
+  IconComponent,
+  PaginationConfig,
   // Pagination types
   PaginationParams,
   PaginationState,
-  PaginationConfig,
+  RenderProps,
   // Sorting types
   SortDirection,
+  SortingConfig,
   SortingParams,
   SortingState,
-  SortingConfig,
-  // Common types
-  BaseConfig,
   TableTheme,
-  IconComponent,
-  RenderProps,
-  EventHandler,
-  DataEvent,
 } from '../../src/types';
 
 describe('Utility Types', () => {
@@ -96,7 +96,7 @@ describe('Utility Types', () => {
         maxSortColumns: 3,
         defaultSort: [{ columnId: 'id', direction: 'asc' }],
         resetOnClick: false,
-        comparator: (a: any, b: any, columnId: string, direction: SortDirection) => {
+        comparator: (a: unknown, b: unknown, columnId: string, direction: SortDirection) => {
           if (direction === 'asc') {
             return a[columnId] > b[columnId] ? 1 : -1;
           }
@@ -125,7 +125,7 @@ describe('Utility Types', () => {
 
       expectTypeOf(config.id).toBeString();
       expectTypeOf(config.name).toEqualTypeOf<string | undefined>();
-      expectTypeOf(config.meta).toEqualTypeOf<Record<string, any> | undefined>();
+      expectTypeOf(config.meta).toEqualTypeOf<Record<string, unknown> | undefined>();
     });
 
     it('should type TableTheme correctly', () => {
@@ -149,19 +149,23 @@ describe('Utility Types', () => {
       };
 
       expectTypeOf(theme.colors).toMatchTypeOf<Record<string, string | undefined> | undefined>();
-      expectTypeOf(theme.components).toMatchTypeOf<Record<string, Record<string, any> | undefined> | undefined>();
+      expectTypeOf(theme.components).toMatchTypeOf<
+        Record<string, Record<string, unknown> | undefined> | undefined
+      >();
     });
 
     it('should type IconComponent correctly', () => {
-      const Icon: IconComponent = ({ className: _className, size: _size }) => null;
-      
-      expectTypeOf(Icon).toMatchTypeOf<React.ComponentType<{ className?: string; size?: number }>>();
+      const icon: IconComponent = ({ className: _className, size: _size }) => null;
+
+      expectTypeOf(icon).toMatchTypeOf<
+        React.ComponentType<{ className?: string; size?: number }>
+      >();
     });
 
     it('should type RenderProps with generics', () => {
       type User = { id: string; name: string };
       type Column = { id: string; displayName: string };
-      
+
       const props: RenderProps<User, string, Column> = {
         row: { id: '1', name: 'John' },
         value: 'John',
@@ -177,20 +181,20 @@ describe('Utility Types', () => {
 
     it('should type EventHandler correctly', () => {
       const voidHandler: EventHandler = (_event) => {
-        console.log('Event handled');
+        // Event handled
       };
 
       const asyncHandler: EventHandler<{ id: string }> = async (event) => {
         await fetch(`/api/items/${event.id}`);
       };
 
-      expectTypeOf(voidHandler).toMatchTypeOf<(event: void) => void | Promise<void>>();
+      expectTypeOf(voidHandler).toMatchTypeOf<(event: unknown) => void | Promise<void>>();
       expectTypeOf(asyncHandler).toMatchTypeOf<(event: { id: string }) => void | Promise<void>>();
     });
 
     it('should type DataEvent for real-time updates', () => {
       type Item = { id: string; name: string };
-      
+
       const insertEvent: DataEvent<Item> = {
         type: 'insert',
         data: { id: '1', name: 'New Item' },
@@ -213,7 +217,7 @@ describe('Utility Types', () => {
 
       expectTypeOf(insertEvent.type).toEqualTypeOf<'insert' | 'update' | 'delete'>();
       expectTypeOf(updateEvent.data).toMatchTypeOf<Item | Item[]>();
-      expectTypeOf(deleteEvent.meta).toEqualTypeOf<Record<string, any> | undefined>();
+      expectTypeOf(deleteEvent.meta).toEqualTypeOf<Record<string, unknown> | undefined>();
     });
   });
 
@@ -253,4 +257,4 @@ describe('Utility Types', () => {
       expectTypeOf(renderProps.row.roles).toEqualTypeOf<string[]>();
     });
   });
-}); 
+});

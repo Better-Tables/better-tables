@@ -20,7 +20,7 @@ export interface SelectionState {
 /**
  * Selection configuration
  */
-export interface SelectionConfig {
+export interface SelectionConfig<TData = any> {
   /** Selection mode */
   mode?: SelectionMode;
   /** Maximum number of selections (for multiple mode) */
@@ -30,9 +30,9 @@ export interface SelectionConfig {
   /** Whether to show select all checkbox */
   showSelectAll?: boolean;
   /** Custom key function for row IDs */
-  getRowId?: (row: any) => string;
+  getRowId?: (row: TData) => string;
   /** Whether to disable selection for specific rows */
-  isSelectable?: (row: any) => boolean;
+  isSelectable?: (row: TData) => boolean;
 }
 
 /**
@@ -59,4 +59,4 @@ export interface SelectionStats {
   someSelected: boolean;
   /** Selection percentage */
   selectionPercentage: number;
-} 
+}

@@ -1,13 +1,13 @@
 'use client';
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { TextFilterInput } from './inputs/text-filter-input';
-import { NumberFilterInput } from './inputs/number-filter-input';
-import { DateFilterInput } from './inputs/date-filter-input';
-import { OptionFilterInput } from './inputs/option-filter-input';
-import { MultiOptionFilterInput } from './inputs/multi-option-filter-input';
-import { BooleanFilterInput } from './inputs/boolean-filter-input';
 import { IncludeUnknownControl, useIncludeUnknownControl } from './include-unknown-control';
+import { BooleanFilterInput } from './inputs/boolean-filter-input';
+import { DateFilterInput } from './inputs/date-filter-input';
+import { MultiOptionFilterInput } from './inputs/multi-option-filter-input';
+import { NumberFilterInput } from './inputs/number-filter-input';
+import { OptionFilterInput } from './inputs/option-filter-input';
+import { TextFilterInput } from './inputs/text-filter-input';
 
 export interface FilterValueInputProps<TData = any> {
   /** Filter state */
@@ -31,7 +31,7 @@ export function FilterValueInput<TData = any>({
 }: FilterValueInputProps<TData>) {
   // Check if we should show the include unknown control
   const shouldShowIncludeUnknown = useIncludeUnknownControl(filter, column);
-  
+
   // Get the appropriate input component based on column type
   const getInputComponent = () => {
     switch (column.type) {
@@ -39,32 +39,88 @@ export function FilterValueInput<TData = any>({
       case 'email':
       case 'url':
       case 'phone':
-        return <TextFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <TextFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       case 'number':
       case 'currency':
       case 'percentage':
-        return <NumberFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <NumberFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       case 'date':
-        return <DateFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <DateFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       case 'boolean':
-        return <BooleanFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <BooleanFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       case 'option':
-        return <OptionFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <OptionFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       case 'multiOption':
-        return <MultiOptionFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <MultiOptionFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       case 'json':
         // For JSON, use text input for now
-        return <TextFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <TextFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
 
       default:
         // Fallback to text input
-        return <TextFilterInput filter={filter} column={column} onChange={onChange} disabled={disabled} />;
+        return (
+          <TextFilterInput
+            filter={filter}
+            column={column}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        );
     }
   };
 
@@ -77,7 +133,7 @@ export function FilterValueInput<TData = any>({
   return (
     <div className="space-y-4">
       {getInputComponent()}
-      
+
       {shouldShowIncludeUnknown && onIncludeNullChange && (
         <IncludeUnknownControl
           filter={filter}

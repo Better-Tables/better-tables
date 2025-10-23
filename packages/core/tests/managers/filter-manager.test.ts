@@ -1,15 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilterManager } from '../../src/managers/filter-manager';
 import type { ColumnDefinition } from '../../src/types/column';
 import type { FilterState } from '../../src/types/filter';
 
+interface TestData {
+  name: string;
+  age: number;
+  birthDate: Date;
+  status: string;
+  tags: string[];
+  active: boolean;
+  readonly: string;
+}
+
 // Mock column definitions for testing
-const mockColumns: ColumnDefinition[] = [
+const mockColumns: ColumnDefinition<TestData>[] = [
   {
     id: 'name',
     displayName: 'Name',
     type: 'text',
-    accessor: (row: any) => row.name,
+    accessor: (row: TestData) => row.name,
     filterable: true,
     sortable: true,
     resizable: true,
@@ -22,7 +32,7 @@ const mockColumns: ColumnDefinition[] = [
     id: 'age',
     displayName: 'Age',
     type: 'number',
-    accessor: (row: any) => row.age,
+    accessor: (row: TestData) => row.age,
     filterable: true,
     sortable: true,
     resizable: true,
@@ -36,7 +46,7 @@ const mockColumns: ColumnDefinition[] = [
     id: 'birthDate',
     displayName: 'Birth Date',
     type: 'date',
-    accessor: (row: any) => row.birthDate,
+    accessor: (row: TestData) => row.birthDate,
     filterable: true,
     sortable: true,
     resizable: true,
@@ -45,7 +55,7 @@ const mockColumns: ColumnDefinition[] = [
     id: 'status',
     displayName: 'Status',
     type: 'option',
-    accessor: (row: any) => row.status,
+    accessor: (row: TestData) => row.status,
     filterable: true,
     sortable: true,
     resizable: true,
@@ -62,7 +72,7 @@ const mockColumns: ColumnDefinition[] = [
     id: 'tags',
     displayName: 'Tags',
     type: 'multiOption',
-    accessor: (row: any) => row.tags,
+    accessor: (row: TestData) => row.tags,
     filterable: true,
     sortable: true,
     resizable: true,
@@ -71,7 +81,7 @@ const mockColumns: ColumnDefinition[] = [
     id: 'active',
     displayName: 'Active',
     type: 'boolean',
-    accessor: (row: any) => row.active,
+    accessor: (row: TestData) => row.active,
     filterable: true,
     sortable: true,
     resizable: true,
@@ -80,7 +90,7 @@ const mockColumns: ColumnDefinition[] = [
     id: 'readonly',
     displayName: 'Readonly',
     type: 'text',
-    accessor: (row: any) => row.readonly,
+    accessor: (row: TestData) => row.readonly,
     filterable: false, // Not filterable
     sortable: true,
     resizable: true,
@@ -263,7 +273,9 @@ describe('FilterManager', () => {
         },
       ];
 
-      filters.forEach(filter => filterManager.addFilter(filter));
+      for (const filter of filters) {
+        filterManager.addFilter(filter);
+      }
     });
 
     it('should get filter for specific column', () => {
@@ -355,7 +367,7 @@ describe('FilterManager', () => {
       const filter: FilterState = {
         columnId: 'name',
         type: 'text',
-        operator: 'unknown' as any,
+        operator: 'unknown' as never,
         values: ['John'],
       };
 
@@ -408,7 +420,12 @@ describe('FilterManager', () => {
     it('should get available operators for a column', () => {
       const operators = filterManager.getAvailableOperators('name');
       expect(operators).toHaveLength(4);
-      expect(operators.map(op => op.key)).toEqual(['contains', 'equals', 'startsWith', 'endsWith']);
+      expect(operators.map((op) => op.key)).toEqual([
+        'contains',
+        'equals',
+        'startsWith',
+        'endsWith',
+      ]);
     });
 
     it('should return empty array for non-filterable column', () => {
@@ -466,7 +483,7 @@ describe('FilterManager', () => {
 
     it('should notify subscribers when filter is updated', () => {
       const callback = vi.fn();
-      
+
       const filter: FilterState = {
         columnId: 'name',
         type: 'text',
@@ -495,7 +512,7 @@ describe('FilterManager', () => {
 
     it('should notify subscribers when filter is removed', () => {
       const callback = vi.fn();
-      
+
       const filter: FilterState = {
         columnId: 'name',
         type: 'text',
@@ -516,7 +533,7 @@ describe('FilterManager', () => {
 
     it('should notify subscribers when filters are cleared', () => {
       const callback = vi.fn();
-      
+
       const filter: FilterState = {
         columnId: 'name',
         type: 'text',
@@ -573,7 +590,9 @@ describe('FilterManager', () => {
         },
       ];
 
-      filters.forEach(filter => filterManager.addFilter(filter));
+      for (const filter of filters) {
+        filterManager.addFilter(filter);
+      }
     });
 
     it('should serialize filters to JSON', () => {
@@ -645,7 +664,9 @@ describe('FilterManager', () => {
         },
       ];
 
-      filters.forEach(filter => filterManager.addFilter(filter));
+      for (const filter of filters) {
+        filterManager.addFilter(filter);
+      }
     });
 
     it('should get filter statistics', () => {
@@ -703,7 +724,7 @@ describe('FilterManager', () => {
       filterManager.addFilter(filter);
 
       expect(() => {
-        filterManager.updateFilter('name', { operator: 'unknown' as any });
+        filterManager.updateFilter('name', { operator: 'unknown' as never });
       }).toThrow('Invalid filter update');
     });
 
@@ -735,4 +756,4 @@ describe('FilterManager', () => {
       consoleSpy.mockRestore();
     });
   });
-}); 
+});

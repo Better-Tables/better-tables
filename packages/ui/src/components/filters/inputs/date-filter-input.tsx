@@ -1,19 +1,19 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { CalendarIcon, Clock } from 'lucide-react';
+import * as React from 'react';
 
+import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
+import { type DatePreset, getCommonPresets, getDatePresetConfig } from '@/lib/date-presets';
+import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
-import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
-import { formatDateWithConfig, formatDateRange } from '@/lib/date-utils';
-import { getDatePresetConfig, getCommonPresets, type DatePreset } from '@/lib/date-presets';
 
 export interface DateFilterInputProps<TData = any> {
   /** Filter state */
@@ -43,24 +43,21 @@ export function DateFilterInput<TData = any>({
     'isNotNull',
   ].includes(filter.operator);
 
-  // Get date formatting configuration from column metadata
+  // Get date formatting configuration from column filter config
   const dateFormat = React.useMemo(() => {
-    const format = column.meta?.dateFormat;
+    const filterConfig = column.filter;
     return {
-      format: format?.format || 'PPP', // Default to date-fns 'PPP' format
-      locale: format?.locale || 'en-US',
-      showTime: format?.showTime || false,
-      showRelative: format?.showRelative || false,
-      timeZone: format?.timeZone,
-      relativeOptions: format?.relativeOptions,
+      format: filterConfig?.format || 'PPP', // Default to date-fns 'PPP' format
+      locale: 'en-US',
+      showTime: filterConfig?.includeTime || false,
+      showRelative: false,
+      timeZone: undefined,
+      relativeOptions: undefined,
     };
-  }, [column.meta?.dateFormat]);
+  }, [column.filter]);
 
   // Get date preset configuration
-  const presetConfig = React.useMemo(() => 
-    getDatePresetConfig(column.meta), 
-    [column.meta]
-  );
+  const presetConfig = React.useMemo(() => getDatePresetConfig(column.meta), [column.meta]);
 
   // Get presets to show
   const presets = React.useMemo(() => {
@@ -144,19 +141,22 @@ export function DateFilterInput<TData = any>({
   }, [filter.values, needsDateRange]);
 
   // Handle preset selection
-  const handlePresetSelect = React.useCallback((preset: DatePreset) => {
-    const range = preset.getRange();
-    
-    if (needsDateRange) {
-      setDateRange({ from: range.from, to: range.to });
-    } else {
-      // For single date, use the from date
-      setSingleDate(range.from);
-    }
-  }, [needsDateRange]);
+  const handlePresetSelect = React.useCallback(
+    (preset: DatePreset) => {
+      const range = preset.getRange();
+
+      if (needsDateRange) {
+        setDateRange({ from: range.from, to: range.to });
+      } else {
+        // For single date, use the from date
+        setSingleDate(range.from);
+      }
+    },
+    [needsDateRange]
+  );
 
   // Preset component
-  const PresetButtons = React.memo(() => (
+  const presetButtons = React.memo(() => (
     <div className="flex flex-col gap-1 p-2">
       <div className="flex items-center gap-2 mb-2">
         <Clock className="h-4 w-4 text-muted-foreground" />
@@ -198,7 +198,7 @@ export function DateFilterInput<TData = any>({
               className={cn(
                 'w-full justify-start text-left font-normal',
                 !dateRange && 'text-muted-foreground',
-                !validation.isValid && validationValues.length > 0 && 'border-destructive',
+                !validation.isValid && validationValues.length > 0 && 'border-destructive'
               )}
               disabled={disabled}
               onKeyDown={keyboardNavigation.onKeyDown}
@@ -245,7 +245,7 @@ export function DateFilterInput<TData = any>({
             className={cn(
               'w-full justify-start text-left font-normal',
               !singleDate && 'text-muted-foreground',
-              !validation.isValid && validationValues.length > 0 && 'border-destructive',
+              !validation.isValid && validationValues.length > 0 && 'border-destructive'
             )}
             disabled={disabled}
             onKeyDown={keyboardNavigation.onKeyDown}

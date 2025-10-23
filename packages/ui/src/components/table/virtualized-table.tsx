@@ -1,8 +1,8 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import { cn } from '../../lib/utils';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table';
-import { useVirtualization, type UseVirtualizationConfig } from '../../hooks/use-virtualization';
 import type { ColumnDefinition } from '@better-tables/core';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
+import { cn } from '../../lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 /**
  * Props for the VirtualizedTable component
@@ -10,45 +10,50 @@ import type { ColumnDefinition } from '@better-tables/core';
 export interface VirtualizedTableProps<T = any> {
   /** Array of data to display */
   data: T[];
-  
+
   /** Array of column definitions */
   columns: ColumnDefinition<T>[];
-  
+
   /** Virtualization configuration */
   virtualization?: Partial<UseVirtualizationConfig>;
-  
+
   /** Custom row renderer */
   renderRow?: (item: T, index: number, style: React.CSSProperties) => React.ReactNode;
-  
+
   /** Custom cell renderer */
-  renderCell?: (value: any, column: ColumnDefinition<T>, item: T, rowIndex: number) => React.ReactNode;
-  
+  renderCell?: (
+    value: any,
+    column: ColumnDefinition<T>,
+    item: T,
+    rowIndex: number
+  ) => React.ReactNode;
+
   /** Row height (static) */
   rowHeight?: number;
-  
+
   /** Enable dynamic row heights */
   dynamicRowHeight?: boolean;
-  
+
   /** Container height */
   height?: number | string;
-  
+
   /** Container width */
   width?: number | string;
-  
+
   /** Additional CSS classes */
   className?: string;
-  
+
   /** Loading state */
   loading?: boolean;
-  
+
   /** Empty state component */
   emptyState?: React.ReactNode;
-  
+
   /** Callbacks */
   onRowClick?: (item: T, index: number) => void;
   onScroll?: (scrollInfo: any) => void;
   onViewportChange?: (startIndex: number, endIndex: number) => void;
-  
+
   /** Accessibility props */
   'aria-label'?: string;
   'aria-describedby'?: string;
@@ -62,7 +67,12 @@ interface VirtualizedRowProps<T> {
   index: number;
   columns: ColumnDefinition<T>[];
   style: React.CSSProperties;
-  renderCell?: (value: any, column: ColumnDefinition<T>, item: T, rowIndex: number) => React.ReactNode;
+  renderCell?: (
+    value: any,
+    column: ColumnDefinition<T>,
+    item: T,
+    rowIndex: number
+  ) => React.ReactNode;
   onRowClick?: (item: T, index: number) => void;
   onMeasure: (height: number) => void;
 }
@@ -90,7 +100,7 @@ function VirtualizedRow<T>({
     });
 
     resizeObserver.observe(row);
-    
+
     // Initial measurement
     onMeasure(row.offsetHeight);
 
@@ -101,10 +111,7 @@ function VirtualizedRow<T>({
     <TableRow
       ref={rowRef}
       style={style}
-      className={cn(
-        "cursor-pointer hover:bg-muted/50 transition-colors",
-        "border-b border-border"
-      )}
+      className={cn('cursor-pointer hover:bg-muted/50 transition-colors', 'border-b border-border')}
       onClick={() => onRowClick?.(item, index)}
       data-row-index={index}
     >
@@ -113,10 +120,7 @@ function VirtualizedRow<T>({
         return (
           <TableCell
             key={column.id}
-            className={cn(
-              "p-4 align-middle",
-              column.meta?.className
-            )}
+            className={cn('p-4 align-middle', column.meta?.className)}
             style={{
               width: column.meta?.width,
               minWidth: column.meta?.minWidth,
@@ -153,31 +157,35 @@ export function VirtualizedTable<T = any>({
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedBy,
 }: VirtualizedTableProps<T>) {
-  
   // Virtualization configuration
-  const virtualizationConfig: UseVirtualizationConfig = useMemo(() => ({
-    totalRows: data.length,
-    defaultRowHeight: rowHeight,
-    dynamicRowHeight,
-    containerHeight: typeof height === 'number' ? height : 400,
-    containerWidth: typeof width === 'number' ? width : undefined,
-    overscan: 5,
-    smoothScrolling: true,
-    ...virtualization,
-    onScroll,
-    onViewportChange,
-  }), [data.length, rowHeight, dynamicRowHeight, height, width, virtualization, onScroll, onViewportChange]);
+  const virtualizationConfig: UseVirtualizationConfig = useMemo(
+    () => ({
+      totalRows: data.length,
+      defaultRowHeight: rowHeight,
+      dynamicRowHeight,
+      containerHeight: typeof height === 'number' ? height : 400,
+      containerWidth: typeof width === 'number' ? width : undefined,
+      overscan: 5,
+      smoothScrolling: true,
+      ...virtualization,
+      onScroll,
+      onViewportChange,
+    }),
+    [
+      data.length,
+      rowHeight,
+      dynamicRowHeight,
+      height,
+      width,
+      virtualization,
+      onScroll,
+      onViewportChange,
+    ]
+  );
 
   // Use the virtualization hook
-  const {
-    virtualRows,
-    containerRef,
-    contentRef,
-    actions,
-    styles,
-    metrics,
-    utils,
-  } = useVirtualization(virtualizationConfig);
+  const { virtualRows, containerRef, contentRef, actions, styles, metrics, utils } =
+    useVirtualization(virtualizationConfig);
 
   // Handle row measurements for dynamic heights
   const handleRowMeasure = (rowIndex: number) => (height: number) => {
@@ -201,10 +209,7 @@ export function VirtualizedTable<T = any>({
   // Loading state
   if (loading) {
     return (
-      <div
-        className={cn("border rounded-md", className)}
-        style={{ height, width }}
-      >
+      <div className={cn('border rounded-md', className)} style={{ height, width }}>
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -215,10 +220,7 @@ export function VirtualizedTable<T = any>({
   // Empty state
   if (data.length === 0) {
     return (
-      <div
-        className={cn("border rounded-md", className)}
-        style={{ height, width }}
-      >
+      <div className={cn('border rounded-md', className)} style={{ height, width }}>
         <div className="flex items-center justify-center h-full">
           {emptyState || <p className="text-muted-foreground">No data available</p>}
         </div>
@@ -227,18 +229,15 @@ export function VirtualizedTable<T = any>({
   }
 
   return (
-    <div 
-      className={cn("border rounded-md overflow-hidden", className)}
-      style={{ height, width }}
-    >
+    <div className={cn('border rounded-md overflow-hidden', className)} style={{ height, width }}>
       {/* Performance metrics (dev mode only) */}
       {process.env.NODE_ENV === 'development' && (
         <div className="text-xs text-muted-foreground p-2 border-b bg-muted/50">
-          Rendering {metrics.renderedRows}/{metrics.totalRows} rows 
-          ({metrics.efficiency.toFixed(1)}% efficiency)
+          Rendering {metrics.renderedRows}/{metrics.totalRows} rows ({metrics.efficiency.toFixed(1)}
+          % efficiency)
         </div>
       )}
-      
+
       {/* Table header - always visible */}
       <div className="border-b bg-background sticky top-0 z-10">
         <Table>
@@ -248,7 +247,7 @@ export function VirtualizedTable<T = any>({
                 <TableHead
                   key={column.id}
                   className={cn(
-                    "h-12 px-4 text-left align-middle font-medium",
+                    'h-12 px-4 text-left align-middle font-medium',
                     column.meta?.headerClassName
                   )}
                   style={{
@@ -256,9 +255,9 @@ export function VirtualizedTable<T = any>({
                     minWidth: column.meta?.minWidth,
                     maxWidth: column.meta?.maxWidth,
                   }}
-                                  >
-                    {column.displayName}
-                  </TableHead>
+                >
+                  {column.displayName}
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>
@@ -273,7 +272,7 @@ export function VirtualizedTable<T = any>({
           ...styles.container,
           height: typeof height === 'number' ? height - 48 : 'calc(100% - 48px)', // Subtract header height
         }}
-        aria-label={ariaLabel || "Virtualized table content"}
+        aria-label={ariaLabel || 'Virtualized table content'}
         aria-describedby={ariaDescribedBy}
         role="grid"
         tabIndex={0}
@@ -329,13 +328,18 @@ export function VirtualizedTable<T = any>({
       {process.env.NODE_ENV === 'development' && (
         <div className="text-xs text-muted-foreground p-2 border-t bg-muted/50 flex justify-between">
           <span>
-            Scroll: {Math.round(utils.getTotalHeight() > 0 
-              ? (virtualRows[0]?.start || 0) / utils.getTotalHeight() * 100 
-              : 0)}%
+            Scroll:{' '}
+            {Math.round(
+              utils.getTotalHeight() > 0
+                ? ((virtualRows[0]?.start || 0) / utils.getTotalHeight()) * 100
+                : 0
+            )}
+            %
           </span>
           <span>
-            Visible: {virtualRows.length > 0 
-              ? `${virtualRows[0].index}-${virtualRows[virtualRows.length - 1].index}` 
+            Visible:{' '}
+            {virtualRows.length > 0
+              ? `${virtualRows[0].index}-${virtualRows[virtualRows.length - 1].index}`
               : 'None'}
           </span>
         </div>
@@ -347,4 +351,4 @@ export function VirtualizedTable<T = any>({
 /**
  * Export default component
  */
-export default VirtualizedTable; 
+export default VirtualizedTable;
