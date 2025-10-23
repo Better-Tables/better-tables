@@ -1,24 +1,24 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { expectTypeOf } from 'vitest';
+import type { ColumnType } from '../../src/types/column';
+import type { FilterOperator } from '../../src/types/filter';
 import {
+  BOOLEAN_OPERATORS,
+  DATE_OPERATORS,
   FILTER_OPERATORS,
-  getOperatorsForType,
-  getOperatorDefinition,
-  getDefaultOperatorsForType,
-  validateOperatorValues,
+  FilterOperatorKey,
+  JSON_OPERATORS,
+  MULTI_OPTION_OPERATORS,
+  NUMBER_OPERATORS,
+  OPTION_OPERATORS,
+  TEXT_OPERATORS,
   createOperatorRegistry,
   getAllOperators,
-  TEXT_OPERATORS,
-  NUMBER_OPERATORS,
-  DATE_OPERATORS,
-  OPTION_OPERATORS,
-  MULTI_OPTION_OPERATORS,
-  BOOLEAN_OPERATORS,
-  JSON_OPERATORS,
-  FilterOperatorKey
+  getDefaultOperatorsForType,
+  getOperatorDefinition,
+  getOperatorsForType,
+  validateOperatorValues,
 } from '../../src/types/filter-operators';
-import type { FilterOperator } from '../../src/types/filter';
-import type { ColumnType } from '../../src/types/column';
 
 describe('Filter Operators', () => {
   describe('FILTER_OPERATORS registry', () => {
@@ -58,7 +58,7 @@ describe('Filter Operators', () => {
 
   describe('TEXT_OPERATORS', () => {
     it('should include all text operators', () => {
-      const operators = TEXT_OPERATORS.map(op => op.key);
+      const operators = TEXT_OPERATORS.map((op) => op.key);
       expect(operators).toContain('contains');
       expect(operators).toContain('equals');
       expect(operators).toContain('startsWith');
@@ -68,13 +68,13 @@ describe('Filter Operators', () => {
     });
 
     it('should have proper validation for text operators', () => {
-      const containsOp = TEXT_OPERATORS.find(op => op.key === 'contains');
+      const containsOp = TEXT_OPERATORS.find((op) => op.key === 'contains');
       expect(containsOp).toBeDefined();
       expect(containsOp?.validate?.(['hello'])).toBe(true);
       expect(containsOp?.validate?.([123])).toBe(false);
       expect(containsOp?.validate?.(['hello', 'world'])).toBe(false);
 
-      const isEmptyOp = TEXT_OPERATORS.find(op => op.key === 'isEmpty');
+      const isEmptyOp = TEXT_OPERATORS.find((op) => op.key === 'isEmpty');
       expect(isEmptyOp).toBeDefined();
       expect(isEmptyOp?.validate?.([])).toBe(true);
       expect(isEmptyOp?.validate?.(['hello'])).toBe(false);
@@ -83,7 +83,7 @@ describe('Filter Operators', () => {
 
   describe('NUMBER_OPERATORS', () => {
     it('should include all number operators', () => {
-      const operators = NUMBER_OPERATORS.map(op => op.key);
+      const operators = NUMBER_OPERATORS.map((op) => op.key);
       expect(operators).toContain('equals');
       expect(operators).toContain('notEquals');
       expect(operators).toContain('greaterThan');
@@ -97,13 +97,13 @@ describe('Filter Operators', () => {
     });
 
     it('should have proper validation for number operators', () => {
-      const greaterThanOp = NUMBER_OPERATORS.find(op => op.key === 'greaterThan');
+      const greaterThanOp = NUMBER_OPERATORS.find((op) => op.key === 'greaterThan');
       expect(greaterThanOp).toBeDefined();
       expect(greaterThanOp?.validate?.([42])).toBe(true);
       expect(greaterThanOp?.validate?.(['42'])).toBe(false);
       expect(greaterThanOp?.validate?.([42, 50])).toBe(false);
 
-      const betweenOp = NUMBER_OPERATORS.find(op => op.key === 'between');
+      const betweenOp = NUMBER_OPERATORS.find((op) => op.key === 'between');
       expect(betweenOp).toBeDefined();
       expect(betweenOp?.validate?.([10, 20])).toBe(true);
       expect(betweenOp?.validate?.([20, 10])).toBe(false);
@@ -114,7 +114,7 @@ describe('Filter Operators', () => {
 
   describe('DATE_OPERATORS', () => {
     it('should include all date operators', () => {
-      const operators = DATE_OPERATORS.map(op => op.key);
+      const operators = DATE_OPERATORS.map((op) => op.key);
       expect(operators).toContain('is');
       expect(operators).toContain('isNot');
       expect(operators).toContain('before');
@@ -134,13 +134,13 @@ describe('Filter Operators', () => {
       const date1 = new Date('2023-01-01');
       const date2 = new Date('2023-12-31');
 
-      const beforeOp = DATE_OPERATORS.find(op => op.key === 'before');
+      const beforeOp = DATE_OPERATORS.find((op) => op.key === 'before');
       expect(beforeOp).toBeDefined();
       expect(beforeOp?.validate?.([date1])).toBe(true);
       expect(beforeOp?.validate?.(['2023-01-01'])).toBe(false);
       expect(beforeOp?.validate?.([date1, date2])).toBe(false);
 
-      const betweenOp = DATE_OPERATORS.find(op => op.key === 'between');
+      const betweenOp = DATE_OPERATORS.find((op) => op.key === 'between');
       expect(betweenOp).toBeDefined();
       expect(betweenOp?.validate?.([date1, date2])).toBe(true);
       expect(betweenOp?.validate?.([date2, date1])).toBe(false);
@@ -150,7 +150,7 @@ describe('Filter Operators', () => {
 
   describe('OPTION_OPERATORS', () => {
     it('should include all option operators', () => {
-      const operators = OPTION_OPERATORS.map(op => op.key);
+      const operators = OPTION_OPERATORS.map((op) => op.key);
       expect(operators).toContain('is');
       expect(operators).toContain('isNot');
       expect(operators).toContain('isAnyOf');
@@ -160,13 +160,13 @@ describe('Filter Operators', () => {
     });
 
     it('should have proper validation for option operators', () => {
-      const isOp = OPTION_OPERATORS.find(op => op.key === 'is');
+      const isOp = OPTION_OPERATORS.find((op) => op.key === 'is');
       expect(isOp).toBeDefined();
       expect(isOp?.validate?.(['active'])).toBe(true);
       expect(isOp?.validate?.([null])).toBe(false);
       expect(isOp?.validate?.(['active', 'inactive'])).toBe(false);
 
-      const isAnyOfOp = OPTION_OPERATORS.find(op => op.key === 'isAnyOf');
+      const isAnyOfOp = OPTION_OPERATORS.find((op) => op.key === 'isAnyOf');
       expect(isAnyOfOp).toBeDefined();
       expect(isAnyOfOp?.validate?.(['active', 'inactive'])).toBe(true);
       expect(isAnyOfOp?.validate?.(['active'])).toBe(true);
@@ -177,7 +177,7 @@ describe('Filter Operators', () => {
 
   describe('MULTI_OPTION_OPERATORS', () => {
     it('should include all multi-option operators', () => {
-      const operators = MULTI_OPTION_OPERATORS.map(op => op.key);
+      const operators = MULTI_OPTION_OPERATORS.map((op) => op.key);
       expect(operators).toContain('includes');
       expect(operators).toContain('excludes');
       expect(operators).toContain('includesAny');
@@ -189,13 +189,13 @@ describe('Filter Operators', () => {
     });
 
     it('should have proper validation for multi-option operators', () => {
-      const includesOp = MULTI_OPTION_OPERATORS.find(op => op.key === 'includes');
+      const includesOp = MULTI_OPTION_OPERATORS.find((op) => op.key === 'includes');
       expect(includesOp).toBeDefined();
       expect(includesOp?.validate?.(['tag1'])).toBe(true);
       expect(includesOp?.validate?.([null])).toBe(false);
       expect(includesOp?.validate?.(['tag1', 'tag2'])).toBe(false);
 
-      const includesAnyOp = MULTI_OPTION_OPERATORS.find(op => op.key === 'includesAny');
+      const includesAnyOp = MULTI_OPTION_OPERATORS.find((op) => op.key === 'includesAny');
       expect(includesAnyOp).toBeDefined();
       expect(includesAnyOp?.validate?.(['tag1', 'tag2'])).toBe(true);
       expect(includesAnyOp?.validate?.(['tag1'])).toBe(true);
@@ -206,7 +206,7 @@ describe('Filter Operators', () => {
 
   describe('BOOLEAN_OPERATORS', () => {
     it('should include all boolean operators', () => {
-      const operators = BOOLEAN_OPERATORS.map(op => op.key);
+      const operators = BOOLEAN_OPERATORS.map((op) => op.key);
       expect(operators).toContain('isTrue');
       expect(operators).toContain('isFalse');
       expect(operators).toContain('isNull');
@@ -214,7 +214,7 @@ describe('Filter Operators', () => {
     });
 
     it('should have proper validation for boolean operators', () => {
-      const isTrueOp = BOOLEAN_OPERATORS.find(op => op.key === 'isTrue');
+      const isTrueOp = BOOLEAN_OPERATORS.find((op) => op.key === 'isTrue');
       expect(isTrueOp).toBeDefined();
       expect(isTrueOp?.validate?.([])).toBe(true);
       expect(isTrueOp?.validate?.([true])).toBe(false);
@@ -223,7 +223,7 @@ describe('Filter Operators', () => {
 
   describe('JSON_OPERATORS', () => {
     it('should include all JSON operators', () => {
-      const operators = JSON_OPERATORS.map(op => op.key);
+      const operators = JSON_OPERATORS.map((op) => op.key);
       expect(operators).toContain('contains');
       expect(operators).toContain('equals');
       expect(operators).toContain('isEmpty');
@@ -233,7 +233,7 @@ describe('Filter Operators', () => {
     });
 
     it('should have proper validation for JSON operators', () => {
-      const containsOp = JSON_OPERATORS.find(op => op.key === 'contains');
+      const containsOp = JSON_OPERATORS.find((op) => op.key === 'contains');
       expect(containsOp).toBeDefined();
       expect(containsOp?.validate?.(['{"key": "value"}'])).toBe(true);
       expect(containsOp?.validate?.([123])).toBe(false);
@@ -279,23 +279,49 @@ describe('Filter Operators', () => {
   describe('getDefaultOperatorsForType', () => {
     it('should return correct default operators for text types', () => {
       const textOps = getDefaultOperatorsForType('text');
-      expect(textOps).toEqual(['contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty']);
-      
+      expect(textOps).toEqual([
+        'contains',
+        'equals',
+        'startsWith',
+        'endsWith',
+        'isEmpty',
+        'isNotEmpty',
+      ]);
+
       const urlOps = getDefaultOperatorsForType('url');
       expect(urlOps).toEqual(textOps);
     });
 
     it('should return correct default operators for number types', () => {
       const numberOps = getDefaultOperatorsForType('number');
-      expect(numberOps).toEqual(['equals', 'notEquals', 'greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual', 'between', 'notBetween']);
-      
+      expect(numberOps).toEqual([
+        'equals',
+        'notEquals',
+        'greaterThan',
+        'greaterThanOrEqual',
+        'lessThan',
+        'lessThanOrEqual',
+        'between',
+        'notBetween',
+      ]);
+
       const currencyOps = getDefaultOperatorsForType('currency');
       expect(currencyOps).toEqual(numberOps);
     });
 
     it('should return correct default operators for date type', () => {
       const dateOps = getDefaultOperatorsForType('date');
-      expect(dateOps).toEqual(['is', 'isNot', 'before', 'after', 'isToday', 'isYesterday', 'isThisWeek', 'isThisMonth', 'isThisYear']);
+      expect(dateOps).toEqual([
+        'is',
+        'isNot',
+        'before',
+        'after',
+        'isToday',
+        'isYesterday',
+        'isThisWeek',
+        'isThisMonth',
+        'isThisYear',
+      ]);
     });
 
     it('should return correct default operators for boolean type', () => {
@@ -306,9 +332,16 @@ describe('Filter Operators', () => {
     it('should return correct default operators for option types', () => {
       const optionOps = getDefaultOperatorsForType('option');
       expect(optionOps).toEqual(['is', 'isNot', 'isAnyOf', 'isNoneOf']);
-      
+
       const multiOptionOps = getDefaultOperatorsForType('multiOption');
-      expect(multiOptionOps).toEqual(['includes', 'excludes', 'includesAny', 'includesAll', 'excludesAny', 'excludesAll']);
+      expect(multiOptionOps).toEqual([
+        'includes',
+        'excludes',
+        'includesAny',
+        'includesAll',
+        'excludesAny',
+        'excludesAll',
+      ]);
     });
 
     it('should return fallback operators for unknown type', () => {
@@ -321,8 +354,12 @@ describe('Filter Operators', () => {
     it('should validate operator values correctly', () => {
       // Test single value operators
       expect(validateOperatorValues('contains', ['hello'])).toBe(true);
-      expect(validateOperatorValues('contains', ['hello', 'world'])).toBe('This operator requires exactly 1 value(s)');
-      expect(validateOperatorValues('contains', [])).toBe('This operator requires exactly 1 value(s)');
+      expect(validateOperatorValues('contains', ['hello', 'world'])).toBe(
+        'This operator requires exactly 1 value(s)'
+      );
+      expect(validateOperatorValues('contains', [])).toBe(
+        'This operator requires exactly 1 value(s)'
+      );
 
       // Test no value operators
       expect(validateOperatorValues('isEmpty', [])).toBe(true);
@@ -331,10 +368,14 @@ describe('Filter Operators', () => {
       // Test variable value operators
       expect(validateOperatorValues('isAnyOf', ['option1', 'option2'])).toBe(true);
       expect(validateOperatorValues('isAnyOf', ['option1'])).toBe(true);
-      expect(validateOperatorValues('isAnyOf', [])).toBe('This operator requires at least one value');
+      expect(validateOperatorValues('isAnyOf', [])).toBe(
+        'This operator requires at least one value'
+      );
 
       // Test unknown operator
-      expect(validateOperatorValues('unknownOperator' as FilterOperator, [])).toBe('Unknown operator');
+      expect(validateOperatorValues('unknownOperator' as FilterOperator, [])).toBe(
+        'Unknown operator'
+      );
     });
 
     it('should use custom validation when available', () => {
@@ -342,7 +383,9 @@ describe('Filter Operators', () => {
       expect(validateOperatorValues('between', [10, 20])).toBe(true);
       expect(validateOperatorValues('between', [20, 10])).toBe('Invalid values for this operator');
       expect(validateOperatorValues('between', [10, 10])).toBe(true);
-      expect(validateOperatorValues('between', ['10', '20'])).toBe('Invalid values for this operator');
+      expect(validateOperatorValues('between', ['10', '20'])).toBe(
+        'Invalid values for this operator'
+      );
     });
   });
 
@@ -350,11 +393,11 @@ describe('Filter Operators', () => {
     it('should create a registry from operator definitions', () => {
       const operators = [
         { key: 'equals' as FilterOperator, label: 'Equals', valueCount: 1 },
-        { key: 'contains' as FilterOperator, label: 'Contains', valueCount: 1 }
+        { key: 'contains' as FilterOperator, label: 'Contains', valueCount: 1 },
       ];
 
       const registry = createOperatorRegistry(operators);
-      
+
       expect(registry.size).toBe(2);
       expect(registry.get('equals')).toBeDefined();
       expect(registry.get('contains')).toBeDefined();
@@ -370,19 +413,19 @@ describe('Filter Operators', () => {
   describe('getAllOperators', () => {
     it('should return all operators as a flat array', () => {
       const allOperators = getAllOperators();
-      
+
       expect(allOperators.length).toBeGreaterThan(0);
-      expect(allOperators.some(op => op.key === 'contains')).toBe(true);
-      expect(allOperators.some(op => op.key === 'equals')).toBe(true);
-      expect(allOperators.some(op => op.key === 'isTrue')).toBe(true);
-      expect(allOperators.some(op => op.key === 'includes')).toBe(true);
+      expect(allOperators.some((op) => op.key === 'contains')).toBe(true);
+      expect(allOperators.some((op) => op.key === 'equals')).toBe(true);
+      expect(allOperators.some((op) => op.key === 'isTrue')).toBe(true);
+      expect(allOperators.some((op) => op.key === 'includes')).toBe(true);
     });
 
     it('should not have duplicate operators', () => {
       const allOperators = getAllOperators();
-      const keys = allOperators.map(op => op.key);
+      const keys = allOperators.map((op) => op.key);
       const uniqueKeys = [...new Set(keys)];
-      
+
       expect(keys.length).toBe(uniqueKeys.length);
     });
   });
@@ -391,37 +434,37 @@ describe('Filter Operators', () => {
     it('should have required properties for all operators', () => {
       const allOperators = getAllOperators();
 
-      allOperators.forEach(op => {
+      for (const op of allOperators) {
         expect(op.key).toBeDefined();
         expect(op.label).toBeDefined();
         expect(op.valueCount).toBeDefined();
         expect(typeof op.supportsNull).toBe('boolean');
-        
+
         if (op.validate) {
           expect(typeof op.validate).toBe('function');
         }
-      });
+      }
     });
 
     it('should have consistent value counts', () => {
       const allOperators = getAllOperators();
-      
-      allOperators.forEach(op => {
+
+      for (const op of allOperators) {
         expect(
-          op.valueCount === 0 || 
-          op.valueCount === 1 || 
-          op.valueCount === 2 || 
-          op.valueCount === 'variable'
+          op.valueCount === 0 ||
+            op.valueCount === 1 ||
+            op.valueCount === 2 ||
+            op.valueCount === 'variable'
         ).toBe(true);
-      });
+      }
     });
   });
 
   describe('Type Safety', () => {
     it('should ensure FilterOperator type matches AllOperatorKeys', () => {
-      // This ensures the manual FilterOperator type in filter.ts 
+      // This ensures the manual FilterOperator type in filter.ts
       // stays in sync with the derived AllOperatorKeys type
       expectTypeOf<FilterOperator>().toEqualTypeOf<FilterOperatorKey>();
     });
   });
-}); 
+});

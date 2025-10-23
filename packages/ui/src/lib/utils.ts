@@ -1,8 +1,8 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 // Re-export date utilities for convenience
@@ -18,8 +18,8 @@ export {
   validateNumberInput,
   getFormattedPlaceholder,
   getNumberInputStep,
-  type NumberInputConfig
+  type NumberInputConfig,
 } from './number-format-utils';
 
 // Re-export date presets for convenience
-export * from './date-presets'; 
+export * from './date-presets';

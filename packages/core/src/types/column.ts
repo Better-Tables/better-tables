@@ -23,7 +23,7 @@ export type ColumnType =
 /**
  * Column definition for table columns
  */
-export interface ColumnDefinition<TData = any, TValue = any> {
+export interface ColumnDefinition<TData = unknown, TValue = unknown> {
   /** Unique column identifier */
   id: string;
 
@@ -76,13 +76,14 @@ export interface ColumnDefinition<TData = any, TValue = any> {
   nullable?: boolean;
 
   /** Column metadata */
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 /**
  * Props for custom cell renderers
  */
-export interface CellRendererProps<TData = any, TValue = any> extends RenderProps<TData, TValue, ColumnDefinition<TData, TValue>> {
+export interface CellRendererProps<TData = unknown, TValue = unknown>
+  extends RenderProps<TData, TValue, ColumnDefinition<TData, TValue>> {
   /** Whether the row is selected */
   isSelected?: boolean;
   /** Whether the row is expanded */
@@ -92,7 +93,7 @@ export interface CellRendererProps<TData = any, TValue = any> extends RenderProp
 /**
  * Props for custom header renderers
  */
-export interface HeaderRendererProps<TData = any> {
+export interface HeaderRendererProps<TData = unknown> {
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Sorting state */
@@ -108,7 +109,7 @@ export interface HeaderRendererProps<TData = any> {
 /**
  * Validation rule for column values
  */
-export interface ValidationRule<TValue = any> {
+export interface ValidationRule<TValue = unknown> {
   /** Rule identifier */
   id: string;
   /** Validation function */

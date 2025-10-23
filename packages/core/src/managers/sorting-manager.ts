@@ -1,5 +1,5 @@
-import type { SortingState, SortingParams, SortDirection, SortingConfig } from '../types/sorting';
 import type { ColumnDefinition } from '../types/column';
+import type { SortDirection, SortingConfig, SortingParams, SortingState } from '../types/sorting';
 
 /**
  * Event types for sorting manager
@@ -30,14 +30,14 @@ export interface SortingValidationResult {
 /**
  * Core sorting manager class for managing sorting state and operations
  */
-export class SortingManager<TData = any> {
+export class SortingManager<TData = unknown> {
   private sortingState: SortingState = [];
   private columns: ColumnDefinition<TData>[] = [];
   private subscribers: SortingManagerSubscriber[] = [];
   private config: SortingConfig = {};
 
   constructor(
-    columns: ColumnDefinition<TData>[], 
+    columns: ColumnDefinition<TData>[],
     config: SortingConfig = {},
     initialSort: SortingState = []
   ) {
@@ -47,14 +47,14 @@ export class SortingManager<TData = any> {
       multiSort: false,
       maxSortColumns: 1,
       resetOnClick: false,
-      ...config
+      ...config,
     };
-    
+
     // If multi-sort is enabled but maxSortColumns is not set, default to 3
     if (this.config.multiSort && !config.maxSortColumns) {
       this.config.maxSortColumns = 3;
     }
-    
+
     this.setSorting(initialSort);
   }
 
@@ -73,7 +73,7 @@ export class SortingManager<TData = any> {
       return;
     }
 
-    const validSorts = sorts.filter(sort => {
+    const validSorts = sorts.filter((sort) => {
       const validation = this.validateSort(sort);
       if (!validation.valid) {
         console.warn(`Invalid sort for column ${sort.columnId}: ${validation.error}`);
@@ -83,7 +83,7 @@ export class SortingManager<TData = any> {
     });
 
     // Enforce multi-sort limits
-    const limitedSorts = this.config.multiSort 
+    const limitedSorts = this.config.multiSort
       ? validSorts.slice(0, this.config.maxSortColumns || 1)
       : validSorts.slice(0, 1);
 
@@ -99,8 +99,8 @@ export class SortingManager<TData = any> {
       return;
     }
 
-    const existingSort = this.sortingState.find(s => s.columnId === columnId);
-    
+    const existingSort = this.sortingState.find((s) => s.columnId === columnId);
+
     if (existingSort) {
       if (existingSort.direction === 'asc') {
         // Toggle to desc
@@ -128,12 +128,12 @@ export class SortingManager<TData = any> {
 
     const sort: SortingParams = { columnId, direction };
     const validation = this.validateSort(sort);
-    
+
     if (!validation.valid) {
       throw new Error(`Invalid sort for column ${columnId}: ${validation.error}`);
     }
 
-    const existingIndex = this.sortingState.findIndex(s => s.columnId === columnId);
+    const existingIndex = this.sortingState.findIndex((s) => s.columnId === columnId);
 
     if (existingIndex >= 0) {
       // Update existing sort
@@ -151,7 +151,10 @@ export class SortingManager<TData = any> {
           // Remove oldest sort if at limit
           const removedSort = this.sortingState.shift();
           if (removedSort) {
-            this.notifySubscribers({ type: 'sort_removed', columnId: removedSort.columnId });
+            this.notifySubscribers({
+              type: 'sort_removed',
+              columnId: removedSort.columnId,
+            });
           }
         }
         this.sortingState.push(sort);
@@ -164,12 +167,16 @@ export class SortingManager<TData = any> {
    * Update sorting direction for a column
    */
   updateSort(columnId: string, direction: SortDirection): void {
-    const index = this.sortingState.findIndex(s => s.columnId === columnId);
+    const index = this.sortingState.findIndex((s) => s.columnId === columnId);
     if (index >= 0) {
       const sort = { ...this.sortingState[index], direction };
       this.sortingState[index] = sort;
       this.notifySubscribers({ type: 'sort_updated', columnId, sort });
-      this.notifySubscribers({ type: 'direction_toggled', columnId, direction });
+      this.notifySubscribers({
+        type: 'direction_toggled',
+        columnId,
+        direction,
+      });
     }
   }
 
@@ -177,7 +184,7 @@ export class SortingManager<TData = any> {
    * Remove sorting for a column
    */
   removeSort(columnId: string): void {
-    const index = this.sortingState.findIndex(s => s.columnId === columnId);
+    const index = this.sortingState.findIndex((s) => s.columnId === columnId);
     if (index >= 0) {
       this.sortingState.splice(index, 1);
       this.notifySubscribers({ type: 'sort_removed', columnId });
@@ -196,21 +203,21 @@ export class SortingManager<TData = any> {
    * Get sorting for a specific column
    */
   getSort(columnId: string): SortingParams | undefined {
-    return this.sortingState.find(s => s.columnId === columnId);
+    return this.sortingState.find((s) => s.columnId === columnId);
   }
 
   /**
    * Check if column is currently sorted
    */
   isSorted(columnId: string): boolean {
-    return this.sortingState.some(s => s.columnId === columnId);
+    return this.sortingState.some((s) => s.columnId === columnId);
   }
 
   /**
    * Get sort direction for a column
    */
   getSortDirection(columnId: string): SortDirection | undefined {
-    const sort = this.sortingState.find(s => s.columnId === columnId);
+    const sort = this.sortingState.find((s) => s.columnId === columnId);
     return sort?.direction;
   }
 
@@ -218,7 +225,7 @@ export class SortingManager<TData = any> {
    * Get sort priority for a column (lower number = higher priority)
    */
   getSortPriority(columnId: string): number | undefined {
-    const index = this.sortingState.findIndex(s => s.columnId === columnId);
+    const index = this.sortingState.findIndex((s) => s.columnId === columnId);
     return index >= 0 ? index : undefined;
   }
 
@@ -226,7 +233,7 @@ export class SortingManager<TData = any> {
    * Get all sorted column IDs in order
    */
   getSortedColumnIds(): string[] {
-    return this.sortingState.map(s => s.columnId);
+    return this.sortingState.map((s) => s.columnId);
   }
 
   /**
@@ -247,7 +254,7 @@ export class SortingManager<TData = any> {
    * Validate a sort against column definitions
    */
   validateSort(sort: SortingParams): SortingValidationResult {
-    const column = this.columns.find(c => c.id === sort.columnId);
+    const column = this.columns.find((c) => c.id === sort.columnId);
     if (!column) {
       return { valid: false, error: `Column ${sort.columnId} not found` };
     }
@@ -257,7 +264,10 @@ export class SortingManager<TData = any> {
     }
 
     if (!['asc', 'desc'].includes(sort.direction)) {
-      return { valid: false, error: `Invalid sort direction: ${sort.direction}` };
+      return {
+        valid: false,
+        error: `Invalid sort direction: ${sort.direction}`,
+      };
     }
 
     return { valid: true };
@@ -280,13 +290,13 @@ export class SortingManager<TData = any> {
    * Notify all subscribers of sorting changes
    */
   private notifySubscribers(event: SortingManagerEvent): void {
-    this.subscribers.forEach(callback => {
+    for (const callback of this.subscribers) {
       try {
         callback(event);
       } catch (error) {
         console.error('Error in sorting manager subscriber:', error);
       }
-    });
+    }
   }
 
   /**
@@ -301,7 +311,7 @@ export class SortingManager<TData = any> {
    */
   updateConfig(config: Partial<SortingConfig>): void {
     this.config = { ...this.config, ...config };
-    
+
     // Validate current sorting state against new config
     if (!this.config.enabled) {
       this.clearSorting();
@@ -321,4 +331,4 @@ export class SortingManager<TData = any> {
   clone(): SortingManager<TData> {
     return new SortingManager(this.columns, this.config, this.sortingState);
   }
-} 
+}

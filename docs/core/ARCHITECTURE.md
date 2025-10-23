@@ -1,0 +1,731 @@
+# @better-tables/core - Architecture Guide
+
+## Overview
+
+The Better Tables core package is designed with a modular, extensible architecture that prioritizes type safety, performance, and developer experience. This guide explains the design decisions, patterns, and architectural principles that guide the implementation.
+
+## Table of Contents
+
+- [Architecture Principles](#architecture-principles)
+- [Package Structure](#package-structure)
+- [Design Patterns](#design-patterns)
+- [Type System Design](#type-system-design)
+- [State Management Architecture](#state-management-architecture)
+- [Performance Considerations](#performance-considerations)
+- [Extensibility](#extensibility)
+- [Testing Strategy](#testing-strategy)
+
+## Architecture Principles
+
+### 1. Type Safety First
+
+Every component is designed with TypeScript in mind, providing compile-time safety and excellent developer experience:
+
+```typescript
+// Generic types ensure type safety throughout the system
+interface ColumnDefinition<TData = any, TValue = any> {
+  accessor: (data: TData) => TValue;
+  // ... other properties
+}
+
+// Type-safe column builders
+const cb = createColumnBuilder<User>();
+cb.text().accessor(user => user.name); // user is typed as User
+```
+
+### 2. Fluent API Design
+
+The fluent API pattern provides an intuitive, chainable interface for configuration:
+
+```typescript
+// Readable, self-documenting configuration
+const column = cb.text()
+  .id('name')
+  .displayName('Full Name')
+  .accessor(user => `${user.firstName} ${user.lastName}`)
+  .searchable({ debounce: 300 })
+  .width(200, 100, 400)
+  .sortable(true)
+  .filterable(true)
+  .build();
+```
+
+### 3. Event-Driven Architecture
+
+All state changes are communicated through events, enabling reactive programming patterns:
+
+```typescript
+// Subscribe to state changes
+filterManager.subscribe((event) => {
+  switch (event.type) {
+    case 'filter_added':
+      // React to new filter
+      break;
+    case 'filters_cleared':
+      // React to cleared filters
+      break;
+  }
+});
+```
+
+### 4. Immutable State
+
+State is treated as immutable, with defensive copying to prevent accidental mutations:
+
+```typescript
+// Always return copies of state
+getFilters(): FilterState[] {
+  return [...this.filters]; // Defensive copy
+}
+
+// State updates create new objects
+setFilters(filters: FilterState[]): void {
+  this.filters = [...filters]; // New array
+  this.notifySubscribers({ type: 'filters_replaced', filters: this.filters });
+}
+```
+
+### 5. Validation at Boundaries
+
+All inputs are validated at system boundaries to ensure data integrity:
+
+```typescript
+// Validate before state updates
+addFilter(filter: FilterState): void {
+  const validation = this.validateFilter(filter);
+  if (!validation.valid) {
+    throw new Error(`Invalid filter: ${validation.error}`);
+  }
+  // ... proceed with update
+}
+```
+
+## Package Structure
+
+```
+packages/core/
+├── src/
+│   ├── types/           # Type definitions
+│   │   ├── table.ts     # Core table types
+│   │   ├── column.ts    # Column definitions
+│   │   ├── filter.ts    # Filter types and operators
+│   │   ├── adapter.ts   # Adapter interface
+│   │   ├── pagination.ts # Pagination types
+│   │   ├── sorting.ts   # Sorting types
+│   │   ├── selection.ts # Selection types
+│   │   ├── virtualization.ts # Virtualization types
+│   │   └── common.ts    # Shared types
+│   ├── builders/        # Column builders
+│   │   ├── column-builder.ts      # Base builder
+│   │   ├── text-column-builder.ts # Text-specific builder
+│   │   ├── number-column-builder.ts # Number-specific builder
+│   │   ├── date-column-builder.ts # Date-specific builder
+│   │   ├── option-column-builder.ts # Option-specific builder
+│   │   ├── multi-option-column-builder.ts # Multi-option builder
+│   │   ├── boolean-column-builder.ts # Boolean-specific builder
+│   │   └── column-factory.ts # Factory functions
+│   ├── managers/        # State managers
+│   │   ├── filter-manager.ts      # Filter state management
+│   │   ├── sorting-manager.ts     # Sorting state management
+│   │   ├── pagination-manager.ts  # Pagination state management
+│   │   ├── selection-manager.ts   # Selection state management
+│   │   └── virtualization-manager.ts # Virtualization management
+│   ├── utils/          # Utility functions
+│   │   └── filter-serialization.ts # URL serialization
+│   └── index.ts        # Public API exports
+├── tests/              # Test suite
+├── package.json        # Package configuration
+├── tsconfig.json       # TypeScript configuration
+└── tsup.config.ts      # Build configuration
+```
+
+### Module Organization
+
+Each module follows a consistent structure:
+
+1. **Types**: Type definitions and interfaces
+2. **Core Logic**: Main implementation classes
+3. **Utilities**: Helper functions and utilities
+4. **Tests**: Comprehensive test coverage
+5. **Exports**: Clean public API
+
+## Design Patterns
+
+### 1. Builder Pattern
+
+The column builder system uses the builder pattern for fluent configuration:
+
+```typescript
+// Base builder with common functionality
+abstract class ColumnBuilder<TData, TValue> {
+  protected config: Partial<ColumnDefinition<TData, TValue>>;
+  
+  // Fluent methods return 'this' for chaining
+  id(id: string): this {
+    this.config.id = id;
+    return this;
+  }
+  
+  displayName(name: string): this {
+    this.config.displayName = name;
+    return this;
+  }
+  
+  // Build method creates final object
+  build(): ColumnDefinition<TData, TValue> {
+    this.validateConfig();
+    return this.config as ColumnDefinition<TData, TValue>;
+  }
+}
+
+// Specialized builders extend base functionality
+class TextColumnBuilder<TData> extends ColumnBuilder<TData, string> {
+  searchable(options?: SearchOptions): this {
+    // Text-specific configuration
+    return this;
+  }
+}
+```
+
+### 2. Factory Pattern
+
+The column factory provides type-safe column creation:
+
+```typescript
+interface ColumnFactory<TData = any> {
+  text(): TextColumnBuilder<TData>;
+  number(): NumberColumnBuilder<TData>;
+  date(): DateColumnBuilder<TData>;
+  // ... other builders
+}
+
+function createColumnBuilder<TData>(): ColumnFactory<TData> {
+  return {
+    text: () => new TextColumnBuilder<TData>(),
+    number: () => new NumberColumnBuilder<TData>(),
+    date: () => new DateColumnBuilder<TData>(),
+    // ... other builders
+  };
+}
+```
+
+### 3. Observer Pattern
+
+Managers use the observer pattern for state change notifications:
+
+```typescript
+class FilterManager {
+  private subscribers: FilterManagerSubscriber[] = [];
+  
+  subscribe(subscriber: FilterManagerSubscriber): () => void {
+    this.subscribers.push(subscriber);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.subscribers.indexOf(subscriber);
+      if (index >= 0) {
+        this.subscribers.splice(index, 1);
+      }
+    };
+  }
+  
+  private notifySubscribers(event: FilterManagerEvent): void {
+    this.subscribers.forEach(subscriber => {
+      try {
+        subscriber(event);
+      } catch (error) {
+        console.error('Error in filter manager subscriber:', error);
+      }
+    });
+  }
+}
+```
+
+### 4. Adapter Pattern
+
+The adapter pattern enables different data sources:
+
+```typescript
+interface TableAdapter<TData = any> {
+  fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
+  getFilterOptions(columnId: string): Promise<FilterOption[]>;
+  // ... other methods
+}
+
+// Different implementations for different data sources
+class RestAdapter<TData> implements TableAdapter<TData> {
+  async fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>> {
+    // REST API implementation
+  }
+}
+
+class GraphQLAdapter<TData> implements TableAdapter<TData> {
+  async fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>> {
+    // GraphQL implementation
+  }
+}
+```
+
+### 5. Strategy Pattern
+
+Different strategies for filtering, sorting, and rendering:
+
+```typescript
+// Filter strategies
+interface FilterStrategy {
+  apply(data: any[], filter: FilterState): any[];
+}
+
+class TextFilterStrategy implements FilterStrategy {
+  apply(data: any[], filter: FilterState): any[] {
+    // Text-specific filtering logic
+  }
+}
+
+class NumberFilterStrategy implements FilterStrategy {
+  apply(data: any[], filter: FilterState): any[] {
+    // Number-specific filtering logic
+  }
+}
+```
+
+## Type System Design
+
+### Generic Type Parameters
+
+The type system uses generic parameters for maximum flexibility and type safety:
+
+```typescript
+// Generic data type
+interface ColumnDefinition<TData = any, TValue = any> {
+  accessor: (data: TData) => TValue;
+  cellRenderer?: (props: CellRendererProps<TData, TValue>) => ReactNode;
+}
+
+// Generic managers
+class FilterManager<TData = any> {
+  constructor(columns: ColumnDefinition<TData>[]) {
+    // Type-safe column access
+  }
+}
+```
+
+### Union Types for Operators
+
+Filter operators use union types with centralized definitions:
+
+```typescript
+// Centralized operator definitions
+const TEXT_OPERATORS = [
+  { key: 'contains', label: 'Contains', valueCount: 1 },
+  { key: 'equals', label: 'Equals', valueCount: 1 },
+  // ... other operators
+] as const;
+
+// Auto-generated union type
+type TextOperator = typeof TEXT_OPERATORS[number]['key'];
+// Result: 'contains' | 'equals' | 'startsWith' | ...
+
+// Combined union type
+type FilterOperator = 
+  | TextOperator 
+  | NumberOperator 
+  | DateOperator 
+  | OptionOperator;
+```
+
+### Type Guards and Validation
+
+Type guards ensure runtime type safety:
+
+```typescript
+function isTextColumn(column: ColumnDefinition): column is ColumnDefinition<any, string> {
+  return column.type === 'text';
+}
+
+function validateFilterState(filter: any): filter is FilterState {
+  return (
+    typeof filter === 'object' &&
+    typeof filter.columnId === 'string' &&
+    typeof filter.type === 'string' &&
+    typeof filter.operator === 'string' &&
+    Array.isArray(filter.values)
+  );
+}
+```
+
+## State Management Architecture
+
+### Manager Responsibilities
+
+Each manager has a single responsibility:
+
+- **FilterManager**: Filter state and operations
+- **SortingManager**: Sorting state and operations  
+- **PaginationManager**: Pagination state and navigation
+- **SelectionManager**: Row selection state
+- **VirtualizationManager**: Virtual scrolling optimization
+
+### State Synchronization
+
+Managers coordinate through events and shared state:
+
+```typescript
+class TableManager {
+  private filterManager: FilterManager;
+  private paginationManager: PaginationManager;
+  
+  constructor() {
+    this.setupCoordination();
+  }
+  
+  private setupCoordination() {
+    // Reset pagination when filters change
+    this.filterManager.subscribe((event) => {
+      if (event.type === 'filter_added' || event.type === 'filter_removed') {
+        this.paginationManager.goToPage(1);
+      }
+    });
+  }
+}
+```
+
+### Event System Design
+
+Events are strongly typed and immutable:
+
+```typescript
+// Strongly typed events
+type FilterManagerEvent =
+  | { type: 'filter_added'; filter: FilterState }
+  | { type: 'filter_updated'; columnId: string; filter: FilterState }
+  | { type: 'filter_removed'; columnId: string }
+  | { type: 'filters_cleared' };
+
+// Immutable event objects
+notifySubscribers(event: FilterManagerEvent): void {
+  // Event object is immutable - no risk of mutation
+  this.subscribers.forEach(subscriber => subscriber(event));
+}
+```
+
+## Performance Considerations
+
+### 1. Lazy Evaluation
+
+Expensive operations are deferred until needed:
+
+```typescript
+class VirtualizationManager {
+  private virtualRows: VirtualRowItem[] = [];
+  private dirty = true;
+  
+  getVirtualRows(): VirtualRowItem[] {
+    if (this.dirty) {
+      this.calculateVirtualRows();
+      this.dirty = false;
+    }
+    return this.virtualRows;
+  }
+  
+  updateScroll(): void {
+    this.dirty = true; // Mark for recalculation
+  }
+}
+```
+
+### 2. Memoization
+
+Expensive calculations are memoized:
+
+```typescript
+class FilterManager {
+  private operatorCache = new Map<string, FilterOperator[]>();
+  
+  getOperatorsForColumn(columnId: string): FilterOperator[] {
+    if (!this.operatorCache.has(columnId)) {
+      const operators = this.calculateOperators(columnId);
+      this.operatorCache.set(columnId, operators);
+    }
+    return this.operatorCache.get(columnId)!;
+  }
+}
+```
+
+### 3. Debouncing
+
+Frequent updates are debounced to prevent performance issues:
+
+```typescript
+// Debounced filter updates
+const debouncedUpdate = debounce((filters: FilterState[]) => {
+  // Expensive operation
+  updateTable(filters);
+}, 300);
+
+filterManager.subscribe(() => {
+  const filters = filterManager.getFilters();
+  debouncedUpdate(filters);
+});
+```
+
+### 4. Virtual Scrolling
+
+Large datasets use virtual scrolling for optimal performance:
+
+```typescript
+class VirtualizationManager {
+  calculateVirtualRows(): VirtualRowItem[] {
+    const { scrollTop, clientHeight } = this.scrollInfo;
+    const startIndex = Math.floor(scrollTop / this.defaultRowHeight);
+    const endIndex = Math.min(
+      startIndex + Math.ceil(clientHeight / this.defaultRowHeight) + this.overscan,
+      this.totalRows
+    );
+    
+    // Only render visible rows
+    return this.createVirtualRows(startIndex, endIndex);
+  }
+}
+```
+
+## Extensibility
+
+### 1. Plugin Architecture
+
+The system is designed for extensibility through plugins:
+
+```typescript
+interface TablePlugin {
+  name: string;
+  version: string;
+  install(table: TableInstance): void;
+  uninstall(table: TableInstance): void;
+}
+
+class ExportPlugin implements TablePlugin {
+  name = 'export';
+  version = '1.0.0';
+  
+  install(table: TableInstance): void {
+    // Add export functionality
+  }
+}
+```
+
+### 2. Custom Column Types
+
+New column types can be added through the builder system:
+
+```typescript
+class CustomColumnBuilder<TData> extends ColumnBuilder<TData, any> {
+  constructor() {
+    super('custom');
+  }
+  
+  customMethod(): this {
+    // Custom functionality
+    return this;
+  }
+}
+
+// Extend factory
+function createExtendedColumnBuilder<TData>(): ExtendedColumnFactory<TData> {
+  return {
+    ...createColumnBuilder<TData>(),
+    custom: () => new CustomColumnBuilder<TData>(),
+  };
+}
+```
+
+### 3. Custom Filter Operators
+
+New filter operators can be added:
+
+```typescript
+const CUSTOM_OPERATORS = [
+  {
+    key: 'customOperator',
+    label: 'Custom Operator',
+    description: 'Custom filtering logic',
+    valueCount: 1,
+    validate: (values) => values.length === 1,
+  },
+];
+
+// Register with manager
+const customRegistry = createOperatorRegistry(CUSTOM_OPERATORS);
+filterManager.registerOperators(customRegistry);
+```
+
+### 4. Adapter Extensions
+
+Adapters can be extended with additional functionality:
+
+```typescript
+interface ExtendedTableAdapter<TData> extends TableAdapter<TData> {
+  // Additional methods
+  bulkUpdate?(ids: string[], data: Partial<TData>): Promise<TData[]>;
+  subscribeToChanges?(callback: (event: DataEvent<TData>) => void): () => void;
+}
+```
+
+## Testing Strategy
+
+### 1. Unit Tests
+
+Each module has comprehensive unit tests:
+
+```typescript
+describe('FilterManager', () => {
+  let filterManager: FilterManager;
+  let columns: ColumnDefinition[];
+  
+  beforeEach(() => {
+    columns = [
+      createTextColumn('name'),
+      createNumberColumn('age'),
+    ];
+    filterManager = new FilterManager(columns);
+  });
+  
+  describe('addFilter', () => {
+    it('should add valid filter', () => {
+      const filter = createTextFilter('name', 'contains', ['john']);
+      filterManager.addFilter(filter);
+      
+      const filters = filterManager.getFilters();
+      expect(filters).toHaveLength(1);
+      expect(filters[0]).toEqual(filter);
+    });
+    
+    it('should throw error for invalid filter', () => {
+      const invalidFilter = { columnId: 'nonexistent' };
+      
+      expect(() => {
+        filterManager.addFilter(invalidFilter as any);
+      }).toThrow('Invalid filter');
+    });
+  });
+});
+```
+
+### 2. Integration Tests
+
+Integration tests verify manager coordination:
+
+```typescript
+describe('TableManager Integration', () => {
+  it('should reset pagination when filters change', () => {
+    const tableManager = new TableManager(columns);
+    const paginationManager = tableManager.getPaginationManager();
+    
+    // Set pagination to page 3
+    paginationManager.goToPage(3);
+    expect(paginationManager.getPagination().page).toBe(3);
+    
+    // Add filter - should reset to page 1
+    const filterManager = tableManager.getFilterManager();
+    filterManager.addFilter(createTextFilter('name', 'contains', ['john']));
+    
+    expect(paginationManager.getPagination().page).toBe(1);
+  });
+});
+```
+
+### 3. Performance Tests
+
+Performance tests ensure optimal behavior with large datasets:
+
+```typescript
+describe('VirtualizationManager Performance', () => {
+  it('should handle 100k rows efficiently', () => {
+    const manager = new VirtualizationManager({
+      containerHeight: 400,
+      defaultRowHeight: 50,
+    }, 100000);
+    
+    const startTime = performance.now();
+    const virtualRows = manager.getVirtualRows();
+    const endTime = performance.now();
+    
+    expect(endTime - startTime).toBeLessThan(10); // Should be fast
+    expect(virtualRows.length).toBeLessThan(20); // Should only render visible rows
+  });
+});
+```
+
+### 4. Type Tests
+
+Type tests ensure type safety:
+
+```typescript
+// Type tests using expect-type
+import { expectType } from 'tsd';
+
+expectType<ColumnDefinition<User, string>>(
+  createColumnBuilder<User>().text().accessor(user => user.name).build()
+);
+
+expectType<FilterManager<User>>(
+  new FilterManager<User>(columns)
+);
+```
+
+## Future Architecture Considerations
+
+### 1. Micro-Frontend Support
+
+The architecture is designed to support micro-frontend patterns:
+
+```typescript
+// Table can be embedded in different contexts
+interface TableContext {
+  theme: TableTheme;
+  locale: string;
+  permissions: string[];
+}
+
+class ContextualTableManager {
+  constructor(context: TableContext) {
+    // Adapt behavior based on context
+  }
+}
+```
+
+### 2. Real-Time Updates
+
+The event system supports real-time updates:
+
+```typescript
+interface RealtimeTableAdapter<TData> extends TableAdapter<TData> {
+  subscribe(callback: (event: DataEvent<TData>) => void): () => void;
+}
+
+// WebSocket adapter
+class WebSocketAdapter<TData> implements RealtimeTableAdapter<TData> {
+  subscribe(callback: (event: DataEvent<TData>) => void): () => void {
+    // WebSocket subscription logic
+  }
+}
+```
+
+### 3. Offline Support
+
+The architecture supports offline functionality:
+
+```typescript
+interface OfflineTableAdapter<TData> extends TableAdapter<TData> {
+  sync(): Promise<void>;
+  getOfflineData(): TData[];
+  isOnline(): boolean;
+}
+```
+
+## Related Documentation
+
+- [Types API Reference](./TYPES_API_REFERENCE.md)
+- [Column Builders Guide](./COLUMN_BUILDERS_GUIDE.md)
+- [Managers API Reference](./MANAGERS_API_REFERENCE.md)
+- [Utilities API Reference](./UTILITIES_API_REFERENCE.md)
+- [User Guide](./USER_GUIDE.md)

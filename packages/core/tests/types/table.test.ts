@@ -1,34 +1,54 @@
-import { describe, it, expect, expectTypeOf } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
-  TableConfig,
-  TableFeatures,
   BulkActionDefinition,
   BulkActionProps,
-  ExportConfig,
-  RowConfig,
-  EmptyStateConfig,
-  LoadingStateConfig,
-  ErrorStateConfig,
   ColumnDefinition,
+  EmptyStateConfig,
+  EmptyStateProps,
+  ErrorStateConfig,
+  ExportConfig,
+  LoadingStateConfig,
+  RowConfig,
   TableAdapter,
+  TableConfig,
+  TableFeatures,
 } from '../../src/types';
 
 describe('Table Types', () => {
   describe('TableConfig', () => {
     it('should have correct structure', () => {
       type User = { id: string; name: string; email: string };
-      
+
       const mockAdapter: TableAdapter<User> = {
-        fetchData: async () => ({ data: [], total: 0, pagination: {} as any }),
+        fetchData: async () => ({
+          data: [],
+          total: 0,
+          pagination: {
+            page: 1,
+            limit: 10,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          },
+        }),
         getFilterOptions: async () => [],
         getFacetedValues: async () => new Map(),
         getMinMaxValues: async () => [0, 0],
         meta: {
           name: 'MockAdapter',
           version: '1.0.0',
-          features: { read: true } as any,
+          features: {
+            create: false,
+            read: true,
+            update: false,
+            delete: false,
+            bulkOperations: false,
+            realTimeUpdates: false,
+            export: false,
+            transactions: false,
+          },
           supportedColumnTypes: ['text'],
-          supportedOperators: { 
+          supportedOperators: {
             text: ['contains'],
             number: [],
             date: [],
@@ -109,46 +129,60 @@ describe('Table Types', () => {
         rowExpansion: true,
       };
 
-      Object.entries(features).forEach(([_key, value]: [string, boolean | undefined]) => {
-        expectTypeOf(value).toEqualTypeOf<boolean | undefined>();
-      });
+      for (const [_key, value] of Object.entries(features)) {
+        expect(typeof value).toBe('boolean');
+      }
     });
   });
 
   describe('BulkActionDefinition', () => {
     it('should define bulk actions', () => {
-      const deleteAction: BulkActionDefinition = {
+      const deleteAction: BulkActionDefinition<unknown> = {
         id: 'delete',
         label: 'Delete Selected',
         variant: 'destructive',
-        handler: async (selectedIds) => {
-          console.log('Deleting:', selectedIds);
+        handler: async (_selectedIds) => {
+          // Delete selectedIds
         },
         requiresConfirmation: true,
         confirmationMessage: 'Are you sure you want to delete the selected items?',
       };
 
-      const _exportAction: BulkActionDefinition = {
+      const exportAction: BulkActionDefinition<unknown> = {
         id: 'export',
         label: 'Export Selected',
         variant: 'secondary',
-        handler: async (selectedIds, data) => {
-          console.log('Exporting:', selectedIds, data);
+        handler: async (_selectedIds, _data) => {
+          // Export selectedIds and data
         },
       };
 
-      expectTypeOf(deleteAction.variant).toEqualTypeOf<'default' | 'primary' | 'secondary' | 'destructive' | undefined>();
-      expectTypeOf(deleteAction.handler).toEqualTypeOf<((selectedIds: string[], data?: any) => void | Promise<void>) | undefined>();
+      expectTypeOf(deleteAction.variant).toEqualTypeOf<
+        'default' | 'primary' | 'secondary' | 'destructive' | undefined
+      >();
+      expectTypeOf(deleteAction.handler).toEqualTypeOf<
+        ((selectedIds: string[], data?: unknown[]) => void | Promise<void>) | undefined
+      >();
+      expectTypeOf(exportAction.variant).toEqualTypeOf<
+        'default' | 'primary' | 'secondary' | 'destructive' | undefined
+      >();
     });
 
     it('should support custom bulk action components', () => {
-      const customAction: BulkActionDefinition = {
+      const customAction: BulkActionDefinition<unknown> = {
         id: 'custom',
         label: 'Custom Action',
-        component: ({ selectedIds: _selectedIds, onClose: _onClose, onSuccess: _onSuccess, onError: _onError }: BulkActionProps) => null,
+        component: ({
+          selectedIds: _selectedIds,
+          onClose: _onClose,
+          onSuccess: _onSuccess,
+          onError: _onError,
+        }: BulkActionProps) => null,
       };
 
-      expectTypeOf(customAction.component).toMatchTypeOf<React.ComponentType<BulkActionProps> | undefined>();
+      expectTypeOf(customAction.component).toMatchTypeOf<
+        React.ComponentType<BulkActionProps> | undefined
+      >();
     });
   });
 
@@ -159,33 +193,39 @@ describe('Table Types', () => {
         defaultFormat: 'csv',
         includeHiddenColumns: false,
         customHandler: async (_format, _data) => {
-          console.log(`Exporting as ${_format}:`, _data);
+          // Export as format
         },
       };
 
       expectTypeOf(exportConfig.formats).toEqualTypeOf<('csv' | 'json' | 'excel')[] | undefined>();
-      expectTypeOf(exportConfig.defaultFormat).toEqualTypeOf<'csv' | 'json' | 'excel' | undefined>();
+      expectTypeOf(exportConfig.defaultFormat).toEqualTypeOf<
+        'csv' | 'json' | 'excel' | undefined
+      >();
     });
   });
 
   describe('RowConfig', () => {
     it('should configure row behavior', () => {
       type User = { id: string; name: string; isActive: boolean };
-      
+
       const rowConfig: RowConfig<User> = {
         getId: (_row) => _row.id,
         isSelectable: (row) => row.isActive,
         isExpandable: (_row) => true,
         expandedContent: (row) => `Details for ${row.name}`,
-        onClick: (event) => console.log('Row clicked:', event),
-        className: (row) => row.isActive ? 'active-row' : 'inactive-row',
+        onClick: (_event) => {
+          // Row clicked
+        },
+        className: (row) => (row.isActive ? 'active-row' : 'inactive-row'),
         style: (row) => ({
           opacity: row.isActive ? 1 : 0.5,
         }),
       };
 
       expectTypeOf(rowConfig.getId).toEqualTypeOf<((row: User) => string) | undefined>();
-      expectTypeOf(rowConfig.className).toEqualTypeOf<string | ((row: User) => string) | undefined>();
+      expectTypeOf(rowConfig.className).toEqualTypeOf<
+        string | ((row: User) => string) | undefined
+      >();
     });
   });
 
@@ -198,7 +238,9 @@ describe('Table Types', () => {
       };
 
       expectTypeOf(emptyConfig.title).toEqualTypeOf<string | undefined>();
-      expectTypeOf(emptyConfig.component).toMatchTypeOf<React.ComponentType<any> | undefined>();
+      expectTypeOf(emptyConfig.component).toMatchTypeOf<
+        React.ComponentType<EmptyStateProps> | undefined
+      >();
     });
   });
 
@@ -219,7 +261,9 @@ describe('Table Types', () => {
       const errorConfig: ErrorStateConfig = {
         title: 'Something went wrong',
         component: ({ error: _error, onRetry: _onRetry }) => null,
-        onRetry: () => console.log('Retrying...'),
+        onRetry: () => {
+          // Retrying
+        },
       };
 
       expectTypeOf(errorConfig.title).toEqualTypeOf<string | undefined>();
@@ -281,7 +325,7 @@ describe('Table Types', () => {
             displayName: 'In Stock',
             accessor: (row) => row.inStock,
             type: 'boolean',
-            cellRenderer: ({ value }) => value ? '✓' : '✗',
+            cellRenderer: ({ value }) => (value ? '✓' : '✗'),
           },
         ],
         adapter: {} as TableAdapter<Product>,
@@ -307,12 +351,16 @@ describe('Table Types', () => {
             id: 'delete',
             label: 'Delete',
             variant: 'destructive',
-            handler: async (ids) => console.log('Delete:', ids),
+            handler: async (_ids) => {
+              // Delete ids
+            },
           },
           {
             id: 'export',
             label: 'Export',
-            handler: async (ids) => console.log('Export:', ids),
+            handler: async (_ids) => {
+              // Export ids
+            },
           },
         ],
         exportOptions: {
@@ -322,7 +370,7 @@ describe('Table Types', () => {
         rowConfig: {
           getId: (_row) => _row.id,
           isSelectable: (row) => row.inStock,
-          className: (row) => row.inStock ? '' : 'out-of-stock',
+          className: (row) => (row.inStock ? '' : 'out-of-stock'),
         },
         emptyState: {
           title: 'No products found',
@@ -342,4 +390,4 @@ describe('Table Types', () => {
       expectTypeOf(tableConfig).toEqualTypeOf<TableConfig<Product>>();
     });
   });
-}); 
+});

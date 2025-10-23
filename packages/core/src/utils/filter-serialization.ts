@@ -1,3 +1,4 @@
+import type { ColumnType, FilterOperator } from '../types';
 import type { FilterState } from '../types/filter';
 
 /**
@@ -29,270 +30,277 @@ export interface URLSerializationResult {
 /**
  * Filter serialization utilities for URL state persistence
  */
-export class FilterURLSerializer {
-  private static readonly DEFAULT_PARAM_NAME = 'filters';
-  private static readonly DEFAULT_MAX_LENGTH = 2000; // Conservative URL length limit
 
-  /**
-   * Serialize filters to URL-safe string
-   */
-  static serialize(
-    filters: FilterState[], 
-    options: URLSerializationOptions = {}
-  ): URLSerializationResult {
-    const { compress = true, includeMeta = false, maxLength = this.DEFAULT_MAX_LENGTH } = options;
+const DEFAULT_PARAM_NAME = 'filters';
+const DEFAULT_MAX_LENGTH = 2000; // Conservative URL length limit
 
-    // Create minimal filter data
-    const filterData = filters.map(filter => ({
-      c: filter.columnId,
-      t: filter.type,
-      o: filter.operator,
-      v: filter.values,
-      ...(filter.includeNull && { n: filter.includeNull }),
-      ...(includeMeta && filter.meta && { m: filter.meta })
-    }));
+/**
+ * Serialize filters to URL-safe string
+ */
+export function serializeFiltersToURL(
+  filters: FilterState[],
+  options: URLSerializationOptions = {}
+): URLSerializationResult {
+  const { compress = true, includeMeta = false, maxLength = DEFAULT_MAX_LENGTH } = options;
 
-    const json = JSON.stringify(filterData);
-    
-    // Try uncompressed first
-    let result = this.encodeToURL(json);
-    let isCompressed = false;
+  // Create minimal filter data
+  const filterData = filters.map((filter) => ({
+    c: filter.columnId,
+    t: filter.type,
+    o: filter.operator,
+    v: filter.values,
+    ...(filter.includeNull && { n: filter.includeNull }),
+    ...(includeMeta && filter.meta && { m: filter.meta }),
+  }));
 
-    // Apply compression if needed or requested
-    if (compress || result.length > maxLength) {
-      const compressed = this.compressData(json);
-      const compressedResult = this.encodeToURL(compressed);
-      
-      if (compressedResult.length < result.length) {
-        result = `c:${compressedResult}`; // Prefix to indicate compression
-        isCompressed = true;
-      }
-    }
+  const json = JSON.stringify(filterData);
 
-    return {
-      value: result,
-      compressed: isCompressed,
-      size: result.length
-    };
-  }
+  // Try uncompressed first
+  let result = encodeToURL(json);
+  let isCompressed = false;
 
-  /**
-   * Deserialize filters from URL string
-   */
-  static deserialize(urlString: string): FilterState[] {
-    if (!urlString || urlString.trim() === '') {
-      return [];
-    }
+  // Apply compression if needed or requested
+  if (compress || result.length > maxLength) {
+    const compressed = compressData(json);
+    const compressedResult = encodeToURL(compressed);
 
-    try {
-      let json: string;
-      
-      // Check if compressed
-      if (urlString.startsWith('c:')) {
-        const compressed = urlString.slice(2);
-        const decodedCompressed = this.decodeFromURL(compressed);
-        json = this.decompressData(decodedCompressed);
-      } else {
-        json = this.decodeFromURL(urlString);
-      }
-
-      const filterData = JSON.parse(json);
-      
-      if (!Array.isArray(filterData)) {
-        throw new Error('Invalid filter data format');
-      }
-
-      // Convert back to full FilterState format
-      return filterData.map((data: any) => ({
-        columnId: data.c,
-        type: data.t,
-        operator: data.o,
-        values: data.v,
-        ...(data.n && { includeNull: data.n }),
-        ...(data.m && { meta: data.m })
-      }));
-    } catch (error) {
-      console.warn('Failed to deserialize filters from URL:', error);
-      throw error; // Re-throw for validation to catch
+    if (compressedResult.length < result.length) {
+      result = `c:${compressedResult}`; // Prefix to indicate compression
+      isCompressed = true;
     }
   }
 
-  /**
-   * Get filters from current URL
-   */
-  static getFromURL(
-    options: Pick<URLSerializationOptions, 'paramName'> = {}
-  ): FilterState[] {
-    const { paramName = this.DEFAULT_PARAM_NAME } = options;
-    
-    if (typeof window === 'undefined') {
-      return []; // SSR safety
-    }
+  return {
+    value: result,
+    compressed: isCompressed,
+    size: result.length,
+  };
+}
 
-    const params = new URLSearchParams(window.location.search);
-    const filterString = params.get(paramName);
-    
-    if (!filterString) {
-      return [];
-    }
-
-    try {
-      return this.deserialize(filterString);
-    } catch (error) {
-      console.warn('Failed to get filters from URL:', error);
-      return [];
-    }
+/**
+ * Deserialize filters from URL string
+ */
+export function deserializeFiltersFromURL(urlString: string): FilterState[] {
+  if (!urlString || urlString.trim() === '') {
+    return [];
   }
 
-  /**
-   * Set filters in current URL
-   */
-  static setInURL(
-    filters: FilterState[],
-    options: URLSerializationOptions = {}
-  ): void {
-    const { paramName = this.DEFAULT_PARAM_NAME } = options;
-    
-    if (typeof window === 'undefined') {
-      return; // SSR safety
-    }
+  try {
+    let json: string;
 
-    const url = new URL(window.location.href);
-    const params = url.searchParams;
-
-    if (filters.length === 0) {
-      params.delete(paramName);
+    // Check if compressed
+    if (urlString.startsWith('c:')) {
+      const compressed = urlString.slice(2);
+      const decodedCompressed = decodeFromURL(compressed);
+      json = decompressData(decodedCompressed);
     } else {
-      const result = this.serialize(filters, options);
-      params.set(paramName, result.value);
+      json = decodeFromURL(urlString);
     }
 
-    // Update URL without page reload
-    window.history.replaceState({}, '', url.toString());
-  }
+    const filterData = JSON.parse(json);
 
-  /**
-   * Create shareable URL with filters
-   */
-  static createShareableURL(
-    filters: FilterState[],
-    baseURL?: string,
-    options: URLSerializationOptions = {}
-  ): string {
-    const { paramName = this.DEFAULT_PARAM_NAME } = options;
-    
-    const url = new URL(baseURL || (typeof window !== 'undefined' ? window.location.href : ''));
-    
-    if (filters.length > 0) {
-      const result = this.serialize(filters, options);
-      url.searchParams.set(paramName, result.value);
+    if (!Array.isArray(filterData)) {
+      throw new Error('Invalid filter data format');
     }
 
-    return url.toString();
-  }
-
-  /**
-   * Validate that URL string can be deserialized
-   */
-  static validate(urlString: string): boolean {
-    try {
-      const result = this.deserialize(urlString);
-      return Array.isArray(result);
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Get serialization info without actually serializing
-   */
-  static getSerializationInfo(
-    filters: FilterState[],
-    options: URLSerializationOptions = {}
-  ): {
-    estimatedSize: number;
-    wouldCompress: boolean;
-    filterCount: number;
-  } {
-    const { maxLength = this.DEFAULT_MAX_LENGTH } = options;
-    const filterData = filters.map(filter => ({
-      c: filter.columnId,
-      t: filter.type,
-      o: filter.operator,
-      v: filter.values
+    // Convert back to full FilterState format
+    return filterData.map((data: Record<string, unknown>) => ({
+      columnId: data.c as string,
+      type: data.t as ColumnType,
+      operator: data.o as FilterOperator,
+      values: data.v as unknown[],
+      ...(data.n && typeof data.n === 'boolean' ? { includeNull: data.n } : {}),
+      ...(data.m && typeof data.m === 'object' ? { meta: data.m as Record<string, unknown> } : {}),
     }));
+  } catch (error) {
+    console.warn('Failed to deserialize filters from URL:', error);
+    throw error; // Re-throw for validation to catch
+  }
+}
 
-    const json = JSON.stringify(filterData);
-    const encoded = this.encodeToURL(json);
-    
-    return {
-      estimatedSize: encoded.length,
-      wouldCompress: encoded.length > maxLength,
-      filterCount: filters.length
-    };
+/**
+ * Get filters from current URL
+ */
+export function getFiltersFromURL(
+  options: Pick<URLSerializationOptions, 'paramName'> = {}
+): FilterState[] {
+  const { paramName = DEFAULT_PARAM_NAME } = options;
+
+  if (typeof window === 'undefined') {
+    return []; // SSR safety
   }
 
-  /**
-   * Encode string to URL-safe format
-   */
-  private static encodeToURL(str: string): string {
-    return btoa(encodeURIComponent(str))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+  const params = new URLSearchParams(window.location.search);
+  const filterString = params.get(paramName);
+
+  if (!filterString) {
+    return [];
   }
 
-  /**
-   * Decode string from URL-safe format
-   */
-  private static decodeFromURL(str: string): string {
-    // Add padding if needed
-    const padded = str + '='.repeat((4 - str.length % 4) % 4);
-    const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
-    return decodeURIComponent(atob(base64));
+  try {
+    return deserializeFiltersFromURL(filterString);
+  } catch (error) {
+    console.warn('Failed to get filters from URL:', error);
+    return [];
+  }
+}
+
+/**
+ * Set filters in current URL
+ */
+export function setFiltersInURL(
+  filters: FilterState[],
+  options: URLSerializationOptions = {}
+): void {
+  const { paramName = DEFAULT_PARAM_NAME } = options;
+
+  if (typeof window === 'undefined') {
+    return; // SSR safety
   }
 
-  /**
-   * Safe compression using key shortening only
-   */
-  private static compressData(str: string): string {
-    // Only use safe key shortening - this provides significant URL length reduction
-    // without the risk of data corruption from run-length encoding
-    return str
-      .replace(/("columnId")/g, '"c"')
-      .replace(/("type")/g, '"t"')
-      .replace(/("operator")/g, '"o"')
-      .replace(/("values")/g, '"v"')
-      .replace(/("includeNull")/g, '"n"')
-      .replace(/("meta")/g, '"m"');
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+
+  if (filters.length === 0) {
+    params.delete(paramName);
+  } else {
+    const result = serializeFiltersToURL(filters, options);
+    params.set(paramName, result.value);
   }
 
-  /**
-   * Decompress data by reversing key shortening
-   */
-  private static decompressData(str: string): string {
-    // Only reverse the safe key shortening - no unsafe run-length decoding
-    return str
-      .replace(/("c")/g, '"columnId"')
-      .replace(/("t")/g, '"type"')
-      .replace(/("o")/g, '"operator"')
-      .replace(/("v")/g, '"values"')
-      .replace(/("n")/g, '"includeNull"')
-      .replace(/("m")/g, '"meta"');
+  // Update URL without page reload
+  window.history.replaceState({}, '', url.toString());
+}
+
+/**
+ * Create shareable URL with filters
+ */
+export function createShareableURL(
+  filters: FilterState[],
+  baseUrl?: string,
+  options: URLSerializationOptions = {}
+): string {
+  const { paramName = DEFAULT_PARAM_NAME } = options;
+
+  const url = new URL(baseUrl || (typeof window !== 'undefined' ? window.location.href : ''));
+
+  if (filters.length > 0) {
+    const result = serializeFiltersToURL(filters, options);
+    url.searchParams.set(paramName, result.value);
   }
+
+  return url.toString();
+}
+
+/**
+ * Validate that URL string can be deserialized
+ */
+export function validateFilterURL(urlString: string): boolean {
+  try {
+    const result = deserializeFiltersFromURL(urlString);
+    return Array.isArray(result);
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * Get serialization info without actually serializing
+ */
+export function getSerializationInfo(
+  filters: FilterState[],
+  options: URLSerializationOptions = {}
+): {
+  estimatedSize: number;
+  wouldCompress: boolean;
+  filterCount: number;
+} {
+  const { maxLength = DEFAULT_MAX_LENGTH } = options;
+  const filterData = filters.map((filter) => ({
+    c: filter.columnId,
+    t: filter.type,
+    o: filter.operator,
+    v: filter.values,
+  }));
+
+  const json = JSON.stringify(filterData);
+  const encoded = encodeToURL(json);
+
+  return {
+    estimatedSize: encoded.length,
+    wouldCompress: encoded.length > maxLength,
+    filterCount: filters.length,
+  };
+}
+
+/**
+ * Encode string to URL-safe format
+ */
+function encodeToURL(str: string): string {
+  return btoa(encodeURIComponent(str)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Decode string from URL-safe format
+ */
+function decodeFromURL(str: string): string {
+  // Add padding if needed
+  const padded = str + '='.repeat((4 - (str.length % 4)) % 4);
+  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+  return decodeURIComponent(atob(base64));
+}
+
+/**
+ * Safe compression using key shortening only
+ */
+function compressData(str: string): string {
+  // Only use safe key shortening - this provides significant URL length reduction
+  // without the risk of data corruption from run-length encoding
+  return str
+    .replace(/("columnId")/g, '"c"')
+    .replace(/("type")/g, '"t"')
+    .replace(/("operator")/g, '"o"')
+    .replace(/("values")/g, '"v"')
+    .replace(/("includeNull")/g, '"n"')
+    .replace(/("meta")/g, '"m"');
+}
+
+/**
+ * Decompress data by reversing key shortening
+ */
+function decompressData(str: string): string {
+  // Only reverse the safe key shortening - no unsafe run-length decoding
+  return str
+    .replace(/("c")/g, '"columnId"')
+    .replace(/("t")/g, '"type"')
+    .replace(/("o")/g, '"operator"')
+    .replace(/("v")/g, '"values"')
+    .replace(/("n")/g, '"includeNull"')
+    .replace(/("m")/g, '"meta"');
 }
 
 /**
  * Hook-style utility for React applications
  */
 export const filterURLUtils = {
-  serialize: FilterURLSerializer.serialize.bind(FilterURLSerializer),
-  deserialize: FilterURLSerializer.deserialize.bind(FilterURLSerializer),
-  getFromURL: FilterURLSerializer.getFromURL.bind(FilterURLSerializer),
-  setInURL: FilterURLSerializer.setInURL.bind(FilterURLSerializer),
-  createShareableURL: FilterURLSerializer.createShareableURL.bind(FilterURLSerializer),
-  validate: FilterURLSerializer.validate.bind(FilterURLSerializer),
-  getInfo: FilterURLSerializer.getSerializationInfo.bind(FilterURLSerializer)
+  serialize: serializeFiltersToURL,
+  deserialize: deserializeFiltersFromURL,
+  getFromURL: getFiltersFromURL,
+  setInURL: setFiltersInURL,
+  createShareableURL: createShareableURL,
+  validate: validateFilterURL,
+  getInfo: getSerializationInfo,
 };
 
-export default FilterURLSerializer; 
+// Legacy export for backward compatibility
+export const FilterURLSerializer = {
+  serialize: serializeFiltersToURL,
+  deserialize: deserializeFiltersFromURL,
+  getFromURL: getFiltersFromURL,
+  setInURL: setFiltersInURL,
+  createShareableURL: createShareableURL,
+  validate: validateFilterURL,
+  getSerializationInfo: getSerializationInfo,
+};
+
+export default FilterURLSerializer;

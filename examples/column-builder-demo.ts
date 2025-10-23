@@ -1,12 +1,12 @@
 /**
  * Better Tables Column Builder Demo
- * 
+ *
  * This demonstrates the powerful column builder system with fluent API
  * for creating type-safe, declarative table column definitions.
  */
 
-import { createColumnBuilder, validateColumns, quickColumn } from '../packages/core/src/builders';
 import type { ReactNode } from 'react';
+import { createColumnBuilder, quickColumn, validateColumns } from '../packages/core/src/builders';
 
 // Example data types
 interface Contact {
@@ -34,27 +34,30 @@ const cb = createColumnBuilder<Contact>();
 // TEXT COLUMNS
 // ================================
 
-const nameColumn = cb.text()
+const nameColumn = cb
+  .text()
   .id('name')
   .displayName('Full Name')
-  .accessor(contact => `${contact.firstName} ${contact.lastName}`)
+  .accessor((contact) => `${contact.firstName} ${contact.lastName}`)
   .searchable({ debounce: 500 })
   .width(200, 100, 300)
   .build();
 
-const emailColumn = cb.text()
+const emailColumn = cb
+  .text()
   .id('email')
   .displayName('Email Address')
-  .accessor(contact => contact.email)
+  .accessor((contact) => contact.email)
   .asEmail()
   .searchable()
   .truncate({ maxLength: 30, showTooltip: true })
   .build();
 
-const phoneColumn = cb.text()
+const phoneColumn = cb
+  .text()
   .id('phone')
   .displayName('Phone Number')
-  .accessor(contact => contact.phone)
+  .accessor((contact) => contact.phone)
   .asPhone()
   .transform('none')
   .build();
@@ -63,18 +66,20 @@ const phoneColumn = cb.text()
 // NUMBER COLUMNS
 // ================================
 
-const ageColumn = cb.number()
+const ageColumn = cb
+  .number()
   .id('age')
   .displayName('Age')
-  .accessor(contact => contact.age)
+  .accessor((contact) => contact.age)
   .range(18, 100)
   .format({ useGrouping: false })
   .build();
 
-const scoreColumn = cb.number()
+const scoreColumn = cb
+  .number()
   .id('score')
   .displayName('Score')
-  .accessor(contact => contact.score)
+  .accessor((contact) => contact.score)
   .range(0, 100)
   .precision(1)
   .percentage({ format: 'decimal' })
@@ -84,17 +89,19 @@ const scoreColumn = cb.number()
 // DATE COLUMNS
 // ================================
 
-const createdAtColumn = cb.date()
+const createdAtColumn = cb
+  .date()
   .id('createdAt')
   .displayName('Created')
-  .accessor(contact => contact.createdAt)
+  .accessor((contact) => contact.createdAt)
   .dateOnly({ format: 'MMM dd, yyyy' })
   .build();
 
-const updatedAtColumn = cb.date()
+const updatedAtColumn = cb
+  .date()
   .id('updatedAt')
   .displayName('Last Updated')
-  .accessor(contact => contact.updatedAt)
+  .accessor((contact) => contact.updatedAt)
   .relative({ style: 'short' })
   .build();
 
@@ -102,18 +109,20 @@ const updatedAtColumn = cb.date()
 // BOOLEAN COLUMNS
 // ================================
 
-const isActiveColumn = cb.boolean()
+const isActiveColumn = cb
+  .boolean()
   .id('isActive')
   .displayName('Active')
-  .accessor(contact => contact.isActive)
+  .accessor((contact) => contact.isActive)
   .activeInactive()
   .booleanFilter()
   .build();
 
-const verifiedColumn = cb.boolean()
+const verifiedColumn = cb
+  .boolean()
   .id('verified')
   .displayName('Verified')
-  .accessor(contact => contact.email.includes('@verified.com'))
+  .accessor((contact) => contact.email.includes('@verified.com'))
   .checkbox({ interactive: false })
   .build();
 
@@ -121,10 +130,11 @@ const verifiedColumn = cb.boolean()
 // OPTION COLUMNS
 // ================================
 
-const statusColumn = cb.option()
+const statusColumn = cb
+  .option()
   .id('status')
   .displayName('Status')
-  .accessor(contact => contact.status)
+  .accessor((contact) => contact.status)
   .status([
     { value: 'active', label: 'Active', color: 'green' },
     { value: 'inactive', label: 'Inactive', color: 'red' },
@@ -133,17 +143,19 @@ const statusColumn = cb.option()
   .showBadges({ showColors: true })
   .build();
 
-const priorityColumn = cb.option()
+const priorityColumn = cb
+  .option()
   .id('priority')
   .displayName('Priority')
-  .accessor(contact => contact.priority)
+  .accessor((contact) => contact.priority)
   .priority() // Uses predefined priority options
   .build();
 
-const countryColumn = cb.option()
+const countryColumn = cb
+  .option()
   .id('country')
   .displayName('Country')
-  .accessor(contact => contact.country)
+  .accessor((contact) => contact.country)
   .asyncOptions(async () => {
     // Simulate API call for country options
     return [
@@ -159,36 +171,41 @@ const countryColumn = cb.option()
 // MULTI-OPTION COLUMNS
 // ================================
 
-const tagsColumn = cb.multiOption()
+const tagsColumn = cb
+  .multiOption()
   .id('tags')
   .displayName('Tags')
-  .accessor(contact => contact.tags)
-  .tags([
-    { value: 'vip', label: 'VIP', color: 'purple' },
-    { value: 'lead', label: 'Lead', color: 'blue' },
-    { value: 'customer', label: 'Customer', color: 'green' },
-    { value: 'prospect', label: 'Prospect', color: 'orange' },
-  ], { 
-    maxTags: 3, 
-    allowCreate: true 
-  })
+  .accessor((contact) => contact.tags)
+  .tags(
+    [
+      { value: 'vip', label: 'VIP', color: 'purple' },
+      { value: 'lead', label: 'Lead', color: 'blue' },
+      { value: 'customer', label: 'Customer', color: 'green' },
+      { value: 'prospect', label: 'Prospect', color: 'orange' },
+    ],
+    {
+      maxTags: 3,
+      allowCreate: true,
+    }
+  )
   .showBadges({ removable: true })
   .build();
 
-const skillsColumn = cb.multiOption()
+const skillsColumn = cb
+  .multiOption()
   .id('skills')
   .displayName('Skills')
-  .accessor(contact => contact.tags.filter(tag => tag.startsWith('skill:')))
+  .accessor((contact) => contact.tags.filter((tag) => tag.startsWith('skill:')))
   .options([
     { value: 'skill:javascript', label: 'JavaScript' },
     { value: 'skill:typescript', label: 'TypeScript' },
     { value: 'skill:react', label: 'React' },
     { value: 'skill:node', label: 'Node.js' },
   ])
-  .displayFormat({ 
-    type: 'comma', 
-    maxVisible: 2, 
-    separator: ' • ' 
+  .displayFormat({
+    type: 'comma',
+    maxVisible: 2,
+    separator: ' • ',
   })
   .build();
 
@@ -196,10 +213,11 @@ const skillsColumn = cb.multiOption()
 // CUSTOM COLUMNS
 // ================================
 
-const avatarColumn = cb.custom<string>('custom')
+const avatarColumn = cb
+  .custom<string>('custom')
   .id('avatar')
   .displayName('Avatar')
-  .accessor(contact => contact.avatar || '')
+  .accessor((contact) => contact.avatar || '')
   .cellRenderer(({ value, row }): ReactNode => {
     if (!value) return `No Avatar`;
     return `Avatar for ${row.firstName} ${row.lastName}`;
@@ -209,7 +227,8 @@ const avatarColumn = cb.custom<string>('custom')
   .width(80)
   .build();
 
-const actionsColumn = cb.custom<void>('custom')
+const actionsColumn = cb
+  .custom<void>('custom')
   .id('actions')
   .displayName('Actions')
   .accessor(() => void 0)
@@ -261,10 +280,10 @@ if (!validation.valid) {
 
 // For rapid prototyping, use quick columns
 const quickColumns = [
-  quickColumn<Contact, string>('firstName', 'First Name', c => c.firstName),
-  quickColumn<Contact, string>('lastName', 'Last Name', c => c.lastName),
-  quickColumn<Contact, number>('age', 'Age', c => c.age, { type: 'number', width: 80 }),
-  quickColumn<Contact, boolean>('isActive', 'Active', c => c.isActive, { type: 'boolean' }),
+  quickColumn<Contact, string>('firstName', 'First Name', (c) => c.firstName),
+  quickColumn<Contact, string>('lastName', 'Last Name', (c) => c.lastName),
+  quickColumn<Contact, number>('age', 'Age', (c) => c.age, { type: 'number', width: 80 }),
+  quickColumn<Contact, boolean>('isActive', 'Active', (c) => c.isActive, { type: 'boolean' }),
 ];
 
 // ================================
@@ -311,7 +330,7 @@ const sampleContacts: Contact[] = [
 // Test accessor functions with real data
 const testAccessors = () => {
   const contact = sampleContacts[0];
-  
+
   console.log('Testing column accessors:');
   console.log('Name:', nameColumn.accessor(contact));
   console.log('Email:', emailColumn.accessor(contact));
@@ -326,10 +345,11 @@ const testAccessors = () => {
 // ================================
 
 // Column with complex filtering and validation
-const advancedEmailColumn = cb.text()
+const advancedEmailColumn = cb
+  .text()
   .id('businessEmail')
   .displayName('Business Email')
-  .accessor(contact => contact.email)
+  .accessor((contact) => contact.email)
   .asEmail()
   .searchable({
     debounce: 1000,
@@ -338,19 +358,19 @@ const advancedEmailColumn = cb.text()
         return 'Business emails only (no @gmail.com)';
       }
       return true;
-    }
+    },
   })
   .validation([
     {
       id: 'email-format',
       validate: (email) => email.includes('@'),
-      message: 'Must be a valid email address'
+      message: 'Must be a valid email address',
     },
     {
       id: 'business-email',
       validate: (email) => !email.includes('@gmail.com'),
-      message: 'Business emails only'
-    }
+      message: 'Business emails only',
+    },
   ])
   .cellRenderer(({ value, row }): ReactNode => {
     const verified = value.includes('@verified.com') ? ' ✓' : '';
@@ -389,12 +409,13 @@ export {
 //   .build();
 
 // ✅ This is type-safe and correct:
-const typeSafeColumn = cb.text()
+const typeSafeColumn = cb
+  .text()
   .id('fullName')
   .displayName('Full Name')
-  .accessor(contact => `${contact.firstName} ${contact.lastName}`) // ✓ Returns string
+  .accessor((contact) => `${contact.firstName} ${contact.lastName}`) // ✓ Returns string
   .build();
 
 console.log('🎉 Column Builder Demo Complete!');
 console.log('📝 Check the contactColumns array for the complete configuration');
-console.log('🧪 Run testAccessors() to see the columns in action'); 
+console.log('🧪 Run testAccessors() to see the columns in action');

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ColumnType, ColumnDefinition } from './column';
+import type { ColumnDefinition, ColumnType } from './column';
 import type { IconComponent } from './common';
 
 /**
@@ -7,7 +7,7 @@ import type { IconComponent } from './common';
  * NOTE: This must stay in sync with centralized filter operator definitions
  * in filter-operators.ts. Tests ensure consistency.
  */
-export type FilterOperator = 
+export type FilterOperator =
   // Text operators
   | 'contains'
   | 'equals'
@@ -15,8 +15,8 @@ export type FilterOperator =
   | 'endsWith'
   | 'isEmpty'
   | 'isNotEmpty'
-  
-  // Number operators  
+
+  // Number operators
   | 'notEquals'
   | 'greaterThan'
   | 'greaterThanOrEqual'
@@ -24,7 +24,7 @@ export type FilterOperator =
   | 'lessThanOrEqual'
   | 'between'
   | 'notBetween'
-  
+
   // Date operators
   | 'is'
   | 'isNot'
@@ -35,11 +35,11 @@ export type FilterOperator =
   | 'isThisWeek'
   | 'isThisMonth'
   | 'isThisYear'
-  
+
   // Option operators
   | 'isAnyOf'
   | 'isNoneOf'
-  
+
   // Multi-option operators
   | 'includes'
   | 'excludes'
@@ -47,11 +47,11 @@ export type FilterOperator =
   | 'includesAll'
   | 'excludesAny'
   | 'excludesAll'
-  
+
   // Boolean operators
   | 'isTrue'
   | 'isFalse'
-  
+
   // Universal operators (available for most types)
   | 'isNull'
   | 'isNotNull';
@@ -62,27 +62,33 @@ export type FilterOperator =
 export interface FilterConfig<TValue = any> {
   /** Filter operators allowed for this column */
   operators?: FilterOperator[];
-  
+
   /** Options for option/multiOption filters */
   options?: FilterOption[];
-  
+
   /** Minimum value for number filters */
   min?: number;
-  
+
   /** Maximum value for number filters */
   max?: number;
-  
+
   /** Custom filter component */
   customComponent?: ComponentType<FilterComponentProps<TValue>>;
-  
+
   /** Whether to include null/undefined values */
   includeNull?: boolean;
-  
+
   /** Debounce delay for text filters */
   debounce?: number;
-  
+
   /** Validation for filter values */
   validation?: (value: TValue) => boolean | string;
+
+  /** Whether to include time component for date filters */
+  includeTime?: boolean;
+
+  /** Date format for date filters */
+  format?: string;
 }
 
 /**
@@ -109,21 +115,21 @@ export interface FilterOption {
 export interface FilterState {
   /** Column ID being filtered */
   columnId: string;
-  
+
   /** Filter type */
   type: ColumnType;
-  
+
   /** Filter operator */
   operator: FilterOperator;
-  
+
   /** Filter values */
-  values: any[];
-  
+  values: unknown[];
+
   /** Whether to include null values */
   includeNull?: boolean;
-  
+
   /** Filter metadata */
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -132,19 +138,19 @@ export interface FilterState {
 export interface FilterGroup {
   /** Group identifier */
   id: string;
-  
+
   /** Group display name */
   label: string;
-  
+
   /** Group icon */
   icon?: IconComponent;
-  
+
   /** Columns in this group */
   columns: string[];
-  
+
   /** Whether group is collapsed by default */
   defaultCollapsed?: boolean;
-  
+
   /** Group description */
   description?: string;
 }
@@ -160,9 +166,9 @@ export interface FilterComponentProps<TValue = any> {
   /** Filter operator */
   operator: FilterOperator;
   /** Column definition */
-  column: ColumnDefinition<any, TValue>;
+  column: ColumnDefinition<unknown, TValue>;
   /** Theme configuration */
-  theme?: any; // Will be TableTheme
+  theme?: Record<string, unknown>; // Will be TableTheme
 }
 
 /**
@@ -171,22 +177,22 @@ export interface FilterComponentProps<TValue = any> {
 export interface FilterOperatorDefinition<TOperator extends string = FilterOperator> {
   /** Operator key */
   key: TOperator;
-  
+
   /** Display label */
   label: string;
-  
+
   /** Description */
   description?: string;
-  
+
   /** Number of values required */
   valueCount: number | 'variable';
-  
+
   /** Whether operator supports null values */
   supportsNull?: boolean;
-  
+
   /** Validation function */
-  validate?: (values: any[]) => boolean | string;
-  
+  validate?: (values: unknown[]) => boolean | string;
+
   /** Custom input component */
   inputComponent?: ComponentType<FilterInputProps>;
 }
@@ -194,7 +200,7 @@ export interface FilterOperatorDefinition<TOperator extends string = FilterOpera
 /**
  * Props for filter input components
  */
-export interface FilterInputProps<TValue = any> {
+export interface FilterInputProps<TValue = unknown> {
   /** Current value */
   value: TValue[];
   /** Change handler */
@@ -202,7 +208,7 @@ export interface FilterInputProps<TValue = any> {
   /** Operator */
   operator: FilterOperator;
   /** Column definition */
-  column: ColumnDefinition<any, TValue>;
+  column: ColumnDefinition<unknown, TValue>;
   /** Theme */
-  theme?: any; // Will be TableTheme
-} 
+  theme?: Record<string, unknown>; // Will be TableTheme
+}

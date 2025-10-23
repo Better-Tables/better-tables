@@ -1,12 +1,12 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { getOperatorDefinition } from '@better-tables/core';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { getOperatorDefinition } from '@better-tables/core';
+import { HelpCircle } from 'lucide-react';
+import * as React from 'react';
 
 export interface IncludeUnknownControlProps<TData = any> {
   /** Filter state */
@@ -95,9 +95,12 @@ export function IncludeUnknownControl<TData = any>({
     }
   }, [column.type]);
 
-  const handleCheckedChange = React.useCallback((checked: boolean) => {
-    onChange(checked);
-  }, [onChange]);
+  const handleCheckedChange = React.useCallback(
+    (checked: boolean) => {
+      onChange(checked);
+    },
+    [onChange]
+  );
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -108,7 +111,7 @@ export function IncludeUnknownControl<TData = any>({
           onCheckedChange={handleCheckedChange}
           disabled={disabled}
         />
-        <Label 
+        <Label
           htmlFor={`include-null-${filter.columnId}`}
           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
         >
@@ -116,10 +119,8 @@ export function IncludeUnknownControl<TData = any>({
         </Label>
         <HelpCircle className="h-4 w-4 text-muted-foreground" />
       </div>
-      
-      <p className="text-xs text-muted-foreground pl-6">
-        {description}
-      </p>
+
+      <p className="text-xs text-muted-foreground pl-6">{description}</p>
     </div>
   );
 }
@@ -199,4 +200,4 @@ export function getIncludeUnknownDescription(columnType: string): string {
     default:
       return 'Include records where this field is null or undefined';
   }
-} 
+}

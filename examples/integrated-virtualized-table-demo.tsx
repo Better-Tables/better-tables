@@ -1,14 +1,13 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import { FilterBar, ActiveFilters, VirtualizedTable } from '@better-tables/ui';
-import { 
-  createColumnBuilder,
-  FilterManager,
-  SortingManager,
-  PaginationManager,
-  type FilterState,
-  type SortingState,
+import {
   type ColumnDefinition,
+  FilterManager,
+  type FilterState,
+  PaginationManager,
+  type SortingState,
+  createColumnBuilder,
 } from '@better-tables/core';
+import { ActiveFilters, FilterBar, VirtualizedTable } from '@better-tables/ui';
+import React, { useMemo, useState, useCallback } from 'react';
 
 /**
  * Sample data structure for the integrated demo
@@ -30,12 +29,54 @@ interface Employee {
 /**
  * Generate realistic employee dataset
  */
-function generateEmployeeDataset(size: number = 50000): Employee[] {
-  const departments = ['Engineering', 'Sales', 'Marketing', 'HR', 'Finance', 'Operations', 'Product', 'Support'];
-  const locations = ['New York', 'San Francisco', 'London', 'Berlin', 'Tokyo', 'Sydney', 'Toronto', 'Paris'];
-  const firstNames = ['John', 'Jane', 'Bob', 'Alice', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];
-  const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
-  
+function generateEmployeeDataset(size = 50000): Employee[] {
+  const departments = [
+    'Engineering',
+    'Sales',
+    'Marketing',
+    'HR',
+    'Finance',
+    'Operations',
+    'Product',
+    'Support',
+  ];
+  const locations = [
+    'New York',
+    'San Francisco',
+    'London',
+    'Berlin',
+    'Tokyo',
+    'Sydney',
+    'Toronto',
+    'Paris',
+  ];
+  const firstNames = [
+    'John',
+    'Jane',
+    'Bob',
+    'Alice',
+    'Charlie',
+    'Diana',
+    'Eve',
+    'Frank',
+    'Grace',
+    'Henry',
+    'Ivy',
+    'Jack',
+  ];
+  const lastNames = [
+    'Smith',
+    'Johnson',
+    'Williams',
+    'Brown',
+    'Jones',
+    'Garcia',
+    'Miller',
+    'Davis',
+    'Rodriguez',
+    'Martinez',
+  ];
+
   return Array.from({ length: size }, (_, index) => ({
     id: `emp-${index + 1}`,
     firstName: firstNames[Math.floor(Math.random() * firstNames.length)],
@@ -56,100 +97,110 @@ function generateEmployeeDataset(size: number = 50000): Employee[] {
  */
 export function IntegratedVirtualizedTableDemo() {
   const [datasetSize, setDatasetSize] = useState(50000);
-  
+
   // Generate dataset
   const originalData = useMemo(() => generateEmployeeDataset(datasetSize), [datasetSize]);
 
   // Define columns using the builder pattern
   const columns = useMemo(() => {
     const cb = createColumnBuilder<Employee>();
-    
+
     return [
-      cb.text()
+      cb
+        .text()
         .id('id')
         .displayName('ID')
-        .accessor(emp => emp.id)
+        .accessor((emp) => emp.id)
         .width(100)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.text()
+
+      cb
+        .text()
         .id('firstName')
         .displayName('First Name')
-        .accessor(emp => emp.firstName)
+        .accessor((emp) => emp.firstName)
         .width(120)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.text()
+
+      cb
+        .text()
         .id('lastName')
         .displayName('Last Name')
-        .accessor(emp => emp.lastName)
+        .accessor((emp) => emp.lastName)
         .width(120)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.text()
+
+      cb
+        .text()
         .id('email')
         .displayName('Email')
-        .accessor(emp => emp.email)
+        .accessor((emp) => emp.email)
         .width(250)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.number()
+
+      cb
+        .number()
         .id('age')
         .displayName('Age')
-        .accessor(emp => emp.age)
+        .accessor((emp) => emp.age)
         .width(80)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.number()
+
+      cb
+        .number()
         .id('salary')
         .displayName('Salary')
-        .accessor(emp => emp.salary)
+        .accessor((emp) => emp.salary)
         .width(120)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.text()
+
+      cb
+        .text()
         .id('department')
         .displayName('Department')
-        .accessor(emp => emp.department)
+        .accessor((emp) => emp.department)
         .width(120)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.text()
+
+      cb
+        .text()
         .id('location')
         .displayName('Location')
-        .accessor(emp => emp.location)
+        .accessor((emp) => emp.location)
         .width(120)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.number()
+
+      cb
+        .number()
         .id('performanceScore')
         .displayName('Performance')
-        .accessor(emp => emp.performanceScore)
+        .accessor((emp) => emp.performanceScore)
         .width(100)
         .sortable()
         .filterable()
         .build(),
-        
-      cb.date()
+
+      cb
+        .date()
         .id('joinDate')
         .displayName('Join Date')
-        .accessor(emp => emp.joinDate)
+        .accessor((emp) => emp.joinDate)
         .width(120)
         .sortable()
         .filterable()
@@ -158,11 +209,17 @@ export function IntegratedVirtualizedTableDemo() {
   }, []);
 
   // Initialize managers
-  const filterManager = useMemo(() => new FilterManager(columns), [columns]);
-  const sortingManager = useMemo(() => new SortingManager(columns, { multiSort: true, maxSortColumns: 3 }), [columns]);
-  const paginationManager = useMemo(() => new PaginationManager({ 
-    defaultPageSize: 100, // Large page size for virtualization
-  }), []);
+  const filterManager = useMemo(
+    () => new FilterManager(columns as ColumnDefinition<Employee, unknown>[]),
+    [columns]
+  );
+  const paginationManager = useMemo(
+    () =>
+      new PaginationManager({
+        defaultPageSize: 100, // Large page size for virtualization
+      }),
+    []
+  );
 
   // State for filters and sorting
   const [filters, setFilters] = useState<FilterState[]>([]);
@@ -174,14 +231,14 @@ export function IntegratedVirtualizedTableDemo() {
 
     // Apply filters using the filter manager's logic
     if (filters.length > 0) {
-      data = data.filter(item => {
-        return filters.every(filter => {
-          const column = columns.find(col => col.id === filter.columnId);
+      data = data.filter((item) => {
+        return filters.every((filter) => {
+          const column = columns.find((col) => col.id === filter.columnId);
           if (!column) return true;
 
           const value = item[filter.columnId as keyof Employee];
           const filterValue = filter.values[0]; // Use first value from values array
-          
+
           // Simple filtering logic (you can expand this with the FilterManager)
           switch (filter.operator) {
             case 'contains':
@@ -217,11 +274,11 @@ export function IntegratedVirtualizedTableDemo() {
         for (const sort of sorting) {
           const aValue = a[sort.columnId as keyof Employee];
           const bValue = b[sort.columnId as keyof Employee];
-          
+
           let comparison = 0;
           if (aValue < bValue) comparison = -1;
           if (aValue > bValue) comparison = 1;
-          
+
           if (comparison !== 0) {
             return sort.direction === 'desc' ? -comparison : comparison;
           }
@@ -239,50 +296,62 @@ export function IntegratedVirtualizedTableDemo() {
   }, [processedData.length, paginationManager]);
 
   // Handle filter changes
-  const handleFiltersChange = useCallback((newFilters: FilterState[]) => {
-    setFilters(newFilters);
-    // Sync with filter manager
-    filterManager.setFilters(newFilters);
-  }, [filterManager]);
+  const handleFiltersChange = useCallback(
+    (newFilters: FilterState[]) => {
+      setFilters(newFilters);
+      // Sync with filter manager
+      filterManager.setFilters(newFilters);
+    },
+    [filterManager]
+  );
 
   // Handle individual filter updates
-  const handleUpdateFilter = useCallback((columnId: string, updates: Partial<FilterState>) => {
-    const newFilters = filters.map(f => 
-      f.columnId === columnId ? { ...f, ...updates } : f
-    );
-    handleFiltersChange(newFilters);
-  }, [filters, handleFiltersChange]);
+  const handleUpdateFilter = useCallback(
+    (columnId: string, updates: Partial<FilterState>) => {
+      const newFilters = filters.map((f) => (f.columnId === columnId ? { ...f, ...updates } : f));
+      handleFiltersChange(newFilters);
+    },
+    [filters, handleFiltersChange]
+  );
 
   // Handle filter removal
-  const handleRemoveFilter = useCallback((columnId: string) => {
-    const newFilters = filters.filter(f => f.columnId !== columnId);
-    handleFiltersChange(newFilters);
-  }, [filters, handleFiltersChange]);
+  const handleRemoveFilter = useCallback(
+    (columnId: string) => {
+      const newFilters = filters.filter((f) => f.columnId !== columnId);
+      handleFiltersChange(newFilters);
+    },
+    [filters, handleFiltersChange]
+  );
 
   // Handle sorting changes
-  const handleSortingChange = useCallback((columnId: string) => {
-    const currentSort = sorting.find(s => s.columnId === columnId);
-    
-    if (!currentSort) {
-      // Add new sort
-      setSorting(prev => [...prev, { columnId, direction: 'asc' }]);
-    } else if (currentSort.direction === 'asc') {
-      // Change to desc
-      setSorting(prev => prev.map(s => 
-        s.columnId === columnId ? { ...s, direction: 'desc' } : s
-      ));
-    } else {
-      // Remove sort
-      setSorting(prev => prev.filter(s => s.columnId !== columnId));
-    }
-  }, [sorting]);
+  const handleSortingChange = useCallback(
+    (columnId: string) => {
+      const currentSort = sorting.find((s) => s.columnId === columnId);
+
+      if (!currentSort) {
+        // Add new sort
+        setSorting((prev) => [...prev, { columnId, direction: 'asc' }]);
+      } else if (currentSort.direction === 'asc') {
+        // Change to desc
+        setSorting((prev) =>
+          prev.map((s) => (s.columnId === columnId ? { ...s, direction: 'desc' } : s))
+        );
+      } else {
+        // Remove sort
+        setSorting((prev) => prev.filter((s) => s.columnId !== columnId));
+      }
+    },
+    [sorting]
+  );
 
   // Performance metrics
   const metrics = useMemo(() => {
     const originalCount = originalData.length;
     const filteredCount = processedData.length;
-    const reductionPercentage = ((originalCount - filteredCount) / originalCount * 100).toFixed(1);
-    
+    const reductionPercentage = (((originalCount - filteredCount) / originalCount) * 100).toFixed(
+      1
+    );
+
     return {
       originalCount,
       filteredCount,
@@ -291,49 +360,61 @@ export function IntegratedVirtualizedTableDemo() {
   }, [originalData.length, processedData.length]);
 
   // Custom cell renderer with enhanced styling
-  const renderCell = (value: any, column: ColumnDefinition<Employee>, item: Employee, rowIndex: number) => {
+  const renderCell = (
+    value: unknown,
+    column: ColumnDefinition<Employee>,
+    item: Employee,
+    _rowIndex: number
+  ) => {
     if (column.id === 'isActive') {
       return (
-        <span className={`px-2 py-1 rounded text-xs font-medium ${
-          item.isActive 
-            ? 'bg-green-100 text-green-800 border border-green-200' 
-            : 'bg-red-100 text-red-800 border border-red-200'
-        }`}>
+        <span
+          className={`px-2 py-1 rounded text-xs font-medium ${
+            item.isActive
+              ? 'bg-green-100 text-green-800 border border-green-200'
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}
+        >
           {item.isActive ? 'Active' : 'Inactive'}
         </span>
       );
     }
-    
+
     if (column.id === 'performanceScore') {
       const score = Number(value);
-      const color = score >= 4.5 ? 'text-green-600' : 
-                   score >= 3.5 ? 'text-blue-600' : 
-                   score >= 2.5 ? 'text-yellow-600' : 'text-red-600';
-      
-      return (
-        <span className={`font-medium ${color}`}>
-          {score.toFixed(1)}
-        </span>
-      );
+      const color =
+        score >= 4.5
+          ? 'text-green-600'
+          : score >= 3.5
+            ? 'text-blue-600'
+            : score >= 2.5
+              ? 'text-yellow-600'
+              : 'text-red-600';
+
+      return <span className={`font-medium ${color}`}>{score.toFixed(1)}</span>;
     }
-    
+
     if (column.id === 'department') {
       const colors = {
-        'Engineering': 'bg-blue-50 text-blue-700 border-blue-200',
-        'Sales': 'bg-green-50 text-green-700 border-green-200',
-        'Marketing': 'bg-purple-50 text-purple-700 border-purple-200',
-        'HR': 'bg-pink-50 text-pink-700 border-pink-200',
-        'Finance': 'bg-yellow-50 text-yellow-700 border-yellow-200',
-        'Operations': 'bg-gray-50 text-gray-700 border-gray-200',
+        Engineering: 'bg-blue-50 text-blue-700 border-blue-200',
+        Sales: 'bg-green-50 text-green-700 border-green-200',
+        Marketing: 'bg-purple-50 text-purple-700 border-purple-200',
+        HR: 'bg-pink-50 text-pink-700 border-pink-200',
+        Finance: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+        Operations: 'bg-gray-50 text-gray-700 border-gray-200',
       };
-      
+
       return (
-        <span className={`px-2 py-1 rounded text-xs border ${colors[value as keyof typeof colors] || 'bg-gray-50 text-gray-700'}`}>
-          {value}
+        <span
+          className={`px-2 py-1 rounded text-xs border ${
+            colors[value as keyof typeof colors] || 'bg-gray-50 text-gray-700'
+          }`}
+        >
+          {String(value)}
         </span>
       );
     }
-    
+
     if (column.id === 'salary') {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -341,15 +422,15 @@ export function IntegratedVirtualizedTableDemo() {
         minimumFractionDigits: 0,
       }).format(Number(value));
     }
-    
+
     if (column.id === 'joinDate') {
       return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
-      }).format(new Date(value));
+      }).format(new Date(value as string | number | Date));
     }
-    
+
     return String(value || '');
   };
 
@@ -358,14 +439,15 @@ export function IntegratedVirtualizedTableDemo() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Integrated Virtualized Table</h1>
         <p className="text-gray-600">
-          High-performance table with filtering, sorting, and virtual scrolling for enterprise datasets
+          High-performance table with filtering, sorting, and virtual scrolling for enterprise
+          datasets
         </p>
       </div>
 
       {/* Configuration Panel */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <h2 className="text-lg font-semibold mb-4">Configuration</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Dataset Size</label>
@@ -381,13 +463,14 @@ export function IntegratedVirtualizedTableDemo() {
               <option value={250000}>250,000 rows</option>
             </select>
           </div>
-          
+
           {/* Metrics Display */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">Performance Metrics</label>
             <div className="p-2 bg-white border border-gray-300 rounded text-sm">
               <span className="text-blue-600 font-medium">
-                {metrics.filteredCount.toLocaleString()} / {metrics.originalCount.toLocaleString()} rows
+                {metrics.filteredCount.toLocaleString()} / {metrics.originalCount.toLocaleString()}{' '}
+                rows
               </span>
               {metrics.reductionPercentage > 0 && (
                 <span className="text-green-600 ml-2">
@@ -402,7 +485,7 @@ export function IntegratedVirtualizedTableDemo() {
       {/* Filtering UI */}
       <div className="mb-4">
         <FilterBar
-          columns={columns}
+          columns={columns as ColumnDefinition<Employee, unknown>[]}
           filters={filters}
           onFiltersChange={handleFiltersChange}
         />
@@ -413,7 +496,7 @@ export function IntegratedVirtualizedTableDemo() {
         <div className="mb-4">
           <ActiveFilters
             filters={filters}
-            columns={columns}
+            columns={columns as ColumnDefinition<Employee, unknown>[]}
             onUpdateFilter={handleUpdateFilter}
             onRemoveFilter={handleRemoveFilter}
           />
@@ -428,7 +511,7 @@ export function IntegratedVirtualizedTableDemo() {
             {sorting.map((sort, index) => (
               <span key={sort.columnId} className="ml-2">
                 {index > 0 && ', '}
-                {columns.find(col => col.id === sort.columnId)?.displayName} ({sort.direction})
+                {columns.find((col) => col.id === sort.columnId)?.displayName} ({sort.direction})
               </span>
             ))}
           </div>
@@ -439,11 +522,13 @@ export function IntegratedVirtualizedTableDemo() {
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
         <VirtualizedTable
           data={processedData}
-          columns={columns.map(col => ({
-            ...col,
-            // Add click handler for sorting
-            onHeaderClick: col.sortable ? () => handleSortingChange(col.id) : undefined,
-          }))}
+          columns={
+            columns.map((col) => ({
+              ...col,
+              // Add click handler for sorting
+              onHeaderClick: col.sortable ? () => handleSortingChange(col.id) : undefined,
+            })) as ColumnDefinition<Employee, unknown>[]
+          }
           height={700}
           rowHeight={56}
           renderCell={renderCell}
@@ -511,4 +596,4 @@ export function IntegratedVirtualizedTableDemo() {
   );
 }
 
-export default IntegratedVirtualizedTableDemo; 
+export default IntegratedVirtualizedTableDemo;

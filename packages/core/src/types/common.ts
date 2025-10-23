@@ -9,7 +9,7 @@ export interface BaseConfig {
   /** Display name */
   name?: string;
   /** Additional metadata */
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -31,17 +31,20 @@ export interface TableTheme {
   };
   /** Component-specific theme overrides */
   components?: {
-    table?: Record<string, any>;
-    filter?: Record<string, any>;
-    pagination?: Record<string, any>;
-    [key: string]: Record<string, any> | undefined;
+    table?: Record<string, unknown>;
+    filter?: Record<string, unknown>;
+    pagination?: Record<string, unknown>;
+    [key: string]: Record<string, unknown> | undefined;
   };
 }
 
 /**
  * Icon component type
  */
-export type IconComponent = ComponentType<{ className?: string; size?: number }>;
+export type IconComponent = ComponentType<{
+  className?: string;
+  size?: number;
+}>;
 
 /**
  * Render props for custom components
@@ -49,7 +52,7 @@ export type IconComponent = ComponentType<{ className?: string; size?: number }>
  * @template TValue - The type of cell value
  * @template TColumn - The type of column definition
  */
-export interface RenderProps<TData = any, TValue = any, TColumn = any> {
+export interface RenderProps<TData = unknown, TValue = unknown, TColumn = unknown> {
   /** Current row data */
   row: TData;
   /** Current cell value */
@@ -59,7 +62,7 @@ export interface RenderProps<TData = any, TValue = any, TColumn = any> {
   /** Row index */
   rowIndex: number;
   /** Table instance */
-  table?: any; // Will be TableInstance
+  table?: Record<string, unknown>; // Will be TableInstance
 }
 
 /**
@@ -70,11 +73,11 @@ export type EventHandler<T = void> = (event: T) => void | Promise<void>;
 /**
  * Data event for real-time updates
  */
-export interface DataEvent<TData = any> {
+export interface DataEvent<TData = unknown> {
   /** Event type */
   type: 'insert' | 'update' | 'delete';
   /** Affected data */
   data: TData | TData[];
   /** Additional event metadata */
-  meta?: Record<string, any>;
-} 
+  meta?: Record<string, unknown>;
+}

@@ -1,7 +1,7 @@
 'use client';
 
-import * as React from 'react';
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import * as React from 'react';
 
 export interface BooleanFilterInputProps<TData = any> {
   /** Filter state */
@@ -22,7 +22,7 @@ export function BooleanFilterInput<TData = any>({
 }: BooleanFilterInputProps<TData>) {
   // Boolean filters with value-based operators don't need inputs
   // since the operator itself defines the value (isTrue, isFalse, isNull, isNotNull)
-  
+
   React.useEffect(() => {
     // Set the appropriate value based on the operator
     switch (filter.operator) {
@@ -40,7 +40,7 @@ export function BooleanFilterInput<TData = any>({
         onChange([]);
     }
   }, [filter.operator, onChange]);
-  
+
   const getDescription = () => {
     switch (filter.operator) {
       case 'isTrue':
@@ -55,10 +55,10 @@ export function BooleanFilterInput<TData = any>({
         return 'Boolean filter';
     }
   };
-  
+
   return (
     <div className={`text-sm text-muted-foreground ${disabled ? 'opacity-50' : ''}`}>
       {getDescription()}
     </div>
   );
-} 
+}

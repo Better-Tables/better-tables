@@ -1,18 +1,18 @@
 import type { ReactNode } from 'react';
-import type { 
-  ColumnDefinition, 
-  ColumnType, 
-  CellRendererProps, 
-  HeaderRendererProps, 
-  ValidationRule 
+import type {
+  CellRendererProps,
+  ColumnDefinition,
+  ColumnType,
+  HeaderRendererProps,
+  ValidationRule,
 } from '../types/column';
-import type { FilterConfig } from '../types/filter';
 import type { IconComponent } from '../types/common';
+import type { FilterConfig } from '../types/filter';
 
 /**
  * Base column builder class with fluent API
  */
-export class ColumnBuilder<TData = any, TValue = any> {
+export class ColumnBuilder<TData = unknown, TValue = unknown> {
   protected config: Partial<ColumnDefinition<TData, TValue>>;
 
   constructor(type: ColumnType) {
@@ -61,7 +61,7 @@ export class ColumnBuilder<TData = any, TValue = any> {
   /**
    * Configure column sorting
    */
-  sortable(sortable: boolean = true): this {
+  sortable(sortable = true): this {
     this.config.sortable = sortable;
     return this;
   }
@@ -69,7 +69,7 @@ export class ColumnBuilder<TData = any, TValue = any> {
   /**
    * Configure column filtering
    */
-  filterable(filterable: boolean = true, filterConfig?: FilterConfig<TValue>): this {
+  filterable(filterable = true, filterConfig?: FilterConfig<TValue>): this {
     this.config.filterable = filterable;
     if (filterConfig) {
       this.config.filter = filterConfig;
@@ -80,7 +80,7 @@ export class ColumnBuilder<TData = any, TValue = any> {
   /**
    * Configure column resizing
    */
-  resizable(resizable: boolean = true): this {
+  resizable(resizable = true): this {
     this.config.resizable = resizable;
     return this;
   }
@@ -150,7 +150,7 @@ export class ColumnBuilder<TData = any, TValue = any> {
   /**
    * Set whether column supports null/undefined values
    */
-  nullable(nullable: boolean = true): this {
+  nullable(nullable = true): this {
     this.config.nullable = nullable;
     return this;
   }
@@ -158,7 +158,7 @@ export class ColumnBuilder<TData = any, TValue = any> {
   /**
    * Set column metadata
    */
-  meta(meta: Record<string, any>): this {
+  meta(meta: Record<string, unknown>): this {
     this.config.meta = { ...this.config.meta, ...meta };
     return this;
   }
@@ -179,13 +179,19 @@ export class ColumnBuilder<TData = any, TValue = any> {
       throw new Error('Column ID is required. Use .id() to set the column identifier.');
     }
     if (!this.config.displayName) {
-      throw new Error('Column display name is required. Use .displayName() to set the column display name.');
+      throw new Error(
+        'Column display name is required. Use .displayName() to set the column display name.'
+      );
     }
     if (!this.config.accessor) {
-      throw new Error('Column accessor is required. Use .accessor() to set the data accessor function.');
+      throw new Error(
+        'Column accessor is required. Use .accessor() to set the data accessor function.'
+      );
     }
     if (!this.config.type) {
-      throw new Error('Column type is required. This should be set by the specific column builder.');
+      throw new Error(
+        'Column type is required. This should be set by the specific column builder.'
+      );
     }
   }
 
@@ -195,4 +201,4 @@ export class ColumnBuilder<TData = any, TValue = any> {
   protected getConfig(): Partial<ColumnDefinition<TData, TValue>> {
     return { ...this.config };
   }
-} 
+}

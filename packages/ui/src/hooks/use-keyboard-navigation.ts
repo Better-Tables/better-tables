@@ -30,7 +30,7 @@ export interface KeyboardNavigationResult {
     'aria-describedby'?: string;
     'aria-expanded'?: boolean;
     'aria-haspopup'?: boolean;
-    'role'?: string;
+    role?: string;
   };
   /** Focus management utilities */
   focusUtils: {
@@ -85,18 +85,14 @@ export function useKeyboardNavigation(
 
       // Handle custom shortcuts
       if (enableShortcuts) {
-        const shortcutKey = [
-          isCtrl && 'Ctrl',
-          isAlt && 'Alt',
-          isShift && 'Shift',
-          key,
-        ]
+        const shortcutKey = [isCtrl && 'Ctrl', isAlt && 'Alt', isShift && 'Shift', key]
           .filter(Boolean)
           .join('+');
 
-        if (shortcuts[shortcutKey]) {
+        const shortcutHandler = shortcuts[shortcutKey];
+        if (shortcutHandler) {
           event.preventDefault();
-          shortcuts[shortcutKey]();
+          shortcutHandler();
           return;
         }
       }
@@ -108,7 +104,16 @@ export function useKeyboardNavigation(
         return;
       }
     },
-    [enableShortcuts, enableEscapeKey, enableArrowKeys, enableTabNavigation, shortcuts, onEscape, onEnter, onTab]
+    [
+      enableShortcuts,
+      enableEscapeKey,
+      enableArrowKeys,
+      enableTabNavigation,
+      shortcuts,
+      onEscape,
+      onEnter,
+      onTab,
+    ]
   );
 
   const focusUtils = React.useMemo(
@@ -130,7 +135,7 @@ export function useKeyboardNavigation(
     () => ({
       'aria-label': 'Filter input',
       'aria-describedby': 'filter-help-text',
-      'role': 'combobox',
+      role: 'combobox',
     }),
     []
   );
@@ -144,14 +149,14 @@ export function useKeyboardNavigation(
 
 // Common keyboard shortcuts for filter components
 export const FILTER_SHORTCUTS = {
-  CLEAR: 'Escape',
-  APPLY: 'Enter',
-  FOCUS_SEARCH: 'Ctrl+k',
-  CLOSE_DROPDOWN: 'Escape',
-  NEXT_ITEM: 'ArrowDown',
-  PREV_ITEM: 'ArrowUp',
-  SELECT_ITEM: 'Enter',
-  TOGGLE_DROPDOWN: 'Space',
+  clear: 'Escape',
+  apply: 'Enter',
+  focusSearch: 'Ctrl+k',
+  closeDropdown: 'Escape',
+  nextItem: 'ArrowDown',
+  prevItem: 'ArrowUp',
+  selectItem: 'Enter',
+  toggleDropdown: 'Space',
 } as const;
 
 // Hook for filter dropdown navigation
@@ -187,7 +192,7 @@ export function useFilterDropdownNavigation(
           if (!isOpen) {
             onToggle();
           } else {
-            setFocusedIndex(prev => prev + 1);
+            setFocusedIndex((prev) => prev + 1);
           }
           break;
         case 'ArrowUp':
@@ -195,7 +200,7 @@ export function useFilterDropdownNavigation(
           if (!isOpen) {
             onToggle();
           } else {
-            setFocusedIndex(prev => Math.max(0, prev - 1));
+            setFocusedIndex((prev) => Math.max(0, prev - 1));
           }
           break;
         case 'Home':
@@ -234,11 +239,11 @@ export function useFocusManagement(containerRef: React.RefObject<HTMLElement>) {
 
   const focusFirst = React.useCallback(() => {
     if (!containerRef.current) return;
-    
+
     const focusableElements = containerRef.current.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
-    
+
     const firstElement = focusableElements[0];
     if (firstElement) {
       firstElement.focus();
@@ -248,11 +253,11 @@ export function useFocusManagement(containerRef: React.RefObject<HTMLElement>) {
 
   const focusLast = React.useCallback(() => {
     if (!containerRef.current) return;
-    
+
     const focusableElements = containerRef.current.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
-    
+
     const lastElement = focusableElements[focusableElements.length - 1];
     if (lastElement) {
       lastElement.focus();
@@ -262,17 +267,17 @@ export function useFocusManagement(containerRef: React.RefObject<HTMLElement>) {
 
   const focusNext = React.useCallback(() => {
     if (!containerRef.current || !focusedElement) return;
-    
+
     const focusableElements = Array.from(
       containerRef.current.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       )
     );
-    
+
     const currentIndex = focusableElements.indexOf(focusedElement);
     const nextIndex = (currentIndex + 1) % focusableElements.length;
     const nextElement = focusableElements[nextIndex];
-    
+
     if (nextElement) {
       nextElement.focus();
       setFocusedElement(nextElement);
@@ -281,17 +286,17 @@ export function useFocusManagement(containerRef: React.RefObject<HTMLElement>) {
 
   const focusPrevious = React.useCallback(() => {
     if (!containerRef.current || !focusedElement) return;
-    
+
     const focusableElements = Array.from(
       containerRef.current.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       )
     );
-    
+
     const currentIndex = focusableElements.indexOf(focusedElement);
     const prevIndex = currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1;
     const prevElement = focusableElements[prevIndex];
-    
+
     if (prevElement) {
       prevElement.focus();
       setFocusedElement(prevElement);
@@ -331,4 +336,4 @@ export function useFocusManagement(containerRef: React.RefObject<HTMLElement>) {
     focusNext,
     focusPrevious,
   };
-} 
+}

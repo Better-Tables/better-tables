@@ -4,7 +4,7 @@ import { ColumnBuilder } from './column-builder';
 /**
  * Multi-option column builder for multi-select columns
  */
-export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, string[]> {
+export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string[]> {
   constructor() {
     super('multiOption');
   }
@@ -12,31 +12,41 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Set available options for the multi-select column
    */
-  options(options: FilterOption[], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Custom validation for option values */
-    validation?: (value: string[]) => boolean | string;
-    /** Whether to allow searching through options (default: true) */
-    searchable?: boolean;
-    /** Placeholder text for the option selector */
-    placeholder?: string;
-    /** Maximum number of selections allowed */
-    maxSelections?: number;
-    /** Minimum number of selections required */
-    minSelections?: number;
-  } = {}): this {
-    const { 
-      includeNull = false, 
-      validation, 
-      searchable = true, 
-      placeholder, 
+  options(
+    options: FilterOption[],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Custom validation for option values */
+      validation?: (value: string[]) => boolean | string;
+      /** Whether to allow searching through options (default: true) */
+      searchable?: boolean;
+      /** Placeholder text for the option selector */
+      placeholder?: string;
+      /** Maximum number of selections allowed */
+      maxSelections?: number;
+      /** Minimum number of selections required */
+      minSelections?: number;
+    } = {}
+  ): this {
+    const {
+      includeNull = false,
+      validation,
+      searchable = true,
+      placeholder,
       maxSelections,
-      minSelections 
+      minSelections,
     } = config;
-    
+
     const filterConfig: FilterConfig<string[]> = {
-      operators: ['includes', 'excludes', 'includesAny', 'includesAll', 'excludesAny', 'excludesAll'],
+      operators: [
+        'includes',
+        'excludes',
+        'includesAny',
+        'includesAll',
+        'excludesAny',
+        'excludesAll',
+      ],
       options,
       includeNull,
       validation,
@@ -59,7 +69,11 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Set specific multi-option operators
    */
-  multiOptionOperators(operators: Array<'includes' | 'excludes' | 'includesAny' | 'includesAll' | 'excludesAny' | 'excludesAll'>): this {
+  multiOptionOperators(
+    operators: Array<
+      'includes' | 'excludes' | 'includesAny' | 'includesAll' | 'excludesAny' | 'excludesAll'
+    >
+  ): this {
     this.config.filter = {
       ...this.config.filter,
       operators,
@@ -70,34 +84,44 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Load options from an async source
    */
-  asyncOptions(optionsLoader: () => Promise<FilterOption[]>, config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Custom validation for option values */
-    validation?: (value: string[]) => boolean | string;
-    /** Whether to allow searching through options (default: true) */
-    searchable?: boolean;
-    /** Placeholder text for the option selector */
-    placeholder?: string;
-    /** Loading placeholder text */
-    loadingPlaceholder?: string;
-    /** Maximum number of selections allowed */
-    maxSelections?: number;
-    /** Minimum number of selections required */
-    minSelections?: number;
-  } = {}): this {
-    const { 
-      includeNull = false, 
-      validation, 
-      searchable = true, 
-      placeholder, 
+  asyncOptions(
+    optionsLoader: () => Promise<FilterOption[]>,
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Custom validation for option values */
+      validation?: (value: string[]) => boolean | string;
+      /** Whether to allow searching through options (default: true) */
+      searchable?: boolean;
+      /** Placeholder text for the option selector */
+      placeholder?: string;
+      /** Loading placeholder text */
+      loadingPlaceholder?: string;
+      /** Maximum number of selections allowed */
+      maxSelections?: number;
+      /** Minimum number of selections required */
+      minSelections?: number;
+    } = {}
+  ): this {
+    const {
+      includeNull = false,
+      validation,
+      searchable = true,
+      placeholder,
       loadingPlaceholder = 'Loading options...',
       maxSelections,
-      minSelections 
+      minSelections,
     } = config;
-    
+
     const filterConfig: FilterConfig<string[]> = {
-      operators: ['includes', 'excludes', 'includesAny', 'includesAll', 'excludesAny', 'excludesAll'],
+      operators: [
+        'includes',
+        'excludes',
+        'includesAny',
+        'includesAll',
+        'excludesAny',
+        'excludesAll',
+      ],
       includeNull,
       validation,
     };
@@ -121,28 +145,36 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Configure as tags column
    */
-  tags(tags: FilterOption[], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Whether to allow searching through tags (default: true) */
-    searchable?: boolean;
-    /** Whether to allow creating new tags (default: false) */
-    allowCreate?: boolean;
-    /** Maximum number of tags allowed */
-    maxTags?: number;
-    /** Minimum number of tags required */
-    minTags?: number;
-  } = {}): this {
-    const { 
-      includeNull = false, 
-      searchable = true, 
-      allowCreate = false, 
+  tags(
+    tags: FilterOption[],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Whether to allow searching through tags (default: true) */
+      searchable?: boolean;
+      /** Whether to allow creating new tags (default: false) */
+      allowCreate?: boolean;
+      /** Maximum number of tags allowed */
+      maxTags?: number;
+      /** Minimum number of tags required */
+      minTags?: number;
+    } = {}
+  ): this {
+    const {
+      includeNull = false,
+      searchable = true,
+      allowCreate = false,
       maxTags,
-      minTags 
+      minTags,
     } = config;
-    
-    this.options(tags, { includeNull, searchable, maxSelections: maxTags, minSelections: minTags });
-    
+
+    this.options(tags, {
+      includeNull,
+      searchable,
+      maxSelections: maxTags,
+      minSelections: minTags,
+    });
+
     this.config.meta = {
       ...this.config.meta,
       tags: {
@@ -156,25 +188,27 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Configure as categories column (hierarchical)
    */
-  categories(categories: FilterOption[], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Whether to allow searching through categories (default: true) */
-    searchable?: boolean;
-    /** Whether to show category hierarchy (default: true) */
-    showHierarchy?: boolean;
-    /** Maximum number of categories allowed */
-    maxCategories?: number;
-  } = {}): this {
-    const { 
-      includeNull = false, 
-      searchable = true, 
-      showHierarchy = true,
-      maxCategories 
-    } = config;
-    
-    this.options(categories, { includeNull, searchable, maxSelections: maxCategories });
-    
+  categories(
+    categories: FilterOption[],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Whether to allow searching through categories (default: true) */
+      searchable?: boolean;
+      /** Whether to show category hierarchy (default: true) */
+      showHierarchy?: boolean;
+      /** Maximum number of categories allowed */
+      maxCategories?: number;
+    } = {}
+  ): this {
+    const { includeNull = false, searchable = true, showHierarchy = true, maxCategories } = config;
+
+    this.options(categories, {
+      includeNull,
+      searchable,
+      maxSelections: maxCategories,
+    });
+
     this.config.meta = {
       ...this.config.meta,
       categories: {
@@ -188,25 +222,23 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Configure as roles/permissions column
    */
-  roles(roles: FilterOption[], config: {
-    /** Whether to include null values (default: false) */
-    includeNull?: boolean;
-    /** Whether to allow searching through roles (default: true) */
-    searchable?: boolean;
-    /** Whether to show role descriptions (default: true) */
-    showDescriptions?: boolean;
-    /** Maximum number of roles allowed */
-    maxRoles?: number;
-  } = {}): this {
-    const { 
-      includeNull = false, 
-      searchable = true, 
-      showDescriptions = true,
-      maxRoles 
-    } = config;
-    
+  roles(
+    roles: FilterOption[],
+    config: {
+      /** Whether to include null values (default: false) */
+      includeNull?: boolean;
+      /** Whether to allow searching through roles (default: true) */
+      searchable?: boolean;
+      /** Whether to show role descriptions (default: true) */
+      showDescriptions?: boolean;
+      /** Maximum number of roles allowed */
+      maxRoles?: number;
+    } = {}
+  ): this {
+    const { includeNull = false, searchable = true, showDescriptions = true, maxRoles } = config;
+
     this.options(roles, { includeNull, searchable, maxSelections: maxRoles });
-    
+
     this.config.meta = {
       ...this.config.meta,
       roles: {
@@ -232,14 +264,14 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
     /** Separator for comma format (default: ', ') */
     separator?: string;
   }): this {
-    const { 
-      type = 'chips', 
-      maxVisible = 3, 
-      truncateText = '+{count} more', 
+    const {
+      type = 'chips',
+      maxVisible = 3,
+      truncateText = '+{count} more',
       showTooltip = true,
-      separator = ', ' 
+      separator = ', ',
     } = format;
-    
+
     this.config.meta = {
       ...this.config.meta,
       display: {
@@ -256,22 +288,24 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
   /**
    * Enable option badges/chips display
    */
-  showBadges(config: {
-    /** Badge variant (default: 'default') */
-    variant?: 'default' | 'secondary' | 'destructive' | 'outline';
-    /** Whether to show option colors (default: true) */
-    showColors?: boolean;
-    /** Whether to show option icons (default: true) */
-    showIcons?: boolean;
-    /** Whether to show remove button on badges (default: true) */
-    removable?: boolean;
-  } = {}): this {
+  showBadges(
+    config: {
+      /** Badge variant (default: 'default') */
+      variant?: 'default' | 'secondary' | 'destructive' | 'outline';
+      /** Whether to show option colors (default: true) */
+      showColors?: boolean;
+      /** Whether to show option icons (default: true) */
+      showIcons?: boolean;
+      /** Whether to show remove button on badges (default: true) */
+      removable?: boolean;
+    } = {}
+  ): this {
     const { variant = 'default', showColors = true, showIcons = true, removable = true } = config;
-    
+
     this.config.meta = {
       ...this.config.meta,
       display: {
-        ...this.config.meta?.display,
+        ...(this.config.meta?.display || {}),
         type: 'chips',
         variant,
         showColors,
@@ -294,7 +328,7 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
     custom?: (values: string[]) => boolean | string;
   }): this {
     const { maxSelections, minSelections, custom } = config;
-    
+
     this.config.meta = {
       ...this.config.meta,
       validation: {
@@ -305,4 +339,4 @@ export class MultiOptionColumnBuilder<TData = any> extends ColumnBuilder<TData, 
     };
     return this;
   }
-} 
+}

@@ -1,0 +1,770 @@
+# Getting Started with Better Tables
+
+## Overview
+
+Better Tables is a comprehensive React table library that provides powerful data management capabilities with excellent performance and developer experience. Built with TypeScript, it offers type-safe APIs, advanced filtering, sorting, pagination, and virtualization for handling large datasets.
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Basic Usage](#basic-usage)
+- [Advanced Features](#advanced-features)
+- [Framework Integration](#framework-integration)
+- [TypeScript Support](#typescript-support)
+- [Next Steps](#next-steps)
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18+ 
+- React 18+
+- TypeScript 5+ (recommended)
+
+### Install Core Package
+
+```bash
+npm install @better-tables/core
+```
+
+### Install UI Package (Optional)
+
+```bash
+npm install @better-tables/ui
+```
+
+### Install Adapter (Choose One)
+
+```bash
+# For REST APIs
+npm install @better-tables/adapters-rest
+
+# For Drizzle ORM
+npm install @better-tables/adapters-drizzle
+
+# For in-memory data (demos/testing)
+npm install @better-tables/adapters-memory
+```
+
+### Peer Dependencies
+
+The UI package requires these peer dependencies:
+
+```bash
+npm install react react-dom tailwindcss
+```
+
+## Quick Start
+
+### 1. Basic Table Setup
+
+```tsx
+import { BetterTable } from '@better-tables/ui';
+import { createColumnBuilder } from '@better-tables/core';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
+  department: string;
+}
+
+function UserTable() {
+  const [data, setData] = useState<User[]>([]);
+  
+  const columns = [
+    createColumnBuilder<User>()
+      .text()
+      .id('name')
+      .displayName('Name')
+      .accessor(user => user.name)
+      .searchable()
+      .build(),
+      
+    createColumnBuilder<User>()
+      .text()
+      .id('email')
+      .displayName('Email')
+      .accessor(user => user.email)
+      .searchable()
+      .build(),
+      
+    createColumnBuilder<User>()
+      .number()
+      .id('age')
+      .displayName('Age')
+      .accessor(user => user.age)
+      .range(18, 100)
+      .build(),
+      
+    createColumnBuilder<User>()
+      .option()
+      .id('department')
+      .displayName('Department')
+      .accessor(user => user.department)
+      .options([
+        { value: 'engineering', label: 'Engineering' },
+        { value: 'marketing', label: 'Marketing' },
+        { value: 'sales', label: 'Sales' },
+      ])
+      .build(),
+  ];
+
+  return (
+    <BetterTable
+      id="users-table"
+      name="Users"
+      columns={columns}
+      data={data}
+      features={{
+        filtering: true,
+        sorting: true,
+        pagination: true,
+        rowSelection: true,
+      }}
+    />
+  );
+}
+```
+
+### 2. With Data Fetching
+
+```tsx
+import { useTableData } from '@better-tables/ui';
+import { RestAdapter } from '@better-tables/adapters-rest';
+
+function UserTableWithData() {
+  const adapter = new RestAdapter({
+    baseUrl: '/api/users',
+    endpoints: {
+      list: '/',
+      create: '/',
+      update: '/:id',
+      delete: '/:id',
+    },
+  });
+
+  const { data, loading, error, refetch } = useTableData({
+    adapter,
+    filters: [],
+    pagination: { page: 1, limit: 20 },
+  });
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <BetterTable
+      columns={columns}
+      data={data}
+      loading={loading}
+      error={error}
+      onRetry={refetch}
+      features={{
+        filtering: true,
+        sorting: true,
+        pagination: true,
+      }}
+    />
+  );
+}
+```
+
+## Basic Usage
+
+### Column Types
+
+Better Tables supports various column types with specialized features:
+
+#### Text Columns
+
+```tsx
+createColumnBuilder<User>()
+  .text()
+  .id('name')
+  .displayName('Full Name')
+  .accessor(user => user.name)
+  .searchable()           // Enable text search
+  .sortable()             // Enable sorting
+  .filterable()           // Enable filtering
+  .build()
+```
+
+#### Number Columns
+
+```tsx
+createColumnBuilder<User>()
+  .number()
+  .id('salary')
+  .displayName('Salary')
+  .accessor(user => user.salary)
+  .range(30000, 200000)   // Set min/max range
+  .format('currency')     // Format as currency
+  .build()
+```
+
+#### Date Columns
+
+```tsx
+createColumnBuilder<User>()
+  .date()
+  .id('createdAt')
+  .displayName('Created At')
+  .accessor(user => user.createdAt)
+  .filter({
+    includeTime: true,    // Include time component
+    format: 'MM/dd/yyyy', // Custom date format
+  })
+  .build()
+```
+
+#### Option Columns
+
+```tsx
+createColumnBuilder<User>()
+  .option()
+  .id('status')
+  .displayName('Status')
+  .accessor(user => user.status)
+  .options([
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'pending', label: 'Pending' },
+  ])
+  .build()
+```
+
+#### Boolean Columns
+
+```tsx
+createColumnBuilder<User>()
+  .boolean()
+  .id('isActive')
+  .displayName('Active')
+  .accessor(user => user.isActive)
+  .build()
+```
+
+### Table Features
+
+Enable/disable features as needed:
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={data}
+  features={{
+    filtering: true,      // Enable filtering
+    sorting: true,        // Enable sorting
+    pagination: true,     // Enable pagination
+    rowSelection: true,   // Enable row selection
+    virtualization: true, // Enable virtualization (auto for large datasets)
+  }}
+/>
+```
+
+### Custom Cell Rendering
+
+```tsx
+createColumnBuilder<User>()
+  .text()
+  .id('avatar')
+  .displayName('Avatar')
+  .accessor(user => user.avatar)
+  .render((value, user) => (
+    <div className="flex items-center gap-2">
+      <img 
+        src={value} 
+        alt={user.name}
+        className="w-8 h-8 rounded-full"
+      />
+      <span>{user.name}</span>
+    </div>
+  ))
+  .build()
+```
+
+## Advanced Features
+
+### Filtering
+
+#### Basic Filtering
+
+```tsx
+import { FilterBar, ActiveFilters } from '@better-tables/ui';
+
+function FilteredTable() {
+  const [filters, setFilters] = useState<FilterState[]>([]);
+  
+  return (
+    <div className="space-y-4">
+      <FilterBar
+        columns={columns}
+        filters={filters}
+        onFiltersChange={setFilters}
+        searchable={true}
+        maxFilters={5}
+      />
+      
+      <ActiveFilters
+        columns={columns}
+        filters={filters}
+        onUpdateFilter={(columnId, updates) => {
+          setFilters(prev => prev.map(f => 
+            f.columnId === columnId ? { ...f, ...updates } : f
+          ));
+        }}
+        onRemoveFilter={(columnId) => {
+          setFilters(prev => prev.filter(f => f.columnId !== columnId));
+        }}
+      />
+      
+      <BetterTable
+        columns={columns}
+        data={data}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
+    </div>
+  );
+}
+```
+
+#### Advanced Filtering
+
+```tsx
+// Custom filter groups
+const filterGroups: FilterGroup[] = [
+  {
+    id: 'personal',
+    label: 'Personal Information',
+    columns: ['name', 'email', 'age'],
+  },
+  {
+    id: 'work',
+    label: 'Work Information',
+    columns: ['department', 'salary', 'startDate'],
+  },
+];
+
+<FilterBar
+  columns={columns}
+  filters={filters}
+  onFiltersChange={setFilters}
+  groups={filterGroups}
+  showGroups={true}
+/>
+```
+
+### Virtualization
+
+For large datasets, use the VirtualizedTable component:
+
+```tsx
+import { VirtualizedTable } from '@better-tables/ui';
+
+function LargeDataTable() {
+  const [data, setData] = useState<LargeItem[]>([]);
+  
+  return (
+    <VirtualizedTable
+      data={data}
+      columns={columns}
+      height={600}
+      rowHeight={52}
+      virtualization={{
+        overscan: 5,
+        smoothScrolling: true,
+      }}
+      onRowClick={(item, index) => {
+        console.log('Clicked:', item);
+      }}
+    />
+  );
+}
+```
+
+### Row Selection
+
+```tsx
+function SelectableTable() {
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  
+  const handleBulkAction = () => {
+    const selectedItems = data.filter((_, index) => 
+      selectedRows.has(`row-${index}`)
+    );
+    console.log('Selected items:', selectedItems);
+  };
+  
+  return (
+    <div className="space-y-4">
+      {selectedRows.size > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+          <span>{selectedRows.size} rows selected</span>
+          <Button onClick={handleBulkAction}>Bulk Action</Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => setSelectedRows(new Set())}
+          >
+            Clear Selection
+          </Button>
+        </div>
+      )}
+      
+      <BetterTable
+        columns={columns}
+        data={data}
+        selectedRows={selectedRows}
+        onRowSelectionChange={setSelectedRows}
+        features={{ rowSelection: true }}
+      />
+    </div>
+  );
+}
+```
+
+## Framework Integration
+
+### Next.js
+
+#### 1. Install Dependencies
+
+```bash
+npm install @better-tables/core @better-tables/ui @better-tables/adapters-rest
+npm install tailwindcss @tailwindcss/forms
+```
+
+#### 2. Setup Tailwind CSS
+
+```bash
+npx tailwindcss init -p
+```
+
+Update `tailwind.config.js`:
+
+```javascript
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+#### 3. Create API Route
+
+```typescript
+// app/api/users/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '20');
+  const search = searchParams.get('search') || '';
+  
+  // Your data fetching logic here
+  const users = await fetchUsers({ page, limit, search });
+  
+  return NextResponse.json({
+    data: users.items,
+    totalCount: users.total,
+    page,
+    limit,
+  });
+}
+```
+
+#### 4. Use in Component
+
+```tsx
+// app/users/page.tsx
+'use client';
+
+import { BetterTable } from '@better-tables/ui';
+import { RestAdapter } from '@better-tables/adapters-rest';
+
+export default function UsersPage() {
+  const adapter = new RestAdapter({
+    baseUrl: '/api/users',
+  });
+
+  return (
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-8">Users</h1>
+      <BetterTable
+        adapter={adapter}
+        columns={columns}
+        features={{
+          filtering: true,
+          pagination: true,
+          sorting: true,
+        }}
+      />
+    </div>
+  );
+}
+```
+
+### Remix
+
+#### 1. Install Dependencies
+
+```bash
+npm install @better-tables/core @better-tables/ui @better-tables/adapters-rest
+```
+
+#### 2. Create Loader
+
+```typescript
+// app/routes/users.tsx
+import { json } from '@remix-run/node';
+import { useLoaderData } from '@remix-run/react';
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get('page') || '1');
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  
+  const users = await fetchUsers({ page, limit });
+  
+  return json({
+    users: users.items,
+    totalCount: users.total,
+    page,
+    limit,
+  });
+}
+
+export default function UsersPage() {
+  const { users, totalCount } = useLoaderData<typeof loader>();
+  
+  return (
+    <BetterTable
+      columns={columns}
+      data={users}
+      totalCount={totalCount}
+      features={{
+        filtering: true,
+        pagination: true,
+        sorting: true,
+      }}
+    />
+  );
+}
+```
+
+### Vite + React
+
+#### 1. Install Dependencies
+
+```bash
+npm install @better-tables/core @better-tables/ui @better-tables/adapters-rest
+npm install tailwindcss @tailwindcss/forms
+```
+
+#### 2. Setup Tailwind
+
+```bash
+npx tailwindcss init -p
+```
+
+#### 3. Import Styles
+
+```tsx
+// main.tsx
+import './index.css';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+```
+
+```css
+/* index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+## TypeScript Support
+
+Better Tables is built with TypeScript and provides excellent type safety:
+
+### Type-Safe Column Definitions
+
+```typescript
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
+  department: string;
+  createdAt: Date;
+  isActive: boolean;
+}
+
+const columns = [
+  createColumnBuilder<User>()  // Type-safe builder
+    .text()
+    .id('name')
+    .accessor(user => user.name)  // Type-safe accessor
+    .build(),
+    
+  createColumnBuilder<User>()
+    .number()
+    .id('age')
+    .accessor(user => user.age)   // Type-safe accessor
+    .build(),
+];
+```
+
+### Type-Safe Props
+
+```typescript
+interface UserTableProps {
+  data: User[];  // Type-safe data prop
+  onRowClick?: (user: User) => void;  // Type-safe callback
+}
+
+function UserTable({ data, onRowClick }: UserTableProps) {
+  return (
+    <BetterTable
+      columns={columns}
+      data={data}
+      onRowClick={onRowClick}  // Type-safe callback
+    />
+  );
+}
+```
+
+### Custom Types
+
+```typescript
+// Extend column definition for custom properties
+interface CustomColumnDefinition<T> extends ColumnDefinition<T> {
+  customProperty?: string;
+}
+
+// Type-safe custom renderer
+const customRenderer = (value: any, item: User, column: CustomColumnDefinition<User>) => {
+  // Type-safe access to custom property
+  return <div>{column.customProperty}</div>;
+};
+```
+
+## Next Steps
+
+### Learn More
+
+- [Component Reference](./ui/COMPONENT_REFERENCE.md) - Complete API reference
+- [Architecture Guide](./ARCHITECTURE.md) - Understanding the system design
+- [Performance Guide](./PERFORMANCE_BENCHMARKS.md) - Optimization tips
+- [Styling Guide](./ui/STYLING_GUIDE.md) - Customization options
+
+### Examples
+
+- [Basic Table Example](../examples/basic-table-example.tsx)
+- [Advanced Filtering Example](../examples/advanced-filtering-example.tsx)
+- [Virtualization Example](../examples/virtualization-example.tsx)
+- [Custom Components Example](../examples/custom-components-example.tsx)
+
+### Community
+
+- [GitHub Repository](https://github.com/yourusername/better-tables)
+- [Issues & Bug Reports](https://github.com/yourusername/better-tables/issues)
+- [Discussions](https://github.com/yourusername/better-tables/discussions)
+
+### Contributing
+
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Development Setup](./CONTRIBUTING.md#development-setup)
+- [Code Standards](./CONTRIBUTING.md#code-standards)
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Tailwind CSS Not Working
+
+**Problem**: Styles not applied to Better Tables components.
+
+**Solution**: Ensure Tailwind CSS is properly configured and includes the UI package:
+
+```javascript
+// tailwind.config.js
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    './node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}',
+  ],
+  // ... rest of config
+}
+```
+
+#### 2. TypeScript Errors
+
+**Problem**: TypeScript compilation errors.
+
+**Solution**: Ensure you're using the correct types and have TypeScript 5+:
+
+```bash
+npm install typescript@latest @types/react@latest @types/react-dom@latest
+```
+
+#### 3. Performance Issues
+
+**Problem**: Slow rendering with large datasets.
+
+**Solution**: Use virtualization for datasets > 1,000 rows:
+
+```tsx
+<VirtualizedTable
+  data={largeDataset}
+  columns={columns}
+  height={600}
+  rowHeight={52}
+/>
+```
+
+#### 4. Filtering Not Working
+
+**Problem**: Filters not being applied.
+
+**Solution**: Ensure filters are properly connected:
+
+```tsx
+const [filters, setFilters] = useState<FilterState[]>([]);
+
+<BetterTable
+  filters={filters}
+  onFiltersChange={setFilters}
+  // ... other props
+/>
+```
+
+### Getting Help
+
+If you're still having issues:
+
+1. Check the [FAQ](./FAQ.md)
+2. Search [existing issues](https://github.com/yourusername/better-tables/issues)
+3. Create a [new issue](https://github.com/yourusername/better-tables/issues/new) with:
+   - Code example
+   - Error messages
+   - Environment details
+   - Expected vs actual behavior

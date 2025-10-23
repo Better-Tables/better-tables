@@ -3,13 +3,13 @@
  * Uses existing format utilities from format-utils.ts
  */
 
-import { 
-  formatNumber as formatNumberDisplay, 
-  formatCurrency, 
-  formatPercentage,
-  type NumberFormatConfig,
+import {
   type CurrencyFormatConfig,
-  type PercentageFormatConfig
+  type NumberFormatConfig,
+  type PercentageFormatConfig,
+  formatCurrency,
+  formatNumber as formatNumberDisplay,
+  formatPercentage,
 } from './format-utils';
 
 export interface NumberInputConfig {
@@ -69,8 +69,8 @@ export function formatNumber(
   }
 
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
-  
-  if (isNaN(numValue)) {
+
+  if (Number.isNaN(numValue)) {
     return '';
   }
 
@@ -106,7 +106,7 @@ export function formatNumber(
         } as NumberFormatConfig);
         break;
     }
-  } catch (error) {
+  } catch (_error) {
     // Fallback to basic formatting if locale/currency is not supported
     formatted = numValue.toString();
   }
@@ -117,10 +117,7 @@ export function formatNumber(
 /**
  * Parse a formatted number string back to a number
  */
-export function parseFormattedNumber(
-  value: string,
-  config: NumberInputConfig = {}
-): number | null {
+export function parseFormattedNumber(value: string, config: NumberInputConfig = {}): number | null {
   const { type = 'number', locale = 'en-US', currency = 'USD', prefix = '', suffix = '' } = config;
 
   if (!value || value.trim() === '') {
@@ -140,21 +137,24 @@ export function parseFormattedNumber(
   if (type === 'percentage' && cleanValue.endsWith('%')) {
     cleanValue = cleanValue.substring(0, cleanValue.length - 1);
     const numValue = parseFloat(cleanValue.replace(/[^\d.-]/g, ''));
-    return isNaN(numValue) ? null : numValue;
+    return Number.isNaN(numValue) ? null : numValue;
   }
 
   // Handle currency symbols
   if (type === 'currency') {
     // Try to get currency symbol from locale
     try {
-      const formatter = new Intl.NumberFormat(locale, { style: 'currency', currency });
+      const formatter = new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+      });
       const parts = formatter.formatToParts(1);
-      const currencySymbol = parts.find(part => part.type === 'currency')?.value;
-      
+      const currencySymbol = parts.find((part) => part.type === 'currency')?.value;
+
       if (currencySymbol) {
         cleanValue = cleanValue.replace(new RegExp(escapeRegExp(currencySymbol), 'g'), '');
       }
-    } catch (error) {
+    } catch (_error) {
       // Fallback - remove common currency symbols
       cleanValue = cleanValue.replace(/[$€£¥₹]/g, '');
     }
@@ -162,9 +162,9 @@ export function parseFormattedNumber(
 
   // Remove thousand separators and non-numeric characters except decimal point and minus
   cleanValue = cleanValue.replace(/[^\d.-]/g, '');
-  
+
   const numValue = parseFloat(cleanValue);
-  return isNaN(numValue) ? null : numValue;
+  return Number.isNaN(numValue) ? null : numValue;
 }
 
 /**
@@ -174,12 +174,42 @@ function escapeRegExp(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Helper function to safely get string values from metadata
+function getStringValue(
+  meta: Record<string, unknown>,
+  key: string,
+  defaultValue?: string
+): string | undefined {
+  const value = meta[key];
+  return typeof value === 'string' ? value : defaultValue;
+}
+
+// Helper function to safely get number values from metadata
+function getNumberValue(
+  meta: Record<string, unknown>,
+  key: string,
+  defaultValue?: number
+): number | undefined {
+  const value = meta[key];
+  return typeof value === 'number' ? value : defaultValue;
+}
+
+// Helper function to safely get boolean values from metadata
+function getBooleanValue(
+  meta: Record<string, unknown>,
+  key: string,
+  defaultValue?: boolean
+): boolean | undefined {
+  const value = meta[key];
+  return typeof value === 'boolean' ? value : defaultValue;
+}
+
 /**
  * Get input configuration based on column type and metadata
  */
 export function getNumberInputConfig(
   columnType: string,
-  columnMeta?: Record<string, any>
+  columnMeta?: Record<string, unknown>
 ): NumberInputConfig {
   const baseConfig: NumberInputConfig = {
     type: 'number',
@@ -193,8 +223,8 @@ export function getNumberInputConfig(
   switch (columnType) {
     case 'currency':
       baseConfig.type = 'currency';
-      baseConfig.currency = columnMeta?.currency || 'USD';
-      baseConfig.decimals = columnMeta?.decimals ?? 2;
+      baseConfig.currency = getStringValue(columnMeta || {}, 'currency') || 'USD';
+      baseConfig.decimals = getNumberValue(columnMeta || {}, 'decimals') ?? 2;
       baseConfig.minDecimals = 2;
       baseConfig.maxDecimals = 2;
       baseConfig.placeholder = 'Enter amount...';
@@ -202,7 +232,7 @@ export function getNumberInputConfig(
 
     case 'percentage':
       baseConfig.type = 'percentage';
-      baseConfig.decimals = columnMeta?.decimals ?? 2;
+      baseConfig.decimals = getNumberValue(columnMeta || {}, 'decimals') ?? 2;
       baseConfig.minDecimals = 0;
       baseConfig.maxDecimals = 2;
       baseConfig.placeholder = 'Enter percentage...';
@@ -210,12 +240,11 @@ export function getNumberInputConfig(
       baseConfig.max = 100;
       break;
 
-    case 'number':
     default:
       baseConfig.type = 'number';
-      baseConfig.decimals = columnMeta?.decimals;
-      baseConfig.minDecimals = columnMeta?.minDecimals;
-      baseConfig.maxDecimals = columnMeta?.maxDecimals;
+      baseConfig.decimals = getNumberValue(columnMeta || {}, 'decimals');
+      baseConfig.minDecimals = getNumberValue(columnMeta || {}, 'minDecimals');
+      baseConfig.maxDecimals = getNumberValue(columnMeta || {}, 'maxDecimals');
       baseConfig.placeholder = 'Enter number...';
       break;
   }
@@ -224,19 +253,19 @@ export function getNumberInputConfig(
   if (columnMeta) {
     return {
       ...baseConfig,
-      locale: columnMeta.locale || baseConfig.locale,
-      currency: columnMeta.currency || baseConfig.currency,
-      decimals: columnMeta.decimals ?? baseConfig.decimals,
-      minDecimals: columnMeta.minDecimals ?? baseConfig.minDecimals,
-      maxDecimals: columnMeta.maxDecimals ?? baseConfig.maxDecimals,
-      useGrouping: columnMeta.useGrouping ?? baseConfig.useGrouping,
-      prefix: columnMeta.prefix || baseConfig.prefix,
-      suffix: columnMeta.suffix || baseConfig.suffix,
-      allowNegative: columnMeta.allowNegative ?? baseConfig.allowNegative,
-      allowDecimal: columnMeta.allowDecimal ?? baseConfig.allowDecimal,
-      min: columnMeta.min ?? baseConfig.min,
-      max: columnMeta.max ?? baseConfig.max,
-      step: columnMeta.step ?? baseConfig.step,
+      locale: getStringValue(columnMeta, 'locale') || baseConfig.locale,
+      currency: getStringValue(columnMeta, 'currency') || baseConfig.currency,
+      decimals: getNumberValue(columnMeta, 'decimals') ?? baseConfig.decimals,
+      minDecimals: getNumberValue(columnMeta, 'minDecimals') ?? baseConfig.minDecimals,
+      maxDecimals: getNumberValue(columnMeta, 'maxDecimals') ?? baseConfig.maxDecimals,
+      useGrouping: getBooleanValue(columnMeta, 'useGrouping') ?? baseConfig.useGrouping,
+      prefix: getStringValue(columnMeta, 'prefix') || baseConfig.prefix,
+      suffix: getStringValue(columnMeta, 'suffix') || baseConfig.suffix,
+      allowNegative: getBooleanValue(columnMeta, 'allowNegative') ?? baseConfig.allowNegative,
+      allowDecimal: getBooleanValue(columnMeta, 'allowDecimal') ?? baseConfig.allowDecimal,
+      min: getNumberValue(columnMeta, 'min') ?? baseConfig.min,
+      max: getNumberValue(columnMeta, 'max') ?? baseConfig.max,
+      step: getNumberValue(columnMeta, 'step') ?? baseConfig.step,
     };
   }
 
@@ -257,7 +286,7 @@ export function validateNumberInput(
   }
 
   const numValue = parseFormattedNumber(value, config);
-  
+
   if (numValue === null) {
     return { isValid: false, error: 'Invalid number format' };
   }
@@ -273,7 +302,10 @@ export function validateNumberInput(
   if (maxDecimals !== undefined) {
     const decimalPlaces = (numValue.toString().split('.')[1] || '').length;
     if (decimalPlaces > maxDecimals) {
-      return { isValid: false, error: `Maximum ${maxDecimals} decimal places allowed` };
+      return {
+        isValid: false,
+        error: `Maximum ${maxDecimals} decimal places allowed`,
+      };
     }
   }
 
@@ -342,4 +374,4 @@ export function getNumberInputStep(config: NumberInputConfig): number | string {
     default:
       return decimals === 0 ? 1 : 'any';
   }
-} 
+}

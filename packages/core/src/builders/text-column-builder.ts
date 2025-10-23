@@ -4,7 +4,7 @@ import { ColumnBuilder } from './column-builder';
 /**
  * Text column builder with text-specific methods
  */
-export class TextColumnBuilder<TData = any> extends ColumnBuilder<TData, string> {
+export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string> {
   constructor() {
     super('text');
   }
@@ -12,16 +12,18 @@ export class TextColumnBuilder<TData = any> extends ColumnBuilder<TData, string>
   /**
    * Enable search functionality with text operators
    */
-  searchable(options: {
-    /** Debounce delay in milliseconds (default: 300) */
-    debounce?: number;
-    /** Whether to include null values in search (default: false) */
-    includeNull?: boolean;
-    /** Custom validation for search input */
-    validation?: (value: string) => boolean | string;
-  } = {}): this {
+  searchable(
+    options: {
+      /** Debounce delay in milliseconds (default: 300) */
+      debounce?: number;
+      /** Whether to include null values in search (default: false) */
+      includeNull?: boolean;
+      /** Custom validation for search input */
+      validation?: (value: string) => boolean | string;
+    } = {}
+  ): this {
     const { debounce = 300, includeNull = false, validation } = options;
-    
+
     const filterConfig: FilterConfig<string> = {
       operators: ['contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'],
       debounce,
@@ -36,7 +38,9 @@ export class TextColumnBuilder<TData = any> extends ColumnBuilder<TData, string>
   /**
    * Set specific text operators
    */
-  textOperators(operators: Array<'contains' | 'equals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty'>): this {
+  textOperators(
+    operators: Array<'contains' | 'equals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty'>
+  ): this {
     this.config.filter = {
       ...this.config.filter,
       operators,
@@ -71,16 +75,18 @@ export class TextColumnBuilder<TData = any> extends ColumnBuilder<TData, string>
   /**
    * Set text truncation options
    */
-  truncate(options: {
-    /** Maximum characters to show (default: 100) */
-    maxLength?: number;
-    /** Whether to show tooltip with full text (default: true) */
-    showTooltip?: boolean;
-    /** Suffix to show when truncated (default: "...") */
-    suffix?: string;
-  } = {}): this {
+  truncate(
+    options: {
+      /** Maximum characters to show (default: 100) */
+      maxLength?: number;
+      /** Whether to show tooltip with full text (default: true) */
+      showTooltip?: boolean;
+      /** Suffix to show when truncated (default: "...") */
+      suffix?: string;
+    } = {}
+  ): this {
     const { maxLength = 100, showTooltip = true, suffix = '...' } = options;
-    
+
     this.config.meta = {
       ...this.config.meta,
       truncate: {
@@ -102,4 +108,4 @@ export class TextColumnBuilder<TData = any> extends ColumnBuilder<TData, string>
     };
     return this;
   }
-} 
+}

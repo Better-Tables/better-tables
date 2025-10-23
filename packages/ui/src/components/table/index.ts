@@ -1,2 +1,2 @@
 // Table components will be exported from here
-export * from './virtualized-table'; 
+export * from './virtualized-table';

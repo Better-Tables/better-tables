@@ -2,7 +2,7 @@
  * Format utilities for different data types
  */
 
-import { ColumnType } from "@better-tables/core";
+import { ColumnType } from '@better-tables/core';
 
 export interface NumberFormatConfig {
   locale?: string;
@@ -28,7 +28,7 @@ export function formatNumber(
   value: number | null | undefined,
   config: NumberFormatConfig = {}
 ): string {
-  if (value === null || value === undefined || isNaN(value)) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
     return '';
   }
 
@@ -60,7 +60,7 @@ export function formatCurrency(
   value: number | null | undefined,
   config: CurrencyFormatConfig = {}
 ): string {
-  if (value === null || value === undefined || isNaN(value)) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
     return '';
   }
 
@@ -97,7 +97,7 @@ export function formatPercentage(
   value: number | null | undefined,
   config: PercentageFormatConfig = {}
 ): string {
-  if (value === null || value === undefined || isNaN(value)) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
     return '';
   }
 
@@ -113,7 +113,7 @@ export function formatPercentage(
     // Assume value is already in percentage form (e.g., 85 for 85%)
     // If it's in decimal form (e.g., 0.85), multiply by 100
     const percentValue = value > 1 ? value : value * 100;
-    
+
     return new Intl.NumberFormat(locale, {
       style: 'percent',
       minimumFractionDigits,
@@ -132,15 +132,15 @@ export function formatPercentage(
  */
 export function formatEmail(email: string | null | undefined): string {
   if (!email) return '';
-  
+
   // Basic email validation and formatting
   const trimmed = email.trim().toLowerCase();
-  
+
   // Check if it looks like an email
   if (trimmed.includes('@') && trimmed.includes('.')) {
     return trimmed;
   }
-  
+
   return email; // Return original if doesn't look like email
 }
 
@@ -149,14 +149,14 @@ export function formatEmail(email: string | null | undefined): string {
  */
 export function formatUrl(url: string | null | undefined): string {
   if (!url) return '';
-  
+
   const trimmed = url.trim();
-  
+
   // Add protocol if missing
   if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
     return `https://${trimmed}`;
   }
-  
+
   return trimmed;
 }
 
@@ -165,19 +165,20 @@ export function formatUrl(url: string | null | undefined): string {
  */
 export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return '';
-  
+
   // Remove all non-numeric characters
   const cleaned = phone.replace(/\D/g, '');
-  
+
   // Format based on length
   if (cleaned.length === 10) {
     // US format: (555) 123-4567
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+  }
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
     // US format with country code: +1 (555) 123-4567
     return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
   }
-  
+
   // Return original for other formats
   return phone;
 }
@@ -185,32 +186,26 @@ export function formatPhone(phone: string | null | undefined): string {
 /**
  * Truncate text with ellipsis
  */
-export function truncateText(
-  text: string | null | undefined,
-  maxLength: number = 50
-): string {
+export function truncateText(text: string | null | undefined, maxLength = 50): string {
   if (!text) return '';
-  
+
   if (text.length <= maxLength) {
     return text;
   }
-  
-  return text.slice(0, maxLength - 3) + '...';
+
+  return `${text.slice(0, maxLength - 3)}...`;
 }
 
 /**
  * Format JSON for display
  */
-export function formatJson(
-  value: any,
-  options: { pretty?: boolean } = {}
-): string {
+export function formatJson(value: unknown, options: { pretty?: boolean } = {}): string {
   const { pretty = false } = options;
-  
+
   if (value === null || value === undefined) {
     return '';
   }
-  
+
   try {
     if (typeof value === 'string') {
       // Try to parse if it's a JSON string
@@ -221,7 +216,7 @@ export function formatJson(
         return value;
       }
     }
-    
+
     return pretty ? JSON.stringify(value, null, 2) : JSON.stringify(value);
   } catch (error) {
     console.warn('Error formatting JSON:', error);
@@ -234,26 +229,34 @@ export function formatJson(
  */
 export function getFormatterForType(
   columnType: ColumnType,
-  value: any,
-  meta?: Record<string, any>
+  value: unknown,
+  meta?: Record<string, unknown>
 ): string {
   switch (columnType) {
     case 'number':
-      return formatNumber(value, meta?.numberFormat);
+      return formatNumber(
+        typeof value === 'number' ? value : null,
+        meta?.numberFormat as Record<string, unknown>
+      );
     case 'currency':
-      return formatCurrency(value, { ...meta?.numberFormat, ...meta?.currencyFormat });
+      return formatCurrency(typeof value === 'number' ? value : null, {
+        ...((meta?.numberFormat as Record<string, unknown>) || {}),
+        ...((meta?.currencyFormat as Record<string, unknown>) || {}),
+      });
     case 'percentage':
-      return formatPercentage(value, meta?.numberFormat);
+      return formatPercentage(
+        typeof value === 'number' ? value : null,
+        meta?.numberFormat as Record<string, unknown>
+      );
     case 'email':
-      return formatEmail(value);
+      return formatEmail(typeof value === 'string' ? value : null);
     case 'url':
-      return formatUrl(value);
+      return formatUrl(typeof value === 'string' ? value : null);
     case 'phone':
-      return formatPhone(value);
+      return formatPhone(typeof value === 'string' ? value : null);
     case 'json':
       return formatJson(value, { pretty: false });
-    case 'text':
     default:
       return truncateText(String(value || ''));
   }
-} 
+}

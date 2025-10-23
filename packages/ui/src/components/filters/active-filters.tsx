@@ -1,27 +1,33 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { getOperatorDefinition } from '@better-tables/core';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { X, Lock } from 'lucide-react';
-import { FilterOperatorSelect } from './filter-operator-select';
-import { FilterValueInput } from './filter-value-input';
-import { formatDateWithConfig, formatDateRange } from '@/lib/date-utils';
 import {
-  getFormatterForType,
-  formatNumber,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
+import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
+import {
   formatCurrency,
-  formatPercentage,
   formatEmail,
-  formatUrl,
+  formatNumber,
+  formatPercentage,
   formatPhone,
+  formatUrl,
+  getFormatterForType,
   truncateText,
 } from '@/lib/format-utils';
+import { cn } from '@/lib/utils';
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { getOperatorDefinition } from '@better-tables/core';
+import { Lock, X } from 'lucide-react';
+import * as React from 'react';
+import { FilterOperatorSelect } from './filter-operator-select';
+import { FilterValueInput } from './filter-value-input';
 
 export interface ActiveFiltersProps<TData = any> {
   /** Column definitions */
@@ -55,8 +61,8 @@ function ActiveFiltersComponent<TData = any>({
     <div className={cn('flex gap-2', className)}>
       {/* Mobile: horizontal scrolling, Desktop: flex-wrap */}
       <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 sm:overflow-x-visible sm:flex-wrap">
-        {filters.map(filter => {
-          const column = columns.find(col => col.id === filter.columnId);
+        {filters.map((filter) => {
+          const column = columns.find((col) => col.id === filter.columnId);
           if (!column) return null;
 
           const isProtected = isFilterProtected?.(filter) ?? false;
@@ -66,7 +72,7 @@ function ActiveFiltersComponent<TData = any>({
               <MemoizedFilterBadge
                 filter={filter}
                 column={column}
-                onUpdate={updates => onUpdateFilter(filter.columnId, updates)}
+                onUpdate={(updates) => onUpdateFilter(filter.columnId, updates)}
                 onRemove={() => onRemoveFilter(filter.columnId)}
                 isProtected={isProtected}
                 disabled={disabled}
@@ -99,20 +105,21 @@ function FilterBadge<TData = any>({
   isProtected,
   disabled = false,
 }: FilterBadgeProps<TData>) {
-  const Icon = column.icon;
+  const icon = column.icon;
+  const Icon = icon;
   const [isMobile, setIsMobile] = React.useState(false);
-  
+
   // Check if mobile viewport
   React.useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768); // sm breakpoint
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
   // Get operator label from core package - memoized
   const operatorLabel = React.useMemo(() => {
     const operatorDef = getOperatorDefinition(filter.operator);
@@ -124,7 +131,7 @@ function FilterBadge<TData = any>({
       className={cn(
         'flex items-center rounded-2xl border bg-background text-xs shadow-sm',
         disabled && 'opacity-50 cursor-not-allowed',
-        isProtected && 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950',
+        isProtected && 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
       )}
     >
       {/* Column Name */}
@@ -143,7 +150,7 @@ function FilterBadge<TData = any>({
             variant="ghost"
             className={cn(
               'h-full rounded-none px-2 py-1 text-xs hover:bg-muted',
-              isProtected && 'cursor-not-allowed opacity-75',
+              isProtected && 'cursor-not-allowed opacity-75'
             )}
             disabled={disabled || isProtected}
           >
@@ -155,7 +162,7 @@ function FilterBadge<TData = any>({
           <FilterOperatorSelect
             column={column}
             value={filter.operator}
-            onChange={operator => onUpdate({ operator })}
+            onChange={(operator) => onUpdate({ operator })}
             disabled={disabled || isProtected}
           />
           {isProtected && (
@@ -176,7 +183,7 @@ function FilterBadge<TData = any>({
               variant="ghost"
               className={cn(
                 'h-full rounded-none px-2 py-1 text-xs hover:bg-muted',
-                isProtected && 'cursor-not-allowed opacity-75',
+                isProtected && 'cursor-not-allowed opacity-75'
               )}
               disabled={disabled || isProtected}
             >
@@ -191,8 +198,8 @@ function FilterBadge<TData = any>({
             <FilterValueInput
               filter={filter}
               column={column}
-              onChange={values => onUpdate({ values })}
-              onIncludeNullChange={includeNull => onUpdate({ includeNull })}
+              onChange={(values) => onUpdate({ values })}
+              onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
               disabled={disabled || isProtected}
             />
             {isProtected && (
@@ -209,7 +216,7 @@ function FilterBadge<TData = any>({
               variant="ghost"
               className={cn(
                 'h-full rounded-none px-2 py-1 text-xs hover:bg-muted',
-                isProtected && 'cursor-not-allowed opacity-75',
+                isProtected && 'cursor-not-allowed opacity-75'
               )}
               disabled={disabled || isProtected}
             >
@@ -221,8 +228,8 @@ function FilterBadge<TData = any>({
             <FilterValueInput
               filter={filter}
               column={column}
-              onChange={values => onUpdate({ values })}
-              onIncludeNullChange={includeNull => onUpdate({ includeNull })}
+              onChange={(values) => onUpdate({ values })}
+              onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
               disabled={disabled || isProtected}
             />
             {isProtected && (
@@ -267,7 +274,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
   if (!filter.values || filter.values.length === 0) {
     return <span className="text-muted-foreground">Empty</span>;
   }
-  
+
   // Check if includeNull is active and render an indicator
   const includesNull = filter.includeNull === true;
   const nullIndicator = includesNull ? (
@@ -351,14 +358,14 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
       return <span>{formatPercentage(filter.values[0], column.meta?.numberFormat)}</span>;
 
     case 'date':
-      // Get date formatting configuration from column metadata
+      // Get date formatting configuration from column filter config
       const dateFormat = {
-        format: column.meta?.dateFormat?.format || 'PPP',
-        locale: column.meta?.dateFormat?.locale || 'en-US',
-        showTime: column.meta?.dateFormat?.showTime || false,
-        showRelative: column.meta?.dateFormat?.showRelative || false,
-        timeZone: column.meta?.dateFormat?.timeZone,
-        relativeOptions: column.meta?.dateFormat?.relativeOptions,
+        format: column.filter?.format || 'PPP',
+        locale: 'en-US',
+        showTime: column.filter?.includeTime || false,
+        showRelative: false,
+        timeZone: undefined,
+        relativeOptions: undefined,
       };
 
       if (filter.values.length === 2) {
@@ -374,22 +381,22 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
         </span>
       );
 
-    // TODO: I dont like declaring color styles here
     case 'boolean':
       return (
         <span
-          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+          className={cn(
+            'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
             filter.values[0]
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-          }`}
+          )}
         >
           {filter.values[0] ? 'True' : 'False'}
         </span>
       );
 
     case 'option':
-      const option = column.filter?.options?.find(o => o.value === filter.values[0]);
+      const option = column.filter?.options?.find((o) => o.value === filter.values[0]);
       return (
         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
           {truncateText(option?.label ?? filter.values[0], 20)}
@@ -399,7 +406,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
 
     case 'multiOption':
       const selectedOptions =
-        column.filter?.options?.filter(o => filter.values.includes(o.value)) ?? [];
+        column.filter?.options?.filter((o) => filter.values.includes(o.value)) ?? [];
 
       if (selectedOptions.length === 0) {
         return (

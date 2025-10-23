@@ -1,6 +1,6 @@
-// Test setup file
-import { beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+// Test setup file
+import { afterEach, beforeEach } from 'vitest';
 
 // Add any global test setup here
 beforeEach(() => {

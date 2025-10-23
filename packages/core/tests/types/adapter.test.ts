@@ -1,15 +1,15 @@
-import { describe, it, expectTypeOf } from 'vitest';
+import { describe, expectTypeOf, it } from 'vitest';
 import type {
-  TableAdapter,
-  FetchDataParams,
-  FetchDataResult,
+  AdapterConfig,
+  AdapterFeatures,
+  AdapterMeta,
+  DataEvent,
   ExportParams,
   ExportResult,
-  AdapterMeta,
-  AdapterFeatures,
-  AdapterConfig,
+  FetchDataParams,
+  FetchDataResult,
   FilterState,
-  DataEvent,
+  TableAdapter,
 } from '../../src/types';
 
 describe('Adapter Types', () => {
@@ -77,7 +77,7 @@ describe('Adapter Types', () => {
         createRecord: async (data) => ({ id: '1', ...data }),
         updateRecord: async (_id, data) => ({ id: _id, ...data }),
         deleteRecord: async (_id) => {},
-        bulkUpdate: async (_ids, data) => _ids.map(id => ({ id, ...data })),
+        bulkUpdate: async (_ids, data) => _ids.map((id) => ({ id, ...data })),
         bulkDelete: async (_ids) => {},
         exportData: async (_params) => ({
           data: new Blob(),
@@ -124,7 +124,9 @@ describe('Adapter Types', () => {
       };
 
       expectTypeOf(params.pagination).toMatchTypeOf<{ page: number; limit: number } | undefined>();
-      expectTypeOf(params.sorting).toMatchTypeOf<Array<{ columnId: string; direction: 'asc' | 'desc' }> | undefined>();
+      expectTypeOf(params.sorting).toMatchTypeOf<
+        Array<{ columnId: string; direction: 'asc' | 'desc' }> | undefined
+      >();
       expectTypeOf(params.filters).toMatchTypeOf<FilterState[] | undefined>();
     });
   });
@@ -132,7 +134,7 @@ describe('Adapter Types', () => {
   describe('FetchDataResult', () => {
     it('should return paginated data', () => {
       type User = { id: string; name: string };
-      
+
       const result: FetchDataResult<User> = {
         data: [
           { id: '1', name: 'John' },
@@ -208,14 +210,7 @@ describe('Adapter Types', () => {
           export: true,
           transactions: true,
         },
-        supportedColumnTypes: [
-          'text',
-          'number',
-          'date',
-          'boolean',
-          'option',
-          'multiOption',
-        ],
+        supportedColumnTypes: ['text', 'number', 'date', 'boolean', 'option', 'multiOption'],
         supportedOperators: {
           text: ['contains', 'equals', 'startsWith', 'endsWith'],
           number: ['equals', 'greaterThan', 'lessThan', 'between'],
@@ -234,7 +229,9 @@ describe('Adapter Types', () => {
       };
 
       expectTypeOf(meta.features).toEqualTypeOf<AdapterFeatures>();
-      expectTypeOf(meta.supportedColumnTypes).toEqualTypeOf<Array<import('../../src/types').ColumnType>>();
+      expectTypeOf(meta.supportedColumnTypes).toEqualTypeOf<
+        Array<import('../../src/types').ColumnType>
+      >();
     });
   });
 
@@ -262,15 +259,19 @@ describe('Adapter Types', () => {
         },
       };
 
-      expectTypeOf(config.cache).toMatchTypeOf<{ enabled: boolean; ttl: number; maxSize: number } | undefined>();
-      expectTypeOf(config.logging?.level).toEqualTypeOf<'debug' | 'info' | 'warn' | 'error' | undefined>();
+      expectTypeOf(config.cache).toMatchTypeOf<
+        { enabled: boolean; ttl: number; maxSize: number } | undefined
+      >();
+      expectTypeOf(config.logging?.level).toEqualTypeOf<
+        'debug' | 'info' | 'warn' | 'error' | undefined
+      >();
     });
   });
 
   describe('DataEvent', () => {
     it('should represent real-time data events', () => {
       type User = { id: string; name: string };
-      
+
       const insertEvent: DataEvent<User> = {
         type: 'insert',
         data: { id: '1', name: 'John' },
@@ -294,4 +295,4 @@ describe('Adapter Types', () => {
       expectTypeOf(updateEvent.data).toMatchTypeOf<User | User[]>();
     });
   });
-}); 
+});

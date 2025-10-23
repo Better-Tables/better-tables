@@ -1,4 +1,4 @@
-import type { PaginationState, PaginationParams, PaginationConfig } from '../types/pagination';
+import type { PaginationConfig, PaginationParams, PaginationState } from '../types/pagination';
 
 /**
  * Event types for pagination manager
@@ -35,7 +35,7 @@ export class PaginationManager {
     hasNext: false,
     hasPrev: false,
   };
-  private total: number = 0;
+  private total = 0;
   private subscribers: PaginationManagerSubscriber[] = [];
   private config: PaginationConfig = {};
 
@@ -48,7 +48,7 @@ export class PaginationManager {
       showPageNumbers: true,
       pageNumbersToShow: 7,
       showFirstLastButtons: true,
-      ...config
+      ...config,
     };
 
     if (initialState) {
@@ -157,17 +157,17 @@ export class PaginationManager {
     }
 
     const previousPageSize = this.paginationState.limit;
-    
+
     // Calculate new page to maintain current position
     const currentIndex = (this.paginationState.page - 1) * this.paginationState.limit;
     const newPage = Math.floor(currentIndex / pageSize) + 1;
-    
+
     this.updateState({
       ...this.paginationState,
       limit: pageSize,
       page: newPage,
     });
-    
+
     this.notifySubscribers({ type: 'page_size_changed', pageSize, previousPageSize });
   }
 
@@ -276,7 +276,7 @@ export class PaginationManager {
    */
   updateConfig(config: Partial<PaginationConfig>): void {
     this.config = { ...this.config, ...config };
-    
+
     // Validate current state against new config
     if (this.config.maxPageSize && this.paginationState.limit > this.config.maxPageSize) {
       this.changePageSize(this.config.maxPageSize);
@@ -292,7 +292,10 @@ export class PaginationManager {
     }
 
     if (this.paginationState.totalPages > 0 && page > this.paginationState.totalPages) {
-      return { valid: false, error: `Page ${page} exceeds total pages ${this.paginationState.totalPages}` };
+      return {
+        valid: false,
+        error: `Page ${page} exceeds total pages ${this.paginationState.totalPages}`,
+      };
     }
 
     return { valid: true };
@@ -307,12 +310,18 @@ export class PaginationManager {
     }
 
     if (this.config.maxPageSize && pageSize > this.config.maxPageSize) {
-      return { valid: false, error: `Page size ${pageSize} exceeds maximum ${this.config.maxPageSize}` };
+      return {
+        valid: false,
+        error: `Page size ${pageSize} exceeds maximum ${this.config.maxPageSize}`,
+      };
     }
 
     const validSizes = this.config.pageSizeOptions || [10, 20, 50, 100];
     if (!validSizes.includes(pageSize)) {
-      return { valid: false, error: `Page size ${pageSize} is not in allowed options: ${validSizes.join(', ')}` };
+      return {
+        valid: false,
+        error: `Page size ${pageSize} is not in allowed options: ${validSizes.join(', ')}`,
+      };
     }
 
     return { valid: true };
@@ -333,7 +342,10 @@ export class PaginationManager {
     this.paginationState.hasPrev = this.paginationState.page > 1;
 
     // Ensure current page is within bounds
-    if (this.paginationState.totalPages > 0 && this.paginationState.page > this.paginationState.totalPages) {
+    if (
+      this.paginationState.totalPages > 0 &&
+      this.paginationState.page > this.paginationState.totalPages
+    ) {
       this.paginationState.page = this.paginationState.totalPages;
       this.paginationState.hasNext = false;
     }
@@ -356,7 +368,7 @@ export class PaginationManager {
    * Notify all subscribers of pagination changes
    */
   private notifySubscribers(event: PaginationManagerEvent): void {
-    this.subscribers.forEach(callback => {
+    this.subscribers.forEach((callback) => {
       try {
         callback(event);
       } catch (error) {
@@ -373,4 +385,4 @@ export class PaginationManager {
     cloned.setTotal(this.total);
     return cloned;
   }
-} 
+}

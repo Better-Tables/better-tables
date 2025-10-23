@@ -1,14 +1,14 @@
-import { describe, it, expect, expectTypeOf } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
-  FilterOperator,
+  ColumnDefinition,
+  ColumnType,
+  FilterComponentProps,
   FilterConfig,
+  FilterGroup,
+  FilterOperator,
+  FilterOperatorDefinition,
   FilterOption,
   FilterState,
-  FilterGroup,
-  FilterComponentProps,
-  FilterOperatorDefinition,
-  ColumnType,
-  ColumnDefinition,
 } from '../../src/types';
 
 describe('Filter Types', () => {
@@ -23,7 +23,7 @@ describe('Filter Types', () => {
         'isNotEmpty',
       ];
 
-      textOperators.forEach((op) => {
+      for (const op of textOperators) {
         const filter: FilterState = {
           columnId: 'text',
           type: 'text',
@@ -31,7 +31,7 @@ describe('Filter Types', () => {
           values: ['test'],
         };
         expectTypeOf(filter.operator).toEqualTypeOf<FilterOperator>();
-      });
+      }
     });
 
     it('should include all number operators', () => {
@@ -98,7 +98,9 @@ describe('Filter Types', () => {
 
       expectTypeOf(config.operators).toEqualTypeOf<FilterOperator[] | undefined>();
       expectTypeOf(config.options).toEqualTypeOf<FilterOption[] | undefined>();
-      expectTypeOf(config.validation).toEqualTypeOf<((value: string) => boolean | string) | undefined>();
+      expectTypeOf(config.validation).toEqualTypeOf<
+        ((value: string) => boolean | string) | undefined
+      >();
     });
 
     it('should support number-specific config', () => {
@@ -210,7 +212,9 @@ describe('Filter Types', () => {
       };
 
       expectTypeOf(operatorDef.valueCount).toEqualTypeOf<number | 'variable'>();
-      expectTypeOf(operatorDef.validate).toEqualTypeOf<((values: any[]) => boolean | string) | undefined>();
+      expectTypeOf(operatorDef.validate).toEqualTypeOf<
+        ((values: any[]) => boolean | string) | undefined
+      >();
     });
 
     it('should support variable value count', () => {
@@ -223,4 +227,4 @@ describe('Filter Types', () => {
       expect(operatorDef.valueCount).toBe('variable');
     });
   });
-}); 
+});

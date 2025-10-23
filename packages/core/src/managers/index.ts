@@ -4,4 +4,4 @@ export * from './filter-manager';
 export * from './sorting-manager';
 export * from './pagination-manager';
 export * from './selection-manager';
-export * from './virtualization-manager'; 
+export * from './virtualization-manager';
