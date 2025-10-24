@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export interface FilterOperatorSelectProps<TData = any> {
+export interface FilterOperatorSelectProps<TData = unknown> {
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Current operator value */
@@ -22,29 +22,32 @@ export interface FilterOperatorSelectProps<TData = any> {
   disabled?: boolean;
 }
 
-export function FilterOperatorSelect<TData = any>({
+export function FilterOperatorSelect<TData = unknown>({
   column,
   value,
   onChange,
   disabled = false,
 }: FilterOperatorSelectProps<TData>) {
   // Get available operators for this column type
+  const customOperators = column.filter?.operators;
   const operators = React.useMemo(() => {
     const availableOperators = getOperatorsForType(column.type);
 
     // If column has custom operators defined, use those instead
-    if (column.filter?.operators && column.filter.operators.length > 0) {
-      return availableOperators.filter((op) => column.filter!.operators!.includes(op.key));
+    if (customOperators && customOperators.length > 0) {
+      return availableOperators.filter((op) => customOperators.includes(op.key));
     }
 
     return availableOperators;
-  }, [column.type, column.filter?.operators]);
+  }, [column.type, customOperators]);
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Operator</label>
+      <label htmlFor={`operator-${column.id}`} className="text-sm font-medium">
+        Operator
+      </label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger>
+        <SelectTrigger id={`operator-${column.id}`}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

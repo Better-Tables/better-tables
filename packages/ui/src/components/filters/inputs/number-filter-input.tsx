@@ -5,6 +5,7 @@ import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
+import { getFilterValueAsNumber } from '@/lib/filter-value-utils';
 import {
   formatNumber,
   getFormattedPlaceholder,
@@ -15,18 +16,18 @@ import {
 } from '@/lib/number-format-utils';
 import { cn } from '@/lib/utils';
 
-export interface NumberFilterInputProps<TData = any> {
+export interface NumberFilterInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function NumberFilterInput<TData = any>({
+export function NumberFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
@@ -39,11 +40,12 @@ export function NumberFilterInput<TData = any>({
   );
 
   const [values, setValues] = React.useState(() => {
-    const filterValues = filter.values || [];
+    const val0 = getFilterValueAsNumber(filter, 0);
+    const val1 = getFilterValueAsNumber(filter, 1);
     return {
-      single: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
-      min: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
-      max: filterValues[1] ? formatNumber(filterValues[1], numberConfig) : '',
+      single: val0 !== null ? formatNumber(val0, numberConfig) : '',
+      min: val0 !== null ? formatNumber(val0, numberConfig) : '',
+      max: val1 !== null ? formatNumber(val1, numberConfig) : '',
     };
   });
 
@@ -127,13 +129,14 @@ export function NumberFilterInput<TData = any>({
 
   // Sync local values when filter values change externally
   React.useEffect(() => {
-    const filterValues = filter.values || [];
+    const val0 = getFilterValueAsNumber(filter, 0);
+    const val1 = getFilterValueAsNumber(filter, 1);
     setValues({
-      single: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
-      min: filterValues[0] ? formatNumber(filterValues[0], numberConfig) : '',
-      max: filterValues[1] ? formatNumber(filterValues[1], numberConfig) : '',
+      single: val0 !== null ? formatNumber(val0, numberConfig) : '',
+      min: val0 !== null ? formatNumber(val0, numberConfig) : '',
+      max: val1 !== null ? formatNumber(val1, numberConfig) : '',
     });
-  }, [filter.values, numberConfig]);
+  }, [filter.values, numberConfig, filter]);
 
   // Keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({

@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-export interface IncludeUnknownControlProps<TData = any> {
+export interface IncludeUnknownControlProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
@@ -21,7 +21,7 @@ export interface IncludeUnknownControlProps<TData = any> {
   className?: string;
 }
 
-export function IncludeUnknownControl<TData = any>({
+export function IncludeUnknownControl<TData = unknown>({
   filter,
   column,
   onChange,
@@ -32,17 +32,6 @@ export function IncludeUnknownControl<TData = any>({
   const operatorDef = React.useMemo(() => {
     return getOperatorDefinition(filter.operator);
   }, [filter.operator]);
-
-  // Check if the current operator supports null values
-  const supportsNull = operatorDef?.supportsNull ?? false;
-
-  // Check if the column/filter is configured to include null values
-  const columnAllowsNull = column.filter?.includeNull ?? false;
-
-  // Don't render if the operator doesn't support null or column doesn't allow it
-  if (!supportsNull || !columnAllowsNull) {
-    return null;
-  }
 
   // Get appropriate label and description based on column type
   const { label, description } = React.useMemo(() => {
@@ -102,6 +91,17 @@ export function IncludeUnknownControl<TData = any>({
     [onChange]
   );
 
+  // Check if the current operator supports null values
+  const supportsNull = operatorDef?.supportsNull ?? false;
+
+  // Check if the column/filter is configured to include null values
+  const columnAllowsNull = column.filter?.includeNull ?? false;
+
+  // Don't render if the operator doesn't support null or column doesn't allow it
+  if (!supportsNull || !columnAllowsNull) {
+    return null;
+  }
+
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center space-x-2">
@@ -128,7 +128,7 @@ export function IncludeUnknownControl<TData = any>({
 /**
  * Hook to check if a filter should show the include unknown control
  */
-export function useIncludeUnknownControl<TData = any>(
+export function useIncludeUnknownControl<TData = unknown>(
   filter: FilterState,
   column: ColumnDefinition<TData>
 ): boolean {

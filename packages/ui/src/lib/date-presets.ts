@@ -306,7 +306,7 @@ export function getCommonPresets(): DatePreset[] {
     getPresetById('this-month')!,
     getPresetById('last-week')!,
     getPresetById('last-month')!,
-  ].filter(Boolean);
+  ].filter((preset): preset is DatePreset => preset !== undefined);
 }
 
 /**
@@ -398,7 +398,7 @@ export interface DatePresetConfig {
 /**
  * Get preset configuration based on column metadata
  */
-export function getDatePresetConfig(columnMeta?: Record<string, any>): DatePresetConfig {
+export function getDatePresetConfig(columnMeta?: Record<string, unknown>): DatePresetConfig {
   const config: DatePresetConfig = {
     presets: DEFAULT_DATE_PRESETS,
     showDescriptions: true,

@@ -19,18 +19,18 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useFilterValidation } from '@/hooks/use-filter-validation';
 import { cn } from '@/lib/utils';
 
-export interface MultiOptionFilterInputProps<TData = any> {
+export interface MultiOptionFilterInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function MultiOptionFilterInput<TData = any>({
+export function MultiOptionFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
@@ -38,7 +38,7 @@ export function MultiOptionFilterInput<TData = any>({
 }: MultiOptionFilterInputProps<TData>) {
   const options = column.filter?.options || [];
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
-  const selectedValues = filter.values || [];
+  const selectedValues = (filter.values || []) as string[];
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
 
@@ -112,24 +112,24 @@ export function MultiOptionFilterInput<TData = any>({
         <div className="flex flex-wrap gap-1">
           {selectedValues.map((value) => {
             const option = options.find((opt) => opt.value === value);
-            const icon = option?.icon;
+            const OptionIcon = option?.icon;
             return (
               <Badge
-                key={value}
+                key={value as React.Key}
                 variant="secondary"
                 className={cn('text-xs', 'flex items-center gap-1')}
               >
-                {icon && (
+                {OptionIcon && (
                   <span className="mr-1">
-                    <Icon />
+                    <OptionIcon />
                   </span>
                 )}
-                {option?.label || value}
+                {option?.label ? option.label : String(value)}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="ml-1 h-auto p-0 text-xs hover:bg-transparent"
-                  onClick={() => handleRemoveValue(value)}
+                  onClick={() => handleRemoveValue(String(value))}
                   disabled={disabled}
                 >
                   <X className="h-3 w-3" />
@@ -171,7 +171,7 @@ export function MultiOptionFilterInput<TData = any>({
               <CommandGroup>
                 {filteredOptions.map((option) => {
                   const isSelected = selectedValues.includes(option.value);
-                  const icon = option.icon;
+                  const OptionIcon = option.icon;
                   return (
                     <CommandItem
                       key={option.value}
@@ -183,9 +183,9 @@ export function MultiOptionFilterInput<TData = any>({
                         onChange={() => {}} // Handled by CommandItem onSelect
                       />
                       <div className="flex items-center gap-2 flex-1">
-                        {icon && (
+                        {OptionIcon && (
                           <span>
-                            <Icon />
+                            <OptionIcon />
                           </span>
                         )}
                         <span>{option.label}</span>
