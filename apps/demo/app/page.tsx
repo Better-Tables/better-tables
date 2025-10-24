@@ -101,7 +101,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white p-4 rounded-lg shadow-sm">
           <UsersTableClient
             data={result.data}
             totalCount={result.total}

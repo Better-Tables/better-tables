@@ -32,33 +32,49 @@ export class DrizzleQueryBuilder {
   private schema: Record<string, AnyTableType>;
   private relationshipManager: RelationshipManager;
   private filterHandler: FilterHandler;
-  private mainTable: string;
+  private primaryTable: string | null = null;
   private primaryKeyMap: Record<string, { columnName: string; column: AnyColumnType }>;
 
   constructor(
     db: DrizzleDatabase,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    mainTable: string,
     databaseType: DatabaseDriver = 'postgres',
     primaryKeyMap?: Record<string, string>
   ) {
-    // Validate main table exists in schema
-    if (!schema[mainTable]) {
-      throw new QueryError(`Main table '${mainTable}' not found in schema`, {
-        mainTable,
-        availableTables: Object.keys(schema),
-      });
-    }
-
     this.db = db;
     this.schema = schema;
     this.relationshipManager = relationshipManager;
     this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType);
-    this.mainTable = mainTable;
 
     // Initialize primary key map
     this.primaryKeyMap = getPrimaryKeyMap(schema, primaryKeyMap);
+  }
+
+  /**
+   * Set the primary table for this query context
+   */
+  setPrimaryTable(tableName: string): void {
+    // Validate table exists in schema
+    if (!this.schema[tableName]) {
+      throw new QueryError(`Primary table '${tableName}' not found in schema`, {
+        tableName,
+        availableTables: Object.keys(this.schema),
+      });
+    }
+    this.primaryTable = tableName;
+  }
+
+  /**
+   * Get the current primary table
+   */
+  getPrimaryTable(): string {
+    if (!this.primaryTable) {
+      throw new QueryError('Primary table not set', {
+        suggestion: 'Call setPrimaryTable() before using DrizzleQueryBuilder',
+      });
+    }
+    return this.primaryTable;
   }
 
   /**
@@ -75,10 +91,10 @@ export class DrizzleQueryBuilder {
       columnMapping: Record<string, string>; // Maps SQL result keys to original column IDs
     };
   } {
-    const mainTableSchema = this.schema[this.mainTable];
-    if (!mainTableSchema) {
-      throw new QueryError(`Main table not found: ${this.mainTable}`, {
-        mainTable: this.mainTable,
+    const primaryTableSchema = this.schema[this.getPrimaryTable()];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${this.getPrimaryTable()}`, {
+        primaryTable: this.getPrimaryTable(),
       });
     }
 
@@ -113,8 +129,8 @@ export class DrizzleQueryBuilder {
 
     let query =
       Object.keys(selections).length > 0
-        ? this.db.select(selections).from(mainTableSchema)
-        : this.db.select().from(mainTableSchema);
+        ? this.db.select(selections).from(primaryTableSchema)
+        : this.db.select().from(primaryTableSchema);
 
     // Add joins
     const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths);
@@ -149,14 +165,14 @@ export class DrizzleQueryBuilder {
    * Build COUNT query for pagination
    */
   buildCountQuery(context: QueryContext): QueryBuilderWithJoins {
-    const mainTableSchema = this.schema[this.mainTable];
-    if (!mainTableSchema) {
-      throw new QueryError(`Main table not found: ${this.mainTable}`, {
-        mainTable: this.mainTable,
+    const primaryTableSchema = this.schema[this.getPrimaryTable()];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${this.getPrimaryTable()}`, {
+        primaryTable: this.getPrimaryTable(),
       });
     }
 
-    let query = this.db.select({ count: count() }).from(mainTableSchema);
+    let query = this.db.select({ count: count() }).from(primaryTableSchema);
 
     // Add joins
     const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths);
@@ -198,10 +214,10 @@ export class DrizzleQueryBuilder {
     // Validate column compatibility with aggregate function
     this.validateAggregateColumnCompatibility(columnReference.column, aggregateFunction);
 
-    const mainTableSchema = this.schema[this.mainTable];
+    const mainTableSchema = this.schema[this.getPrimaryTable()];
     if (!mainTableSchema) {
-      throw new QueryError(`Main table not found: ${this.mainTable}`, {
-        mainTable: this.mainTable,
+      throw new QueryError(`Primary table not found: ${this.getPrimaryTable()}`, {
+        primaryTable: this.getPrimaryTable(),
       });
     }
 
@@ -333,14 +349,14 @@ export class DrizzleQueryBuilder {
   private buildFlatSelectionsForRelationships(): Record<string, AnyColumnType> {
     const selections: Record<string, AnyColumnType> = {};
 
-    // Always include all main table columns - use Drizzle schema utilities
-    const mainTableSchema = this.schema[this.mainTable];
-    if (mainTableSchema) {
-      const mainTableColumnNames = getColumnNames(mainTableSchema);
+    // Always include all primary table columns - use Drizzle schema utilities
+    const primaryTableSchema = this.schema[this.getPrimaryTable()];
+    if (primaryTableSchema) {
+      const primaryTableColumnNames = getColumnNames(primaryTableSchema);
 
-      // Add all main table columns to selections
-      for (const colName of mainTableColumnNames) {
-        const col = (mainTableSchema as unknown as TableWithColumns)[colName];
+      // Add all primary table columns to selections
+      for (const colName of primaryTableColumnNames) {
+        const col = (primaryTableSchema as unknown as TableWithColumns)[colName];
         if (col) {
           selections[colName] = col;
         }
@@ -365,20 +381,20 @@ export class DrizzleQueryBuilder {
     // Check if we have any relationship-based columns
     const hasRelationshipColumns = columns.some((col) => col.includes('.'));
 
-    // Always include main table's primary key for grouping
-    const mainTablePrimaryKey = this.primaryKeyMap[this.mainTable];
-    if (mainTablePrimaryKey) {
-      selections[mainTablePrimaryKey.columnName] = mainTablePrimaryKey.column;
+    // Always include primary table's primary key for grouping
+    const primaryTablePrimaryKey = this.primaryKeyMap[this.getPrimaryTable()];
+    if (primaryTablePrimaryKey) {
+      selections[primaryTablePrimaryKey.columnName] = primaryTablePrimaryKey.column;
     }
 
-    // If we're filtering across relationships, include essential main table fields
+    // If we're filtering across relationships, include essential primary table fields
     if (hasRelationshipColumns) {
-      const mainTableSchema = this.schema[this.mainTable];
-      if (mainTableSchema) {
-        const mainTableColumnNames = getColumnNames(mainTableSchema);
+      const primaryTableSchema = this.schema[this.getPrimaryTable()];
+      if (primaryTableSchema) {
+        const primaryTableColumnNames = getColumnNames(primaryTableSchema);
 
-        for (const colName of mainTableColumnNames) {
-          const col = (mainTableSchema as unknown as TableWithColumns)[colName];
+        for (const colName of primaryTableColumnNames) {
+          const col = (primaryTableSchema as unknown as TableWithColumns)[colName];
           if (col && !selections[colName]) {
             selections[colName] = col;
           }
@@ -521,10 +537,10 @@ export class DrizzleQueryBuilder {
       throw new QueryError(`Column not found: ${columnId}`, { columnId });
     }
 
-    const mainTableSchema = this.schema[this.mainTable];
-    if (!mainTableSchema) {
-      throw new QueryError(`Main table not found: ${this.mainTable}`, {
-        mainTable: this.mainTable,
+    const primaryTableSchema = this.schema[this.getPrimaryTable()];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${this.getPrimaryTable()}`, {
+        primaryTable: this.getPrimaryTable(),
       });
     }
 
@@ -533,7 +549,7 @@ export class DrizzleQueryBuilder {
         value: column,
         count: count(),
       })
-      .from(mainTableSchema);
+      .from(primaryTableSchema);
 
     // Add joins if needed
     if (columnPath.isNested && columnPath.relationshipPath) {
@@ -575,10 +591,10 @@ export class DrizzleQueryBuilder {
     // Validate column compatibility with min/max functions
     this.validateMinMaxColumnCompatibility(columnReference.column);
 
-    const mainTableSchema = this.schema[this.mainTable];
-    if (!mainTableSchema) {
-      throw new QueryError(`Main table not found: ${this.mainTable}`, {
-        mainTable: this.mainTable,
+    const primaryTableSchema = this.schema[this.getPrimaryTable()];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${this.getPrimaryTable()}`, {
+        primaryTable: this.getPrimaryTable(),
       });
     }
 
@@ -587,7 +603,7 @@ export class DrizzleQueryBuilder {
         min: min(columnReference.column),
         max: max(columnReference.column),
       })
-      .from(mainTableSchema);
+      .from(primaryTableSchema);
 
     // Add required joins for the column
     const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(columnPath);
