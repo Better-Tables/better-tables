@@ -429,8 +429,8 @@ class DrizzleAdapter<TData> implements TableAdapter<TData> {
     return {
       data: data as TData[],
       totalCount: totalCount[0].count,
-      hasNext: offset + params.pagination.limit < totalCount[0].count,
-      hasPrev: params.pagination.page > 1,
+      hasNext: params.pagination ? offset + params.pagination.limit < totalCount[0].count : false,
+      hasPrev: params.pagination ? params.pagination.page > 1 : false,
     };
   }
   
@@ -713,6 +713,7 @@ function FilterInput({ onFilterChange }: FilterInputProps) {
       value={value}
       onChange={e => setValue(e.target.value)}
       placeholder="Search..."
+      aria-label="Search input"
     />
   );
 }

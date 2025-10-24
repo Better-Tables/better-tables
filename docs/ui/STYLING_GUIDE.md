@@ -265,6 +265,8 @@ function ThemeToggle() {
     <button
       onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
       className="p-2 rounded-md border"
+      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+      aria-pressed={theme === 'dark'}
     >
       {theme === 'light' ? '🌙' : '☀️'}
     </button>
@@ -393,7 +395,7 @@ function ThemeToggle() {
 <BetterTable
   aria-label="User data table"
   aria-describedby="table-description"
-  className="sr-only-focus:ring-2 sr-only-focus:ring-primary"
+  className="sr-only focus-visible:ring-2 focus-visible:ring-primary"
 />
 ```
 

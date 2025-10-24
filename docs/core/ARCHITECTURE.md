@@ -583,8 +583,18 @@ describe('FilterManager', () => {
   
   beforeEach(() => {
     columns = [
-      createTextColumn('name'),
-      createNumberColumn('age'),
+      createColumnBuilder()
+        .text()
+        .id('name')
+        .displayName('Name')
+        .accessor((row: any) => row.name)
+        .build(),
+      createColumnBuilder()
+        .number()
+        .id('age')
+        .displayName('Age')
+        .accessor((row: any) => row.age)
+        .build(),
     ];
     filterManager = new FilterManager(columns);
   });

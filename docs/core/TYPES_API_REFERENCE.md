@@ -75,7 +75,7 @@ interface TableFeatures {
 Defines how a column behaves and renders data.
 
 ```typescript
-interface ColumnDefinition<TData = any, TValue = any> {
+interface ColumnDefinition<TData = unknown, TValue = unknown> {
   id: string; // Unique column identifier
   displayName: string; // Display name
   icon?: IconComponent; // Optional icon
@@ -145,7 +145,7 @@ interface FilterState {
   columnId: string; // Column being filtered
   type: ColumnType; // Column type
   operator: FilterOperator; // Filter operator
-  values: any[]; // Filter values
+  values: unknown[]; // Filter values
   includeNull?: boolean; // Include null values
   meta?: Record<string, any>; // Additional metadata
 }
@@ -301,7 +301,7 @@ interface VirtualizationState {
 Interface for data adapters.
 
 ```typescript
-interface TableAdapter<TData = any> {
+interface TableAdapter<TData = unknown> {
   fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
   getFilterOptions(columnId: string): Promise<FilterOption[]>;
   getFacetedValues(columnId: string): Promise<Map<string, number>>;

@@ -259,7 +259,7 @@ cb.text()
   .headerRenderer(({ column, isSorted, sortDirection, onSort }) => (
     <div className="flex items-center gap-1">
       <span>{column.displayName}</span>
-      <button onClick={onSort}>
+      <button onClick={onSort} aria-label={`Sort by ${column.displayName}`}>
         {isSorted ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
       </button>
     </div>
@@ -379,7 +379,7 @@ paginationManager.firstPage();
 paginationManager.lastPage();
 
 // Change page size
-paginationManager.setPageSize(50);
+paginationManager.changePageSize(50);
 
 // Get pagination state
 const pagination = paginationManager.getPagination();
