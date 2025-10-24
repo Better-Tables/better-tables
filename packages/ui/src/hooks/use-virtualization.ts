@@ -160,10 +160,10 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
   const manager = useMemo(() => {
     return new VirtualizationManager(
       { containerHeight: 400, defaultRowHeight: 40, overscan: 5 },
-      0,
-      0
+      totalRows,
+      totalColumns
     );
-  }, []); // Created once, all updates handled via effects
+  }, [totalRows, totalColumns]); // Created once, all updates handled via effects
 
   // State for tracking virtualization state
   const [state, setState] = useState<VirtualizationState>(() => manager.getState());

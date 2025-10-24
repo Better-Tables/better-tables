@@ -386,9 +386,11 @@ export function FilterDropdown<TData = unknown>({
       <Dialog open={open} onOpenChange={disabled ? undefined : onOpenChange}>
         <DialogTrigger asChild disabled={disabled}>
           <button
+            type="button"
             tabIndex={disabled ? -1 : 0}
             onKeyDown={keyboardNavigation.onKeyDown}
             {...keyboardNavigation.ariaAttributes}
+            className="inline-flex items-center"
           >
             {children}
           </button>
@@ -409,9 +411,11 @@ export function FilterDropdown<TData = unknown>({
     <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
       <PopoverTrigger asChild disabled={disabled}>
         <button
+          type="button"
           tabIndex={disabled ? -1 : 0}
           onKeyDown={keyboardNavigation.onKeyDown}
           {...keyboardNavigation.ariaAttributes}
+          className="inline-flex items-center"
         >
           {children}
         </button>
