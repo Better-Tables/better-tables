@@ -1,6 +1,7 @@
 import type { FilterState, SortingState } from '@better-tables/core';
 import { UsersTableClient } from '@/components/users-table-client';
 import { getAdapter } from '@/lib/adapter';
+import { defaultVisibleColumns } from '@/lib/columns/user-columns';
 
 interface PageProps {
   searchParams: Promise<{
@@ -22,10 +23,8 @@ export default async function DemoPage({ searchParams }: PageProps) {
   if (params.filters) {
     try {
       const parsedFilters = JSON.parse(params.filters);
-      // Filter out invalid filters: date filters and filters with empty values
-      filters = parsedFilters.filter(
-        (f: FilterState) => f.type !== 'date' && f.values && f.values.length > 0
-      );
+      // Filter out invalid filters: date filters (but allow empty values for new filters)
+      filters = parsedFilters.filter((f: FilterState) => f.type !== 'date');
     } catch (_e) {
       // Ignore parse errors
     }
@@ -43,6 +42,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
   // Fetch data using adapter
   const adapter = await getAdapter();
   const result = await adapter.fetchData({
+    columns: defaultVisibleColumns,
     pagination: { page, limit },
     filters,
     sorting,
@@ -105,7 +105,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
           <UsersTableClient
             data={result.data}
             totalCount={result.total}
-            pagination={result.pagination!}
+            pagination={result.pagination || { page: 1, limit: 10, totalPages: 1 }}
             sorting={sorting}
             filters={filters}
           />
@@ -119,10 +119,10 @@ export default async function DemoPage({ searchParams }: PageProps) {
               <h3 className="font-semibold text-gray-900 mb-2">Column Types</h3>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>• Text columns (name, email, bio)</li>
-                <li>• Number columns (age, views, likes)</li>
+                <li>• Number columns (age)</li>
                 <li>• Date columns (joined date)</li>
-                <li>• Boolean columns (has_profile, is_active)</li>
                 <li>• Option columns (role, status)</li>
+                <li>• Relationship columns (profile data)</li>
               </ul>
             </div>
             <div>
@@ -131,8 +131,8 @@ export default async function DemoPage({ searchParams }: PageProps) {
                 <li>• One-to-one (user → profile)</li>
                 <li>• One-to-many (user → posts)</li>
                 <li>• Cross-table filtering</li>
-                <li>• Aggregate queries</li>
-                <li>• Computed columns</li>
+                <li>• Nested data access</li>
+                <li>• Relationship-based columns</li>
               </ul>
             </div>
             <div>
