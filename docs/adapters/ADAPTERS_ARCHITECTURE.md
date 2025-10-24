@@ -32,7 +32,7 @@ The Better Tables adapter system provides a standardized interface for connectin
 
 ```typescript
 // Core adapter interface
-interface TableAdapter<TData = any> {
+interface TableAdapter<TData = unknown> {
   fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
   getFilterOptions(columnId: string): Promise<FilterOption[]>;
   getFacetedValues(columnId: string): Promise<Map<string, number>>;
@@ -61,7 +61,7 @@ interface FetchDataParams {
   /** Sorting parameters */
   sorting?: SortingParams[];
   /** Additional query parameters */
-  [key: string]: any;
+  params?: Record<string, unknown>;
 }
 ```
 
@@ -187,7 +187,8 @@ interface AdapterFeatures {
 ### Base Adapter Class
 
 ```typescript
-abstract class BaseAdapter<TData = any> implements TableAdapter<TData> {
+abstract class BaseAdapter<TData = unknown> implements TableAdapter<TData> {
+  meta: AdapterMeta;
   protected config: AdapterConfig;
   protected cache: Map<string, any> = new Map();
   protected subscribers: Array<(event: DataEvent<TData>) => void> = [];

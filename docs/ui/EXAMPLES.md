@@ -473,7 +473,7 @@ function QueryTable() {
       filters={filters}
       onFiltersChange={setFilters}
       paginationState={pagination}
-      onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+      onPageChange={(page) => setPagination({ ...pagination, page })}
       features={{
         filtering: true,
         pagination: true,

@@ -163,7 +163,7 @@ function TableWithManagers() {
       onFiltersChange={(filters) => filterManager.setFilters(filters)}
       paginationState={paginationManager.getPagination()}
       onPageChange={(page) => paginationManager.goToPage(page)}
-      selectedRows={selectionManager.getSelectedIds()}
+      selectedRows={new Set(selectionManager.getSelectedIds())}
       onRowSelectionChange={(selected) => {
         // Update selection manager
         selected.forEach(id => selectionManager.selectRow(id));
