@@ -72,7 +72,7 @@ cd packages/core && pnpm test
 pnpm lint
 
 # Run type checking
-pnpm type-check
+pnpm --filter @better-tables/core type-check
 
 # Start development mode
 pnpm dev
@@ -528,7 +528,7 @@ describe("Table Integration", () => {
 
 ```bash
 # Run tests with coverage
-pnpm test:coverage
+pnpm --filter @better-tables/core test:coverage
 
 # Generate coverage report
 pnpm test:coverage --reporter=html

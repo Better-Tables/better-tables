@@ -32,7 +32,7 @@ The Better Tables adapter system provides a standardized interface for connectin
 
 ```typescript
 // Core adapter interface
-interface TableAdapter<TData = any> {
+interface TableAdapter<TData = unknown> {
   fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
   getFilterOptions(columnId: string): Promise<FilterOption[]>;
   getFacetedValues(columnId: string): Promise<Map<string, number>>;
@@ -61,7 +61,7 @@ interface FetchDataParams {
   /** Sorting parameters */
   sorting?: SortingParams[];
   /** Additional query parameters */
-  [key: string]: any;
+  params?: Record<string, unknown>;
 }
 ```
 
@@ -187,7 +187,8 @@ interface AdapterFeatures {
 ### Base Adapter Class
 
 ```typescript
-abstract class BaseAdapter<TData = any> implements TableAdapter<TData> {
+abstract class BaseAdapter<TData = unknown> implements TableAdapter<TData> {
+  meta: AdapterMeta;
   protected config: AdapterConfig;
   protected cache: Map<string, any> = new Map();
   protected subscribers: Array<(event: DataEvent<TData>) => void> = [];
@@ -1372,20 +1373,31 @@ describe("MemoryAdapter", () => {
   });
 
   it("should delete records", async () => {
-  private async fetchDataInBatches(params: FetchDataParams): Promise<FetchDataResult<TData>> {
-    const batchSize = 1000;
-    const batches = Math.ceil(params.pagination!.limit / batchSize);
-    const results: TData[] = [];
+    const user = await adapter.create({ name: "John", age: 30 });
+    await adapter.delete(user.id);
+    
+    const deleted = await adapter.findById(user.id);
+    expect(deleted).toBeNull();
+  });
+});
 
-    for (let i = 0; i < batches; i++) {
-      const offset = (params.pagination!.page - 1) * params.pagination!.limit + i * batchSize;
-      const batchParams = {
-        ...params,
-        pagination: {
-          page: Math.floor(offset / batchSize) + 1,
-          limit: Math.min(batchSize, params.pagination!.limit - i * batchSize),
-        },
-      };
+// Helper function for batch processing
+async function fetchDataInBatches<TData>(
+  params: FetchDataParams
+): Promise<FetchDataResult<TData>> {
+  const batchSize = 1000;
+  const batches = Math.ceil(params.pagination!.limit / batchSize);
+  const results: TData[] = [];
+
+  for (let i = 0; i < batches; i++) {
+    const offset = (params.pagination!.page - 1) * params.pagination!.limit + i * batchSize;
+    const batchParams = {
+      ...params,
+      pagination: {
+        page: Math.floor(offset / batchSize) + 1,
+        limit: Math.min(batchSize, params.pagination!.limit - i * batchSize),
+      },
+    };
 
       const batchResult = await super.fetchData(batchParams);
       results.push(...batchResult.data);
@@ -1393,7 +1405,7 @@ describe("MemoryAdapter", () => {
 
     return {
       data: results,
-      total: results.length,
+      total: params.pagination ? Math.ceil(results.length / params.pagination.limit) * params.pagination.limit : results.length,
       pagination: params.pagination ? {
         page: params.pagination.page,
         limit: params.pagination.limit,

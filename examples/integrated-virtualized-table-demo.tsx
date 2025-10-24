@@ -1,4 +1,3 @@
-import React, { useCallback, useMemo, useState } from 'react';
 import {
   type ColumnDefinition,
   createColumnBuilder,
@@ -6,8 +5,9 @@ import {
   type FilterState,
   PaginationManager,
   type SortingState,
-} from '../packages/core/src';
-import { ActiveFilters, FilterBar, VirtualizedTable } from '../packages/ui/src';
+} from '@better-tables/core';
+import { ActiveFilters, FilterBar, VirtualizedTable } from '@better-tables/ui';
+import React, { useCallback, useMemo, useState } from 'react';
 
 /**
  * Sample data structure for the integrated demo
@@ -308,7 +308,9 @@ export function IntegratedVirtualizedTableDemo() {
   // Handle individual filter updates
   const handleUpdateFilter = useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      const newFilters = filters.map((f) => (f.columnId === columnId ? { ...f, ...updates } as FilterState : f));
+      const newFilters = filters.map((f) =>
+        f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f
+      );
       handleFiltersChange(newFilters);
     },
     [filters, handleFiltersChange]
@@ -450,8 +452,11 @@ export function IntegratedVirtualizedTableDemo() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="datasetSize" className="block text-sm font-medium mb-1">Dataset Size</label>
+            <label htmlFor="datasetSize" className="block text-sm font-medium mb-1">
+              Dataset Size
+            </label>
             <select
+              id="datasetSize"
               value={datasetSize}
               onChange={(e) => setDatasetSize(Number(e.target.value))}
               className="w-full p-2 border border-gray-300 rounded"
@@ -466,19 +471,19 @@ export function IntegratedVirtualizedTableDemo() {
 
           {/* Metrics Display */}
           <div className="md:col-span-2">
-            <label htmlFor="performanceMetrics" className="block text-sm font-medium mb-1">
-              Performance Metrics
-            </label>
-            <div className="p-2 bg-white border border-gray-300 rounded text-sm">
-              <span className="text-blue-600 font-medium">
-                {metrics.filteredCount.toLocaleString()} / {metrics.originalCount.toLocaleString()}{' '}
-                rows
-              </span>
-              {metrics.reductionPercentage > 0 && (
-                <span className="text-green-600 ml-2">
-                  ({metrics.reductionPercentage}% filtered)
+            <div className="space-y-1">
+              <div className="block text-sm font-medium">Performance Metrics</div>
+              <div className="p-2 bg-white border border-gray-300 rounded text-sm">
+                <span className="text-blue-600 font-medium">
+                  {metrics.filteredCount.toLocaleString()} /{' '}
+                  {metrics.originalCount.toLocaleString()} rows
                 </span>
-              )}
+                {metrics.reductionPercentage > 0 && (
+                  <span className="text-green-600 ml-2">
+                    ({metrics.reductionPercentage}% filtered)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
