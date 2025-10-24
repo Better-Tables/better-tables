@@ -36,4 +36,5 @@ export * from './components/ui/skeleton';
 export * from './components/ui/switch';
 // Export hooks
 export * from './hooks';
+export * from './lib/filter-value-utils';
 export * from './lib/utils';

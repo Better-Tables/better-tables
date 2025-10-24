@@ -5,26 +5,30 @@ import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useFilterValidation } from '@/hooks/use-filter-validation';
+import { getFilterValueAsString } from '@/lib/filter-value-utils';
 import { cn } from '@/lib/utils';
 
-export interface TextFilterInputProps<TData = any> {
+export interface TextFilterInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function TextFilterInput<TData = any>({
+export function TextFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
   disabled = false,
 }: TextFilterInputProps<TData>) {
-  const [localValue, setLocalValue] = React.useState(filter.values[0] || '');
+  const [localValue, setLocalValue] = React.useState(() => {
+    const value = getFilterValueAsString(filter, 0);
+    return value || '';
+  });
 
   // Debounce the onChange to avoid excessive updates
   const debounceMs = column.filter?.debounce ?? 300;
@@ -47,11 +51,11 @@ export function TextFilterInput<TData = any>({
 
   // Sync local value when filter values change externally
   React.useEffect(() => {
-    const newValue = filter.values[0] || '';
+    const newValue = getFilterValueAsString(filter, 0) || '';
     if (newValue !== localValue) {
       setLocalValue(newValue);
     }
-  }, [filter.values]);
+  }, [filter.values, filter, localValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalValue(e.target.value);
@@ -81,8 +85,11 @@ export function TextFilterInput<TData = any>({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Value</label>
+      <label htmlFor={`value-${filter.columnId}`} className="text-sm font-medium">
+        Value
+      </label>
       <Input
+        id={`value-${filter.columnId}`}
         type="text"
         value={localValue}
         onChange={handleChange}

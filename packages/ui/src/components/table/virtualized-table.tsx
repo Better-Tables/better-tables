@@ -1,4 +1,5 @@
-import type { ColumnDefinition } from '@better-tables/core';
+import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
+import { getColumnStyle } from '@better-tables/core';
 import type React from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
@@ -8,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 /**
  * Props for the VirtualizedTable component
  */
-export interface VirtualizedTableProps<T = any> {
+export interface VirtualizedTableProps<T = unknown> {
   /** Array of data to display */
   data: T[];
 
@@ -23,7 +24,7 @@ export interface VirtualizedTableProps<T = any> {
 
   /** Custom cell renderer */
   renderCell?: (
-    value: any,
+    value: unknown,
     column: ColumnDefinition<T>,
     item: T,
     rowIndex: number
@@ -52,7 +53,7 @@ export interface VirtualizedTableProps<T = any> {
 
   /** Callbacks */
   onRowClick?: (item: T, index: number) => void;
-  onScroll?: (scrollInfo: any) => void;
+  onScroll?: (scrollInfo: ScrollInfo) => void;
   onViewportChange?: (startIndex: number, endIndex: number) => void;
 
   /** Accessibility props */
@@ -69,7 +70,7 @@ interface VirtualizedRowProps<T> {
   columns: ColumnDefinition<T>[];
   style: React.CSSProperties;
   renderCell?: (
-    value: any,
+    value: unknown,
     column: ColumnDefinition<T>,
     item: T,
     rowIndex: number
@@ -106,7 +107,7 @@ function VirtualizedRow<T>({
     onMeasure(row.offsetHeight);
 
     return () => resizeObserver.disconnect();
-  }, [onMeasure, item]);
+  }, [onMeasure]);
 
   return (
     <TableRow
@@ -118,14 +119,15 @@ function VirtualizedRow<T>({
     >
       {columns.map((column) => {
         const value = item[column.id as keyof T];
+        const colStyle = getColumnStyle(column.meta);
         return (
           <TableCell
             key={column.id}
-            className={cn('p-4 align-middle', column.meta?.className)}
+            className={cn('p-4 align-middle', colStyle.className)}
             style={{
-              width: column.meta?.width,
-              minWidth: column.meta?.minWidth,
-              maxWidth: column.meta?.maxWidth,
+              width: colStyle.width,
+              minWidth: colStyle.minWidth,
+              maxWidth: colStyle.maxWidth,
             }}
           >
             {renderCell ? renderCell(value, column, item, index) : String(value || '')}
@@ -139,7 +141,7 @@ function VirtualizedRow<T>({
 /**
  * High-performance virtualized table component for large datasets
  */
-export function VirtualizedTable<T = any>({
+export function VirtualizedTable<T = unknown>({
   data,
   columns,
   virtualization = {},
@@ -244,29 +246,32 @@ export function VirtualizedTable<T = any>({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-none">
-              {columns.map((column) => (
-                <TableHead
-                  key={column.id}
-                  className={cn(
-                    'h-12 px-4 text-left align-middle font-medium',
-                    column.meta?.headerClassName
-                  )}
-                  style={{
-                    width: column.meta?.width,
-                    minWidth: column.meta?.minWidth,
-                    maxWidth: column.meta?.maxWidth,
-                  }}
-                >
-                  {column.displayName}
-                </TableHead>
-              ))}
+              {columns.map((column) => {
+                const colStyle = getColumnStyle(column.meta);
+                return (
+                  <TableHead
+                    key={column.id}
+                    className={cn(
+                      'h-12 px-4 text-left align-middle font-medium',
+                      colStyle.headerClassName
+                    )}
+                    style={{
+                      width: colStyle.width,
+                      minWidth: colStyle.minWidth,
+                      maxWidth: colStyle.maxWidth,
+                    }}
+                  >
+                    {column.displayName}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
         </Table>
       </div>
 
       {/* Virtualized content area */}
-      <div
+      <section
         ref={containerRef}
         className="overflow-auto"
         style={{
@@ -275,8 +280,6 @@ export function VirtualizedTable<T = any>({
         }}
         aria-label={ariaLabel || 'Virtualized table content'}
         aria-describedby={ariaDescribedBy}
-        role="grid"
-        tabIndex={0}
       >
         <div
           ref={contentRef}
@@ -296,14 +299,13 @@ export function VirtualizedTable<T = any>({
 
                 if (renderRow) {
                   return (
-                    <div
+                    <tr
                       key={virtualRow.index}
                       style={rowStyle}
-                      role="row"
                       aria-rowindex={virtualRow.index + 1}
                     >
                       {renderRow(item, virtualRow.index, rowStyle)}
-                    </div>
+                    </tr>
                   );
                 }
 
@@ -323,7 +325,7 @@ export function VirtualizedTable<T = any>({
             </TableBody>
           </Table>
         </div>
-      </div>
+      </section>
 
       {/* Scroll indicators (optional) */}
       {process.env.NODE_ENV === 'development' && (

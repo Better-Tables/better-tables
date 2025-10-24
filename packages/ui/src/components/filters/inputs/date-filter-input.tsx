@@ -12,20 +12,21 @@ import { Separator } from '@/components/ui/separator';
 import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
 import { type DatePreset, getCommonPresets, getDatePresetConfig } from '@/lib/date-presets';
 import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
+import { getFilterValueAsDate } from '@/lib/filter-value-utils';
 import { cn } from '@/lib/utils';
 
-export interface DateFilterInputProps<TData = any> {
+export interface DateFilterInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function DateFilterInput<TData = any>({
+export function DateFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
@@ -76,15 +77,17 @@ export function DateFilterInput<TData = any>({
   });
 
   const [singleDate, setSingleDate] = React.useState<Date | undefined>(() => {
-    return filter.values[0] ? new Date(filter.values[0]) : undefined;
+    const date = getFilterValueAsDate(filter, 0);
+    return date || undefined;
   });
 
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(() => {
     if (filter.values.length >= 2) {
-      return {
-        from: new Date(filter.values[0]),
-        to: new Date(filter.values[1]),
-      };
+      const from = getFilterValueAsDate(filter, 0);
+      const to = getFilterValueAsDate(filter, 1);
+      if (from && to) {
+        return { from, to };
+      }
     }
     return undefined;
   });
@@ -130,14 +133,16 @@ export function DateFilterInput<TData = any>({
   // Sync local dates when filter values change externally
   React.useEffect(() => {
     if (needsDateRange && filter.values.length >= 2) {
-      setDateRange({
-        from: new Date(filter.values[0]),
-        to: new Date(filter.values[1]),
-      });
-    } else if (!needsDateRange && filter.values[0]) {
-      setSingleDate(new Date(filter.values[0]));
+      const from = getFilterValueAsDate(filter, 0);
+      const to = getFilterValueAsDate(filter, 1);
+      if (from && to) {
+        setDateRange({ from, to });
+      }
+    } else if (!needsDateRange) {
+      const date = getFilterValueAsDate(filter, 0);
+      setSingleDate(date || undefined);
     }
-  }, [filter.values, needsDateRange]);
+  }, [filter.values, needsDateRange, filter]);
 
   // Handle preset selection
   const handlePresetSelect = React.useCallback(
@@ -155,28 +160,31 @@ export function DateFilterInput<TData = any>({
   );
 
   // Preset component
-  const presetButtons = React.memo(() => (
-    <div className="flex flex-col gap-1 p-2">
-      <div className="flex items-center gap-2 mb-2">
-        <Clock className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-xs font-medium text-muted-foreground">Quick Select</Label>
+  const PresetButtons = React.useMemo(
+    () => (
+      <div className="flex flex-col gap-1 p-2">
+        <div className="flex items-center gap-2 mb-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-xs font-medium text-muted-foreground">Quick Select</Label>
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          {presets.map((preset) => (
+            <Button
+              key={preset.id}
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePresetSelect(preset)}
+              className="justify-start text-xs h-8 px-2 py-1"
+              title={preset.description}
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-1">
-        {presets.map((preset) => (
-          <Button
-            key={preset.id}
-            variant="ghost"
-            size="sm"
-            onClick={() => handlePresetSelect(preset)}
-            className="justify-start text-xs h-8 px-2 py-1"
-            title={preset.description}
-          >
-            {preset.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  ));
+    ),
+    [presets, handlePresetSelect]
+  );
 
   if (needsNoValues) {
     return (
@@ -213,7 +221,7 @@ export function DateFilterInput<TData = any>({
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <div className="flex">
-              <PresetButtons />
+              {PresetButtons}
               <Separator orientation="vertical" className="h-auto" />
               <Calendar
                 autoFocus
@@ -260,7 +268,7 @@ export function DateFilterInput<TData = any>({
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex">
-            <PresetButtons />
+            {PresetButtons}
             <Separator orientation="vertical" className="h-auto" />
             <Calendar
               mode="single"
