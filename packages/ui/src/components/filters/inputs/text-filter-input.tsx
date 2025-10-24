@@ -55,7 +55,7 @@ export function TextFilterInput<TData = unknown>({
     if (newValue !== localValue) {
       setLocalValue(newValue);
     }
-  }, [filter.values, localValue, filter]);
+  }, [filter.values, filter, localValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalValue(e.target.value);
