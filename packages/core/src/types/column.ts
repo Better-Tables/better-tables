@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ColumnMeta } from './column-meta';
 import type { IconComponent, RenderProps } from './common';
 import type { FilterConfig } from './filter';
 
@@ -75,8 +76,8 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown> {
   /** Whether column supports null/undefined values */
   nullable?: boolean;
 
-  /** Column metadata */
-  meta?: Record<string, unknown>;
+  /** Column metadata - strongly typed */
+  meta?: ColumnMeta;
 }
 
 /**

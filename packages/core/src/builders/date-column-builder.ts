@@ -207,7 +207,7 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
     this.config.meta = {
       ...this.config.meta,
       dateFormat: {
-        ...(this.config.meta?.dateFormat || {}),
+        ...((this.config.meta?.dateFormat as Record<string, unknown>) || {}),
         locale,
         showRelative: true,
         relativeOptions: {

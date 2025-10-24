@@ -1,5 +1,6 @@
 export * from './adapter';
 export * from './column';
+export * from './column-meta';
 export * from './common';
 export * from './filter';
 export * from './filter-operators';

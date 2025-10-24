@@ -305,7 +305,7 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
     this.config.meta = {
       ...this.config.meta,
       display: {
-        ...(this.config.meta?.display || {}),
+        ...((this.config.meta?.display as Record<string, unknown>) || {}),
         type: 'chips',
         variant,
         showColors,
