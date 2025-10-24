@@ -90,7 +90,8 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
       this.schema,
       this.relationshipManager,
       this.mainTable,
-      config.driver
+      config.driver,
+      config.options?.primaryKey?.tableKeys
     );
     this.dataTransformer = new DataTransformer(
       this.schema,

@@ -20,6 +20,20 @@ export type AnyTableType = SQLiteTable | PgTable | MySqlTable;
 export type AnyColumnType = AnyColumn;
 
 /**
+ * Primary key introspection result
+ */
+export interface PrimaryKeyInfo {
+  /** The primary key column name */
+  columnName: string;
+
+  /** The primary key column object */
+  column: AnyColumnType;
+
+  /** Whether this is a composite primary key */
+  isComposite: boolean;
+}
+
+/**
  * Supported aggregate functions
  */
 export type AggregateFunction = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'distinct';
@@ -249,6 +263,15 @@ export interface DrizzleAdapterOptions {
 
     /** Batch size for large queries */
     batchSize?: number;
+  };
+
+  /** Primary key configuration */
+  primaryKey?: {
+    /** Custom primary key column name for the main table (defaults to 'id') */
+    mainTableKey?: string;
+
+    /** Map of table names to their primary key column names */
+    tableKeys?: Record<string, string>;
   };
 
   /** Logging configuration */

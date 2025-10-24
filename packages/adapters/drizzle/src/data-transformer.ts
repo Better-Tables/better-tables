@@ -264,9 +264,9 @@ export class DataTransformer {
       }
 
       // Check if this follows the pattern: tableName_columnName
-      // Need to distinguish between:
-      // - profiles_bio (related table column from JOIN)
-      // - user_id (main table column with underscore)
+      // This is a heuristic for detecting joined columns - not all databases use this pattern
+      // TODO: In the future, this could be improved by using query builder metadata
+      // instead of trying to parse column names from SQL results
       if (key.includes('_')) {
         // Try to find a table name match (longest match first to handle edge cases)
         const tableNames = Object.keys(this.schema).filter((t) => t !== this.mainTable);
@@ -283,13 +283,10 @@ export class DataTransformer {
             const relatedColumns = this.getRelatedTableColumns(tableName);
             if (relatedColumns.includes(field)) {
               // Confirmed: this is a column from the related table
-              // But skip foreign key columns as they're not useful for nesting
-              if (
-                !field.endsWith('Id') &&
-                !field.endsWith('_id') &&
-                field !== 'userId' &&
-                field !== 'user_id'
-              ) {
+              // Check if this is a foreign key column by looking at relationships
+              const isForeignKey = this.isForeignKeyColumn(tableName, field);
+
+              if (!isForeignKey) {
                 columnIds.push(`${tableName}.${field}`);
               }
               foundMatch = true;
@@ -582,5 +579,21 @@ export class DataTransformer {
     }
 
     return stats;
+  }
+
+  /**
+   * Check if a column is a foreign key by examining relationships
+   * This is more generic than hardcoded naming patterns
+   */
+  private isForeignKeyColumn(tableName: string, columnName: string): boolean {
+    // Check if this column is used as a foreign key in any relationship
+    for (const relationship of Object.values(this.relationshipManager.getRelationships())) {
+      // Check if this column is the foreign key in this relationship
+      if (relationship.from === tableName && relationship.foreignKey === columnName) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

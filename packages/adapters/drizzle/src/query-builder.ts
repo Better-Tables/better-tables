@@ -16,6 +16,7 @@ import type {
 } from './types';
 import { QueryError } from './types';
 import { calculateLevenshteinDistance } from './utils/levenshtein';
+import { getPrimaryKeyInfo, getPrimaryKeyMap } from './utils/schema-introspection';
 
 /**
  * Query builder that generates efficient SQL queries with smart joins
@@ -26,13 +27,15 @@ export class DrizzleQueryBuilder {
   private relationshipManager: RelationshipManager;
   private filterHandler: FilterHandler;
   private mainTable: string;
+  private primaryKeyMap: Record<string, { columnName: string; column: AnyColumnType }>;
 
   constructor(
     db: DrizzleDatabase,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
     mainTable: string,
-    databaseType: DatabaseDriver = 'postgres'
+    databaseType: DatabaseDriver = 'postgres',
+    primaryKeyMap?: Record<string, string>
   ) {
     // Validate main table exists in schema
     if (!schema[mainTable]) {
@@ -47,6 +50,9 @@ export class DrizzleQueryBuilder {
     this.relationshipManager = relationshipManager;
     this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType);
     this.mainTable = mainTable;
+
+    // Initialize primary key map
+    this.primaryKeyMap = getPrimaryKeyMap(schema, primaryKeyMap);
   }
 
   /**
@@ -327,15 +333,16 @@ export class DrizzleQueryBuilder {
     const hasRelationshipColumns = columns.some((col) => col.includes('.'));
 
     // Always include main table's primary key for grouping
-    const mainTableSchema = this.schema[this.mainTable];
-    if (mainTableSchema && typeof mainTableSchema === 'object') {
-      const mainTableObj = mainTableSchema as unknown as Record<string, AnyColumnType>;
-      if ('id' in mainTableObj) {
-        selections['id'] = mainTableObj.id;
-      }
+    const mainTablePrimaryKey = this.primaryKeyMap[this.mainTable];
+    if (mainTablePrimaryKey) {
+      selections[mainTablePrimaryKey.columnName] = mainTablePrimaryKey.column;
+    }
 
-      // If we're filtering across relationships, include essential main table fields
-      if (hasRelationshipColumns) {
+    // If we're filtering across relationships, include essential main table fields
+    if (hasRelationshipColumns) {
+      const mainTableSchema = this.schema[this.mainTable];
+      if (mainTableSchema && typeof mainTableSchema === 'object') {
+        const mainTableObj = mainTableSchema as unknown as Record<string, AnyColumnType>;
         const mainTableColumnNames = Object.keys(mainTableObj).filter(
           (key) =>
             !key.startsWith('_') &&
