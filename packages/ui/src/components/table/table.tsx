@@ -89,7 +89,7 @@ export function BetterTable<TData = unknown>({
   // UI-specific props
   filters = [],
   onFiltersChange,
-  sortingState = [],
+  sortingState = [] as SortingState,
   onSortingChange,
   paginationState,
   onPageChange,

@@ -1,6 +1,6 @@
 import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
 import { getDatabase } from './db';
-import { schema } from './db/schema';
+import { relationsSchema, schema } from './db/schema';
 
 // biome-ignore lint/suspicious/noExplicitAny: DrizzleAdapter type is complex
 let adapterInstance: any = null;
@@ -16,6 +16,7 @@ export async function getAdapter() {
     db,
     // biome-ignore lint/suspicious/noExplicitAny: Schema type inference is complex with Drizzle
     schema: schema as any,
+    relations: relationsSchema as unknown as Record<string, unknown>,
     driver: 'sqlite',
     autoDetectRelationships: true,
     options: {

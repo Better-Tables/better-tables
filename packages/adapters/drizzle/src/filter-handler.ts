@@ -53,7 +53,13 @@ export class FilterHandler {
       });
     }
 
-    return this.mapOperatorToCondition(column, filter.operator, filter.values, filter.includeNull);
+    return this.mapOperatorToCondition(
+      column,
+      filter.operator,
+      filter.values,
+      filter.includeNull,
+      filter.type
+    );
   }
 
   /**
@@ -76,7 +82,8 @@ export class FilterHandler {
     column: AnyColumnType,
     operator: FilterOperator,
     values: unknown[],
-    includeNull?: boolean
+    includeNull?: boolean,
+    columnType?: string
   ): SQL | SQLWrapper {
     const conditions: (SQL | SQLWrapper)[] = [];
 
@@ -164,25 +171,35 @@ export class FilterHandler {
         }
         break;
 
-      // Date operators
+      // Date operators - only apply date parsing for date columns
       case 'is': {
-        const dateValue = this.parseFilterDate(values[0]);
-        // For SQLite with timestamp mode, compare as numbers
-        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
-          conditions.push(sql`${column} = ${dateValue}`);
+        if (columnType === 'date') {
+          const dateValue = this.parseFilterDate(values[0]);
+          // For SQLite with timestamp mode, compare as numbers
+          if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+            conditions.push(sql`${column} = ${dateValue}`);
+          } else {
+            conditions.push(eq(column, dateValue));
+          }
         } else {
-          conditions.push(eq(column, dateValue));
+          // For non-date columns, treat as equals
+          conditions.push(eq(column, values[0]));
         }
         break;
       }
 
       case 'isNot': {
-        const dateValue = this.parseFilterDate(values[0]);
-        // For SQLite with timestamp mode, compare as numbers
-        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
-          conditions.push(sql`${column} != ${dateValue}`);
+        if (columnType === 'date') {
+          const dateValue = this.parseFilterDate(values[0]);
+          // For SQLite with timestamp mode, compare as numbers
+          if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+            conditions.push(sql`${column} != ${dateValue}`);
+          } else {
+            conditions.push(not(eq(column, dateValue)));
+          }
         } else {
-          conditions.push(not(eq(column, dateValue)));
+          // For non-date columns, treat as not equals
+          conditions.push(not(eq(column, values[0])));
         }
         break;
       }

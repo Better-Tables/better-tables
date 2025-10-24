@@ -154,107 +154,8 @@ export const userColumns = [
     })
     .build(),
 
-  // Aggregate columns
-  cb
-    .number()
-    .id('posts_count')
-    .displayName('Posts')
-    .accessor((user) => user.posts?.length || 0)
-    .filterable(false)
-    .sortable()
-    .build(),
-
-  cb
-    .number()
-    .id('total_views')
-    .displayName('Total Views')
-    .accessor((user) => user.posts?.reduce((sum, post) => sum + (post.views || 0), 0) || 0)
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .number()
-    .id('total_likes')
-    .displayName('Total Likes')
-    .accessor((user) => user.posts?.reduce((sum, post) => sum + (post.likes || 0), 0) || 0)
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .number()
-    .id('avg_views')
-    .displayName('Avg Views')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      return posts.length > 0
-        ? Math.round(posts.reduce((sum, post) => sum + (post.views || 0), 0) / posts.length)
-        : 0;
-    })
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .number()
-    .id('comments_count')
-    .displayName('Comments')
-    .accessor((user) => user.comments?.length || 0)
-    .filterable()
-    .sortable()
-    .build(),
-
-  // Computed columns
-  cb
-    .number()
-    .id('engagement_score')
-    .displayName('Engagement Score')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0);
-      const totalLikes = posts.reduce((sum, post) => sum + (post.likes || 0), 0);
-      return totalViews + totalLikes * 10; // Likes worth 10x views
-    })
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .boolean()
-    .id('has_profile')
-    .displayName('Has Profile')
-    .accessor((user) => !!user.profile)
-    .filterable()
-    .build(),
-
-  cb
-    .boolean()
-    .id('is_active')
-    .displayName('Active User')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const recentPosts = posts.filter((post) => {
-        const postTime = post.createdAt instanceof Date ? post.createdAt.getTime() : post.createdAt;
-        return postTime >= thirtyDaysAgo;
-      });
-      return recentPosts.length > 0;
-    })
-    .filterable()
-    .build(),
-
-  cb
-    .boolean()
-    .id('popular_author')
-    .displayName('Popular Author')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0);
-      return totalViews >= 5000;
-    })
-    .filterable()
-    .build(),
+  // Note: Computed columns are not yet supported by the adapter
+  // These would need to be implemented as virtual columns or handled differently
 ];
 
 // Default visible columns for the demo
@@ -264,8 +165,9 @@ export const defaultVisibleColumns = [
   'age',
   'role',
   'status',
-  'posts_count',
-  'total_views',
-  'engagement_score',
-  'has_profile',
+  'createdAt',
+  'profile.bio',
+  'profile.website',
+  'profile.location',
+  'profile.github',
 ];
