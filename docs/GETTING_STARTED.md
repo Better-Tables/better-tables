@@ -18,7 +18,7 @@ Better Tables is a comprehensive React table library that provides powerful data
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - React 18+
 - TypeScript 5+ (recommended)
 
@@ -60,8 +60,8 @@ npm install react react-dom tailwindcss
 ### 1. Basic Table Setup
 
 ```tsx
-import { BetterTable } from '@better-tables/ui';
-import { createColumnBuilder } from '@better-tables/core';
+import { BetterTable } from "@better-tables/ui";
+import { createColumnBuilder } from "@better-tables/core";
 
 interface User {
   id: string;
@@ -73,41 +73,41 @@ interface User {
 
 function UserTable() {
   const [data, setData] = useState<User[]>([]);
-  
+
   const columns = [
     createColumnBuilder<User>()
       .text()
-      .id('name')
-      .displayName('Name')
-      .accessor(user => user.name)
+      .id("name")
+      .displayName("Name")
+      .accessor((user) => user.name)
       .searchable()
       .build(),
-      
+
     createColumnBuilder<User>()
       .text()
-      .id('email')
-      .displayName('Email')
-      .accessor(user => user.email)
+      .id("email")
+      .displayName("Email")
+      .accessor((user) => user.email)
       .searchable()
       .build(),
-      
+
     createColumnBuilder<User>()
       .number()
-      .id('age')
-      .displayName('Age')
-      .accessor(user => user.age)
+      .id("age")
+      .displayName("Age")
+      .accessor((user) => user.age)
       .range(18, 100)
       .build(),
-      
+
     createColumnBuilder<User>()
       .option()
-      .id('department')
-      .displayName('Department')
-      .accessor(user => user.department)
+      .id("department")
+      .displayName("Department")
+      .accessor((user) => user.department)
       .options([
-        { value: 'engineering', label: 'Engineering' },
-        { value: 'marketing', label: 'Marketing' },
-        { value: 'sales', label: 'Sales' },
+        { value: "engineering", label: "Engineering" },
+        { value: "marketing", label: "Marketing" },
+        { value: "sales", label: "Sales" },
       ])
       .build(),
   ];
@@ -132,17 +132,65 @@ function UserTable() {
 ### 2. With Data Fetching
 
 ```tsx
-import { useTableData } from '@better-tables/ui';
-import { RestAdapter } from '@better-tables/adapters-rest';
+import { useTableData } from "@better-tables/ui";
+import { RestAdapter } from "@better-tables/adapters-rest";
+import { createColumnBuilder } from "@better-tables/core";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
+  department: string;
+}
 
 function UserTableWithData() {
+  // Define columns (same as Basic Table Setup section above)
+  const columns = [
+    createColumnBuilder<User>()
+      .text()
+      .id("name")
+      .displayName("Name")
+      .accessor((user) => user.name)
+      .searchable()
+      .build(),
+
+    createColumnBuilder<User>()
+      .text()
+      .id("email")
+      .displayName("Email")
+      .accessor((user) => user.email)
+      .searchable()
+      .build(),
+
+    createColumnBuilder<User>()
+      .number()
+      .id("age")
+      .displayName("Age")
+      .accessor((user) => user.age)
+      .range(18, 100)
+      .build(),
+
+    createColumnBuilder<User>()
+      .option()
+      .id("department")
+      .displayName("Department")
+      .accessor((user) => user.department)
+      .options([
+        { value: "engineering", label: "Engineering" },
+        { value: "marketing", label: "Marketing" },
+        { value: "sales", label: "Sales" },
+      ])
+      .build(),
+  ];
+
   const adapter = new RestAdapter({
-    baseUrl: '/api/users',
+    baseUrl: "/api/users",
     endpoints: {
-      list: '/',
-      create: '/',
-      update: '/:id',
-      delete: '/:id',
+      list: "/",
+      create: "/",
+      update: "/:id",
+      delete: "/:id",
     },
   });
 
@@ -183,13 +231,13 @@ Better Tables supports various column types with specialized features:
 ```tsx
 createColumnBuilder<User>()
   .text()
-  .id('name')
-  .displayName('Full Name')
-  .accessor(user => user.name)
-  .searchable()           // Enable text search
-  .sortable()             // Enable sorting
-  .filterable()           // Enable filtering
-  .build()
+  .id("name")
+  .displayName("Full Name")
+  .accessor((user) => user.name)
+  .searchable() // Enable text search
+  .sortable() // Enable sorting
+  .filterable() // Enable filtering
+  .build();
 ```
 
 #### Number Columns
@@ -197,12 +245,12 @@ createColumnBuilder<User>()
 ```tsx
 createColumnBuilder<User>()
   .number()
-  .id('salary')
-  .displayName('Salary')
-  .accessor(user => user.salary)
-  .range(30000, 200000)   // Set min/max range
-  .format('currency')     // Format as currency
-  .build()
+  .id("salary")
+  .displayName("Salary")
+  .accessor((user) => user.salary)
+  .range(30000, 200000) // Set min/max range
+  .format("currency") // Format as currency
+  .build();
 ```
 
 #### Date Columns
@@ -210,14 +258,14 @@ createColumnBuilder<User>()
 ```tsx
 createColumnBuilder<User>()
   .date()
-  .id('createdAt')
-  .displayName('Created At')
-  .accessor(user => user.createdAt)
+  .id("createdAt")
+  .displayName("Created At")
+  .accessor((user) => user.createdAt)
   .filter({
-    includeTime: true,    // Include time component
-    format: 'MM/dd/yyyy', // Custom date format
+    includeTime: true, // Include time component
+    format: "MM/dd/yyyy", // Custom date format
   })
-  .build()
+  .build();
 ```
 
 #### Option Columns
@@ -225,15 +273,15 @@ createColumnBuilder<User>()
 ```tsx
 createColumnBuilder<User>()
   .option()
-  .id('status')
-  .displayName('Status')
-  .accessor(user => user.status)
+  .id("status")
+  .displayName("Status")
+  .accessor((user) => user.status)
   .options([
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-    { value: 'pending', label: 'Pending' },
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+    { value: "pending", label: "Pending" },
   ])
-  .build()
+  .build();
 ```
 
 #### Boolean Columns
@@ -241,10 +289,10 @@ createColumnBuilder<User>()
 ```tsx
 createColumnBuilder<User>()
   .boolean()
-  .id('isActive')
-  .displayName('Active')
-  .accessor(user => user.isActive)
-  .build()
+  .id("isActive")
+  .displayName("Active")
+  .accessor((user) => user.isActive)
+  .build();
 ```
 
 ### Table Features
@@ -256,10 +304,10 @@ Enable/disable features as needed:
   columns={columns}
   data={data}
   features={{
-    filtering: true,      // Enable filtering
-    sorting: true,        // Enable sorting
-    pagination: true,     // Enable pagination
-    rowSelection: true,   // Enable row selection
+    filtering: true, // Enable filtering
+    sorting: true, // Enable sorting
+    pagination: true, // Enable pagination
+    rowSelection: true, // Enable row selection
     virtualization: true, // Enable virtualization (auto for large datasets)
   }}
 />
@@ -270,20 +318,20 @@ Enable/disable features as needed:
 ```tsx
 createColumnBuilder<User>()
   .text()
-  .id('avatar')
-  .displayName('Avatar')
-  .accessor(user => user.avatar)
+  .id("avatar")
+  .displayName("Avatar")
+  .accessor((user) => user.avatar)
   .render((value, user) => (
     <div className="flex items-center gap-2">
-      <img 
-        src={value} 
+      <img
+        src={value}
         alt={user.name}
         className="w-8 h-8 rounded-full"
       />
       <span>{user.name}</span>
     </div>
   ))
-  .build()
+  .build();
 ```
 
 ## Advanced Features
@@ -293,11 +341,11 @@ createColumnBuilder<User>()
 #### Basic Filtering
 
 ```tsx
-import { FilterBar, ActiveFilters } from '@better-tables/ui';
+import { FilterBar, ActiveFilters } from "@better-tables/ui";
 
 function FilteredTable() {
   const [filters, setFilters] = useState<FilterState[]>([]);
-  
+
   return (
     <div className="space-y-4">
       <FilterBar
@@ -307,20 +355,22 @@ function FilteredTable() {
         searchable={true}
         maxFilters={5}
       />
-      
+
       <ActiveFilters
         columns={columns}
         filters={filters}
         onUpdateFilter={(columnId, updates) => {
-          setFilters(prev => prev.map(f => 
-            f.columnId === columnId ? { ...f, ...updates } : f
-          ));
+          setFilters((prev) =>
+            prev.map((f) =>
+              f.columnId === columnId ? { ...f, ...updates } : f
+            )
+          );
         }}
         onRemoveFilter={(columnId) => {
-          setFilters(prev => prev.filter(f => f.columnId !== columnId));
+          setFilters((prev) => prev.filter((f) => f.columnId !== columnId));
         }}
       />
-      
+
       <BetterTable
         columns={columns}
         data={data}
@@ -338,14 +388,14 @@ function FilteredTable() {
 // Custom filter groups
 const filterGroups: FilterGroup[] = [
   {
-    id: 'personal',
-    label: 'Personal Information',
-    columns: ['name', 'email', 'age'],
+    id: "personal",
+    label: "Personal Information",
+    columns: ["name", "email", "age"],
   },
   {
-    id: 'work',
-    label: 'Work Information',
-    columns: ['department', 'salary', 'startDate'],
+    id: "work",
+    label: "Work Information",
+    columns: ["department", "salary", "startDate"],
   },
 ];
 
@@ -355,7 +405,7 @@ const filterGroups: FilterGroup[] = [
   onFiltersChange={setFilters}
   groups={filterGroups}
   showGroups={true}
-/>
+/>;
 ```
 
 ### Virtualization
@@ -363,11 +413,11 @@ const filterGroups: FilterGroup[] = [
 For large datasets, use the VirtualizedTable component:
 
 ```tsx
-import { VirtualizedTable } from '@better-tables/ui';
+import { VirtualizedTable } from "@better-tables/ui";
 
 function LargeDataTable() {
   const [data, setData] = useState<LargeItem[]>([]);
-  
+
   return (
     <VirtualizedTable
       data={data}
@@ -379,7 +429,7 @@ function LargeDataTable() {
         smoothScrolling: true,
       }}
       onRowClick={(item, index) => {
-        console.log('Clicked:', item);
+        console.log("Clicked:", item);
       }}
     />
   );
@@ -391,29 +441,29 @@ function LargeDataTable() {
 ```tsx
 function SelectableTable() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  
+
   const handleBulkAction = () => {
-    const selectedItems = data.filter((_, index) => 
+    const selectedItems = data.filter((_, index) =>
       selectedRows.has(`row-${index}`)
     );
-    console.log('Selected items:', selectedItems);
+    console.log("Selected items:", selectedItems);
   };
-  
+
   return (
     <div className="space-y-4">
       {selectedRows.size > 0 && (
         <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
           <span>{selectedRows.size} rows selected</span>
           <Button onClick={handleBulkAction}>Bulk Action</Button>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => setSelectedRows(new Set())}
           >
             Clear Selection
           </Button>
         </div>
       )}
-      
+
       <BetterTable
         columns={columns}
         data={data}
@@ -448,33 +498,33 @@ Update `tailwind.config.js`:
 ```javascript
 module.exports = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}',
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {},
   },
   plugins: [],
-}
+};
 ```
 
 #### 3. Create API Route
 
 ```typescript
 // app/api/users/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
-  const search = searchParams.get('search') || '';
-  
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "20");
+  const search = searchParams.get("search") || "";
+
   // Your data fetching logic here
   const users = await fetchUsers({ page, limit, search });
-  
+
   return NextResponse.json({
     data: users.items,
     totalCount: users.total,
@@ -488,14 +538,14 @@ export async function GET(request: NextRequest) {
 
 ```tsx
 // app/users/page.tsx
-'use client';
+"use client";
 
-import { BetterTable } from '@better-tables/ui';
-import { RestAdapter } from '@better-tables/adapters-rest';
+import { BetterTable } from "@better-tables/ui";
+import { RestAdapter } from "@better-tables/adapters-rest";
 
 export default function UsersPage() {
   const adapter = new RestAdapter({
-    baseUrl: '/api/users',
+    baseUrl: "/api/users",
   });
 
   return (
@@ -527,16 +577,16 @@ npm install @better-tables/core @better-tables/ui @better-tables/adapters-rest
 
 ```typescript
 // app/routes/users.tsx
-import { json } from '@remix-run/node';
-import { useLoaderData } from '@remix-run/react';
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const page = parseInt(url.searchParams.get('page') || '1');
-  const limit = parseInt(url.searchParams.get('limit') || '20');
-  
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = parseInt(url.searchParams.get("limit") || "20");
+
   const users = await fetchUsers({ page, limit });
-  
+
   return json({
     users: users.items,
     totalCount: users.total,
@@ -547,7 +597,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function UsersPage() {
   const { users, totalCount } = useLoaderData<typeof loader>();
-  
+
   return (
     <BetterTable
       columns={columns}
@@ -582,12 +632,12 @@ npx tailwindcss init -p
 
 ```tsx
 // main.tsx
-import './index.css';
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
+import "./index.css";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
   </StrictMode>
@@ -619,16 +669,16 @@ interface User {
 }
 
 const columns = [
-  createColumnBuilder<User>()  // Type-safe builder
+  createColumnBuilder<User>() // Type-safe builder
     .text()
-    .id('name')
-    .accessor(user => user.name)  // Type-safe accessor
+    .id("name")
+    .accessor((user) => user.name) // Type-safe accessor
     .build(),
-    
+
   createColumnBuilder<User>()
     .number()
-    .id('age')
-    .accessor(user => user.age)   // Type-safe accessor
+    .id("age")
+    .accessor((user) => user.age) // Type-safe accessor
     .build(),
 ];
 ```
@@ -637,8 +687,8 @@ const columns = [
 
 ```typescript
 interface UserTableProps {
-  data: User[];  // Type-safe data prop
-  onRowClick?: (user: User) => void;  // Type-safe callback
+  data: User[]; // Type-safe data prop
+  onRowClick?: (user: User) => void; // Type-safe callback
 }
 
 function UserTable({ data, onRowClick }: UserTableProps) {
@@ -646,7 +696,7 @@ function UserTable({ data, onRowClick }: UserTableProps) {
     <BetterTable
       columns={columns}
       data={data}
-      onRowClick={onRowClick}  // Type-safe callback
+      onRowClick={onRowClick} // Type-safe callback
     />
   );
 }
@@ -661,7 +711,11 @@ interface CustomColumnDefinition<T> extends ColumnDefinition<T> {
 }
 
 // Type-safe custom renderer
-const customRenderer = (value: any, item: User, column: CustomColumnDefinition<User>) => {
+const customRenderer = (
+  value: any,
+  item: User,
+  column: CustomColumnDefinition<User>
+) => {
   // Type-safe access to custom property
   return <div>{column.customProperty}</div>;
 };
@@ -709,11 +763,11 @@ const customRenderer = (value: any, item: User, column: CustomColumnDefinition<U
 // tailwind.config.js
 module.exports = {
   content: [
-    './src/**/*.{js,ts,jsx,tsx}',
-    './node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}',
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "./node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}",
   ],
   // ... rest of config
-}
+};
 ```
 
 #### 2. TypeScript Errors
@@ -754,7 +808,7 @@ const [filters, setFilters] = useState<FilterState[]>([]);
   filters={filters}
   onFiltersChange={setFilters}
   // ... other props
-/>
+/>;
 ```
 
 ### Getting Help

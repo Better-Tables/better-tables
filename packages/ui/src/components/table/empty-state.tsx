@@ -22,7 +22,7 @@ export function EmptyState({
   message = 'No data available',
   hasFilters = false,
   onClearFilters,
-  icon = hasFilters ? Search : Database,
+  icon: Icon = hasFilters ? Search : Database,
   action,
   className,
 }: EmptyStateProps) {

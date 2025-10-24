@@ -1,8 +1,8 @@
-import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useVirtualization } from '../../hooks/use-virtualization';
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useVirtualization } from "../../hooks/use-virtualization";
 
-describe('useVirtualization', () => {
+describe("useVirtualization", () => {
   beforeEach(() => {
     // Mock ResizeObserver
     global.ResizeObserver = class ResizeObserver {
@@ -12,7 +12,7 @@ describe('useVirtualization', () => {
     };
   });
 
-  it('should initialize with default configuration', () => {
+  it("should initialize with default configuration", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -33,7 +33,7 @@ describe('useVirtualization', () => {
     expect(result.current.utils).toBeDefined();
   });
 
-  it('should provide virtual rows for visible range', () => {
+  it("should provide virtual rows for visible range", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -46,7 +46,7 @@ describe('useVirtualization', () => {
     expect(result.current.virtualRows.length).toBeGreaterThan(0);
   });
 
-  it('should handle scroll updates', () => {
+  it("should handle scroll updates", () => {
     const onScroll = vi.fn();
     const { result } = renderHook(() =>
       useVirtualization({
@@ -71,7 +71,7 @@ describe('useVirtualization', () => {
     expect(onScroll).toHaveBeenCalled();
   });
 
-  it('should handle viewport changes', () => {
+  it("should handle viewport changes", () => {
     const onViewportChange = vi.fn();
     const { result } = renderHook(() =>
       useVirtualization({
@@ -96,7 +96,7 @@ describe('useVirtualization', () => {
     expect(onViewportChange).toHaveBeenCalled();
   });
 
-  it('should handle row measurements', () => {
+  it("should handle row measurements", () => {
     const onRowMeasured = vi.fn();
     const { result } = renderHook(() =>
       useVirtualization({
@@ -114,7 +114,7 @@ describe('useVirtualization', () => {
     expect(onRowMeasured).toHaveBeenCalledWith(0, 50);
   });
 
-  it('should update item counts', () => {
+  it("should update item counts", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -131,7 +131,7 @@ describe('useVirtualization', () => {
     expect(result.current.metrics.totalColumns).toBe(10);
   });
 
-  it('should handle scroll to specific row', () => {
+  it("should handle scroll to specific row", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -143,15 +143,15 @@ describe('useVirtualization', () => {
     act(() => {
       result.current.actions.scrollTo({
         rowIndex: 100,
-        behavior: 'smooth',
+        behavior: "smooth",
       });
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // Verify that the scroll position was updated
+    expect(result.current.state.scrollInfo.scrollTop).toBe(100 * 40); // 100 rows * 40px height
   });
 
-  it('should handle scroll to specific column', () => {
+  it("should handle scroll to specific column", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -164,15 +164,15 @@ describe('useVirtualization', () => {
     act(() => {
       result.current.actions.scrollTo({
         columnIndex: 5,
-        behavior: 'smooth',
+        behavior: "smooth",
       });
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // Verify that the column scroll position was updated
+    expect(result.current.state.scrollInfo.scrollLeft).toBeGreaterThan(0);
   });
 
-  it('should provide row visibility utilities', () => {
+  it("should provide row visibility utilities", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -185,7 +185,7 @@ describe('useVirtualization', () => {
     expect(result.current.utils.isRowVisible(999)).toBe(false);
   });
 
-  it('should provide column visibility utilities', () => {
+  it("should provide column visibility utilities", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -199,7 +199,7 @@ describe('useVirtualization', () => {
     expect(result.current.utils.isColumnVisible(19)).toBe(false);
   });
 
-  it('should provide row measurement utilities', () => {
+  it("should provide row measurement utilities", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -215,7 +215,7 @@ describe('useVirtualization', () => {
     expect(measurement?.end).toBeDefined();
   });
 
-  it('should provide total size utilities', () => {
+  it("should provide total size utilities", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -229,7 +229,7 @@ describe('useVirtualization', () => {
     expect(result.current.utils.getTotalWidth()).toBeGreaterThan(0);
   });
 
-  it('should handle configuration updates', () => {
+  it("should handle configuration updates", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -245,11 +245,12 @@ describe('useVirtualization', () => {
       });
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // Verify that the configuration was updated by checking virtual rows length
+    // With overscan of 10, we should see more rows rendered
+    expect(result.current.virtualRows.length).toBeGreaterThan(10);
   });
 
-  it('should handle enabling/disabling virtualization', () => {
+  it("should handle enabling/disabling virtualization", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -263,11 +264,12 @@ describe('useVirtualization', () => {
       result.current.actions.setEnabled(false);
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // When disabled, virtualization should show all rows or behave differently
+    // The exact behavior depends on implementation, but we can verify the action was processed
+    expect(result.current.state).toBeDefined();
   });
 
-  it('should handle element observation', () => {
+  it("should handle element observation", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -276,7 +278,13 @@ describe('useVirtualization', () => {
       })
     );
 
-    const element = document.createElement('div');
+    const element = document.createElement("div");
+    const mockObserve = vi.fn();
+    const mockUnobserve = vi.fn();
+
+    // Mock ResizeObserver methods
+    global.ResizeObserver.prototype.observe = mockObserve;
+    global.ResizeObserver.prototype.unobserve = mockUnobserve;
 
     act(() => {
       result.current.actions.observeElement(element, 0);
@@ -286,11 +294,12 @@ describe('useVirtualization', () => {
       result.current.actions.unobserveElement(element);
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // Verify that ResizeObserver methods were called
+    expect(mockObserve).toHaveBeenCalledWith(element);
+    expect(mockUnobserve).toHaveBeenCalledWith(element);
   });
 
-  it('should provide styling utilities', () => {
+  it("should provide styling utilities", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -308,11 +317,11 @@ describe('useVirtualization', () => {
     if (virtualRow) {
       const rowStyle = result.current.styles.getRowStyle(virtualRow);
       expect(rowStyle).toBeDefined();
-      expect(rowStyle.position).toBe('absolute');
+      expect(rowStyle.position).toBe("absolute");
     }
   });
 
-  it('should handle reset', () => {
+  it("should handle reset", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -321,15 +330,21 @@ describe('useVirtualization', () => {
       })
     );
 
+    // First scroll to a position
+    act(() => {
+      result.current.actions.scrollTo({ rowIndex: 100 });
+    });
+
+    // Then reset
     act(() => {
       result.current.actions.reset();
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // Verify that scroll position was reset
+    expect(result.current.state.scrollInfo.scrollTop).toBe(0);
   });
 
-  it('should handle performance metrics', () => {
+  it("should handle performance metrics", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -344,7 +359,7 @@ describe('useVirtualization', () => {
     expect(result.current.metrics.efficiency).toBeDefined();
   });
 
-  it('should handle large datasets', () => {
+  it("should handle large datasets", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 100000,
@@ -357,7 +372,7 @@ describe('useVirtualization', () => {
     expect(result.current.utils.getTotalHeight()).toBeGreaterThan(0);
   });
 
-  it('should handle zero rows', () => {
+  it("should handle zero rows", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 0,
@@ -370,7 +385,7 @@ describe('useVirtualization', () => {
     expect(result.current.utils.getTotalHeight()).toBe(0);
   });
 
-  it('should handle dynamic row heights', () => {
+  it("should handle dynamic row heights", () => {
     const { result } = renderHook(() =>
       useVirtualization({
         totalRows: 1000,
@@ -385,7 +400,11 @@ describe('useVirtualization', () => {
       result.current.actions.measureRow(1, 80);
     });
 
-    // Should not throw error
-    expect(true).toBe(true);
+    // Verify that the measurements were applied
+    const row0Measurement = result.current.utils.getRowMeasurement(0);
+    const row1Measurement = result.current.utils.getRowMeasurement(1);
+
+    expect(row0Measurement?.height).toBe(60);
+    expect(row1Measurement?.height).toBe(80);
   });
 });
