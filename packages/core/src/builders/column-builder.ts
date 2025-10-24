@@ -51,6 +51,21 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
+   * Set a nullable accessor that handles null/undefined values gracefully
+   */
+  nullableAccessor(
+    accessor: (data: TData) => TValue | null | undefined,
+    defaultValue?: TValue
+  ): this {
+    this.config.nullable = true;
+    this.config.accessor = (data: TData) => {
+      const value = accessor(data);
+      return value ?? defaultValue ?? (null as TValue);
+    };
+    return this;
+  }
+
+  /**
    * Set the column icon
    */
   icon(icon: IconComponent): this {
