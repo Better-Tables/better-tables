@@ -165,21 +165,49 @@ export class FilterHandler {
         break;
 
       // Date operators
-      case 'is':
-        conditions.push(eq(column, values[0]));
+      case 'is': {
+        const dateValue = this.parseFilterDate(values[0]);
+        // For SQLite with timestamp mode, compare as numbers
+        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+          conditions.push(sql`${column} = ${dateValue}`);
+        } else {
+          conditions.push(eq(column, dateValue));
+        }
         break;
+      }
 
-      case 'isNot':
-        conditions.push(not(eq(column, values[0])));
+      case 'isNot': {
+        const dateValue = this.parseFilterDate(values[0]);
+        // For SQLite with timestamp mode, compare as numbers
+        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+          conditions.push(sql`${column} != ${dateValue}`);
+        } else {
+          conditions.push(not(eq(column, dateValue)));
+        }
         break;
+      }
 
-      case 'before':
-        conditions.push(lt(column, values[0]));
+      case 'before': {
+        const dateValue = this.parseFilterDate(values[0]);
+        // For SQLite with timestamp mode, compare as numbers
+        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+          conditions.push(sql`${column} < ${dateValue}`);
+        } else {
+          conditions.push(lt(column, dateValue));
+        }
         break;
+      }
 
-      case 'after':
-        conditions.push(gt(column, values[0]));
+      case 'after': {
+        const dateValue = this.parseFilterDate(values[0]);
+        // For SQLite with timestamp mode, compare as numbers
+        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+          conditions.push(sql`${column} > ${dateValue}`);
+        } else {
+          conditions.push(gt(column, dateValue));
+        }
         break;
+      }
 
       case 'isToday':
         conditions.push(this.buildDateCondition(column, 'today'));
@@ -286,6 +314,29 @@ export class FilterHandler {
       throw new QueryError('Failed to combine conditions', { operator, values });
     }
     return combinedCondition;
+  }
+
+  /**
+   * Parse filter value to Date object or timestamp (database-specific)
+   */
+  private parseFilterDate(value: unknown): Date | number {
+    // For SQLite with timestamp mode, keep numbers as-is
+    if (this.databaseType === 'sqlite' && typeof value === 'number') {
+      return value;
+    }
+
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      // For SQLite, convert to timestamp
+      return this.databaseType === 'sqlite' ? parsed.getTime() : parsed;
+    }
+    if (typeof value === 'number') {
+      return new Date(value);
+    }
+    throw new QueryError('Invalid date value for filter', { value });
   }
 
   /**
