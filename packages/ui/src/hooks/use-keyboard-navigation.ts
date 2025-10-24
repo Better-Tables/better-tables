@@ -157,6 +157,15 @@ export const FILTER_SHORTCUTS = {
   prevItem: 'ArrowUp',
   selectItem: 'Enter',
   toggleDropdown: 'Space',
+  // Backwards-compatible aliases
+  CLEAR: 'Escape',
+  APPLY: 'Enter',
+  FOCUS_SEARCH: 'Ctrl+k',
+  CLOSE_DROPDOWN: 'Escape',
+  NEXT_ITEM: 'ArrowDown',
+  PREV_ITEM: 'ArrowUp',
+  SELECT_ITEM: 'Enter',
+  TOGGLE_DROPDOWN: 'Space',
 } as const;
 
 // Hook for filter dropdown navigation

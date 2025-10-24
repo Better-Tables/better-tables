@@ -80,7 +80,9 @@ interface FilterBarProps<TData = any> {
 ### Usage Example
 
 ```typescript
+import React, { useState } from 'react';
 import { FilterBar } from '@better-tables/ui';
+import type { FilterState } from '@better-tables/core';
 
 function MyTable() {
   const [filters, setFilters] = useState<FilterState[]>([]);

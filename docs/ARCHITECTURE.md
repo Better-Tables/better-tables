@@ -79,7 +79,7 @@ interface TextColumnDefinition<TData> extends ColumnDefinition<TData> {
 }
 
 // Union types for type safety
-type ColumnDefinition<TData> = 
+type ColumnDefinitionUnion<TData> = 
   | TextColumnDefinition<TData>
   | NumberColumnDefinition<TData>
   | DateColumnDefinition<TData>
@@ -429,7 +429,7 @@ class DrizzleAdapter<TData> implements TableAdapter<TData> {
     return {
       data: data as TData[],
       totalCount: totalCount[0].count,
-      hasNext: params.pagination ? offset + params.pagination.limit < totalCount[0].count : false,
+      hasNext: params.pagination ? (params.pagination.page - 1) * params.pagination.limit + params.pagination.limit < totalCount[0].count : false,
       hasPrev: params.pagination ? params.pagination.page > 1 : false,
     };
   }

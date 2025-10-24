@@ -20,6 +20,7 @@ This document provides comprehensive examples and usage patterns for the Better 
 ### Simple Table
 
 ```tsx
+import React, { useState } from 'react';
 import { BetterTable } from '@better-tables/ui';
 import { createColumnBuilder } from '@better-tables/core';
 
@@ -233,7 +234,7 @@ function CustomCellTable() {
       .render((_, user) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" aria-label="Open actions menu">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -824,11 +825,14 @@ function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetError
 }
 
 function TableWithErrorBoundary() {
+  const [error, setError] = useState<Error | null>(null);
+  
   return (
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
       onError={(error, errorInfo) => {
         console.error('Table error:', error, errorInfo);
+        setError(error);
       }}
     >
       <BetterTable
@@ -836,6 +840,7 @@ function TableWithErrorBoundary() {
         data={data}
         error={error}
         onRetry={() => {
+          setError(null);
           // Retry logic
         }}
       />
