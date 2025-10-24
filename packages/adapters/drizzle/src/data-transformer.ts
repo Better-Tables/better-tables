@@ -254,6 +254,15 @@ export class DataTransformer {
         continue;
       }
 
+      // Check if this is a main table column with table name prefix (e.g., users_id, users_name)
+      if (key.startsWith(`${this.mainTable}_`)) {
+        const field = key.substring(this.mainTable.length + 1);
+        if (mainTableColumns.includes(field)) {
+          columnIds.push(field); // Use the field name without table prefix
+          continue;
+        }
+      }
+
       // Check if this follows the pattern: tableName_columnName
       // Need to distinguish between:
       // - profiles_bio (related table column from JOIN)

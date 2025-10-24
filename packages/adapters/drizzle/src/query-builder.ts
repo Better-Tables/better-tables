@@ -61,8 +61,15 @@ export class DrizzleQueryBuilder {
     }
 
     // Build column selections first
-    const selections =
-      columns && columns.length > 0 ? this.buildColumnSelections(columns) : undefined;
+    // Always create explicit selections when we have joins to ensure flat structure
+    let selections: Record<string, AnyColumnType> | undefined;
+
+    if (columns && columns.length > 0) {
+      selections = this.buildColumnSelections(columns);
+    } else if (context.joinPaths.size > 0) {
+      // When filtering across relationships without explicit columns, create flat selections
+      selections = this.buildFlatSelectionsForRelationships();
+    }
 
     let query = selections
       ? this.db.select(selections).from(mainTableSchema)
@@ -272,6 +279,43 @@ export class DrizzleQueryBuilder {
   }
 
   /**
+   * Build flat selections for relationship filtering when no columns are specified
+   * This ensures main table fields are at the top level and avoids nested structures
+   * Generic approach that works with any Drizzle schema design
+   */
+  private buildFlatSelectionsForRelationships(): Record<string, AnyColumnType> {
+    const selections: Record<string, AnyColumnType> = {};
+
+    // Always include all main table columns - this is generic and works with any schema
+    const mainTableSchema = this.schema[this.mainTable];
+    if (mainTableSchema && typeof mainTableSchema === 'object') {
+      const mainTableObj = mainTableSchema as unknown as Record<string, AnyColumnType>;
+
+      // Get all column names from the main table schema
+      const mainTableColumnNames = Object.keys(mainTableObj).filter(
+        (key) =>
+          !key.startsWith('_') &&
+          typeof mainTableObj[key] === 'object' &&
+          mainTableObj[key] !== null
+      );
+
+      // Add all main table columns to selections
+      for (const colName of mainTableColumnNames) {
+        const col = mainTableObj[colName];
+        if (col) {
+          selections[colName] = col;
+        }
+      }
+    }
+
+    // Note: We deliberately do NOT include related table columns here
+    // This ensures we get a flat structure with only main table fields
+    // Related data will be handled by the data transformer if needed
+
+    return selections;
+  }
+
+  /**
    * Build column selections with proper type safety
    * For relationships, selects all columns from related tables to enable proper nesting
    */
@@ -279,12 +323,32 @@ export class DrizzleQueryBuilder {
     const selections: Record<string, AnyColumnType> = {};
     const tablesIncluded = new Set<string>([this.mainTable]);
 
+    // Check if we have any relationship-based columns
+    const hasRelationshipColumns = columns.some((col) => col.includes('.'));
+
     // Always include main table's primary key for grouping
     const mainTableSchema = this.schema[this.mainTable];
     if (mainTableSchema && typeof mainTableSchema === 'object') {
       const mainTableObj = mainTableSchema as unknown as Record<string, AnyColumnType>;
       if ('id' in mainTableObj) {
         selections['id'] = mainTableObj.id;
+      }
+
+      // If we're filtering across relationships, include essential main table fields
+      if (hasRelationshipColumns) {
+        const mainTableColumnNames = Object.keys(mainTableObj).filter(
+          (key) =>
+            !key.startsWith('_') &&
+            typeof mainTableObj[key] === 'object' &&
+            mainTableObj[key] !== null
+        );
+
+        for (const colName of mainTableColumnNames) {
+          const col = mainTableObj[colName];
+          if (col && !selections[colName]) {
+            selections[colName] = col;
+          }
+        }
       }
     }
 
