@@ -379,7 +379,7 @@ paginationManager.firstPage();
 paginationManager.lastPage();
 
 // Change page size
-paginationManager.setPageSize(50);
+paginationManager.changePageSize(50);
 
 // Get pagination state
 const pagination = paginationManager.getPagination();
