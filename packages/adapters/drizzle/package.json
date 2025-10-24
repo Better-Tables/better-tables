@@ -1,0 +1,82 @@
+{
+  "name": "@better-tables/adapters-drizzle",
+  "version": "0.0.1",
+  "description": "Drizzle ORM adapter for Better Tables - Multi-database support with automatic relationship detection",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --apply .",
+    "format": "biome format --write .",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.36.4"
+  },
+  "peerDependencies": {
+    "@better-tables/core": "workspace:*",
+    "mysql2": "^3.12.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@better-tables/core": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "jsdom": "catalog:",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsup": "^8.5.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "react",
+    "table",
+    "data-table",
+    "data-grid",
+    "drizzle",
+    "orm",
+    "database",
+    "postgresql",
+    "mysql",
+    "sqlite",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/better-tables",
+    "directory": "packages/adapters/drizzle"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/better-tables/issues"
+  },
+  "homepage": "https://github.com/yourusername/better-tables#readme"
+}
