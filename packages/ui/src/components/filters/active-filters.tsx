@@ -1,7 +1,7 @@
 'use client';
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { getOperatorDefinition } from '@better-tables/core';
+import { getNumberFormat, getOperatorDefinition } from '@better-tables/core';
 import { Lock, X } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
+import { getFilterValueAsDate, getFilterValueAsNumber } from '@/lib/filter-value-utils';
 import {
   formatCurrency,
   formatEmail,
@@ -29,7 +30,7 @@ import { cn } from '@/lib/utils';
 import { FilterOperatorSelect } from './filter-operator-select';
 import { FilterValueInput } from './filter-value-input';
 
-export interface ActiveFiltersProps<TData = any> {
+export interface ActiveFiltersProps<TData = unknown> {
   /** Column definitions */
   columns: ColumnDefinition<TData>[];
   /** Current filters */
@@ -46,7 +47,7 @@ export interface ActiveFiltersProps<TData = any> {
   className?: string;
 }
 
-function ActiveFiltersComponent<TData = any>({
+function ActiveFiltersComponent<TData = unknown>({
   columns,
   filters,
   onUpdateFilter,
@@ -88,7 +89,7 @@ function ActiveFiltersComponent<TData = any>({
 // Export memoized version with proper typing
 export const ActiveFilters = React.memo(ActiveFiltersComponent) as typeof ActiveFiltersComponent;
 
-interface FilterBadgeProps<TData = any> {
+interface FilterBadgeProps<TData = unknown> {
   filter: FilterState;
   column: ColumnDefinition<TData>;
   onUpdate: (updates: Partial<FilterState>) => void;
@@ -97,7 +98,7 @@ interface FilterBadgeProps<TData = any> {
   disabled?: boolean;
 }
 
-function FilterBadge<TData = any>({
+function FilterBadge<TData = unknown>({
   filter,
   column,
   onUpdate,
@@ -265,12 +266,12 @@ function FilterBadge<TData = any>({
 // Memoize FilterBadge for performance
 const MemoizedFilterBadge = React.memo(FilterBadge) as typeof FilterBadge;
 
-interface FilterValueDisplayProps<TData = any> {
+interface FilterValueDisplayProps<TData = unknown> {
   filter: FilterState;
   column: ColumnDefinition<TData>;
 }
 
-function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayProps<TData>) {
+function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisplayProps<TData>) {
   if (!filter.values || filter.values.length === 0) {
     return <span className="text-muted-foreground">Empty</span>;
   }
@@ -287,7 +288,12 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
     case 'text':
       return (
         <span>
-          {truncateText(filter.values[0], 30)}
+          {truncateText(
+            typeof filter.values[0] === 'string'
+              ? filter.values[0]
+              : String(filter.values[0] || ''),
+            30
+          )}
           {nullIndicator}
         </span>
       );
@@ -295,7 +301,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
     case 'email':
       return (
         <span className="text-blue-600">
-          {formatEmail(filter.values[0])}
+          {formatEmail(typeof filter.values[0] === 'string' ? filter.values[0] : null)}
           {nullIndicator}
         </span>
       );
@@ -303,59 +309,84 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
     case 'url':
       return (
         <span className="text-blue-600 underline">
-          {truncateText(formatUrl(filter.values[0]), 25)}
+          {truncateText(
+            formatUrl(typeof filter.values[0] === 'string' ? filter.values[0] : null),
+            25
+          )}
         </span>
       );
 
     case 'phone':
-      return <span className="font-mono text-sm">{formatPhone(filter.values[0])}</span>;
+      return (
+        <span className="font-mono text-sm">
+          {formatPhone(typeof filter.values[0] === 'string' ? filter.values[0] : null)}
+        </span>
+      );
 
     case 'number':
       if (filter.operator === 'between' || filter.operator === 'notBetween') {
         return (
           <span>
-            {formatNumber(filter.values[0], column.meta?.numberFormat)} -{' '}
-            {formatNumber(filter.values[1], column.meta?.numberFormat)}
+            {formatNumber(
+              typeof filter.values[0] === 'number' ? filter.values[0] : null,
+              column.meta?.numberFormat as Record<string, unknown>
+            )}{' '}
+            -{' '}
+            {formatNumber(
+              typeof filter.values[1] === 'number' ? filter.values[1] : null,
+              column.meta?.numberFormat as Record<string, unknown>
+            )}
           </span>
         );
       }
-      return <span>{formatNumber(filter.values[0], column.meta?.numberFormat)}</span>;
+      return (
+        <span>
+          {formatNumber(
+            typeof filter.values[0] === 'number' ? filter.values[0] : null,
+            column.meta?.numberFormat as Record<string, unknown>
+          )}
+        </span>
+      );
 
     case 'currency':
       if (filter.operator === 'between' || filter.operator === 'notBetween') {
         return (
           <span>
-            {formatCurrency(filter.values[0], {
-              ...column.meta?.numberFormat,
-              ...column.meta?.currencyFormat,
+            {formatCurrency(typeof filter.values[0] === 'number' ? filter.values[0] : null, {
+              ...((column.meta?.numberFormat as Record<string, unknown>) || {}),
+              ...((column.meta?.currencyFormat as Record<string, unknown>) || {}),
             })}{' '}
             -{' '}
-            {formatCurrency(filter.values[1], {
-              ...column.meta?.numberFormat,
-              ...column.meta?.currencyFormat,
+            {formatCurrency(typeof filter.values[1] === 'number' ? filter.values[1] : null, {
+              ...((column.meta?.numberFormat as Record<string, unknown>) || {}),
+              ...((column.meta?.currencyFormat as Record<string, unknown>) || {}),
             })}
           </span>
         );
       }
       return (
         <span>
-          {formatCurrency(filter.values[0], {
-            ...column.meta?.numberFormat,
-            ...column.meta?.currencyFormat,
+          {formatCurrency(typeof filter.values[0] === 'number' ? filter.values[0] : null, {
+            ...((column.meta?.numberFormat as Record<string, unknown>) || {}),
+            ...((column.meta?.currencyFormat as Record<string, unknown>) || {}),
           })}
         </span>
       );
 
-    case 'percentage':
+    case 'percentage': {
+      const val0 = getFilterValueAsNumber(filter, 0);
+      const val1 = getFilterValueAsNumber(filter, 1);
+      const numFormat = getNumberFormat(column.meta);
+
       if (filter.operator === 'between' || filter.operator === 'notBetween') {
         return (
           <span>
-            {formatPercentage(filter.values[0], column.meta?.numberFormat)} -{' '}
-            {formatPercentage(filter.values[1], column.meta?.numberFormat)}
+            {formatPercentage(val0, numFormat)} - {formatPercentage(val1, numFormat)}
           </span>
         );
       }
-      return <span>{formatPercentage(filter.values[0], column.meta?.numberFormat)}</span>;
+      return <span>{formatPercentage(val0, numFormat)}</span>;
+    }
 
     case 'date': {
       // Get date formatting configuration from column filter config
@@ -368,18 +399,21 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
         relativeOptions: undefined,
       };
 
-      if (filter.values.length === 2) {
-        const start = new Date(filter.values[0]);
-        const end = new Date(filter.values[1]);
-        return <span>{formatDateRange(start, end, dateFormat)}</span>;
+      const startDate = getFilterValueAsDate(filter, 0);
+      const endDate = getFilterValueAsDate(filter, 1);
+
+      if (startDate && endDate) {
+        return <span>{formatDateRange(startDate, endDate, dateFormat)}</span>;
       }
-      const date = new Date(filter.values[0]);
-      return (
-        <span>
-          {formatDateWithConfig(date, dateFormat)}
-          {nullIndicator}
-        </span>
-      );
+      if (startDate) {
+        return (
+          <span>
+            {formatDateWithConfig(startDate, dateFormat)}
+            {nullIndicator}
+          </span>
+        );
+      }
+      return <span>Invalid date</span>;
     }
 
     case 'boolean':
@@ -398,17 +432,18 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
 
     case 'option': {
       const option = column.filter?.options?.find((o) => o.value === filter.values[0]);
+      const displayValue = option?.label ?? String(filter.values[0] ?? '');
       return (
         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-          {truncateText(option?.label ?? filter.values[0], 20)}
+          {truncateText(displayValue, 20)}
           {nullIndicator}
         </span>
       );
     }
 
     case 'multiOption': {
-      const selectedOptions =
-        column.filter?.options?.filter((o) => filter.values.includes(o.value)) ?? [];
+      const values = filter.values as string[];
+      const selectedOptions = column.filter?.options?.filter((o) => values.includes(o.value)) ?? [];
 
       if (selectedOptions.length === 0) {
         return (

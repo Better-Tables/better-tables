@@ -308,7 +308,9 @@ export function IntegratedVirtualizedTableDemo() {
   // Handle individual filter updates
   const handleUpdateFilter = useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      const newFilters = filters.map((f) => (f.columnId === columnId ? { ...f, ...updates } : f));
+      const newFilters = filters.map((f) =>
+        f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f
+      );
       handleFiltersChange(newFilters);
     },
     [filters, handleFiltersChange]
@@ -450,8 +452,11 @@ export function IntegratedVirtualizedTableDemo() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Dataset Size</label>
+            <label htmlFor="datasetSize" className="block text-sm font-medium mb-1">
+              Dataset Size
+            </label>
             <select
+              id="datasetSize"
               value={datasetSize}
               onChange={(e) => setDatasetSize(Number(e.target.value))}
               className="w-full p-2 border border-gray-300 rounded"
@@ -466,17 +471,19 @@ export function IntegratedVirtualizedTableDemo() {
 
           {/* Metrics Display */}
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Performance Metrics</label>
-            <div className="p-2 bg-white border border-gray-300 rounded text-sm">
-              <span className="text-blue-600 font-medium">
-                {metrics.filteredCount.toLocaleString()} / {metrics.originalCount.toLocaleString()}{' '}
-                rows
-              </span>
-              {metrics.reductionPercentage > 0 && (
-                <span className="text-green-600 ml-2">
-                  ({metrics.reductionPercentage}% filtered)
+            <div className="space-y-1">
+              <div className="block text-sm font-medium">Performance Metrics</div>
+              <div className="p-2 bg-white border border-gray-300 rounded text-sm">
+                <span className="text-blue-600 font-medium">
+                  {metrics.filteredCount.toLocaleString()} /{' '}
+                  {metrics.originalCount.toLocaleString()} rows
                 </span>
-              )}
+                {metrics.reductionPercentage > 0 && (
+                  <span className="text-green-600 ml-2">
+                    ({metrics.reductionPercentage}% filtered)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

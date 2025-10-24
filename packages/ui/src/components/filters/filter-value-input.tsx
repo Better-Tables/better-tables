@@ -9,20 +9,20 @@ import { NumberFilterInput } from './inputs/number-filter-input';
 import { OptionFilterInput } from './inputs/option-filter-input';
 import { TextFilterInput } from './inputs/text-filter-input';
 
-export interface FilterValueInputProps<TData = any> {
+export interface FilterValueInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Include null change handler */
   onIncludeNullChange?: (includeNull: boolean) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function FilterValueInput<TData = any>({
+export function FilterValueInput<TData = unknown>({
   filter,
   column,
   onChange,

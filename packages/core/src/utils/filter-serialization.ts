@@ -104,6 +104,8 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
     }
 
     // Convert back to full FilterState format
+    // Note: We cast to FilterState[] because JSON deserialization loses type information.
+    // The consuming code should validate these filters to ensure they match the expected types.
     return filterData.map((data: Record<string, unknown>) => ({
       columnId: data.c as string,
       type: data.t as ColumnType,
@@ -111,7 +113,7 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
       values: data.v as unknown[],
       ...(data.n && typeof data.n === 'boolean' ? { includeNull: data.n } : {}),
       ...(data.m && typeof data.m === 'object' ? { meta: data.m as Record<string, unknown> } : {}),
-    }));
+    })) as FilterState[];
   } catch (error) {
     console.warn('Failed to deserialize filters from URL:', error);
     throw error; // Re-throw for validation to catch

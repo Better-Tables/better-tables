@@ -7,7 +7,7 @@ import type {
 } from '@better-tables/core';
 import { useCallback, useEffect, useState } from 'react';
 
-export interface UseTableDataOptions<TData = any> {
+export interface UseTableDataOptions<TData = unknown> {
   /** Table adapter for data fetching */
   adapter: TableAdapter<TData>;
 
@@ -18,13 +18,13 @@ export interface UseTableDataOptions<TData = any> {
   pagination?: PaginationState;
 
   /** Additional fetch parameters */
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 
   /** Whether to fetch data automatically */
   enabled?: boolean;
 }
 
-export interface UseTableDataResult<TData = any> {
+export interface UseTableDataResult<TData = unknown> {
   /** Table data */
   data: TData[];
 
@@ -73,7 +73,7 @@ export interface UseTableDataResult<TData = any> {
  * );
  * ```
  */
-export function useTableData<TData = any>({
+export function useTableData<TData = unknown>({
   adapter,
   filters = [],
   pagination,

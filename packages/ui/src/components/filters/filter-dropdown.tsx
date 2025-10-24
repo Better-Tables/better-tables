@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useFilterDropdownNavigation, useKeyboardNavigation } from '@/hooks';
 import { cn } from '@/lib/utils';
 
-export interface FilterDropdownProps<TData = any> {
+export interface FilterDropdownProps<TData = unknown> {
   /** Available columns to filter */
   columns: ColumnDefinition<TData>[];
   /** Optional grouping for columns */
@@ -53,7 +53,7 @@ export interface FilterDropdownProps<TData = any> {
 // Internal state for tracking the current view
 type ViewState = { type: 'groups' } | { type: 'group'; groupId: string; groupLabel: string };
 
-export function FilterDropdown<TData = any>({
+export function FilterDropdown<TData = unknown>({
   columns,
   groups,
   onSelect,
@@ -129,7 +129,7 @@ export function FilterDropdown<TData = any>({
     const grouped: Array<{
       id: string;
       label: string;
-      icon?: React.ComponentType<any>;
+      icon?: React.ComponentType<{ className?: string }>;
       columns: ColumnDefinition<TData>[];
       description?: string;
     }> = [];
@@ -143,12 +143,14 @@ export function FilterDropdown<TData = any>({
         grouped.push({
           id: group.id,
           label: group.label,
-          icon: group.icon as React.ComponentType<any>,
+          icon: group.icon as React.ComponentType<{ className?: string }>,
           columns: groupColumns,
           description: group.description,
         });
 
-        groupColumns.forEach((col) => assignedColumnIds.add(col.id));
+        groupColumns.forEach((col) => {
+          assignedColumnIds.add(col.id);
+        });
       }
     });
 
@@ -221,6 +223,17 @@ export function FilterDropdown<TData = any>({
     }
   );
 
+  // Keyboard shortcut handlers
+  const handleOpenShortcut = React.useCallback(() => {
+    onOpenChange?.(true);
+  }, [onOpenChange]);
+
+  const handleBackspaceShortcut = React.useCallback(() => {
+    if (currentView.type === 'group') {
+      handleBackToGroups();
+    }
+  }, [currentView.type, handleBackToGroups]);
+
   // Enhanced keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({
     onEscape: () => {
@@ -236,13 +249,9 @@ export function FilterDropdown<TData = any>({
       }
     },
     shortcuts: {
-      'Ctrl+k': () => onOpenChange?.(true),
-      'Ctrl+f': () => onOpenChange?.(true),
-      Backspace: () => {
-        if (currentView.type === 'group') {
-          handleBackToGroups();
-        }
-      },
+      'Ctrl+k': handleOpenShortcut,
+      'Ctrl+f': handleOpenShortcut,
+      Backspace: handleBackspaceShortcut,
     },
   });
 
@@ -376,9 +385,15 @@ export function FilterDropdown<TData = any>({
     return (
       <Dialog open={open} onOpenChange={disabled ? undefined : onOpenChange}>
         <DialogTrigger asChild disabled={disabled}>
-          <div onKeyDown={keyboardNavigation.onKeyDown} {...keyboardNavigation.ariaAttributes}>
+          <button
+            type="button"
+            tabIndex={disabled ? -1 : 0}
+            onKeyDown={keyboardNavigation.onKeyDown}
+            {...keyboardNavigation.ariaAttributes}
+            className="inline-flex items-center"
+          >
             {children}
-          </div>
+          </button>
         </DialogTrigger>
         <DialogContent className="max-w-sm backdrop-blur-sm">
           <DialogHeader>
@@ -395,9 +410,15 @@ export function FilterDropdown<TData = any>({
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
       <PopoverTrigger asChild disabled={disabled}>
-        <div onKeyDown={keyboardNavigation.onKeyDown} {...keyboardNavigation.ariaAttributes}>
+        <button
+          type="button"
+          tabIndex={disabled ? -1 : 0}
+          onKeyDown={keyboardNavigation.onKeyDown}
+          {...keyboardNavigation.ariaAttributes}
+          className="inline-flex items-center"
+        >
           {children}
-        </div>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-[320px] p-0" align="start">
         {commandContent}
