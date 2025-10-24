@@ -20,9 +20,12 @@ import { TablePagination } from './table-pagination';
  * UI-specific props for the BetterTable component
  * Data fetching is handled by parent component
  */
-export interface BetterTableProps<TData = unknown> extends TableConfig<TData> {
+export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TData>, 'adapter'> {
   /** Table data */
   data: TData[];
+
+  /** Adapter (optional when data is provided directly) */
+  adapter?: TableConfig<TData>['adapter'];
 
   /** Loading state */
   loading?: boolean;
@@ -210,20 +213,24 @@ export function BetterTable<TData = unknown>({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-row-${index}`}>
-                  {rowSelection && (
-                    <TableCell>
-                      <Skeleton className="h-4 w-4" />
-                    </TableCell>
-                  )}
-                  {columns.map((column) => (
-                    <TableCell key={column.id}>
-                      <Skeleton className="h-4 w-[100px]" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+              {[...Array(5)].map((_, rowIdx) => {
+                // Use skeleton row+column combo as key to avoid using only index
+                const rowKey = `skeleton-row-${rowIdx}`;
+                return (
+                  <TableRow key={rowKey}>
+                    {rowSelection && (
+                      <TableCell>
+                        <Skeleton className="h-4 w-4" />
+                      </TableCell>
+                    )}
+                    {columns.map((column) => (
+                      <TableCell key={`${rowKey}-col-${column.id}`}>
+                        <Skeleton className="h-4 w-[100px]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
