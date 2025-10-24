@@ -875,11 +875,14 @@ describe('DrizzleAdapter', () => {
     it('should handle mixed text and number filters with AND logic', async () => {
       const result = await adapter.fetchData({
         filters: [
-          { columnId: 'age', type: 'number', operator: 'greaterThan', values: [25] },
+          { columnId: 'age', type: 'number', operator: 'greaterThanOrEqual', values: [25] },
           { columnId: 'name', type: 'text', operator: 'startsWith', values: ['J'] },
         ],
       });
       expect(result.data).toHaveLength(2); // John Doe and Jane Smith
+      const names = result.data.map((r) => (r as UserWithRelations).name).sort();
+      expect(names).toContain('John Doe');
+      expect(names).toContain('Jane Smith');
     });
 
     it('should handle multiple number filters with different operators', async () => {
@@ -934,8 +937,21 @@ describe('DrizzleAdapter', () => {
           { columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] },
         ],
       });
+
       expect(result.data).toHaveLength(1);
       expect((result.data[0] as UserWithRelations).name).toBe('Bob Johnson');
+
+      // Verify the structure is flat (not nested)
+      const firstRecord = result.data[0] as UserWithRelations;
+      expect(firstRecord).toHaveProperty('id');
+      expect(firstRecord).toHaveProperty('name');
+      expect(firstRecord).toHaveProperty('email');
+      expect(firstRecord).toHaveProperty('age');
+      expect(firstRecord).toHaveProperty('createdAt');
+
+      // Verify it's NOT nested under a table key
+      expect(firstRecord).not.toHaveProperty('users');
+      expect(firstRecord).not.toHaveProperty('profiles');
     });
 
     it('should handle range filters with text filters', async () => {
