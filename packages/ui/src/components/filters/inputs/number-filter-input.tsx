@@ -1,5 +1,7 @@
 'use client';
 
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
@@ -12,8 +14,6 @@ import {
   validateNumberInput,
 } from '@/lib/number-format-utils';
 import { cn } from '@/lib/utils';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import * as React from 'react';
 
 export interface NumberFilterInputProps<TData = any> {
   /** Filter state */

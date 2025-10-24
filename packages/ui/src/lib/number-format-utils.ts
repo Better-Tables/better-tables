@@ -5,11 +5,11 @@
 
 import {
   type CurrencyFormatConfig,
-  type NumberFormatConfig,
-  type PercentageFormatConfig,
   formatCurrency,
   formatNumber as formatNumberDisplay,
   formatPercentage,
+  type NumberFormatConfig,
+  type PercentageFormatConfig,
 } from './format-utils';
 
 export interface NumberInputConfig {

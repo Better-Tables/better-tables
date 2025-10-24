@@ -3,11 +3,11 @@ import type {
   ScrollInfo,
   ScrollToOptions,
   VirtualColumnItem,
-  VirtualRowItem,
   VirtualizationConfig,
   VirtualizationMetrics,
   VirtualizationState,
   VirtualizationValidationResult,
+  VirtualRowItem,
 } from '../types/virtualization';
 
 /**

@@ -1,11 +1,11 @@
 'use client';
 
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useFilterValidation } from '@/hooks/use-filter-validation';
 import { cn } from '@/lib/utils';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import * as React from 'react';
 
 export interface TextFilterInputProps<TData = any> {
   /** Filter state */

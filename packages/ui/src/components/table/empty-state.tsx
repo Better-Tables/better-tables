@@ -1,6 +1,6 @@
-import { EmptyStateProps as CoreEmptyStateProps } from '@better-tables/core';
+import type { EmptyStateProps as CoreEmptyStateProps } from '@better-tables/core';
 import { Database, Search } from 'lucide-react';
-import React from 'react';
+import type React from 'react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 

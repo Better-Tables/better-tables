@@ -1,12 +1,12 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 import type { ColumnDefinition, FilterGroup, FilterState } from '@better-tables/core';
 import { getDefaultOperatorsForType } from '@better-tables/core';
 import { Search, X } from 'lucide-react';
 import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { ActiveFilters } from './active-filters';
 import { FilterButton } from './filter-button';
 import { FilterDropdown } from './filter-dropdown';

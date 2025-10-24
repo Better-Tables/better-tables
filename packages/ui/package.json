@@ -68,6 +68,7 @@
     "tailwindcss": "^4.1.11",
     "tsup": "^8.5.0",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   },
   "keywords": [

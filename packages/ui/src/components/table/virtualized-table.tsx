@@ -1,5 +1,6 @@
 import type { ColumnDefinition } from '@better-tables/core';
-import React, { useMemo, useRef, useEffect } from 'react';
+import type React from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
 import { cn } from '../../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';

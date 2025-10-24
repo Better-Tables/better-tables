@@ -1,5 +1,5 @@
-import type { ColumnType, FilterOperator } from "../types";
-import type { FilterState } from "../types/filter";
+import type { ColumnType, FilterOperator } from '../types';
+import type { FilterState } from '../types/filter';
 
 /**
  * Options for URL serialization
@@ -31,7 +31,7 @@ export interface URLSerializationResult {
  * Filter serialization utilities for URL state persistence
  */
 
-const DEFAULT_PARAM_NAME = "filters";
+const DEFAULT_PARAM_NAME = 'filters';
 const DEFAULT_MAX_LENGTH = 2000; // Conservative URL length limit
 
 /**
@@ -41,11 +41,7 @@ export function serializeFiltersToURL(
   filters: FilterState[],
   options: URLSerializationOptions = {}
 ): URLSerializationResult {
-  const {
-    compress = true,
-    includeMeta = false,
-    maxLength = DEFAULT_MAX_LENGTH,
-  } = options;
+  const { compress = true, includeMeta = false, maxLength = DEFAULT_MAX_LENGTH } = options;
 
   // Create minimal filter data
   const filterData = filters.map((filter) => ({
@@ -85,7 +81,7 @@ export function serializeFiltersToURL(
  * Deserialize filters from URL string
  */
 export function deserializeFiltersFromURL(urlString: string): FilterState[] {
-  if (!urlString || urlString.trim() === "") {
+  if (!urlString || urlString.trim() === '') {
     return [];
   }
 
@@ -93,7 +89,7 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
     let json: string;
 
     // Check if compressed
-    if (urlString.startsWith("c:")) {
+    if (urlString.startsWith('c:')) {
       const compressed = urlString.slice(2);
       const decodedCompressed = decodeFromURL(compressed);
       json = decompressData(decodedCompressed);
@@ -104,7 +100,7 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
     const filterData = JSON.parse(json);
 
     if (!Array.isArray(filterData)) {
-      throw new Error("Invalid filter data format");
+      throw new Error('Invalid filter data format');
     }
 
     // Convert back to full FilterState format
@@ -113,13 +109,11 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
       type: data.t as ColumnType,
       operator: data.o as FilterOperator,
       values: data.v as unknown[],
-      ...(data.n && typeof data.n === "boolean" ? { includeNull: data.n } : {}),
-      ...(data.m && typeof data.m === "object"
-        ? { meta: data.m as Record<string, unknown> }
-        : {}),
+      ...(data.n && typeof data.n === 'boolean' ? { includeNull: data.n } : {}),
+      ...(data.m && typeof data.m === 'object' ? { meta: data.m as Record<string, unknown> } : {}),
     }));
   } catch (error) {
-    console.warn("Failed to deserialize filters from URL:", error);
+    console.warn('Failed to deserialize filters from URL:', error);
     throw error; // Re-throw for validation to catch
   }
 }
@@ -128,11 +122,11 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
  * Get filters from current URL
  */
 export function getFiltersFromURL(
-  options: Pick<URLSerializationOptions, "paramName"> = {}
+  options: Pick<URLSerializationOptions, 'paramName'> = {}
 ): FilterState[] {
   const { paramName = DEFAULT_PARAM_NAME } = options;
 
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return []; // SSR safety
   }
 
@@ -146,7 +140,7 @@ export function getFiltersFromURL(
   try {
     return deserializeFiltersFromURL(filterString);
   } catch (error) {
-    console.warn("Failed to get filters from URL:", error);
+    console.warn('Failed to get filters from URL:', error);
     return [];
   }
 }
@@ -160,7 +154,7 @@ export function setFiltersInURL(
 ): void {
   const { paramName = DEFAULT_PARAM_NAME } = options;
 
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return; // SSR safety
   }
 
@@ -175,7 +169,7 @@ export function setFiltersInURL(
   }
 
   // Update URL without page reload
-  window.history.replaceState({}, "", url.toString());
+  window.history.replaceState({}, '', url.toString());
 }
 
 /**
@@ -188,9 +182,7 @@ export function createShareableURL(
 ): string {
   const { paramName = DEFAULT_PARAM_NAME } = options;
 
-  const url = new URL(
-    baseUrl || (typeof window !== "undefined" ? window.location.href : "")
-  );
+  const url = new URL(baseUrl || (typeof window !== 'undefined' ? window.location.href : ''));
 
   if (filters.length > 0) {
     const result = serializeFiltersToURL(filters, options);
@@ -245,10 +237,7 @@ export function getSerializationInfo(
  * Encode string to URL-safe format
  */
 function encodeToURL(str: string): string {
-  return btoa(encodeURIComponent(str))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
+  return btoa(encodeURIComponent(str)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 /**
@@ -256,8 +245,8 @@ function encodeToURL(str: string): string {
  */
 function decodeFromURL(str: string): string {
   // Add padding if needed
-  const padded = str + "=".repeat((4 - (str.length % 4)) % 4);
-  const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = str + '='.repeat((4 - (str.length % 4)) % 4);
+  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
   return decodeURIComponent(atob(base64));
 }
 
@@ -265,12 +254,12 @@ function decodeFromURL(str: string): string {
  * Key mapping for compression
  */
 const COMPRESSION_KEY_MAP: Record<string, string> = {
-  columnId: "c",
-  type: "t",
-  operator: "o",
-  values: "v",
-  includeNull: "n",
-  meta: "m",
+  columnId: 'c',
+  type: 't',
+  operator: 'o',
+  values: 'v',
+  includeNull: 'n',
+  meta: 'm',
 };
 
 /**
@@ -284,7 +273,7 @@ const DECOMPRESSION_KEY_MAP: Record<string, string> = Object.fromEntries(
  * Recursively rename object keys using the provided key map
  */
 function renameKeys(obj: unknown, keyMap: Record<string, string>): unknown {
-  if (obj === null || typeof obj !== "object") {
+  if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
@@ -312,7 +301,7 @@ function compressData(str: string): string {
     return JSON.stringify(compressed);
   } catch (error) {
     // If parsing fails, return original string
-    console.warn("Failed to compress data, using original:", error);
+    console.warn('Failed to compress data, using original:', error);
     return str;
   }
 }
@@ -328,7 +317,7 @@ function decompressData(str: string): string {
     return JSON.stringify(decompressed);
   } catch (error) {
     // If parsing fails, return original string
-    console.warn("Failed to decompress data, using original:", error);
+    console.warn('Failed to decompress data, using original:', error);
     return str;
   }
 }

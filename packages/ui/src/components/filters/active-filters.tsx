@@ -1,5 +1,9 @@
 'use client';
 
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { getOperatorDefinition } from '@better-tables/core';
+import { Lock, X } from 'lucide-react';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,10 +26,6 @@ import {
   truncateText,
 } from '@/lib/format-utils';
 import { cn } from '@/lib/utils';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { getOperatorDefinition } from '@better-tables/core';
-import { Lock, X } from 'lucide-react';
-import * as React from 'react';
 import { FilterOperatorSelect } from './filter-operator-select';
 import { FilterValueInput } from './filter-value-input';
 
@@ -357,7 +357,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
       }
       return <span>{formatPercentage(filter.values[0], column.meta?.numberFormat)}</span>;
 
-    case 'date':
+    case 'date': {
       // Get date formatting configuration from column filter config
       const dateFormat = {
         format: column.filter?.format || 'PPP',
@@ -380,6 +380,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
           {nullIndicator}
         </span>
       );
+    }
 
     case 'boolean':
       return (
@@ -395,7 +396,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
         </span>
       );
 
-    case 'option':
+    case 'option': {
       const option = column.filter?.options?.find((o) => o.value === filter.values[0]);
       return (
         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
@@ -403,8 +404,9 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
           {nullIndicator}
         </span>
       );
+    }
 
-    case 'multiOption':
+    case 'multiOption': {
       const selectedOptions =
         column.filter?.options?.filter((o) => filter.values.includes(o.value)) ?? [];
 
@@ -429,6 +431,7 @@ function FilterValueDisplay<TData = any>({ filter, column }: FilterValueDisplayP
           {selectedOptions.length} selected
         </span>
       );
+    }
 
     case 'json':
       return (

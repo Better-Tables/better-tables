@@ -1,10 +1,10 @@
 'use client';
 
+import { Filter } from 'lucide-react';
+import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Filter } from 'lucide-react';
-import * as React from 'react';
 
 export interface FilterButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Whether there are active filters */

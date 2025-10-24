@@ -1,5 +1,7 @@
 'use client';
 
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,8 +14,6 @@ import {
 } from '@/components/ui/select';
 import { useFilterValidation } from '@/hooks/use-filter-validation';
 import { cn } from '@/lib/utils';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { X } from 'lucide-react';
 
 export interface OptionFilterInputProps<TData = any> {
   /** Filter state */
