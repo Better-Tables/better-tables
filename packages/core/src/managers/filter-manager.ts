@@ -47,7 +47,7 @@ export interface FilterSerializationOptions {
 /**
  * Core filter manager class for managing filter state and operations
  */
-export class FilterManager<TData = any> {
+export class FilterManager<TData = unknown> {
   private filters: FilterState[] = [];
   private columns: ColumnDefinition<TData>[] = [];
   private subscribers: FilterManagerSubscriber[] = [];
@@ -73,7 +73,6 @@ export class FilterManager<TData = any> {
     const validFilters = filters.filter((filter) => {
       const validation = this.validateFilter(filter);
       if (!validation.valid) {
-        console.warn(`Invalid filter for column ${filter.columnId}: ${validation.error}`);
         return false;
       }
       return true;
@@ -120,7 +119,7 @@ export class FilterManager<TData = any> {
   updateFilter(columnId: string, updates: Partial<FilterState>): void {
     const index = this.filters.findIndex((f) => f.columnId === columnId);
     if (index >= 0) {
-      const updatedFilter = { ...this.filters[index], ...updates };
+      const updatedFilter = { ...this.filters[index], ...updates } as FilterState;
       const validation = this.validateFilter(updatedFilter);
 
       if (!validation.valid) {

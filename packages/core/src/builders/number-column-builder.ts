@@ -212,7 +212,7 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
     this.config.meta = {
       ...this.config.meta,
       numberFormat: {
-        ...(this.config.meta?.numberFormat || {}),
+        ...((this.config.meta?.numberFormat as Record<string, unknown>) || {}),
         locale,
         notation: 'compact',
         compactDisplay,

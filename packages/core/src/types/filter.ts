@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ColumnDefinition, ColumnType } from './column';
+import type { ColumnDefinition } from './column';
 import type { IconComponent } from './common';
 
 /**
@@ -59,7 +59,7 @@ export type FilterOperator =
 /**
  * Filter configuration for a column
  */
-export interface FilterConfig<TValue = any> {
+export interface FilterConfig<TValue = unknown> {
   /** Filter operators allowed for this column */
   operators?: FilterOperator[];
 
@@ -106,31 +106,137 @@ export interface FilterOption {
   /** Optional count */
   count?: number;
   /** Additional metadata */
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 /**
- * Current filter state
+ * Metadata for filter state
  */
-export interface FilterState {
+export interface FilterMetadata {
+  /** UI-specific metadata */
+  ui?: {
+    expanded?: boolean;
+    pinned?: boolean;
+    color?: string;
+  };
+
+  /** Validation metadata */
+  validation?: {
+    lastValidated?: number;
+    isValid?: boolean;
+  };
+
+  /** Source of filter (user, preset, url, etc) */
+  source?: 'user' | 'preset' | 'url' | 'api' | 'default';
+
+  /** Allow extensions */
+  [key: string]: unknown;
+}
+
+/**
+ * Base filter state with common properties
+ */
+export interface BaseFilterState {
   /** Column ID being filtered */
   columnId: string;
 
-  /** Filter type */
-  type: ColumnType;
-
   /** Filter operator */
   operator: FilterOperator;
-
-  /** Filter values */
-  values: unknown[];
 
   /** Whether to include null values */
   includeNull?: boolean;
 
   /** Filter metadata */
-  meta?: Record<string, unknown>;
+  meta?: FilterMetadata;
 }
+
+/**
+ * Text filter state (text, email, url, phone)
+ */
+export interface TextFilterState extends BaseFilterState {
+  type: 'text' | 'email' | 'url' | 'phone';
+  values: string[];
+}
+
+/**
+ * Number filter state (number, currency, percentage)
+ */
+export interface NumberFilterState extends BaseFilterState {
+  type: 'number' | 'currency' | 'percentage';
+  values: number[];
+}
+
+/**
+ * Date filter state
+ */
+export interface DateFilterState extends BaseFilterState {
+  type: 'date';
+  values: (Date | string | number)[];
+}
+
+/**
+ * Boolean filter state
+ */
+export interface BooleanFilterState extends BaseFilterState {
+  type: 'boolean';
+  values: boolean[];
+}
+
+/**
+ * Option filter state (single select)
+ */
+export interface OptionFilterState extends BaseFilterState {
+  type: 'option';
+  values: string[];
+}
+
+/**
+ * Multi-option filter state (multi-select)
+ */
+export interface MultiOptionFilterState extends BaseFilterState {
+  type: 'multiOption';
+  values: string[];
+}
+
+/**
+ * JSON filter state
+ */
+export interface JsonFilterState extends BaseFilterState {
+  type: 'json';
+  values: (object | string)[];
+}
+
+/**
+ * Custom filter state (fallback for custom types)
+ */
+export interface CustomFilterState extends BaseFilterState {
+  type: 'custom';
+  values: unknown[];
+}
+
+/**
+ * Current filter state - discriminated union by type
+ *
+ * This discriminated union enables automatic type narrowing based on the `type` field.
+ * When you check `filter.type`, TypeScript will automatically narrow the `values` type.
+ *
+ * @example
+ * ```typescript
+ * if (filter.type === 'number') {
+ *   // TypeScript knows filter.values is number[]
+ *   const value: number = filter.values[0];
+ * }
+ * ```
+ */
+export type FilterState =
+  | TextFilterState
+  | NumberFilterState
+  | DateFilterState
+  | BooleanFilterState
+  | OptionFilterState
+  | MultiOptionFilterState
+  | JsonFilterState
+  | CustomFilterState;
 
 /**
  * Filter group for organizing filters
@@ -158,7 +264,7 @@ export interface FilterGroup {
 /**
  * Props for custom filter components
  */
-export interface FilterComponentProps<TValue = any> {
+export interface FilterComponentProps<TValue = unknown> {
   /** Current filter value */
   value: TValue[];
   /** Value change handler */
