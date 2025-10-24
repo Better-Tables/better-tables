@@ -3,18 +3,18 @@
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import * as React from 'react';
 
-export interface BooleanFilterInputProps<TData = any> {
+export interface BooleanFilterInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function BooleanFilterInput<TData = any>({
+export function BooleanFilterInput<TData = unknown>({
   filter,
   column,
   onChange,

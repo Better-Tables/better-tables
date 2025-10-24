@@ -15,18 +15,18 @@ import {
 import { useFilterValidation } from '@/hooks/use-filter-validation';
 import { cn } from '@/lib/utils';
 
-export interface OptionFilterInputProps<TData = any> {
+export interface OptionFilterInputProps<TData = unknown> {
   /** Filter state */
   filter: FilterState;
   /** Column definition */
   column: ColumnDefinition<TData>;
   /** Value change handler */
-  onChange: (values: any[]) => void;
+  onChange: (values: unknown[]) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-export function OptionFilterInput<TData = any>({
+export function OptionFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
@@ -36,7 +36,7 @@ export function OptionFilterInput<TData = any>({
   const allowsMultiple = filter.operator === 'isAnyOf' || filter.operator === 'isNoneOf';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
 
-  const selectedValues = filter.values || [];
+  const selectedValues = (filter.values || []) as string[];
 
   // Validate the current values
   const validation = useFilterValidation({
@@ -80,18 +80,18 @@ export function OptionFilterInput<TData = any>({
             {selectedValues.map((value) => {
               const option = options.find((opt) => opt.value === value);
               return (
-                <Badge key={value} variant="secondary" className="text-xs">
+                <Badge key={value as React.Key} variant="secondary" className="text-xs">
                   {option?.icon && (
                     <span className="mr-1">
                       <option.icon />
                     </span>
                   )}
-                  {option?.label || value}
+                  {option?.label ? option.label : String(value)}
                   <Button
                     variant="ghost"
                     size="sm"
                     className="ml-1 h-auto p-0 text-xs hover:bg-transparent"
-                    onClick={() => handleRemoveValue(value)}
+                    onClick={() => handleRemoveValue(String(value))}
                     disabled={disabled}
                   >
                     <X className="h-3 w-3" />
@@ -147,7 +147,7 @@ export function OptionFilterInput<TData = any>({
     <div className="space-y-2">
       <Label className="text-sm font-medium">Select Option</Label>
       <Select
-        value={selectedValues[0] || ''}
+        value={selectedValues[0] ? String(selectedValues[0]) : ''}
         onValueChange={handleSingleSelect}
         disabled={disabled}
       >

@@ -8,13 +8,13 @@ export interface ValidationResult {
   warning?: string;
 }
 
-export interface UseFilterValidationOptions {
+export interface UseFilterValidationOptions<TData = unknown> {
   /** Current filter state */
   filter: FilterState;
   /** Column definition */
-  column: ColumnDefinition;
+  column: ColumnDefinition<TData, unknown>;
   /** Values to validate */
-  values: any[];
+  values: unknown[];
   /** Whether to validate immediately */
   immediate?: boolean;
 }
@@ -22,12 +22,12 @@ export interface UseFilterValidationOptions {
 /**
  * Hook for validating filter values against operator and column requirements
  */
-export function useFilterValidation({
+export function useFilterValidation<TData = unknown>({
   filter,
   column,
   values,
   immediate = true,
-}: UseFilterValidationOptions): ValidationResult {
+}: UseFilterValidationOptions<TData>): ValidationResult {
   // Memoize expensive calculations
   const isNumericType = useMemo(
     () => column.type === 'number' || column.type === 'currency' || column.type === 'percentage',
@@ -80,7 +80,7 @@ export function useFilterValidation({
       const numericValues = values.filter((v) => typeof v === 'number');
 
       if (column.filter?.min !== undefined) {
-        const belowMin = numericValues.filter((v) => v < column.filter!.min!);
+        const belowMin = numericValues.filter((v) => v < (column.filter?.min ?? 0));
         if (belowMin.length > 0) {
           return {
             isValid: false,
@@ -90,7 +90,7 @@ export function useFilterValidation({
       }
 
       if (column.filter?.max !== undefined) {
-        const aboveMax = numericValues.filter((v) => v > column.filter!.max!);
+        const aboveMax = numericValues.filter((v) => v > (column.filter?.max ?? 0));
         if (aboveMax.length > 0) {
           return {
             isValid: false,
@@ -102,7 +102,7 @@ export function useFilterValidation({
 
     // Validate options for option/multiOption filters
     if (isOptionType && validOptions.length > 0) {
-      const invalidValues = values.filter((v) => !validOptions.includes(v));
+      const invalidValues = values.filter((v) => !validOptions.includes(v as string));
 
       if (invalidValues.length > 0) {
         return {

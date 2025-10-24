@@ -140,19 +140,30 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Create and manage the virtualization manager
+  // Memoize virtualization config to prevent unnecessary updates
+  const memoizedConfig = useMemo(
+    () => ({
+      containerHeight: virtualizationConfig.containerHeight ?? 400,
+      containerWidth: virtualizationConfig.containerWidth,
+      defaultRowHeight: virtualizationConfig.defaultRowHeight ?? 40,
+      overscan: virtualizationConfig.overscan ?? 5,
+    }),
+    [
+      virtualizationConfig.containerHeight,
+      virtualizationConfig.containerWidth,
+      virtualizationConfig.defaultRowHeight,
+      virtualizationConfig.overscan,
+    ]
+  );
+
+  // Create and manage the virtualization manager (created once with defaults)
   const manager = useMemo(() => {
     return new VirtualizationManager(
-      {
-        containerHeight: 400,
-        defaultRowHeight: 40,
-        overscan: 5,
-        ...virtualizationConfig,
-      },
-      totalRows,
-      totalColumns
+      { containerHeight: 400, defaultRowHeight: 40, overscan: 5 },
+      0,
+      0
     );
-  }, []); // Only create once, updates handled separately
+  }, []); // Created once, all updates handled via effects
 
   // State for tracking virtualization state
   const [state, setState] = useState<VirtualizationState>(() => manager.getState());
@@ -166,10 +177,8 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
   }, [manager, totalRows, totalColumns]);
 
   useEffect(() => {
-    if (Object.keys(virtualizationConfig).length > 0) {
-      manager.updateConfig(virtualizationConfig);
-    }
-  }, [manager, virtualizationConfig]);
+    manager.updateConfig(memoizedConfig);
+  }, [manager, memoizedConfig]);
 
   useEffect(() => {
     manager.setEnabled(enabled);
@@ -267,10 +276,11 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
     const container = containerRef.current;
     if (!container) return;
 
-    container.addEventListener('scroll', handleScroll as any, { passive: true });
+    const scrollHandler = handleScroll as unknown as EventListener;
+    container.addEventListener('scroll', scrollHandler, { passive: true });
 
     return () => {
-      container.removeEventListener('scroll', handleScroll as any);
+      container.removeEventListener('scroll', scrollHandler);
     };
   }, [handleScroll]);
 

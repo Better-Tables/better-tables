@@ -34,7 +34,7 @@ export interface FilterBarTheme {
   activeFilters?: string;
 }
 
-export interface FilterBarProps<TData = any> {
+export interface FilterBarProps<TData = unknown> {
   /** Column definitions from Better Tables */
   columns: ColumnDefinition<TData>[];
   /** Current filter state */
@@ -69,7 +69,7 @@ export interface FilterBarProps<TData = any> {
   isFilterProtected?: (filter: FilterState) => boolean;
 }
 
-export function FilterBar<TData = any>({
+export function FilterBar<TData = unknown>({
   columns,
   filters,
   onFiltersChange,
@@ -140,7 +140,9 @@ export function FilterBar<TData = any>({
 
   const handleUpdateFilter = React.useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      onFiltersChange(filters.map((f) => (f.columnId === columnId ? { ...f, ...updates } : f)));
+      onFiltersChange(
+        filters.map((f) => (f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f))
+      );
     },
     [filters, onFiltersChange]
   );
@@ -181,11 +183,21 @@ export function FilterBar<TData = any>({
       {/* Custom Filters */}
       {customFilters.length > 0 && (
         <div className="flex flex-wrap gap-2 sm:gap-2">
-          {customFilters.map((filter, index) => (
-            <div key={index} className="w-full sm:w-auto sm:max-w-md">
-              {filter}
-            </div>
-          ))}
+          {customFilters.map((filter) => {
+            // Attempt to use a stable key if possible. If 'filter' is a React element and has a key, use that.
+            // Otherwise, as a fallback, use its string representation.
+            const key =
+              (React.isValidElement(filter) && filter.key != null)
+                ? filter.key
+                : typeof filter === 'string'
+                  ? filter
+                  : undefined;
+            return (
+              <div key={key} className="w-full sm:w-auto sm:max-w-md">
+                {filter}
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -9,7 +9,7 @@ export interface EmptyStateProps extends CoreEmptyStateProps {
   message?: string;
 
   /** Custom icon */
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<{ className?: string }>;
 
   /** Custom action */
   action?: React.ReactNode;

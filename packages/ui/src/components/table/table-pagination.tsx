@@ -47,7 +47,7 @@ export function TablePagination({
   const endItem = Math.min(currentPage * pageSize, totalItems || 0);
 
   const renderPageNumbers = () => {
-    const pages = [];
+    const pages: (number | -1)[] = [];
     const maxVisiblePages = 5;
 
     if (totalPages <= maxVisiblePages) {
@@ -68,8 +68,12 @@ export function TablePagination({
 
     return pages.map((page, index) => {
       if (page === -1) {
+        // Use adjacent page as part of the key to avoid using index
+        const prevPage = pages[index - 1];
+        const nextPage = pages[index + 1];
+        const key = `ellipsis-${prevPage ?? 'start'}-${nextPage ?? 'end'}`;
         return (
-          <span key={`ellipsis-${index}`} className="px-2 py-1 text-sm text-muted-foreground">
+          <span key={key} className="px-2 py-1 text-sm text-muted-foreground">
             ...
           </span>
         );
