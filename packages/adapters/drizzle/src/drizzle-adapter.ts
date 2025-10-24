@@ -128,7 +128,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
       }
 
       // Build queries
-      const { dataQuery, countQuery } = this.queryBuilder.buildCompleteQuery({
+      const { dataQuery, countQuery, columnMetadata } = this.queryBuilder.buildCompleteQuery({
         columns: params.columns || [],
         filters: params.filters || [],
         sorting: params.sorting || [],
@@ -143,7 +143,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
       // Transform data to nested structure
       const transformedData = this.dataTransformer.transformToNested<
         InferSelectModel<TSchema[keyof TSchema]>
-      >(data, params.columns);
+      >(data, params.columns, columnMetadata);
 
       // Build result
       const result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> = {

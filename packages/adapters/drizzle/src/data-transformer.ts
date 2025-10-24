@@ -25,7 +25,11 @@ export class DataTransformer {
    */
   transformToNested<TData = Record<string, unknown>>(
     flatData: Record<string, unknown>[],
-    columns?: string[]
+    columns?: string[],
+    columnMetadata?: {
+      selections: Record<string, unknown>;
+      columnMapping: Record<string, string>;
+    }
   ): TData[] {
     if (!flatData || flatData.length === 0) {
       return [];
@@ -38,7 +42,7 @@ export class DataTransformer {
     const nestedData: TData[] = [];
 
     for (const [, records] of groupedData) {
-      const nestedRecord = this.buildNestedRecord(records, columns);
+      const nestedRecord = this.buildNestedRecord(records, columns, columnMetadata);
       nestedData.push(nestedRecord as TData);
     }
 
@@ -75,7 +79,11 @@ export class DataTransformer {
    */
   private buildNestedRecord(
     records: Record<string, unknown>[],
-    columns?: string[]
+    columns?: string[],
+    columnMetadata?: {
+      selections: Record<string, unknown>;
+      columnMapping: Record<string, string>;
+    }
   ): Record<string, unknown> {
     if (records.length === 0) {
       return {};
@@ -110,7 +118,7 @@ export class DataTransformer {
       // Process all available columns
       const firstRecord = records[0];
       if (firstRecord) {
-        const allColumns = this.getAllColumnIds(firstRecord);
+        const allColumns = this.getAllColumnIds(firstRecord, columnMetadata);
         for (const columnId of allColumns) {
           try {
             this.processColumn(nestedRecord, columnId, records);
@@ -180,8 +188,9 @@ export class DataTransformer {
       // Build nested object for the related table
       const relatedData: Record<string, unknown> = {};
 
-      // Extract all columns from the related table
-      const relatedColumns = this.getRelatedTableColumns(realTableName);
+      // Extract all columns from the related table using Drizzle schema utilities
+      const relatedTableSchema = this.schema[realTableName];
+      const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
 
       for (const col of relatedColumns) {
         const flatKey = `${realTableName}_${col}`;
@@ -226,8 +235,9 @@ export class DataTransformer {
         const relatedData = relatedRecords.get(relatedKey);
         if (!relatedData) continue;
 
-        // Extract all columns from the related table
-        const relatedColumns = this.getRelatedTableColumns(realTableName);
+        // Extract all columns from the related table using Drizzle schema utilities
+        const relatedTableSchema = this.schema[realTableName];
+        const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
         for (const col of relatedColumns) {
           const flatKey = `${realTableName}_${col}`;
           if (record[flatKey] !== undefined) {
@@ -241,10 +251,22 @@ export class DataTransformer {
   }
 
   /**
-   * Get all column IDs from a flat record
-   * Handles aliased columns from SQL joins (e.g., profiles_bio, posts_title)
+   * Get all column IDs from a flat record using column metadata
+   * Uses query builder metadata instead of manual parsing
    */
-  private getAllColumnIds(record: Record<string, unknown>): string[] {
+  private getAllColumnIds(
+    record: Record<string, unknown>,
+    columnMetadata?: {
+      selections: Record<string, unknown>;
+      columnMapping: Record<string, string>;
+    }
+  ): string[] {
+    // If we have column metadata, use it for accurate mapping
+    if (columnMetadata) {
+      return Object.keys(record).map((key) => columnMetadata.columnMapping[key] || key);
+    }
+
+    // Fallback to manual parsing attempt
     const columnIds: string[] = [];
     const mainTableColumns = this.getMainTableColumns();
 
@@ -264,10 +286,7 @@ export class DataTransformer {
         }
       }
 
-      // Check if this follows the pattern: tableName_columnName
-      // This is a heuristic for detecting joined columns - not all databases use this pattern
-      // TODO: In the future, this could be improved by using query builder metadata
-      // instead of trying to parse column names from SQL results
+      // For joined columns, use Drizzle schema utilities
       if (key.includes('_')) {
         // Try to find a table name match (longest match first to handle edge cases)
         const tableNames = Object.keys(this.schema).filter((t) => t !== this.mainTable);
@@ -280,12 +299,12 @@ export class DataTransformer {
           // Check if key starts with tableName_
           if (key.startsWith(`${tableName}_`)) {
             const field = key.substring(tableName.length + 1);
-            // Verify the field exists in that table to avoid false matches
-            const relatedColumns = this.getRelatedTableColumns(tableName);
-            if (relatedColumns.includes(field)) {
-              // Confirmed: this is a column from the related table
-              // Check if this is a foreign key column by looking at relationships
-              const isForeignKey = this.isForeignKeyColumn(tableName, field);
+            // Use Drizzle schema utilities to verify the field exists
+            const tableSchema = this.schema[tableName];
+            if (tableSchema && getColumnNames(tableSchema).includes(field)) {
+              // Check if this is a foreign key column using Drizzle schema utilities
+              const foreignKeyColumns = getForeignKeyColumns(tableSchema);
+              const isForeignKey = foreignKeyColumns.some((fk) => fk.name === field);
 
               if (!isForeignKey) {
                 columnIds.push(`${tableName}.${field}`);
@@ -327,19 +346,6 @@ export class DataTransformer {
     }
 
     return [];
-  }
-
-  /**
-   * Get columns for a related table
-   */
-  private getRelatedTableColumns(tableName: string): string[] {
-    const table = this.schema[tableName];
-    if (!table) {
-      return [];
-    }
-
-    // Use Drizzle schema utilities for more accurate column detection
-    return getColumnNames(table);
   }
 
   /**
@@ -568,30 +574,5 @@ export class DataTransformer {
     }
 
     return stats;
-  }
-
-  /**
-   * Check if a column is a foreign key by examining relationships
-   * Uses Drizzle's built-in schema metadata for more accurate detection
-   */
-  private isForeignKeyColumn(tableName: string, columnName: string): boolean {
-    // First, check Drizzle's schema metadata
-    const tableSchema = this.schema[tableName];
-    if (tableSchema) {
-      const foreignKeyColumns = getForeignKeyColumns(tableSchema);
-      if (foreignKeyColumns.some((col) => col.name === columnName)) {
-        return true;
-      }
-    }
-
-    // Fallback: Check if this column is used as a foreign key in any relationship
-    for (const relationship of Object.values(this.relationshipManager.getRelationships())) {
-      // Check if this column is the foreign key in this relationship
-      if (relationship.from === tableName && relationship.foreignKey === columnName) {
-        return true;
-      }
-    }
-
-    return false;
   }
 }

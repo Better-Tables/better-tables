@@ -63,8 +63,18 @@ export class DrizzleQueryBuilder {
 
   /**
    * Build SELECT query with joins
+   * Returns both the query and metadata about column selections
    */
-  buildSelectQuery(context: QueryContext, columns?: string[]): QueryBuilderWithJoins {
+  buildSelectQuery(
+    context: QueryContext,
+    columns?: string[]
+  ): {
+    query: QueryBuilderWithJoins;
+    columnMetadata: {
+      selections: Record<string, AnyColumnType>;
+      columnMapping: Record<string, string>; // Maps SQL result keys to original column IDs
+    };
+  } {
     const mainTableSchema = this.schema[this.mainTable];
     if (!mainTableSchema) {
       throw new QueryError(`Main table not found: ${this.mainTable}`, {
@@ -74,18 +84,37 @@ export class DrizzleQueryBuilder {
 
     // Build column selections first
     // Always create explicit selections when we have joins to ensure flat structure
-    let selections: Record<string, AnyColumnType> | undefined;
+    const selections: Record<string, AnyColumnType> = {};
+    const columnMapping: Record<string, string> = {};
 
     if (columns && columns.length > 0) {
-      selections = this.buildColumnSelections(columns);
+      Object.assign(selections, this.buildColumnSelections(columns));
+      // Build mapping for explicit columns
+      for (const columnId of columns) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId);
+
+        if (columnPath.isNested && columnPath.relationshipPath) {
+          const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
+          const realTableName = relationship?.to || columnPath.table;
+          const aliasedKey = `${realTableName}_${columnPath.field}`;
+          columnMapping[aliasedKey] = columnId;
+        } else {
+          columnMapping[columnId] = columnId;
+        }
+      }
     } else if (context.joinPaths.size > 0) {
       // When filtering across relationships without explicit columns, create flat selections
-      selections = this.buildFlatSelectionsForRelationships();
+      Object.assign(selections, this.buildFlatSelectionsForRelationships());
+      // For flat selections, all columns map to themselves
+      for (const key of Object.keys(selections)) {
+        columnMapping[key] = key;
+      }
     }
 
-    let query = selections
-      ? this.db.select(selections).from(mainTableSchema)
-      : this.db.select().from(mainTableSchema);
+    let query =
+      Object.keys(selections).length > 0
+        ? this.db.select(selections).from(mainTableSchema)
+        : this.db.select().from(mainTableSchema);
 
     // Add joins
     const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths);
@@ -107,7 +136,13 @@ export class DrizzleQueryBuilder {
       }
     }
 
-    return query;
+    return {
+      query,
+      columnMetadata: {
+        selections,
+        columnMapping,
+      },
+    };
   }
 
   /**
@@ -438,7 +473,14 @@ export class DrizzleQueryBuilder {
     filters?: FilterState[];
     sorting?: SortingParams[];
     pagination?: PaginationParams;
-  }): { dataQuery: QueryBuilderWithJoins; countQuery: QueryBuilderWithJoins } {
+  }): {
+    dataQuery: QueryBuilderWithJoins;
+    countQuery: QueryBuilderWithJoins;
+    columnMetadata: {
+      selections: Record<string, AnyColumnType>;
+      columnMapping: Record<string, string>;
+    };
+  } {
     // Build query context
     const context = this.relationshipManager.buildQueryContext({
       columns: params.columns || [],
@@ -447,18 +489,18 @@ export class DrizzleQueryBuilder {
     });
 
     // Build data query
-    let dataQuery = this.buildSelectQuery(context, params.columns);
-    dataQuery = this.applyFilters(dataQuery, params.filters || []);
-    dataQuery = this.applySorting(dataQuery, params.sorting || []);
+    const { query: dataQuery, columnMetadata } = this.buildSelectQuery(context, params.columns);
+    let finalDataQuery = this.applyFilters(dataQuery, params.filters || []);
+    finalDataQuery = this.applySorting(finalDataQuery, params.sorting || []);
     if (params.pagination) {
-      dataQuery = this.applyPagination(dataQuery, params.pagination);
+      finalDataQuery = this.applyPagination(finalDataQuery, params.pagination);
     }
 
     // Build count query
     let countQuery = this.buildCountQuery(context);
     countQuery = this.applyFilters(countQuery, params.filters || []);
 
-    return { dataQuery, countQuery };
+    return { dataQuery: finalDataQuery, countQuery, columnMetadata };
   }
 
   /**
