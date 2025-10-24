@@ -12,16 +12,30 @@ import {
 export class DataTransformer {
   private schema: Record<string, AnyTableType>;
   private relationshipManager: RelationshipManager;
-  private mainTable: string;
+  private primaryTable: string | null = null;
 
-  constructor(
-    schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager,
-    mainTable: string
-  ) {
+  constructor(schema: Record<string, AnyTableType>, relationshipManager: RelationshipManager) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
-    this.mainTable = mainTable;
+  }
+
+  /**
+   * Set the primary table for this query context
+   */
+  setPrimaryTable(tableName: string): void {
+    this.primaryTable = tableName;
+  }
+
+  /**
+   * Get the current primary table
+   */
+  getPrimaryTable(): string {
+    if (!this.primaryTable) {
+      throw new Error(
+        'Primary table not set. Call setPrimaryTable() before using DataTransformer.'
+      );
+    }
+    return this.primaryTable;
   }
 
   /**
@@ -63,11 +77,11 @@ export class DataTransformer {
 
     for (const record of flatData) {
       // Get the primary key dynamically from the schema
-      const tableSchema = this.schema[this.mainTable];
+      const tableSchema = this.schema[this.getPrimaryTable()];
       if (!tableSchema) continue;
       const primaryKeyName = this.getPrimaryKeyName(tableSchema);
       const mainKey = String(
-        record[primaryKeyName] || record[`${this.mainTable}_${primaryKeyName}`]
+        record[primaryKeyName] || record[`${this.getPrimaryTable()}_${primaryKeyName}`]
       );
 
       if (!grouped.has(mainKey)) {
@@ -291,9 +305,9 @@ export class DataTransformer {
         continue;
       }
 
-      // Check if this is a main table column with table name prefix (e.g., users_id, users_name)
-      if (key.startsWith(`${this.mainTable}_`)) {
-        const field = key.substring(this.mainTable.length + 1);
+      // Check if this is a primary table column with table name prefix (e.g., users_id, users_name)
+      if (key.startsWith(`${this.getPrimaryTable()}_`)) {
+        const field = key.substring(this.getPrimaryTable().length + 1);
         if (mainTableColumns.includes(field)) {
           columnIds.push(field); // Use the field name without table prefix
           continue;
@@ -303,7 +317,7 @@ export class DataTransformer {
       // For joined columns, use Drizzle schema utilities
       if (key.includes('_')) {
         // Try to find a table name match (longest match first to handle edge cases)
-        const tableNames = Object.keys(this.schema).filter((t) => t !== this.mainTable);
+        const tableNames = Object.keys(this.schema).filter((t) => t !== this.getPrimaryTable());
         // Sort by length descending to match longest table name first
         tableNames.sort((a, b) => b.length - a.length);
 
@@ -346,7 +360,7 @@ export class DataTransformer {
    * Get column names from main table
    */
   private getMainTableColumns(): string[] {
-    const table = this.schema[this.mainTable];
+    const table = this.schema[this.getPrimaryTable()];
     if (!table || typeof table !== 'object') {
       return [];
     }
@@ -553,7 +567,7 @@ export class DataTransformer {
 
         // Check for required fields
         const recordObj = record as Record<string, unknown>;
-        if (!recordObj.id && !recordObj[`${this.mainTable}_id`]) {
+        if (!recordObj.id && !recordObj[`${this.getPrimaryTable()}_id`]) {
           return false;
         }
       }

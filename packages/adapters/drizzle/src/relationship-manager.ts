@@ -20,17 +20,31 @@ import { calculateLevenshteinDistance } from './utils/levenshtein';
 export class RelationshipManager {
   private relationships: RelationshipMap;
   private schema: Record<string, AnyTableType>;
-  private mainTable: string;
+  private primaryTable: string | null = null;
   private joinPathCache = new Map<string, RelationshipPath[]>();
 
-  constructor(
-    schema: Record<string, AnyTableType>,
-    relationships: RelationshipMap,
-    mainTable: string
-  ) {
+  constructor(schema: Record<string, AnyTableType>, relationships: RelationshipMap) {
     this.schema = schema;
     this.relationships = relationships;
-    this.mainTable = mainTable;
+  }
+
+  /**
+   * Set the primary table for this query context
+   */
+  setPrimaryTable(tableName: string): void {
+    this.primaryTable = tableName;
+  }
+
+  /**
+   * Get the current primary table
+   */
+  getPrimaryTable(): string {
+    if (!this.primaryTable) {
+      throw new RelationshipError('Primary table not set', {
+        suggestion: 'Call setPrimaryTable() before using RelationshipManager',
+      });
+    }
+    return this.primaryTable;
   }
 
   /**
@@ -60,25 +74,25 @@ export class RelationshipManager {
         });
       }
 
-      // Check if it's actually a field in the main table first
-      const mainTableSchema = this.schema[this.mainTable];
-      if (mainTableSchema) {
-        const fieldExists = (mainTableSchema as unknown as Record<string, AnyColumnType>)[
+      // Check if it's actually a field in the primary table first
+      const primaryTableSchema = this.schema[this.getPrimaryTable()];
+      if (primaryTableSchema) {
+        const fieldExists = (primaryTableSchema as unknown as Record<string, AnyColumnType>)[
           fieldOrAlias
         ];
         if (fieldExists) {
           // It's a direct field
           return {
             columnId,
-            table: this.mainTable,
+            table: this.getPrimaryTable(),
             field: fieldOrAlias,
             isNested: false,
           };
         }
       }
 
-      // If not a field, check if this matches a relationship alias from the main table
-      const relKey = `${this.mainTable}.${fieldOrAlias}`;
+      // If not a field, check if this matches a relationship alias from the primary table
+      const relKey = `${this.getPrimaryTable()}.${fieldOrAlias}`;
       const relationship = this.relationships[relKey];
       if (relationship) {
         return {
@@ -91,14 +105,14 @@ export class RelationshipManager {
       }
 
       // If neither field nor relationship, throw error with helpful message
-      const availableFields = mainTableSchema ? this.getTableColumns(mainTableSchema) : [];
+      const availableFields = primaryTableSchema ? this.getTableColumns(primaryTableSchema) : [];
       const availableRelationships = this.getAvailableRelationships();
 
       throw new RelationshipError(
-        `Field '${fieldOrAlias}' not found in main table '${this.mainTable}'`,
+        `Field '${fieldOrAlias}' not found in primary table '${this.getPrimaryTable()}'`,
         {
           field: fieldOrAlias,
-          mainTable: this.mainTable,
+          primaryTable: this.getPrimaryTable(),
           availableFields: availableFields.slice(0, 10),
           totalFields: availableFields.length,
           availableRelationships,
@@ -122,16 +136,16 @@ export class RelationshipManager {
         });
       }
 
-      // Find the relationship from main table to the relationship name
-      const relationshipKey = `${this.mainTable}.${relationshipName}`;
+      // Find the relationship from primary table to the relationship name
+      const relationshipKey = `${this.getPrimaryTable()}.${relationshipName}`;
       const relationship = this.relationships[relationshipKey];
 
       if (!relationship) {
         const availableRelationships = this.getAvailableRelationships();
         throw new RelationshipError(
-          `No relationship found from ${this.mainTable} to ${relationshipName}`,
+          `No relationship found from ${this.getPrimaryTable()} to ${relationshipName}`,
           {
-            mainTable: this.mainTable,
+            primaryTable: this.getPrimaryTable(),
             relationshipName,
             columnId,
             availableRelationships,
@@ -156,7 +170,7 @@ export class RelationshipManager {
       // Multi-level relationship (e.g., "profile.company.name")
       this.validateMultiLevelPath(parts);
 
-      const relationshipPath = this.resolveMultiLevelPath(this.mainTable, parts);
+      const relationshipPath = this.resolveMultiLevelPath(this.getPrimaryTable(), parts);
       const fieldName = parts[parts.length - 1];
 
       if (!fieldName) {
@@ -180,8 +194,8 @@ export class RelationshipManager {
       // Validate field exists in real final table
       const realFinalTableName =
         relationshipPath.length > 0
-          ? relationshipPath[relationshipPath.length - 1]?.to || this.mainTable
-          : this.mainTable;
+          ? relationshipPath[relationshipPath.length - 1]?.to || this.getPrimaryTable()
+          : this.getPrimaryTable();
       this.validateRelatedTableField(realFinalTableName, fieldName);
 
       return {
@@ -195,7 +209,7 @@ export class RelationshipManager {
 
     throw new RelationshipError(`Invalid column path: ${columnId}`, {
       columnId,
-      mainTable: this.mainTable,
+      primaryTable: this.getPrimaryTable(),
       reason: 'Unsupported path format',
       suggestion: 'Use format: field, table.field, or table1.table2.field',
     });
@@ -272,7 +286,7 @@ export class RelationshipManager {
    */
   optimizeJoinOrder(requiredJoins: Map<string, RelationshipPath[]>): RelationshipPath[] {
     const joinOrder: RelationshipPath[] = [];
-    const processed = new Set<string>([this.mainTable]);
+    const processed = new Set<string>([this.getPrimaryTable()]);
     const remaining = new Map(requiredJoins);
 
     // Process joins in dependency order
@@ -327,18 +341,18 @@ export class RelationshipManager {
   getAccessibleColumns(): string[] {
     const accessibleColumns: string[] = [];
 
-    // Add direct columns from main table
-    const mainTableSchema = this.schema[this.mainTable];
-    if (mainTableSchema) {
+    // Add direct columns from primary table
+    const primaryTableSchema = this.schema[this.getPrimaryTable()];
+    if (primaryTableSchema) {
       // Generic way to get columns from any Drizzle table
-      const columns = this.getTableColumns(mainTableSchema);
+      const columns = this.getTableColumns(primaryTableSchema);
       accessibleColumns.push(...columns);
     }
 
     // Add columns from related tables (use alias names for exposure)
     for (const key of Object.keys(this.relationships)) {
-      if (key.startsWith(`${this.mainTable}.`)) {
-        const alias = key.substring(`${this.mainTable}.`.length);
+      if (key.startsWith(`${this.getPrimaryTable()}.`)) {
+        const alias = key.substring(`${this.getPrimaryTable()}.`.length);
         const relationship = this.relationships[key];
         if (relationship) {
           const relatedTableSchema = this.schema[relationship.to];
@@ -363,7 +377,7 @@ export class RelationshipManager {
     sorts?: Array<{ columnId: string }>;
   }): QueryContext {
     const context: QueryContext = {
-      requiredTables: new Set([this.mainTable]),
+      requiredTables: new Set([this.getPrimaryTable()]),
       joinPaths: new Map(),
       columns: new Set(),
       filters: new Set(),
@@ -426,12 +440,12 @@ export class RelationshipManager {
    * Check if a table is reachable from main table
    */
   isTableReachable(targetTable: string): boolean {
-    if (this.mainTable === targetTable) {
+    if (this.getPrimaryTable() === targetTable) {
       return true;
     }
 
     try {
-      this.getJoinPath(this.mainTable, targetTable);
+      this.getJoinPath(this.getPrimaryTable(), targetTable);
       return true;
     } catch {
       return false;
@@ -501,7 +515,7 @@ export class RelationshipManager {
     // Build join path to the target table (map alias to real table)
     const finalRelationship = columnPath.relationshipPath?.[columnPath.relationshipPath.length - 1];
     const realTargetTable = finalRelationship?.to || columnPath.table;
-    const joinPath = this.getJoinPath(this.mainTable, realTargetTable);
+    const joinPath = this.getJoinPath(this.getPrimaryTable(), realTargetTable);
 
     return joinPath.map((relationship) => {
       const table = this.schema[relationship.to];
@@ -644,27 +658,27 @@ export class RelationshipManager {
 
       return {
         column,
-        tableAlias: `${columnPath.table}_${this.mainTable}`,
+        tableAlias: `${columnPath.table}_${this.getPrimaryTable()}`,
         isRelated: true,
         joinPath: columnPath.relationshipPath || [],
       };
     } else {
-      // Handle main table columns
-      const mainTableSchema = this.schema[this.mainTable];
-      if (!mainTableSchema) {
-        throw new RelationshipError(`Main table not found: ${this.mainTable}`, {
+      // Handle primary table columns
+      const primaryTableSchema = this.schema[this.getPrimaryTable()];
+      if (!primaryTableSchema) {
+        throw new RelationshipError(`Primary table not found: ${this.getPrimaryTable()}`, {
           columnPath,
-          mainTable: this.mainTable,
+          primaryTable: this.getPrimaryTable(),
         });
       }
 
-      const column = (mainTableSchema as unknown as Record<string, AnyColumnType>)[
+      const column = (primaryTableSchema as unknown as Record<string, AnyColumnType>)[
         columnPath.field
       ];
       if (!column) {
         throw new RelationshipError(`Column not found: ${columnPath.field}`, {
           columnPath,
-          availableColumns: Object.keys(mainTableSchema as unknown as Record<string, unknown>),
+          availableColumns: Object.keys(primaryTableSchema as unknown as Record<string, unknown>),
         });
       }
 
@@ -707,15 +721,15 @@ export class RelationshipManager {
           );
         }
       } else {
-        // Check if field exists in main table
-        const mainTableSchema = this.schema[this.mainTable];
+        // Check if field exists in primary table
+        const primaryTableSchema = this.schema[this.getPrimaryTable()];
         if (
-          !mainTableSchema ||
-          !(mainTableSchema as unknown as Record<string, AnyColumnType>)[columnPath.field]
+          !primaryTableSchema ||
+          !(primaryTableSchema as unknown as Record<string, AnyColumnType>)[columnPath.field]
         ) {
-          throw new RelationshipError(`Field not found in main table: ${columnPath.field}`, {
+          throw new RelationshipError(`Field not found in primary table: ${columnPath.field}`, {
             columnId,
-            table: this.mainTable,
+            table: this.getPrimaryTable(),
             field: columnPath.field,
           });
         }
@@ -868,7 +882,7 @@ export class RelationshipManager {
    * Get available relationship names from main table
    */
   private getAvailableRelationships(): string[] {
-    return this.getAvailableRelationshipsFromTable(this.mainTable);
+    return this.getAvailableRelationshipsFromTable(this.getPrimaryTable());
   }
 
   /**

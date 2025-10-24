@@ -16,7 +16,6 @@ export async function getAdapter() {
     db,
     // biome-ignore lint/suspicious/noExplicitAny: Schema type inference is complex with Drizzle
     schema: schema as any,
-    mainTable: 'users',
     driver: 'sqlite',
     autoDetectRelationships: true,
     options: {
