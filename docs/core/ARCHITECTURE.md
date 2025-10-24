@@ -23,7 +23,7 @@ Every component is designed with TypeScript in mind, providing compile-time safe
 
 ```typescript
 // Generic types ensure type safety throughout the system
-interface ColumnDefinition<TData = any, TValue = any> {
+interface ColumnDefinition<TData = unknown, TValue = unknown> {
   accessor: (data: TData) => TValue;
   // ... other properties
 }
@@ -246,7 +246,7 @@ class FilterManager {
 The adapter pattern enables different data sources:
 
 ```typescript
-interface TableAdapter<TData = any> {
+interface TableAdapter<TData = unknown> {
   fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
   getFilterOptions(columnId: string): Promise<FilterOption[]>;
   // ... other methods
@@ -583,8 +583,18 @@ describe('FilterManager', () => {
   
   beforeEach(() => {
     columns = [
-      createTextColumn('name'),
-      createNumberColumn('age'),
+      createColumnBuilder()
+        .text()
+        .id('name')
+        .displayName('Name')
+        .accessor((row: any) => row.name)
+        .build(),
+      createColumnBuilder()
+        .number()
+        .id('age')
+        .displayName('Age')
+        .accessor((row: any) => row.age)
+        .build(),
     ];
     filterManager = new FilterManager(columns);
   });

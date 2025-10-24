@@ -271,7 +271,7 @@ export function VirtualizedTable<T = unknown>({
       </div>
 
       {/* Virtualized content area */}
-      <div
+      <section
         ref={containerRef}
         className="overflow-auto"
         style={{
@@ -280,7 +280,6 @@ export function VirtualizedTable<T = unknown>({
         }}
         aria-label={ariaLabel || 'Virtualized table content'}
         aria-describedby={ariaDescribedBy}
-        role="presentation"
       >
         <div
           ref={contentRef}
@@ -300,9 +299,13 @@ export function VirtualizedTable<T = unknown>({
 
                 if (renderRow) {
                   return (
-                    <div key={virtualRow.index} style={rowStyle} role="presentation">
+                    <tr
+                      key={virtualRow.index}
+                      style={rowStyle}
+                      aria-rowindex={virtualRow.index + 1}
+                    >
                       {renderRow(item, virtualRow.index, rowStyle)}
-                    </div>
+                    </tr>
                   );
                 }
 
@@ -322,7 +325,7 @@ export function VirtualizedTable<T = unknown>({
             </TableBody>
           </Table>
         </div>
-      </div>
+      </section>
 
       {/* Scroll indicators (optional) */}
       {process.env.NODE_ENV === 'development' && (

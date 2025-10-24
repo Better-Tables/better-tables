@@ -75,7 +75,7 @@ interface TableFeatures {
 Defines how a column behaves and renders data.
 
 ```typescript
-interface ColumnDefinition<TData = any, TValue = any> {
+interface ColumnDefinition<TData = unknown, TValue = unknown> {
   id: string; // Unique column identifier
   displayName: string; // Display name
   icon?: IconComponent; // Optional icon
@@ -93,7 +93,7 @@ interface ColumnDefinition<TData = any, TValue = any> {
   filter?: FilterConfig<TValue>; // Filter configuration
   validation?: ValidationRule<TValue>[]; // Validation rules
   nullable?: boolean; // Supports null values
-  meta?: Record<string, any>; // Additional metadata
+  meta?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -145,9 +145,9 @@ interface FilterState {
   columnId: string; // Column being filtered
   type: ColumnType; // Column type
   operator: FilterOperator; // Filter operator
-  values: any[]; // Filter values
+  values: unknown[]; // Filter values
   includeNull?: boolean; // Include null values
-  meta?: Record<string, any>; // Additional metadata
+  meta?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -301,7 +301,7 @@ interface VirtualizationState {
 Interface for data adapters.
 
 ```typescript
-interface TableAdapter<TData = any> {
+interface TableAdapter<TData = unknown> {
   fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>>;
   getFilterOptions(columnId: string): Promise<FilterOption[]>;
   getFacetedValues(columnId: string): Promise<Map<string, number>>;
@@ -328,7 +328,7 @@ interface FetchDataParams {
   filters?: FilterState[]; // Active filters
   search?: string; // Search query
   columns?: string[]; // Columns to include
-  params?: Record<string, any>; // Additional parameters
+  params?: Record<string, unknown>; // Additional parameters
 }
 ```
 
@@ -349,7 +349,7 @@ interface FetchDataResult<TData = any> {
     hasPrev: boolean;
   };
   faceted?: Record<string, Map<string, number>>; // Faceted values
-  meta?: Record<string, any>; // Additional metadata
+  meta?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -374,10 +374,10 @@ interface TableTheme {
   };
   components?: {
     // Component overrides
-    table?: Record<string, any>;
-    filter?: Record<string, any>;
-    pagination?: Record<string, any>;
-    [key: string]: Record<string, any> | undefined;
+    table?: Record<string, unknown>;
+    filter?: Record<string, unknown>;
+    pagination?: Record<string, unknown>;
+    [key: string]: Record<string, unknown> | undefined;
   };
 }
 ```
@@ -412,7 +412,7 @@ Real-time data update events.
 interface DataEvent<TData = any> {
   type: "insert" | "update" | "delete"; // Event type
   data: TData | TData[]; // Affected data
-  meta?: Record<string, any>; // Event metadata
+  meta?: Record<string, unknown>; // Event metadata
 }
 ```
 

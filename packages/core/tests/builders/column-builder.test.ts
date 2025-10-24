@@ -5,6 +5,7 @@ import {
   type ColumnFactory,
   column,
   createColumnBuilder,
+  createColumnBuilders,
   DateColumnBuilder,
   MultiOptionColumnBuilder,
   NumberColumnBuilder,
@@ -201,7 +202,7 @@ describe('Column Builder System', () => {
         .build();
 
       expect(column.type).toBe('percentage');
-      expect(column.meta?.percentage?.format).toBe('percentage');
+      expect((column.meta?.percentage as { format: string })?.format).toBe('percentage');
     });
   });
 
@@ -217,7 +218,7 @@ describe('Column Builder System', () => {
         .build();
 
       expect(column.type).toBe('date');
-      expect(column.meta?.dateFormat?.format).toBe('yyyy-MM-dd');
+      expect((column.meta?.dateFormat as { format: string })?.format).toBe('yyyy-MM-dd');
     });
 
     it('should configure date-specific options', () => {
@@ -231,9 +232,30 @@ describe('Column Builder System', () => {
         .relative()
         .build();
 
-      expect(column.meta?.dateFormat?.showTime).toBe(true);
-      expect(column.meta?.dateFormat?.timeZone).toBe('America/New_York');
-      expect(column.meta?.dateFormat?.showRelative).toBe(true);
+      expect((column.meta?.dateFormat as { showTime: boolean })?.showTime).toBe(true);
+      expect((column.meta?.dateFormat as { timeZone: string })?.timeZone).toBe('America/New_York');
+      expect((column.meta?.dateFormat as { showRelative: boolean })?.showRelative).toBe(true);
+    });
+
+    it('should handle relative() method without existing dateFormat config', () => {
+      const builder = new DateColumnBuilder<TestUser>();
+
+      const column = builder
+        .id('createdAt')
+        .displayName('Created At')
+        .accessor((user) => user.createdAt)
+        .relative({ locale: 'en-US', numeric: 'always', style: 'short' })
+        .build();
+
+      expect((column.meta?.dateFormat as { showRelative: boolean })?.showRelative).toBe(true);
+      expect((column.meta?.dateFormat as { locale: string })?.locale).toBe('en-US');
+      expect(
+        (column.meta?.dateFormat as { relativeOptions: { numeric: string } })?.relativeOptions
+          ?.numeric
+      ).toBe('always');
+      expect(
+        (column.meta?.dateFormat as { relativeOptions: { style: string } })?.relativeOptions?.style
+      ).toBe('short');
     });
   });
 
@@ -271,7 +293,7 @@ describe('Column Builder System', () => {
         ])
         .build();
 
-      expect(column.meta?.status?.showBadge).toBe(true);
+      expect((column.meta?.status as { showBadge: boolean })?.showBadge).toBe(true);
     });
   });
 
@@ -318,8 +340,58 @@ describe('Column Builder System', () => {
         .tags(options, { maxTags: 5, allowCreate: true })
         .build();
 
-      expect(column.meta?.tags?.allowCreate).toBe(true);
-      expect(column.meta?.options?.maxSelections).toBe(5);
+      expect((column.meta?.tags as { allowCreate: boolean })?.allowCreate).toBe(true);
+      expect((column.meta?.options as { maxSelections: number })?.maxSelections).toBe(5);
+    });
+
+    it('should configure badges display without existing display config', () => {
+      const builder = new MultiOptionColumnBuilder<TestUser>();
+
+      const options = [
+        { value: 'vip', label: 'VIP' },
+        { value: 'lead', label: 'Lead' },
+      ];
+
+      const column = builder
+        .id('tags')
+        .displayName('Tags')
+        .accessor((user) => user.tags)
+        .options(options)
+        .showBadges({
+          variant: 'secondary',
+          showColors: false,
+          showIcons: false,
+          removable: false,
+        })
+        .build();
+
+      expect((column.meta?.display as { type: string })?.type).toBe('chips');
+      expect((column.meta?.display as { variant: string })?.variant).toBe('secondary');
+      expect((column.meta?.display as { showColors: boolean })?.showColors).toBe(false);
+      expect((column.meta?.display as { showIcons: boolean })?.showIcons).toBe(false);
+      expect((column.meta?.display as { removable: boolean })?.removable).toBe(false);
+    });
+
+    it('should configure badges display with existing display config', () => {
+      const builder = new MultiOptionColumnBuilder<TestUser>();
+
+      const options = [
+        { value: 'vip', label: 'VIP' },
+        { value: 'lead', label: 'Lead' },
+      ];
+
+      const column = builder
+        .id('tags')
+        .displayName('Tags')
+        .accessor((user) => user.tags)
+        .options(options)
+        .displayFormat({ type: 'comma', separator: '; ' })
+        .showBadges({ variant: 'outline' })
+        .build();
+
+      expect((column.meta?.display as { type: string })?.type).toBe('chips');
+      expect((column.meta?.display as { separator: string })?.separator).toBe('; '); // Should preserve existing config
+      expect((column.meta?.display as { variant: string })?.variant).toBe('outline');
     });
   });
 
@@ -348,9 +420,9 @@ describe('Column Builder System', () => {
         .activeInactive()
         .build();
 
-      expect(column.meta?.display?.type).toBe('badge');
-      expect(column.meta?.display?.trueText).toBe('Active');
-      expect(column.meta?.display?.falseText).toBe('Inactive');
+      expect((column.meta?.display as { type: string })?.type).toBe('badge');
+      expect((column.meta?.display as { trueText: string })?.trueText).toBe('Active');
+      expect((column.meta?.display as { falseText: string })?.falseText).toBe('Inactive');
     });
   });
 
@@ -393,7 +465,7 @@ describe('Column Builder System', () => {
         .text()
         .id('name')
         .displayName('Name')
-        .accessor((data: TestUser) => data.name)
+        .accessor((data: unknown) => (data as TestUser).name)
         .build();
 
       expect(textColumn.type).toBe('text');
@@ -410,6 +482,65 @@ describe('Column Builder System', () => {
         .build();
 
       expect(column.type).toBe('text');
+    });
+
+    it('should create multiple typed column builders', () => {
+      interface User {
+        id: string;
+        name: string;
+      }
+
+      interface Order {
+        id: string;
+        total: number;
+      }
+
+      interface Product {
+        id: string;
+        title: string;
+        price: number;
+      }
+
+      const builders = createColumnBuilders({
+        users: {} as User,
+        orders: {} as Order,
+        products: {} as Product,
+      });
+
+      expect(typeof builders.users.text).toBe('function');
+      expect(typeof builders.orders.number).toBe('function');
+      expect(typeof builders.products.text).toBe('function');
+
+      // Test that each builder is properly typed
+      const userColumn = builders.users
+        .text()
+        .id('name')
+        .displayName('Name')
+        .accessor((user: User) => user.name)
+        .build();
+
+      const orderColumn = builders.orders
+        .number()
+        .id('total')
+        .displayName('Total')
+        .accessor((order: Order) => order.total)
+        .build();
+
+      const productColumn = builders.products
+        .text()
+        .id('title')
+        .displayName('Title')
+        .accessor((product: Product) => product.title)
+        .build();
+
+      expect(userColumn.type).toBe('text');
+      expect(orderColumn.type).toBe('number');
+      expect(productColumn.type).toBe('text');
+    });
+
+    it('should handle empty types object', () => {
+      const builders = createColumnBuilders({});
+      expect(Object.keys(builders)).toHaveLength(0);
     });
   });
 
@@ -432,7 +563,7 @@ describe('Column Builder System', () => {
           .build(),
       ];
 
-      const validation = validateColumns(validColumns);
+      const validation = validateColumns(validColumns as ColumnDefinition<unknown, unknown>[]);
       expect(validation.valid).toBe(true);
       expect(validation.errors).toEqual([]);
     });
@@ -443,7 +574,9 @@ describe('Column Builder System', () => {
         { id: 'age', accessor: (user: TestUser) => user.age, type: 'number' },
       ];
 
-      const validation = validateColumns(invalidColumns);
+      const validation = validateColumns(
+        invalidColumns as unknown as ColumnDefinition<unknown, unknown>[]
+      );
       expect(validation.valid).toBe(false);
       expect(validation.errors).toContain("Column at index 0 is missing required 'id' field");
       expect(validation.errors).toContain(
@@ -469,7 +602,9 @@ describe('Column Builder System', () => {
           .build(),
       ];
 
-      const validation = validateColumns(columnsWithDuplicates);
+      const validation = validateColumns(
+        columnsWithDuplicates as ColumnDefinition<unknown, unknown>[]
+      );
       expect(validation.valid).toBe(false);
       expect(validation.errors).toContain("Duplicate column ID 'name' found at index 1");
     });

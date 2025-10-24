@@ -60,6 +60,7 @@ npm install react react-dom tailwindcss
 ### 1. Basic Table Setup
 
 ```tsx
+import React, { useState } from 'react';
 import { BetterTable } from "@better-tables/ui";
 import { createColumnBuilder } from "@better-tables/core";
 
@@ -341,7 +342,9 @@ createColumnBuilder<User>()
 #### Basic Filtering
 
 ```tsx
+import React, { useState } from 'react';
 import { FilterBar, ActiveFilters } from "@better-tables/ui";
+import type { FilterState } from "@better-tables/core";
 
 function FilteredTable() {
   const [filters, setFilters] = useState<FilterState[]>([]);

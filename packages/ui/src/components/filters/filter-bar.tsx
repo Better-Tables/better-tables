@@ -183,15 +183,15 @@ export function FilterBar<TData = unknown>({
       {/* Custom Filters */}
       {customFilters.length > 0 && (
         <div className="flex flex-wrap gap-2 sm:gap-2">
-          {customFilters.map((filter) => {
+          {customFilters.map((filter, index) => {
             // Attempt to use a stable key if possible. If 'filter' is a React element and has a key, use that.
-            // Otherwise, as a fallback, use its string representation.
+            // Otherwise, use the index as fallback to ensure React stability.
             const key =
-              (React.isValidElement(filter) && filter.key != null)
+              React.isValidElement(filter) && filter.key != null
                 ? filter.key
                 : typeof filter === 'string'
                   ? filter
-                  : undefined;
+                  : index;
             return (
               <div key={key} className="w-full sm:w-auto sm:max-w-md">
                 {filter}

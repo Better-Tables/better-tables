@@ -311,7 +311,7 @@ function FilterDropdown() {
   });
 
   return (
-    <div onKeyDown={onKeyDown} {...ariaAttributes} ref={focusUtils.setFocusRef}>
+    <div onKeyDown={onKeyDown} {...ariaAttributes} ref={focusUtils.setFocusRef} tabIndex={0}>
       <Button onClick={() => setIsOpen(!isOpen)}>Add Filter</Button>
       {isOpen && <div className="dropdown-content">{/* Dropdown content */}</div>}
     </div>

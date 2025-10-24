@@ -25,7 +25,7 @@ export type SelectionManagerSubscriber = (event: SelectionManagerEvent) => void;
 /**
  * Core selection manager class for managing row selection state and operations
  */
-export class SelectionManager<TData = any> {
+export class SelectionManager<TData = unknown> {
   private selectionState: SelectionState = {
     selectedIds: new Set<string>(),
     allSelected: false,
@@ -185,8 +185,31 @@ export class SelectionManager<TData = any> {
       this.selectionState.selectedIds.clear();
       this.selectionState.selectedIds.add(validIds[0]);
     } else {
-      // Multiple selection
-      validIds.forEach((id) => this.selectionState.selectedIds.add(id));
+      // Multiple selection - respect maxSelections limit
+      if (this.config.maxSelections) {
+        const currentCount = this.selectionState.selectedIds.size;
+        const remainingSlots = this.config.maxSelections - currentCount;
+
+        if (remainingSlots <= 0) {
+          console.warn(`Maximum selections reached (${this.config.maxSelections})`);
+          return;
+        }
+
+        // Only select up to the remaining slots
+        const idsToSelect = validIds.slice(0, remainingSlots);
+        for (const id of idsToSelect) {
+          this.selectionState.selectedIds.add(id);
+        }
+
+        this.updateSelectionState();
+        this.notifySubscribers({ type: 'rows_selected', rowIds: idsToSelect, selected: true });
+        return;
+      }
+
+      // No maxSelections limit - select all valid IDs
+      for (const id of validIds) {
+        this.selectionState.selectedIds.add(id);
+      }
     }
 
     this.updateSelectionState();
@@ -199,7 +222,9 @@ export class SelectionManager<TData = any> {
   deselectRows(rowIds: string[]): void {
     const deselectedIds = rowIds.filter((id) => this.selectionState.selectedIds.has(id));
 
-    deselectedIds.forEach((id) => this.selectionState.selectedIds.delete(id));
+    for (const id of deselectedIds) {
+      this.selectionState.selectedIds.delete(id);
+    }
     this.updateSelectionState();
 
     if (deselectedIds.length > 0) {
@@ -215,11 +240,11 @@ export class SelectionManager<TData = any> {
       return;
     }
 
-    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable!(row));
+    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable?.(row));
 
-    selectableRows.forEach((row) => {
+    for (const row of selectableRows) {
       this.selectionState.selectedIds.add(this.getRowId(row));
-    });
+    }
 
     this.updateSelectionState();
     this.notifySubscribers({ type: 'all_selected', selected: true });
@@ -293,7 +318,7 @@ export class SelectionManager<TData = any> {
    * Get selection statistics
    */
   getSelectionStats(): SelectionStats {
-    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable!(row));
+    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable?.(row));
 
     const selectedCount = this.selectionState.selectedIds.size;
     const totalCount = selectableRows.length;
@@ -314,7 +339,7 @@ export class SelectionManager<TData = any> {
    * Get row ID using the configured getRowId function
    */
   private getRowId(row: TData): string {
-    return this.config.getRowId!(row);
+    return this.config.getRowId?.(row) || String(row);
   }
 
   /**
@@ -330,7 +355,7 @@ export class SelectionManager<TData = any> {
       return { valid: false, error: `Row with ID ${rowId} not found` };
     }
 
-    if (!this.config.isSelectable!(row)) {
+    if (!this.config.isSelectable?.(row)) {
       return { valid: false, error: `Row with ID ${rowId} is not selectable` };
     }
 
@@ -359,7 +384,7 @@ export class SelectionManager<TData = any> {
    * Update selection state metadata
    */
   private updateSelectionState(): void {
-    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable!(row));
+    const selectableRows = this.availableRows.filter((row) => this.config.isSelectable?.(row));
 
     const selectedCount = this.selectionState.selectedIds.size;
     const totalCount = selectableRows.length;

@@ -385,14 +385,15 @@ export function FilterDropdown<TData = unknown>({
     return (
       <Dialog open={open} onOpenChange={disabled ? undefined : onOpenChange}>
         <DialogTrigger asChild disabled={disabled}>
-          {React.cloneElement(
-            children as React.ReactElement<React.ButtonHTMLAttributes<HTMLButtonElement>>,
-            {
-              tabIndex: disabled ? -1 : 0,
-              onKeyDown: keyboardNavigation.onKeyDown,
-              ...keyboardNavigation.ariaAttributes,
-            }
-          )}
+          <button
+            type="button"
+            tabIndex={disabled ? -1 : 0}
+            onKeyDown={keyboardNavigation.onKeyDown}
+            {...keyboardNavigation.ariaAttributes}
+            className="inline-flex items-center"
+          >
+            {children}
+          </button>
         </DialogTrigger>
         <DialogContent className="max-w-sm backdrop-blur-sm">
           <DialogHeader>
@@ -409,14 +410,14 @@ export function FilterDropdown<TData = unknown>({
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
       <PopoverTrigger asChild disabled={disabled}>
-        {React.cloneElement(
-          children as React.ReactElement<React.ButtonHTMLAttributes<HTMLButtonElement>>,
-          {
-            tabIndex: disabled ? -1 : 0,
-            onKeyDown: keyboardNavigation.onKeyDown,
-            ...keyboardNavigation.ariaAttributes,
-          }
-        )}
+        <button
+          tabIndex={disabled ? -1 : 0}
+          onKeyDown={keyboardNavigation.onKeyDown}
+          {...keyboardNavigation.ariaAttributes}
+          className="inline-flex items-center"
+        >
+          {children}
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-[320px] p-0" align="start">
         {commandContent}

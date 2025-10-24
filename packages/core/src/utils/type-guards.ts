@@ -82,20 +82,61 @@ export function assertFilterValueType<T>(
 }
 
 /**
+ * Type predicate for filter values with runtime validation
+ * Validates that all values in the filter match the expected type
+ */
+export function isFilterValuesOfType<T>(
+  filter: FilterState,
+  typeChecker: (value: unknown) => value is T
+): filter is FilterState & { values: T[] } {
+  return filter.values.every(typeChecker);
+}
+
+/**
+ * Type predicate for text filter values
+ */
+export function isTextFilterValues(
+  filter: FilterState
+): filter is FilterState & { values: string[] } {
+  return isFilterValuesOfType(filter, (value): value is string => typeof value === 'string');
+}
+
+/**
+ * Type predicate for number filter values
+ */
+export function isNumberFilterValues(
+  filter: FilterState
+): filter is FilterState & { values: number[] } {
+  return isFilterValuesOfType(filter, (value): value is number => typeof value === 'number');
+}
+
+/**
+ * Type predicate for date filter values
+ */
+export function isDateFilterValues(
+  filter: FilterState
+): filter is FilterState & { values: Date[] } {
+  return isFilterValuesOfType(
+    filter,
+    (value): value is Date => value instanceof Date && !Number.isNaN(value.getTime())
+  );
+}
+
+/**
  * Check if a value is a valid Date
  */
 export function isValidDate(value: unknown): value is Date {
-  return value instanceof Date && !isNaN(value.getTime());
+  return value instanceof Date && !Number.isNaN(value.getTime());
 }
 
 /**
  * Check if a value can be converted to a Date
  */
 export function isDateLike(value: unknown): value is Date | string | number {
-  if (value instanceof Date) return !isNaN(value.getTime());
+  if (value instanceof Date) return !Number.isNaN(value.getTime());
   if (typeof value === 'string' || typeof value === 'number') {
     const date = new Date(value);
-    return !isNaN(date.getTime());
+    return !Number.isNaN(date.getTime());
   }
   return false;
 }
