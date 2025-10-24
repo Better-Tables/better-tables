@@ -930,36 +930,47 @@ describe('DrizzleAdapter', () => {
       expect((result.data[0] as UserWithRelations).name).toBe('John Doe');
     });
 
-    it('should work with custom primary key configuration', async () => {
-      // Test with a custom primary key name
-      const customConfig: DrizzleAdapterConfig<typeof schema> = {
-        db,
-        schema,
-        mainTable: 'users' as keyof typeof schema,
-        driver: 'sqlite',
-        autoDetectRelationships: true,
-        relations: _relationsSchema,
-        options: {
-          primaryKey: {
-            mainTableKey: 'id', // Explicitly specify 'id' (should work the same)
-            tableKeys: {
-              users: 'id',
-              profiles: 'id',
-              posts: 'id',
-            },
-          },
-        },
+    it('should work with different primary key naming conventions', async () => {
+      // Test that our schema introspection can handle different primary key names
+      const customSchema = {
+        customers: sqliteTable('customers', {
+          customerId: integer('customer_id').primaryKey(), // Different PK name
+          customerName: text('customer_name').notNull(),
+          email: text('email').notNull(),
+        }),
+        orders: sqliteTable('orders', {
+          orderId: integer('order_id').primaryKey(), // Different PK name
+          customerId: integer('customer_id').notNull(),
+          orderDate: integer('order_date', { mode: 'timestamp' }).notNull(),
+        }),
       };
 
-      const customAdapter = new DrizzleAdapter(customConfig);
+      // Test that our schema introspection utilities work with different naming
+      const { getPrimaryKeyColumns, getColumnNames } = await import(
+        '../src/utils/drizzle-schema-utils'
+      );
 
-      const result = await customAdapter.fetchData({
-        filters: [{ columnId: 'age', type: 'number', operator: 'isNotNull', values: [] }],
-      });
+      // Test primary key detection
+      const customerPrimaryKeys = getPrimaryKeyColumns(customSchema.customers);
+      expect(customerPrimaryKeys).toHaveLength(1);
+      expect(customerPrimaryKeys[0].name).toBe('customerId');
+      expect(customerPrimaryKeys[0].isPrimaryKey).toBe(true);
 
-      expect(result.data).toHaveLength(3);
-      expect(result.data[0]).toHaveProperty('id');
-      expect(result.data[0]).toHaveProperty('name');
+      const orderPrimaryKeys = getPrimaryKeyColumns(customSchema.orders);
+      expect(orderPrimaryKeys).toHaveLength(1);
+      expect(orderPrimaryKeys[0].name).toBe('orderId');
+      expect(orderPrimaryKeys[0].isPrimaryKey).toBe(true);
+
+      // Test column detection
+      const customerColumns = getColumnNames(customSchema.customers);
+      expect(customerColumns).toContain('customerId');
+      expect(customerColumns).toContain('customerName');
+      expect(customerColumns).toContain('email');
+
+      const orderColumns = getColumnNames(customSchema.orders);
+      expect(orderColumns).toContain('orderId');
+      expect(orderColumns).toContain('customerId');
+      expect(orderColumns).toContain('orderDate');
     });
 
     it('should handle range filters with text filters', async () => {

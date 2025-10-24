@@ -1,5 +1,6 @@
 import type { RelationshipManager } from './relationship-manager';
 import type { AggregateColumn, AnyTableType, ColumnPath } from './types';
+import { getColumnNames, getForeignKeyColumns } from './utils/drizzle-schema-utils';
 
 /**
  * Data transformer that converts flat SQL results to nested structures
@@ -333,24 +334,12 @@ export class DataTransformer {
    */
   private getRelatedTableColumns(tableName: string): string[] {
     const table = this.schema[tableName];
-    if (!table || typeof table !== 'object') {
+    if (!table) {
       return [];
     }
 
-    const tableObj = table as unknown as Record<string, unknown>;
-
-    // Try _.columns first
-    if ('_' in tableObj && tableObj._ && typeof tableObj._ === 'object') {
-      const meta = tableObj._ as Record<string, unknown>;
-      if ('columns' in meta && meta.columns && typeof meta.columns === 'object') {
-        return Object.keys(meta.columns);
-      }
-    }
-
-    // Fallback: use direct property access
-    return Object.keys(tableObj).filter(
-      (key) => !key.startsWith('_') && typeof tableObj[key] === 'object' && tableObj[key] !== null
-    );
+    // Use Drizzle schema utilities for more accurate column detection
+    return getColumnNames(table);
   }
 
   /**
@@ -583,10 +572,19 @@ export class DataTransformer {
 
   /**
    * Check if a column is a foreign key by examining relationships
-   * This is more generic than hardcoded naming patterns
+   * Uses Drizzle's built-in schema metadata for more accurate detection
    */
   private isForeignKeyColumn(tableName: string, columnName: string): boolean {
-    // Check if this column is used as a foreign key in any relationship
+    // First, check Drizzle's schema metadata
+    const tableSchema = this.schema[tableName];
+    if (tableSchema) {
+      const foreignKeyColumns = getForeignKeyColumns(tableSchema);
+      if (foreignKeyColumns.some((col) => col.name === columnName)) {
+        return true;
+      }
+    }
+
+    // Fallback: Check if this column is used as a foreign key in any relationship
     for (const relationship of Object.values(this.relationshipManager.getRelationships())) {
       // Check if this column is the foreign key in this relationship
       if (relationship.from === tableName && relationship.foreignKey === columnName) {
