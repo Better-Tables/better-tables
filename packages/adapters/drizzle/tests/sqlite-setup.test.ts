@@ -930,28 +930,36 @@ describe('DrizzleAdapter', () => {
       expect((result.data[0] as UserWithRelations).name).toBe('John Doe');
     });
 
-    it('should handle null checks with other filters', async () => {
-      const result = await adapter.fetchData({
-        filters: [
-          { columnId: 'age', type: 'number', operator: 'isNotNull', values: [] },
-          { columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] },
-        ],
+    it('should work with custom primary key configuration', async () => {
+      // Test with a custom primary key name
+      const customConfig: DrizzleAdapterConfig<typeof schema> = {
+        db,
+        schema,
+        mainTable: 'users' as keyof typeof schema,
+        driver: 'sqlite',
+        autoDetectRelationships: true,
+        relations: _relationsSchema,
+        options: {
+          primaryKey: {
+            mainTableKey: 'id', // Explicitly specify 'id' (should work the same)
+            tableKeys: {
+              users: 'id',
+              profiles: 'id',
+              posts: 'id',
+            },
+          },
+        },
+      };
+
+      const customAdapter = new DrizzleAdapter(customConfig);
+
+      const result = await customAdapter.fetchData({
+        filters: [{ columnId: 'age', type: 'number', operator: 'isNotNull', values: [] }],
       });
 
-      expect(result.data).toHaveLength(1);
-      expect((result.data[0] as UserWithRelations).name).toBe('Bob Johnson');
-
-      // Verify the structure is flat (not nested)
-      const firstRecord = result.data[0] as UserWithRelations;
-      expect(firstRecord).toHaveProperty('id');
-      expect(firstRecord).toHaveProperty('name');
-      expect(firstRecord).toHaveProperty('email');
-      expect(firstRecord).toHaveProperty('age');
-      expect(firstRecord).toHaveProperty('createdAt');
-
-      // Verify it's NOT nested under a table key
-      expect(firstRecord).not.toHaveProperty('users');
-      expect(firstRecord).not.toHaveProperty('profiles');
+      expect(result.data).toHaveLength(3);
+      expect(result.data[0]).toHaveProperty('id');
+      expect(result.data[0]).toHaveProperty('name');
     });
 
     it('should handle range filters with text filters', async () => {

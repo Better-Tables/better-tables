@@ -33,6 +33,13 @@ export class RelationshipManager {
   }
 
   /**
+   * Get all relationships
+   */
+  getRelationships(): RelationshipMap {
+    return this.relationships;
+  }
+
+  /**
    * Resolve column path (e.g., "profile.bio" -> table + field)
    */
   resolveColumnPath(columnId: string): ColumnPath {
