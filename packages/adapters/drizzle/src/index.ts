@@ -37,13 +37,17 @@ export type {
   ColumnPath,
   DatabaseDriver,
   DrizzleAdapterConfig,
-  DrizzleAdapterError,
   JoinConfig,
   QueryContext,
-  QueryError,
   QueryMetadata,
-  RelationshipError,
   RelationshipMap,
   RelationshipPath,
+} from './types';
+
+// Error class exports (as values, not types)
+export {
+  DrizzleAdapterError,
+  QueryError,
+  RelationshipError,
   SchemaError,
 } from './types';

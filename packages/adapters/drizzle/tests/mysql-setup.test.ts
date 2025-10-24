@@ -102,8 +102,10 @@ describe.skip('DrizzleAdapter - MySQL', () => {
 
   beforeEach(async () => {
     // Create MySQL connection
-    const connectionString =
-      process.env.MYSQL_TEST_URL || 'mysql://root:password@localhost:3306/drizzle_test';
+    const connectionString = process.env.MYSQL_TEST_URL;
+    if (!connectionString) {
+      throw new Error('MYSQL_TEST_URL environment variable is required for MySQL tests');
+    }
 
     mysqlConnection = await mysql.createConnection({
       uri: connectionString,
@@ -294,8 +296,8 @@ describe.skip('DrizzleAdapter - MySQL', () => {
       const result = await adapter.fetchData({
         filters: [{ columnId: 'bio', type: 'text', operator: 'isNotEmpty', values: [] }],
       });
-      // This would need users with non-empty bio to test properly
-      expect(result.data).toHaveLength(0);
+      // Both John Doe and Jane Smith have non-empty bios
+      expect(result.data).toHaveLength(2);
     });
 
     it('should filter by text notEquals', async () => {

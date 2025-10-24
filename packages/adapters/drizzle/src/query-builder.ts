@@ -360,7 +360,7 @@ export class DrizzleQueryBuilder {
    */
   private buildColumnSelections(columns: string[]): Record<string, AnyColumnType> {
     const selections: Record<string, AnyColumnType> = {};
-    const tablesIncluded = new Set<string>([this.mainTable]);
+    const relationshipPathsIncluded = new Set<string>();
 
     // Check if we have any relationship-based columns
     const hasRelationshipColumns = columns.some((col) => col.includes('.'));
@@ -392,10 +392,15 @@ export class DrizzleQueryBuilder {
 
       // For nested columns, select ALL columns from the related table
       if (columnPath.isNested && columnPath.relationshipPath) {
-        const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
-        const realTableName = relationship?.to || columnPath.table;
+        // Create a unique key for this relationship path
+        const relationshipPathKey = columnPath.relationshipPath
+          .map((r) => `${r.from}.${r.to}`)
+          .join('->');
 
-        if (!tablesIncluded.has(realTableName)) {
+        if (!relationshipPathsIncluded.has(relationshipPathKey)) {
+          const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
+          const realTableName = relationship?.to || columnPath.table;
+
           // Select all columns from this related table with aliased names
           const relatedTable = this.schema[realTableName];
           if (relatedTable) {
@@ -409,12 +414,14 @@ export class DrizzleQueryBuilder {
                 selections[aliasedKey] = col;
               }
             }
-            tablesIncluded.add(realTableName);
           }
+          relationshipPathsIncluded.add(relationshipPathKey);
         }
       } else {
         // Direct column from main table
-        selections[columnId] = columnReference.column;
+        if (columnReference) {
+          selections[columnId] = columnReference.column;
+        }
       }
     }
 

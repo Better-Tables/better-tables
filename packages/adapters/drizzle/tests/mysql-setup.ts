@@ -102,8 +102,10 @@ describe.skip('DrizzleAdapter - MySQL', () => {
 
   beforeEach(async () => {
     // Create MySQL connection
-    const connectionString =
-      process.env.MYSQL_TEST_URL || 'mysql://root:password@localhost:3306/drizzle_test';
+    const connectionString = process.env.MYSQL_TEST_URL;
+    if (!connectionString) {
+      throw new Error('MYSQL_TEST_URL environment variable is required for MySQL tests');
+    }
 
     mysqlConnection = await mysql.createConnection({
       uri: connectionString,

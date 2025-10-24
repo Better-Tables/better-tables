@@ -697,7 +697,15 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
     for (const row of data) {
       const values = headers.map((header) => {
         const value = (row as Record<string, unknown>)[header];
-        return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
+        if (typeof value === 'string') {
+          // Prevent CSV formula injection by prefixing with quote if starts with formula characters
+          const sanitizedValue = value.replace(/"/g, '""');
+          if (/^[=+\-@]/.test(value)) {
+            return `"'${sanitizedValue}"`;
+          }
+          return `"${sanitizedValue}"`;
+        }
+        return value;
       });
       csvRows.push(values.join(','));
     }

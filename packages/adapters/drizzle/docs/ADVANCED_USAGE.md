@@ -376,7 +376,7 @@ class CustomFilterHandler extends FilterHandler {
         return sql`EXISTS (
           SELECT 1 FROM user_roles ur 
           JOIN roles r ON ur.role_id = r.id 
-          WHERE ur.user_id = ${column} AND r.name IN (${values.join(',')})
+          WHERE ur.user_id = ${column} AND r.name IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})
         )`;
       
       case 'createdInLastDays':

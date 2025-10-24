@@ -370,7 +370,7 @@ export interface AggregateColumn {
   columnId: string;
 
   /** Aggregate function */
-  function: 'count' | 'sum' | 'avg' | 'min' | 'max';
+  function: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'distinct';
 
   /** Target field for aggregation */
   field: string;

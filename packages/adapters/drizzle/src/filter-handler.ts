@@ -80,8 +80,8 @@ export class FilterHandler {
   ): SQL | SQLWrapper {
     const conditions: (SQL | SQLWrapper)[] = [];
 
-    // Handle null inclusion
-    if (includeNull && (operator === 'isNull' || operator === 'isNotNull')) {
+    // Handle null inclusion - only add null condition for non-null operators
+    if (includeNull && operator !== 'isNull' && operator !== 'isNotNull') {
       conditions.push(isNull(column));
     }
 
@@ -375,17 +375,34 @@ export class FilterHandler {
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
-        return gte(column, startOfWeek);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+        endOfWeek.setHours(0, 0, 0, 0);
+        const condition = and(gte(column, startOfWeek), lt(column, endOfWeek));
+        if (!condition) {
+          throw new QueryError('Failed to create date condition', { period });
+        }
+        return condition;
       }
 
       case 'thisMonth': {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        return gte(column, startOfMonth);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const condition = and(gte(column, startOfMonth), lt(column, endOfMonth));
+        if (!condition) {
+          throw new QueryError('Failed to create date condition', { period });
+        }
+        return condition;
       }
 
       case 'thisYear': {
         const startOfYear = new Date(now.getFullYear(), 0, 1);
-        return gte(column, startOfYear);
+        const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
+        const condition = and(gte(column, startOfYear), lt(column, endOfYear));
+        if (!condition) {
+          throw new QueryError('Failed to create date condition', { period });
+        }
+        return condition;
       }
 
       default:
@@ -403,7 +420,7 @@ export class FilterHandler {
       case 'mysql':
         return sql`JSON_CONTAINS(${column}, ${JSON.stringify([value])})`;
       case 'sqlite':
-        return sql`JSON_EXTRACT(${column}, '$') LIKE '%${JSON.stringify(value)}%'`;
+        return sql`JSON_EXTRACT(${column}, '$') LIKE ${`%${JSON.stringify(value)}%`}`;
       default:
         throw new QueryError(`Unsupported database type: ${this.databaseType}`, {
           databaseType: this.databaseType,
@@ -423,7 +440,7 @@ export class FilterHandler {
       case 'sqlite': {
         // SQLite doesn't have JSON_OVERLAPS, so we use a workaround
         const conditions = values.map(
-          (val) => sql`JSON_EXTRACT(${column}, '$') LIKE '%${JSON.stringify(val)}%'`
+          (val) => sql`JSON_EXTRACT(${column}, '$') LIKE ${`%${JSON.stringify(val)}%`}`
         );
         return sql`(${sql.join(conditions, sql` OR `)})`;
       }
@@ -446,7 +463,7 @@ export class FilterHandler {
       case 'sqlite': {
         // SQLite doesn't have JSON_CONTAINS, so we use a workaround
         const conditions = values.map(
-          (val) => sql`JSON_EXTRACT(${column}, '$') LIKE '%${JSON.stringify(val)}%'`
+          (val) => sql`JSON_EXTRACT(${column}, '$') LIKE ${`%${JSON.stringify(val)}%`}`
         );
         return sql`(${sql.join(conditions, sql` AND `)})`;
       }

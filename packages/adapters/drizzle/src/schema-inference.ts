@@ -107,9 +107,9 @@ export type DotNotationType<T, Prefix extends string = ''> = {
     : never]: T[K] extends Record<string, unknown>
     ? T[K] extends Array<infer U>
       ? U extends Record<string, unknown>
-        ? DotNotationType<U, `${Prefix}.${K & string}`>
+        ? DotNotationType<U, Prefix extends '' ? K & string : `${Prefix}.${K & string}`>
         : T[K]
-      : DotNotationType<T[K], `${Prefix}.${K & string}`>
+      : DotNotationType<T[K], Prefix extends '' ? K & string : `${Prefix}.${K & string}`>
     : T[K];
 };
 
@@ -133,7 +133,7 @@ export type ExtractColumnPaths<
     ? TTable extends keyof TSchema
       ? {
           [FK in keyof InferTableColumns<TSchema[TTable]> as FK extends string
-            ? `${string}.${string}`
+            ? `${K & string}.${FK & string}`
             : never]: InferTableColumns<TSchema[TTable]>[FK];
         }
       : never
