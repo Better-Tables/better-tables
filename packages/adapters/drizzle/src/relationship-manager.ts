@@ -11,6 +11,7 @@ import type {
   RelationshipPath,
 } from './types';
 import { RelationshipError } from './types';
+import { getColumnNames } from './utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from './utils/levenshtein';
 
 /**
@@ -738,44 +739,10 @@ export class RelationshipManager {
 
   /**
    * Generic method to get columns from any Drizzle table
+   * Uses Drizzle schema utilities for accurate column detection
    */
   private getTableColumns(table: AnyTableType): string[] {
-    // Try different ways to access columns based on Drizzle table structure
-    if (table && typeof table === 'object') {
-      const tableObj = table as unknown as Record<string, unknown>;
-
-      // Method 1: Check for _ property with columns
-      if ('_' in tableObj && tableObj._ && typeof tableObj._ === 'object') {
-        const meta = tableObj._ as Record<string, unknown>;
-        if ('columns' in meta && meta.columns && typeof meta.columns === 'object') {
-          return Object.keys(meta.columns);
-        }
-      }
-
-      // Method 2: Check for direct column properties (excluding symbols and methods)
-      const columns: string[] = [];
-      for (const [key, value] of Object.entries(tableObj)) {
-        // Skip symbols, functions, and metadata properties
-        if (typeof value === 'object' && value !== null && !key.startsWith('_')) {
-          // Check if this looks like a column (has name property or is a Drizzle column)
-          const columnObj = value as Record<string, unknown>;
-          if ('name' in columnObj || Symbol.for('drizzle:Name') in columnObj) {
-            columns.push(key);
-          }
-        }
-      }
-
-      if (columns.length > 0) {
-        return columns;
-      }
-
-      // Method 3: Fallback - return all non-symbol properties
-      return Object.keys(tableObj).filter(
-        (key) => !key.startsWith('_') && typeof tableObj[key] === 'object' && tableObj[key] !== null
-      );
-    }
-
-    return [];
+    return getColumnNames(table);
   }
 
   /**

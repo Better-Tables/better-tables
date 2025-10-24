@@ -15,8 +15,14 @@ import type {
   RelationshipPath,
 } from './types';
 import { QueryError } from './types';
+import { getColumnNames } from './utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from './utils/levenshtein';
-import { getPrimaryKeyInfo, getPrimaryKeyMap } from './utils/schema-introspection';
+import { getPrimaryKeyMap } from './utils/schema-introspection';
+
+/**
+ * Type for accessing table columns by name
+ */
+type TableWithColumns = Record<string, AnyColumnType>;
 
 /**
  * Query builder that generates efficient SQL queries with smart joins
@@ -292,22 +298,14 @@ export class DrizzleQueryBuilder {
   private buildFlatSelectionsForRelationships(): Record<string, AnyColumnType> {
     const selections: Record<string, AnyColumnType> = {};
 
-    // Always include all main table columns - this is generic and works with any schema
+    // Always include all main table columns - use Drizzle schema utilities
     const mainTableSchema = this.schema[this.mainTable];
-    if (mainTableSchema && typeof mainTableSchema === 'object') {
-      const mainTableObj = mainTableSchema as unknown as Record<string, AnyColumnType>;
-
-      // Get all column names from the main table schema
-      const mainTableColumnNames = Object.keys(mainTableObj).filter(
-        (key) =>
-          !key.startsWith('_') &&
-          typeof mainTableObj[key] === 'object' &&
-          mainTableObj[key] !== null
-      );
+    if (mainTableSchema) {
+      const mainTableColumnNames = getColumnNames(mainTableSchema);
 
       // Add all main table columns to selections
       for (const colName of mainTableColumnNames) {
-        const col = mainTableObj[colName];
+        const col = (mainTableSchema as unknown as TableWithColumns)[colName];
         if (col) {
           selections[colName] = col;
         }
@@ -341,17 +339,11 @@ export class DrizzleQueryBuilder {
     // If we're filtering across relationships, include essential main table fields
     if (hasRelationshipColumns) {
       const mainTableSchema = this.schema[this.mainTable];
-      if (mainTableSchema && typeof mainTableSchema === 'object') {
-        const mainTableObj = mainTableSchema as unknown as Record<string, AnyColumnType>;
-        const mainTableColumnNames = Object.keys(mainTableObj).filter(
-          (key) =>
-            !key.startsWith('_') &&
-            typeof mainTableObj[key] === 'object' &&
-            mainTableObj[key] !== null
-        );
+      if (mainTableSchema) {
+        const mainTableColumnNames = getColumnNames(mainTableSchema);
 
         for (const colName of mainTableColumnNames) {
-          const col = mainTableObj[colName];
+          const col = (mainTableSchema as unknown as TableWithColumns)[colName];
           if (col && !selections[colName]) {
             selections[colName] = col;
           }
@@ -371,16 +363,12 @@ export class DrizzleQueryBuilder {
         if (!tablesIncluded.has(realTableName)) {
           // Select all columns from this related table with aliased names
           const relatedTable = this.schema[realTableName];
-          if (relatedTable && typeof relatedTable === 'object') {
-            // Get column names using direct property access (not _.columns)
-            const tableObj = relatedTable as unknown as Record<string, AnyColumnType>;
-            const columnNames = Object.keys(tableObj).filter(
-              (key) =>
-                !key.startsWith('_') && typeof tableObj[key] === 'object' && tableObj[key] !== null
-            );
+          if (relatedTable) {
+            // Use Drizzle schema utilities for column extraction
+            const columnNames = getColumnNames(relatedTable);
 
             for (const colName of columnNames) {
-              const col = tableObj[colName];
+              const col = (relatedTable as unknown as TableWithColumns)[colName];
               if (col) {
                 const aliasedKey = `${realTableName}_${colName}`;
                 selections[aliasedKey] = col;

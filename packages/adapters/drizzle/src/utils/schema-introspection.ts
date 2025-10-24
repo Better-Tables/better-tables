@@ -1,8 +1,9 @@
 import type { AnyColumnType, AnyTableType, PrimaryKeyInfo } from '../types';
+import { getPrimaryKeyColumns } from './drizzle-schema-utils';
 
 /**
  * Introspect primary key information from a Drizzle table schema
- * This is generic and works with any table design
+ * Uses Drizzle's built-in schema metadata instead of guessing
  */
 export function getPrimaryKeyInfo(
   tableSchema: AnyTableType,
@@ -23,41 +24,19 @@ export function getPrimaryKeyInfo(
     };
   }
 
-  // Try to find primary key by checking for common patterns
-  // This is more robust than assuming 'id'
-  const possiblePrimaryKeys = ['id', 'ID', 'Id', 'pk', 'PK', 'primaryKey', 'primary_key'];
+  // Use Drizzle's built-in schema introspection
+  const primaryKeyColumns = getPrimaryKeyColumns(tableSchema);
 
-  for (const keyName of possiblePrimaryKeys) {
-    if (tableObj[keyName]) {
-      return {
-        columnName: keyName,
-        column: tableObj[keyName],
-        isComposite: false,
-      };
+  if (primaryKeyColumns.length > 0) {
+    const primaryKey = primaryKeyColumns[0]; // Take the first primary key
+    if (!primaryKey) {
+      return null;
     }
-  }
-
-  // If no common pattern found, look for any column that might be a primary key
-  // This is a fallback for unusual naming conventions
-  for (const [key, column] of Object.entries(tableObj)) {
-    if (key.startsWith('_')) continue; // Skip Drizzle internal properties
-
-    // Check if this looks like a primary key column
-    if (typeof column === 'object' && column !== null) {
-      // This is a basic heuristic - in practice, Drizzle columns have more complex structure
-      // But this gives us a reasonable fallback
-      if (
-        key.toLowerCase().includes('id') ||
-        key.toLowerCase().includes('key') ||
-        key.toLowerCase().includes('pk')
-      ) {
-        return {
-          columnName: key,
-          column: column,
-          isComposite: false,
-        };
-      }
-    }
+    return {
+      columnName: primaryKey.name,
+      column: primaryKey.column,
+      isComposite: primaryKeyColumns.length > 1,
+    };
   }
 
   return null;
