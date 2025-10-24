@@ -395,7 +395,7 @@ function ThemeToggle() {
 <BetterTable
   aria-label="User data table"
   aria-describedby="table-description"
-  className="sr-only focus-visible:ring-2 focus-visible:ring-primary"
+  className="sr-only focus:ring-2 focus:ring-primary focus:outline-none"
 />
 ```
 

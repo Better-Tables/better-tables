@@ -76,14 +76,14 @@ const columns = [
 Creates a type-safe column factory for your data type.
 
 ```typescript
-interface ColumnFactory<TData = any> {
+interface ColumnFactory<TData = unknown> {
   text(): TextColumnBuilder<TData>;
   number(): NumberColumnBuilder<TData>;
   date(): DateColumnBuilder<TData>;
   boolean(): BooleanColumnBuilder<TData>;
   option(): OptionColumnBuilder<TData>;
   multiOption(): MultiOptionColumnBuilder<TData>;
-  custom<TValue = any>(type: 'json' | 'custom'): ColumnBuilder<TData, TValue>;
+  custom<TValue = unknown>(type: 'json' | 'custom'): ColumnBuilder<TData, TValue>;
 }
 ```
 
@@ -157,7 +157,7 @@ class ColumnBuilder<TData, TValue> {
   nullable(nullable?: boolean): this;
 
   // Metadata
-  meta(meta: Record<string, any>): this;
+  meta(meta: Record<string, unknown>): this;
 
   // Build
   build(): ColumnDefinition<TData, TValue>;

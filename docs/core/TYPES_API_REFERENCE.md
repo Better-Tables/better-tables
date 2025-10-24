@@ -93,7 +93,7 @@ interface ColumnDefinition<TData = unknown, TValue = unknown> {
   filter?: FilterConfig<TValue>; // Filter configuration
   validation?: ValidationRule<TValue>[]; // Validation rules
   nullable?: boolean; // Supports null values
-  meta?: Record<string, any>; // Additional metadata
+  meta?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -147,7 +147,7 @@ interface FilterState {
   operator: FilterOperator; // Filter operator
   values: unknown[]; // Filter values
   includeNull?: boolean; // Include null values
-  meta?: Record<string, any>; // Additional metadata
+  meta?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -328,7 +328,7 @@ interface FetchDataParams {
   filters?: FilterState[]; // Active filters
   search?: string; // Search query
   columns?: string[]; // Columns to include
-  params?: Record<string, any>; // Additional parameters
+  params?: Record<string, unknown>; // Additional parameters
 }
 ```
 
@@ -349,7 +349,7 @@ interface FetchDataResult<TData = any> {
     hasPrev: boolean;
   };
   faceted?: Record<string, Map<string, number>>; // Faceted values
-  meta?: Record<string, any>; // Additional metadata
+  meta?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -374,10 +374,10 @@ interface TableTheme {
   };
   components?: {
     // Component overrides
-    table?: Record<string, any>;
-    filter?: Record<string, any>;
-    pagination?: Record<string, any>;
-    [key: string]: Record<string, any> | undefined;
+    table?: Record<string, unknown>;
+    filter?: Record<string, unknown>;
+    pagination?: Record<string, unknown>;
+    [key: string]: Record<string, unknown> | undefined;
   };
 }
 ```
@@ -412,7 +412,7 @@ Real-time data update events.
 interface DataEvent<TData = any> {
   type: "insert" | "update" | "delete"; // Event type
   data: TData | TData[]; // Affected data
-  meta?: Record<string, any>; // Event metadata
+  meta?: Record<string, unknown>; // Event metadata
 }
 ```
 
