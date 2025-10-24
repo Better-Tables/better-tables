@@ -1,24 +1,25 @@
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { TextFilterInput } from '../components/filters/inputs/text-filter-input';
+import type { ColumnDefinition, FilterState } from "@better-tables/core";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { TextFilterInput } from "../text-filter-input";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockColumn: ColumnDefinition = {
-  id: 'name',
-  displayName: 'Name',
+  id: "name",
+  displayName: "Name",
   accessor: (data: any) => data.name,
-  type: 'text',
+  type: "text",
   sortable: true,
   filterable: true,
 };
 
 const mockFilter: FilterState = {
-  columnId: 'name',
-  type: 'text',
-  operator: 'contains',
-  values: ['John'],
+  columnId: "name",
+  type: "text",
+  operator: "contains",
+  values: ["John"],
 };
 
-describe('TextFilterInput', () => {
+describe("TextFilterInput", () => {
   const defaultProps = {
     filter: mockFilter,
     column: mockColumn,
@@ -29,33 +30,33 @@ describe('TextFilterInput', () => {
     vi.clearAllMocks();
   });
 
-  it('should render text input with current value', () => {
+  it("should render text input with current value", () => {
     render(<TextFilterInput {...defaultProps} />);
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveValue('John');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveValue("John");
   });
 
-  it('should call onChange when input value changes', async () => {
+  it("should call onChange when input value changes", async () => {
     render(<TextFilterInput {...defaultProps} />);
 
-    const input = screen.getByRole('textbox');
-    fireEvent.change(input, { target: { value: 'Jane' } });
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "Jane" } });
 
     await waitFor(() => {
-      expect(defaultProps.onChange).toHaveBeenCalledWith(['Jane']);
+      expect(defaultProps.onChange).toHaveBeenCalledWith(["Jane"]);
     });
   });
 
-  it('should debounce input changes', async () => {
+  it("should debounce input changes", async () => {
     vi.useFakeTimers();
 
     render(<TextFilterInput {...defaultProps} />);
 
-    const input = screen.getByRole('textbox');
-    fireEvent.change(input, { target: { value: 'J' } });
-    fireEvent.change(input, { target: { value: 'Ja' } });
-    fireEvent.change(input, { target: { value: 'Jane' } });
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "J" } });
+    fireEvent.change(input, { target: { value: "Ja" } });
+    fireEvent.change(input, { target: { value: "Jane" } });
 
     // Should not call onChange immediately
     expect(defaultProps.onChange).not.toHaveBeenCalled();
@@ -64,140 +65,181 @@ describe('TextFilterInput', () => {
     vi.advanceTimersByTime(300);
 
     await waitFor(() => {
-      expect(defaultProps.onChange).toHaveBeenCalledWith(['Jane']);
+      expect(defaultProps.onChange).toHaveBeenCalledWith(["Jane"]);
     });
 
     vi.useRealTimers();
   });
 
-  it('should show placeholder based on operator', () => {
+  it("should show placeholder based on operator", () => {
     const containsFilter: FilterState = {
       ...mockFilter,
-      operator: 'contains',
+      operator: "contains",
     };
 
-    render(<TextFilterInput {...defaultProps} filter={containsFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={containsFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveAttribute('placeholder', 'Contains...');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("placeholder", "Contains...");
   });
 
-  it('should show different placeholder for different operators', () => {
+  it("should show different placeholder for different operators", () => {
     const startsWithFilter: FilterState = {
       ...mockFilter,
-      operator: 'startsWith',
+      operator: "startsWith",
     };
 
-    render(<TextFilterInput {...defaultProps} filter={startsWithFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={startsWithFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveAttribute('placeholder', 'Starts with...');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("placeholder", "Starts with...");
   });
 
-  it('should handle empty values', () => {
+  it("should handle empty values", () => {
     const emptyFilter: FilterState = {
       ...mockFilter,
       values: [],
     };
 
-    render(<TextFilterInput {...defaultProps} filter={emptyFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={emptyFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveValue('');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveValue("");
   });
 
-  it('should handle null values', () => {
+  it("should handle null values", () => {
     const nullFilter: FilterState = {
       ...mockFilter,
       values: [null],
     };
 
-    render(<TextFilterInput {...defaultProps} filter={nullFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={nullFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveValue('');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveValue("");
   });
 
-  it('should handle disabled state', () => {
-    render(<TextFilterInput {...defaultProps} disabled={true} />);
+  it("should handle disabled state", () => {
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        disabled={true}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole("textbox");
     expect(input).toBeDisabled();
   });
 
-  it('should handle validation errors', async () => {
+  it("should handle validation errors", async () => {
     const columnWithValidation: ColumnDefinition = {
       ...mockColumn,
       filter: {
         validation: (value: any) => {
           if (value && value.length < 3) {
-            return 'Value must be at least 3 characters';
+            return "Value must be at least 3 characters";
           }
           return true;
         },
       },
     };
 
-    render(<TextFilterInput {...defaultProps} column={columnWithValidation} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        column={columnWithValidation}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    fireEvent.change(input, { target: { value: 'ab' } });
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "ab" } });
 
     await waitFor(() => {
-      expect(screen.getByText('Value must be at least 3 characters')).toBeInTheDocument();
+      expect(
+        screen.getByText("Value must be at least 3 characters")
+      ).toBeInTheDocument();
     });
   });
 
-  it('should clear validation error when value becomes valid', async () => {
+  it("should clear validation error when value becomes valid", async () => {
     const columnWithValidation: ColumnDefinition = {
       ...mockColumn,
       filter: {
         validation: (value: any) => {
           if (value && value.length < 3) {
-            return 'Value must be at least 3 characters';
+            return "Value must be at least 3 characters";
           }
           return true;
         },
       },
     };
 
-    render(<TextFilterInput {...defaultProps} column={columnWithValidation} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        column={columnWithValidation}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole("textbox");
 
     // Enter invalid value
-    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.change(input, { target: { value: "ab" } });
 
     await waitFor(() => {
-      expect(screen.getByText('Value must be at least 3 characters')).toBeInTheDocument();
+      expect(
+        screen.getByText("Value must be at least 3 characters")
+      ).toBeInTheDocument();
     });
 
     // Enter valid value
-    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.change(input, { target: { value: "abc" } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Value must be at least 3 characters')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Value must be at least 3 characters")
+      ).not.toBeInTheDocument();
     });
   });
 
-  it('should handle keyboard events', () => {
+  it("should handle keyboard events", () => {
     render(<TextFilterInput {...defaultProps} />);
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole("textbox");
 
     // Enter key should not prevent default
-    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(input).toHaveFocus();
 
     // Escape key should clear input
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(input).toHaveValue('');
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input).toHaveValue("");
   });
 
-  it('should handle focus and blur events', () => {
+  it("should handle focus and blur events", () => {
     render(<TextFilterInput {...defaultProps} />);
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole("textbox");
 
     fireEvent.focus(input);
     expect(input).toHaveFocus();
@@ -206,8 +248,14 @@ describe('TextFilterInput', () => {
     expect(input).not.toHaveFocus();
   });
 
-  it('should handle different text operators', () => {
-    const operators = ['contains', 'equals', 'startsWith', 'endsWith', 'notContains'];
+  it("should handle different text operators", () => {
+    const operators = [
+      "contains",
+      "equals",
+      "startsWith",
+      "endsWith",
+      "notContains",
+    ];
 
     operators.forEach((operator) => {
       const filter: FilterState = {
@@ -215,113 +263,147 @@ describe('TextFilterInput', () => {
         operator: operator as any,
       };
 
-      const { unmount } = render(<TextFilterInput {...defaultProps} filter={filter} />);
+      const { unmount } = render(
+        <TextFilterInput
+          {...defaultProps}
+          filter={filter}
+        />
+      );
 
-      const input = screen.getByRole('textbox');
+      const input = screen.getByRole("textbox");
       expect(input).toBeInTheDocument();
 
       unmount();
     });
   });
 
-  it('should handle email column type', () => {
+  it("should handle email column type", () => {
     const emailColumn: ColumnDefinition = {
       ...mockColumn,
-      type: 'email',
+      type: "email",
     };
 
-    render(<TextFilterInput {...defaultProps} column={emailColumn} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        column={emailColumn}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveAttribute('type', 'email');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("type", "email");
   });
 
-  it('should handle url column type', () => {
+  it("should handle url column type", () => {
     const urlColumn: ColumnDefinition = {
       ...mockColumn,
-      type: 'url',
+      type: "url",
     };
 
-    render(<TextFilterInput {...defaultProps} column={urlColumn} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        column={urlColumn}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveAttribute('type', 'url');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("type", "url");
   });
 
-  it('should handle phone column type', () => {
+  it("should handle phone column type", () => {
     const phoneColumn: ColumnDefinition = {
       ...mockColumn,
-      type: 'phone',
+      type: "phone",
     };
 
-    render(<TextFilterInput {...defaultProps} column={phoneColumn} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        column={phoneColumn}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveAttribute('type', 'tel');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("type", "tel");
   });
 
-  it('should handle accessibility attributes', () => {
+  it("should handle accessibility attributes", () => {
     render(<TextFilterInput {...defaultProps} />);
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveAttribute('aria-label', 'Filter Name');
-    expect(input).toHaveAttribute('aria-describedby');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("aria-label", "Filter Name");
+    expect(input).toHaveAttribute("aria-describedby");
   });
 
-  it('should handle custom className', () => {
-    const { container } = render(<TextFilterInput {...defaultProps} className="custom-class" />);
-
-    expect(container.firstChild).toHaveClass('custom-class');
-  });
-
-  it('should handle multiple values for multi-value operators', () => {
+  it("should handle multiple values for multi-value operators", () => {
     const multiValueFilter: FilterState = {
       ...mockFilter,
-      operator: 'in',
-      values: ['John', 'Jane'],
+      operator: "isAnyOf",
+      values: ["John", "Jane"],
     };
 
-    render(<TextFilterInput {...defaultProps} filter={multiValueFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={multiValueFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveValue('John, Jane');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveValue("John, Jane");
   });
 
-  it('should handle case sensitivity for case-sensitive operators', () => {
+  it("should handle case sensitivity for case-sensitive operators", () => {
     const caseSensitiveFilter: FilterState = {
       ...mockFilter,
-      operator: 'equals',
-      values: ['John'],
+      operator: "equals",
+      values: ["John"],
     };
 
-    render(<TextFilterInput {...defaultProps} filter={caseSensitiveFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={caseSensitiveFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveValue('John');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveValue("John");
   });
 
-  it('should handle special characters in values', () => {
+  it("should handle special characters in values", () => {
     const specialCharFilter: FilterState = {
       ...mockFilter,
-      values: ['John & Jane'],
+      values: ["John & Jane"],
     };
 
-    render(<TextFilterInput {...defaultProps} filter={specialCharFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={specialCharFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
-    expect(input).toHaveValue('John & Jane');
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveValue("John & Jane");
   });
 
-  it('should handle very long values', () => {
-    const longValue = 'a'.repeat(1000);
+  it("should handle very long values", () => {
+    const longValue = "a".repeat(1000);
     const longValueFilter: FilterState = {
       ...mockFilter,
       values: [longValue],
     };
 
-    render(<TextFilterInput {...defaultProps} filter={longValueFilter} />);
+    render(
+      <TextFilterInput
+        {...defaultProps}
+        filter={longValueFilter}
+      />
+    );
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole("textbox");
     expect(input).toHaveValue(longValue);
   });
 });

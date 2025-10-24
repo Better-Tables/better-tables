@@ -1,8 +1,8 @@
-import { act, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useDebounce } from '../../hooks/use-debounce';
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDebounce } from "../../hooks/use-debounce";
 
-describe('useDebounce', () => {
+describe("useDebounce", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -11,21 +11,24 @@ describe('useDebounce', () => {
     vi.useRealTimers();
   });
 
-  it('should return the initial value immediately', () => {
-    const { result } = renderHook(() => useDebounce('initial', 100));
-    expect(result.current).toBe('initial');
+  it("should return the initial value immediately", () => {
+    const { result } = renderHook(() => useDebounce("initial", 100));
+    expect(result.current).toBe("initial");
   });
 
-  it('should debounce value changes', () => {
-    const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
-      initialProps: { value: 'initial', delay: 100 },
-    });
+  it("should debounce value changes", () => {
+    const { result, rerender } = renderHook(
+      ({ value, delay }) => useDebounce(value, delay),
+      {
+        initialProps: { value: "initial", delay: 100 },
+      }
+    );
 
     // Change the value
-    rerender({ value: 'updated', delay: 100 });
+    rerender({ value: "updated", delay: 100 });
 
     // Value should still be initial before delay
-    expect(result.current).toBe('initial');
+    expect(result.current).toBe("initial");
 
     // Fast forward time
     act(() => {
@@ -33,21 +36,24 @@ describe('useDebounce', () => {
     });
 
     // Value should now be updated
-    expect(result.current).toBe('updated');
+    expect(result.current).toBe("updated");
   });
 
-  it('should handle multiple rapid changes', () => {
-    const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
-      initialProps: { value: 'initial', delay: 100 },
-    });
+  it("should handle multiple rapid changes", () => {
+    const { result, rerender } = renderHook(
+      ({ value, delay }) => useDebounce(value, delay),
+      {
+        initialProps: { value: "initial", delay: 100 },
+      }
+    );
 
     // Make multiple rapid changes
-    rerender({ value: 'first', delay: 100 });
-    rerender({ value: 'second', delay: 100 });
-    rerender({ value: 'third', delay: 100 });
+    rerender({ value: "first", delay: 100 });
+    rerender({ value: "second", delay: 100 });
+    rerender({ value: "third", delay: 100 });
 
     // Value should still be initial
-    expect(result.current).toBe('initial');
+    expect(result.current).toBe("initial");
 
     // Fast forward time
     act(() => {
@@ -55,16 +61,19 @@ describe('useDebounce', () => {
     });
 
     // Value should be the last one
-    expect(result.current).toBe('third');
+    expect(result.current).toBe("third");
   });
 
-  it('should handle delay changes', () => {
-    const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
-      initialProps: { value: 'initial', delay: 100 },
-    });
+  it("should handle delay changes", () => {
+    const { result, rerender } = renderHook(
+      ({ value, delay }) => useDebounce(value, delay),
+      {
+        initialProps: { value: "initial", delay: 100 },
+      }
+    );
 
     // Change value and delay
-    rerender({ value: 'updated', delay: 200 });
+    rerender({ value: "updated", delay: 200 });
 
     // Fast forward by original delay
     act(() => {
@@ -72,7 +81,7 @@ describe('useDebounce', () => {
     });
 
     // Value should still be initial
-    expect(result.current).toBe('initial');
+    expect(result.current).toBe("initial");
 
     // Fast forward by remaining delay
     act(() => {
@@ -80,27 +89,33 @@ describe('useDebounce', () => {
     });
 
     // Value should now be updated
-    expect(result.current).toBe('updated');
+    expect(result.current).toBe("updated");
   });
 
-  it('should handle zero delay', () => {
-    const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
-      initialProps: { value: 'initial', delay: 0 },
-    });
+  it("should handle zero delay", () => {
+    const { result, rerender } = renderHook(
+      ({ value, delay }) => useDebounce(value, delay),
+      {
+        initialProps: { value: "initial", delay: 0 },
+      }
+    );
 
-    rerender({ value: 'updated', delay: 0 });
+    rerender({ value: "updated", delay: 0 });
 
     // With zero delay, value should update immediately
-    expect(result.current).toBe('updated');
+    expect(result.current).toBe("updated");
   });
 
-  it('should handle cleanup on unmount', () => {
-    const { result, unmount } = renderHook(() => useDebounce('initial', 100));
+  it("should handle cleanup on unmount", () => {
+    const { rerender, unmount } = renderHook(
+      ({ value, delay }) => useDebounce(value, delay),
+      {
+        initialProps: { value: "initial", delay: 100 },
+      }
+    );
 
-    // Change value
-    act(() => {
-      result.current = 'updated';
-    });
+    // Change value by rerendering with new value
+    rerender({ value: "updated", delay: 100 });
 
     // Unmount before delay completes
     unmount();
@@ -114,7 +129,7 @@ describe('useDebounce', () => {
     expect(true).toBe(true);
   });
 
-  it('should work with different data types', () => {
+  it("should work with different data types", () => {
     // Test with number
     const { result: numberResult, rerender: numberRerender } = renderHook(
       ({ value, delay }) => useDebounce(value, delay),

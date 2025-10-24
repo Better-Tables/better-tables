@@ -1,18 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FilterState } from '../../src/types/filter';
-import { FilterURLSerializer, filterURLUtils } from '../../src/utils/filter-serialization';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FilterState } from "../../src/types/filter";
+import {
+  FilterURLSerializer,
+  filterURLUtils,
+} from "../../src/utils/filter-serialization";
 
 // Mock browser APIs
 const mockLocation = {
-  href: 'https://example.com/table',
-  search: '',
+  href: "https://example.com/table",
+  search: "",
 };
 
 const mockHistory = {
   replaceState: vi.fn(),
 };
 
-Object.defineProperty(global, 'window', {
+Object.defineProperty(global, "window", {
   value: {
     location: mockLocation,
     history: mockHistory,
@@ -23,69 +26,73 @@ Object.defineProperty(global, 'window', {
 // Mock data
 const mockFilters: FilterState[] = [
   {
-    columnId: 'name',
-    type: 'text',
-    operator: 'contains',
-    values: ['John'],
+    columnId: "name",
+    type: "text",
+    operator: "contains",
+    values: ["John"],
   },
   {
-    columnId: 'age',
-    type: 'number',
-    operator: 'greaterThan',
+    columnId: "age",
+    type: "number",
+    operator: "greaterThan",
     values: [25],
   },
   {
-    columnId: 'status',
-    type: 'option',
-    operator: 'is',
-    values: ['active'],
+    columnId: "status",
+    type: "option",
+    operator: "is",
+    values: ["active"],
   },
 ];
 
 const mockFilterWithMeta: FilterState = {
-  columnId: 'priority',
-  type: 'option',
-  operator: 'isAnyOf',
-  values: ['high', 'urgent'],
+  columnId: "priority",
+  type: "option",
+  operator: "isAnyOf",
+  values: ["high", "urgent"],
   includeNull: true,
   meta: {
-    customField: 'test',
+    customField: "test",
     nested: { value: 123 },
   },
 };
 
-describe('FilterURLSerializer', () => {
+describe("FilterURLSerializer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLocation.search = '';
-    mockLocation.href = 'https://example.com/table';
+    mockLocation.search = "";
+    mockLocation.href = "https://example.com/table";
   });
 
-  describe('serialize', () => {
-    it('should serialize filters to URL-safe string', () => {
+  describe("serialize", () => {
+    it("should serialize filters to URL-safe string", () => {
       const result = FilterURLSerializer.serialize(mockFilters);
 
-      expect(result.value).toBeTypeOf('string');
+      expect(result.value).toBeTypeOf("string");
       expect(result.size).toBeGreaterThan(0);
-      expect(result.compressed).toBeTypeOf('boolean'); // May or may not compress based on size
+      expect(result.compressed).toBeTypeOf("boolean"); // May or may not compress based on size
     });
 
-    it('should serialize without compression when disabled', () => {
-      const result = FilterURLSerializer.serialize(mockFilters, { compress: false });
+    it("should serialize without compression when disabled", () => {
+      const result = FilterURLSerializer.serialize(mockFilters, {
+        compress: false,
+      });
 
       expect(result.compressed).toBe(false);
-      expect(result.value).not.toContain('c:'); // No compression prefix
+      expect(result.value).not.toContain("c:"); // No compression prefix
     });
 
-    it('should include metadata when requested', () => {
+    it("should include metadata when requested", () => {
       const filtersWithMeta = [mockFilterWithMeta];
-      const result = FilterURLSerializer.serialize(filtersWithMeta, { includeMeta: true });
+      const result = FilterURLSerializer.serialize(filtersWithMeta, {
+        includeMeta: true,
+      });
 
       const deserialized = FilterURLSerializer.deserialize(result.value);
       expect(deserialized[0].meta).toEqual(mockFilterWithMeta.meta);
     });
 
-    it('should exclude metadata by default', () => {
+    it("should exclude metadata by default", () => {
       const filtersWithMeta = [mockFilterWithMeta];
       const result = FilterURLSerializer.serialize(filtersWithMeta);
 
@@ -93,73 +100,86 @@ describe('FilterURLSerializer', () => {
       expect(deserialized[0].meta).toBeUndefined();
     });
 
-    it('should handle empty filters array', () => {
+    it("should handle empty filters array", () => {
       const result = FilterURLSerializer.serialize([]);
 
-      expect(result.value).toBeTypeOf('string');
+      expect(result.value).toBeTypeOf("string");
       expect(result.size).toBeGreaterThan(0);
 
       const deserialized = FilterURLSerializer.deserialize(result.value);
       expect(deserialized).toEqual([]);
     });
 
-    it('should apply compression for large data', () => {
-      const largeFilters: FilterState[] = Array.from({ length: 50 }, (_, i) => ({
-        columnId: `veryLongColumnNameThatRepeatsOften${i}`,
-        type: 'text',
-        operator: 'contains',
-        values: [`very long value that repeats often and makes the data much larger ${i}`],
-      }));
+    it("should apply compression for large data", () => {
+      const largeFilters: FilterState[] = Array.from(
+        { length: 50 },
+        (_, i) => ({
+          columnId: `veryLongColumnNameThatRepeatsOften${i}`,
+          type: "text",
+          operator: "contains",
+          values: [
+            `very long value that repeats often and makes the data much larger ${i}`,
+          ],
+        })
+      );
 
-      const result = FilterURLSerializer.serialize(largeFilters, { maxLength: 100 });
+      const result = FilterURLSerializer.serialize(largeFilters, {
+        maxLength: 100,
+      });
 
       // The compression should either work or not apply if it doesn't help
       if (result.compressed) {
-        expect(result.value).toContain('c:'); // Compression prefix
+        expect(result.value).toContain("c:"); // Compression prefix
       }
-      expect(result.value).toBeTypeOf('string');
+      expect(result.value).toBeTypeOf("string");
     });
   });
 
-  describe('deserialize', () => {
-    it('should deserialize filters from URL string', () => {
+  describe("deserialize", () => {
+    it("should deserialize filters from URL string", () => {
       const serialized = FilterURLSerializer.serialize(mockFilters);
       const deserialized = FilterURLSerializer.deserialize(serialized.value);
 
       expect(deserialized).toEqual(mockFilters);
     });
 
-    it('should handle compressed data', () => {
-      const serialized = FilterURLSerializer.serialize(mockFilters, { compress: true });
+    it("should handle compressed data", () => {
+      const serialized = FilterURLSerializer.serialize(mockFilters, {
+        compress: true,
+      });
       const deserialized = FilterURLSerializer.deserialize(serialized.value);
 
       expect(deserialized).toEqual(mockFilters);
     });
 
-    it('should handle uncompressed data', () => {
-      const serialized = FilterURLSerializer.serialize(mockFilters, { compress: false });
+    it("should handle uncompressed data", () => {
+      const serialized = FilterURLSerializer.serialize(mockFilters, {
+        compress: false,
+      });
       const deserialized = FilterURLSerializer.deserialize(serialized.value);
 
       expect(deserialized).toEqual(mockFilters);
     });
 
-    it('should throw error for invalid data', () => {
+    it("should throw error for invalid data", () => {
       expect(() => {
-        FilterURLSerializer.deserialize('invalid-data');
+        FilterURLSerializer.deserialize("invalid-data");
       }).toThrow();
     });
 
-    it('should preserve special properties', () => {
+    it("should preserve special properties", () => {
       const filtersWithProps = [mockFilterWithMeta];
-      const serialized = FilterURLSerializer.serialize(filtersWithProps, { includeMeta: true });
+      const serialized = FilterURLSerializer.serialize(filtersWithProps, {
+        includeMeta: true,
+      });
       const deserialized = FilterURLSerializer.deserialize(serialized.value);
 
       expect(deserialized[0]).toEqual(mockFilterWithMeta);
     });
   });
 
-  describe('URL operations', () => {
-    it('should get filters from URL', () => {
+  describe("URL operations", () => {
+    it("should get filters from URL", () => {
       const serialized = FilterURLSerializer.serialize(mockFilters);
       mockLocation.search = `?filters=${encodeURIComponent(serialized.value)}`;
 
@@ -168,129 +188,144 @@ describe('FilterURLSerializer', () => {
       expect(filters).toEqual(mockFilters);
     });
 
-    it('should return empty array when no filters in URL', () => {
-      mockLocation.search = '';
+    it("should return empty array when no filters in URL", () => {
+      mockLocation.search = "";
 
       const filters = FilterURLSerializer.getFromURL();
 
       expect(filters).toEqual([]);
     });
 
-    it('should get filters with custom param name', () => {
+    it("should get filters with custom param name", () => {
       const serialized = FilterURLSerializer.serialize(mockFilters);
-      mockLocation.search = `?tableFilters=${encodeURIComponent(serialized.value)}`;
+      mockLocation.search = `?tableFilters=${encodeURIComponent(
+        serialized.value
+      )}`;
 
-      const filters = FilterURLSerializer.getFromURL({ paramName: 'tableFilters' });
+      const filters = FilterURLSerializer.getFromURL({
+        paramName: "tableFilters",
+      });
 
       expect(filters).toEqual(mockFilters);
     });
 
-    it('should set filters in URL', () => {
+    it("should set filters in URL", () => {
       FilterURLSerializer.setInURL(mockFilters);
 
       expect(mockHistory.replaceState).toHaveBeenCalled();
       const callArgs = mockHistory.replaceState.mock.calls[0];
-      expect(callArgs[2]).toContain('filters=');
+      expect(callArgs[2]).toContain("filters=");
     });
 
-    it('should remove filters param when setting empty filters', () => {
+    it("should remove filters param when setting empty filters", () => {
       FilterURLSerializer.setInURL([]);
 
       expect(mockHistory.replaceState).toHaveBeenCalled();
       const callArgs = mockHistory.replaceState.mock.calls[0];
-      expect(callArgs[2]).not.toContain('filters=');
+      expect(callArgs[2]).not.toContain("filters=");
     });
 
-    it('should use custom param name when setting in URL', () => {
-      FilterURLSerializer.setInURL(mockFilters, { paramName: 'customFilters' });
+    it("should use custom param name when setting in URL", () => {
+      FilterURLSerializer.setInURL(mockFilters, { paramName: "customFilters" });
 
       expect(mockHistory.replaceState).toHaveBeenCalled();
       const callArgs = mockHistory.replaceState.mock.calls[0];
-      expect(callArgs[2]).toContain('customFilters=');
+      expect(callArgs[2]).toContain("customFilters=");
     });
   });
 
-  describe('createShareableURL', () => {
-    it('should create shareable URL with filters', () => {
+  describe("createShareableURL", () => {
+    it("should create shareable URL with filters", () => {
       const url = FilterURLSerializer.createShareableURL(mockFilters);
 
-      expect(url).toContain('https://example.com/table');
-      expect(url).toContain('filters=');
+      expect(url).toContain("https://example.com/table");
+      expect(url).toContain("filters=");
     });
 
-    it('should create shareable URL with custom base URL', () => {
-      const baseUrl = 'https://custom.com/page';
+    it("should create shareable URL with custom base URL", () => {
+      const baseUrl = "https://custom.com/page";
       const url = FilterURLSerializer.createShareableURL(mockFilters, baseUrl);
 
-      expect(url).toContain('https://custom.com/page');
-      expect(url).toContain('filters=');
+      expect(url).toContain("https://custom.com/page");
+      expect(url).toContain("filters=");
     });
 
-    it('should handle empty filters in shareable URL', () => {
+    it("should handle empty filters in shareable URL", () => {
       const url = FilterURLSerializer.createShareableURL([]);
 
-      expect(url).toBe('https://example.com/table');
-      expect(url).not.toContain('filters=');
+      expect(url).toBe("https://example.com/table");
+      expect(url).not.toContain("filters=");
     });
 
-    it('should use custom param name in shareable URL', () => {
-      const url = FilterURLSerializer.createShareableURL(mockFilters, undefined, {
-        paramName: 'f',
-      });
+    it("should use custom param name in shareable URL", () => {
+      const url = FilterURLSerializer.createShareableURL(
+        mockFilters,
+        undefined,
+        {
+          paramName: "f",
+        }
+      );
 
-      expect(url).toContain('f=');
-      expect(url).not.toContain('filters=');
+      expect(url).toContain("f=");
+      expect(url).not.toContain("filters=");
     });
   });
 
-  describe('validation', () => {
-    it('should validate correct serialized data', () => {
+  describe("validation", () => {
+    it("should validate correct serialized data", () => {
       const serialized = FilterURLSerializer.serialize(mockFilters);
       const isValid = FilterURLSerializer.validate(serialized.value);
 
       expect(isValid).toBe(true);
     });
 
-    it('should reject invalid data', () => {
-      const isValid = FilterURLSerializer.validate('invalid-data');
+    it("should reject invalid data", () => {
+      const isValid = FilterURLSerializer.validate("invalid-data");
 
       expect(isValid).toBe(false);
     });
 
-    it('should validate compressed data', () => {
-      const serialized = FilterURLSerializer.serialize(mockFilters, { compress: true });
+    it("should validate compressed data", () => {
+      const serialized = FilterURLSerializer.serialize(mockFilters, {
+        compress: true,
+      });
       const isValid = FilterURLSerializer.validate(serialized.value);
 
       expect(isValid).toBe(true);
     });
   });
 
-  describe('getSerializationInfo', () => {
-    it('should provide serialization info', () => {
+  describe("getSerializationInfo", () => {
+    it("should provide serialization info", () => {
       const info = FilterURLSerializer.getSerializationInfo(mockFilters);
 
       expect(info.filterCount).toBe(3);
       expect(info.estimatedSize).toBeGreaterThan(0);
-      expect(info.wouldCompress).toBeTypeOf('boolean');
+      expect(info.wouldCompress).toBeTypeOf("boolean");
     });
 
-    it('should indicate compression for large data', () => {
-      const largeFilters: FilterState[] = Array.from({ length: 100 }, (_, i) => ({
-        columnId: `veryLongColumnNameThatRepeats${i}`,
-        type: 'text',
-        operator: 'contains',
-        values: [`very long value that makes the URL extremely long ${i}`],
-      }));
+    it("should indicate compression for large data", () => {
+      const largeFilters: FilterState[] = Array.from(
+        { length: 100 },
+        (_, i) => ({
+          columnId: `veryLongColumnNameThatRepeats${i}`,
+          type: "text",
+          operator: "contains",
+          values: [`very long value that makes the URL extremely long ${i}`],
+        })
+      );
 
-      const info = FilterURLSerializer.getSerializationInfo(largeFilters, { maxLength: 500 });
+      const info = FilterURLSerializer.getSerializationInfo(largeFilters, {
+        maxLength: 500,
+      });
 
       expect(info.wouldCompress).toBe(true);
       expect(info.filterCount).toBe(100);
     });
   });
 
-  describe('SSR safety', () => {
-    it('should handle SSR environment gracefully', () => {
+  describe("SSR safety", () => {
+    it("should handle SSR environment gracefully", () => {
       const originalWindow = global.window;
       // @ts-ignore - Simulating SSR
       global.window = undefined;
@@ -307,13 +342,13 @@ describe('FilterURLSerializer', () => {
     });
   });
 
-  describe('edge cases', () => {
-    it('should handle filters with special characters', () => {
+  describe("edge cases", () => {
+    it("should handle filters with special characters", () => {
       const specialFilters: FilterState[] = [
         {
-          columnId: 'search',
-          type: 'text',
-          operator: 'contains',
+          columnId: "search",
+          type: "text",
+          operator: "contains",
           values: ['special characters: !@#$%^&*()_+-=[]{}|;":,.<>?'],
         },
       ];
@@ -324,12 +359,12 @@ describe('FilterURLSerializer', () => {
       expect(deserialized).toEqual(specialFilters);
     });
 
-    it('should handle filters with null/undefined values', () => {
+    it("should handle filters with null/undefined values", () => {
       const filtersWithNulls: FilterState[] = [
         {
-          columnId: 'optional',
-          type: 'text',
-          operator: 'isEmpty',
+          columnId: "optional",
+          type: "text",
+          operator: "isEmpty",
           values: [],
         },
       ];
@@ -339,21 +374,102 @@ describe('FilterURLSerializer', () => {
 
       expect(deserialized).toEqual(filtersWithNulls);
     });
+
+    it("should not corrupt values containing key names during compression", () => {
+      // This tests the fix for the bug where string replacement was corrupting values
+      const filtersWithKeyNames: FilterState[] = [
+        {
+          columnId: "description",
+          type: "text",
+          operator: "contains",
+          values: [
+            "The type of this operator is columnId-based and uses values from meta",
+          ],
+        },
+        {
+          columnId: "metadata",
+          type: "text",
+          operator: "equals",
+          values: ["includeNull in values should not be replaced"],
+        },
+        {
+          columnId: "info",
+          type: "option",
+          operator: "is",
+          values: ["This text has type, operator, and columnId words"],
+        },
+      ];
+
+      // Test with compression enabled
+      const serialized = FilterURLSerializer.serialize(filtersWithKeyNames, {
+        compress: true,
+      });
+      const deserialized = FilterURLSerializer.deserialize(serialized.value);
+
+      // Values should be completely unchanged
+      expect(deserialized).toEqual(filtersWithKeyNames);
+      expect(deserialized[0].values[0]).toBe(
+        "The type of this operator is columnId-based and uses values from meta"
+      );
+      expect(deserialized[1].values[0]).toBe(
+        "includeNull in values should not be replaced"
+      );
+      expect(deserialized[2].values[0]).toBe(
+        "This text has type, operator, and columnId words"
+      );
+    });
+
+    it("should handle nested meta values containing key names", () => {
+      const filtersWithNestedKeyNames: FilterState[] = [
+        {
+          columnId: "complex",
+          type: "text",
+          operator: "contains",
+          values: ["test"],
+          includeNull: true,
+          meta: {
+            description: "The type operator is used",
+            nested: {
+              info: "columnId and values in nested meta",
+              array: ["type", "operator", "includeNull"],
+            },
+          },
+        },
+      ];
+
+      const serialized = FilterURLSerializer.serialize(
+        filtersWithNestedKeyNames,
+        {
+          compress: true,
+          includeMeta: true,
+        }
+      );
+      const deserialized = FilterURLSerializer.deserialize(serialized.value);
+
+      expect(deserialized).toEqual(filtersWithNestedKeyNames);
+      expect(deserialized[0].meta?.description).toBe(
+        "The type operator is used"
+      );
+      expect(deserialized[0].meta?.nested).toEqual({
+        info: "columnId and values in nested meta",
+        array: ["type", "operator", "includeNull"],
+      });
+    });
   });
 });
 
-describe('filterURLUtils', () => {
-  it('should provide bound utility functions', () => {
-    expect(filterURLUtils.serialize).toBeTypeOf('function');
-    expect(filterURLUtils.deserialize).toBeTypeOf('function');
-    expect(filterURLUtils.getFromURL).toBeTypeOf('function');
-    expect(filterURLUtils.setInURL).toBeTypeOf('function');
-    expect(filterURLUtils.createShareableURL).toBeTypeOf('function');
-    expect(filterURLUtils.validate).toBeTypeOf('function');
-    expect(filterURLUtils.getInfo).toBeTypeOf('function');
+describe("filterURLUtils", () => {
+  it("should provide bound utility functions", () => {
+    expect(filterURLUtils.serialize).toBeTypeOf("function");
+    expect(filterURLUtils.deserialize).toBeTypeOf("function");
+    expect(filterURLUtils.getFromURL).toBeTypeOf("function");
+    expect(filterURLUtils.setInURL).toBeTypeOf("function");
+    expect(filterURLUtils.createShareableURL).toBeTypeOf("function");
+    expect(filterURLUtils.validate).toBeTypeOf("function");
+    expect(filterURLUtils.getInfo).toBeTypeOf("function");
   });
 
-  it('should work the same as static methods', () => {
+  it("should work the same as static methods", () => {
     const serialized1 = FilterURLSerializer.serialize(mockFilters);
     const serialized2 = filterURLUtils.serialize(mockFilters);
 
