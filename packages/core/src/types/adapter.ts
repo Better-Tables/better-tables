@@ -1,7 +1,6 @@
 import type { ColumnType } from './column';
 import type { DataEvent } from './common';
-import type { FilterOption, FilterState } from './filter';
-import type { FilterOperator } from './filter';
+import type { FilterOperator, FilterOption, FilterState } from './filter';
 import type { PaginationParams } from './pagination';
 import type { SortingParams } from './sorting';
 

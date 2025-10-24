@@ -2,7 +2,7 @@
  * Format utilities for different data types
  */
 
-import { ColumnType } from '@better-tables/core';
+import type { ColumnType } from '@better-tables/core';
 
 export interface NumberFormatConfig {
   locale?: string;

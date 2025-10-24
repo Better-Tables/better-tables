@@ -2,11 +2,11 @@ import {
   type ScrollInfo,
   type ScrollToOptions,
   type VirtualColumnItem,
-  type VirtualRowItem,
   type VirtualizationConfig,
   VirtualizationManager,
   type VirtualizationMetrics,
   type VirtualizationState,
+  type VirtualRowItem,
 } from '@better-tables/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 

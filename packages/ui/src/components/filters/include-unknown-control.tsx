@@ -1,12 +1,12 @@
 'use client';
 
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { getOperatorDefinition } from '@better-tables/core';
 import { HelpCircle } from 'lucide-react';
 import * as React from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export interface IncludeUnknownControlProps<TData = any> {
   /** Filter state */

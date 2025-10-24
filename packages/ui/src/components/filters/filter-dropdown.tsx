@@ -1,6 +1,9 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
+import type { ColumnDefinition, FilterGroup } from '@better-tables/core';
+import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -8,24 +11,17 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { useFilterDropdownNavigation, useKeyboardNavigation } from "@/hooks";
-import { cn } from "@/lib/utils";
-import type { ColumnDefinition, FilterGroup } from "@better-tables/core";
-import { ArrowLeft, Check, ChevronRight } from "lucide-react";
-import * as React from "react";
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useFilterDropdownNavigation, useKeyboardNavigation } from '@/hooks';
+import { cn } from '@/lib/utils';
 
 export interface FilterDropdownProps<TData = any> {
   /** Available columns to filter */
@@ -55,9 +51,7 @@ export interface FilterDropdownProps<TData = any> {
 }
 
 // Internal state for tracking the current view
-type ViewState =
-  | { type: "groups" }
-  | { type: "group"; groupId: string; groupLabel: string };
+type ViewState = { type: 'groups' } | { type: 'group'; groupId: string; groupLabel: string };
 
 export function FilterDropdown<TData = any>({
   columns,
@@ -67,16 +61,16 @@ export function FilterDropdown<TData = any>({
   onOpenChange,
   children,
   searchable = true,
-  searchPlaceholder = "Search columns...",
+  searchPlaceholder = 'Search columns...',
   searchTerm,
   onSearchChange,
   disabled = false,
-  emptyMessage = "No columns found.",
+  emptyMessage = 'No columns found.',
 }: FilterDropdownProps<TData>) {
-  const [internalSearch, setInternalSearch] = React.useState("");
+  const [internalSearch, setInternalSearch] = React.useState('');
   const [isMobile, setIsMobile] = React.useState(false);
   const [currentView, setCurrentView] = React.useState<ViewState>({
-    type: "groups",
+    type: 'groups',
   });
 
   // Check if mobile viewport
@@ -86,18 +80,18 @@ export function FilterDropdown<TData = any>({
     };
 
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Reset view when dropdown opens/closes
   React.useEffect(() => {
     if (open) {
-      setCurrentView({ type: "groups" });
+      setCurrentView({ type: 'groups' });
       if (onSearchChange) {
-        onSearchChange("");
+        onSearchChange('');
       } else {
-        setInternalSearch("");
+        setInternalSearch('');
       }
     }
   }, [open, onSearchChange]);
@@ -123,8 +117,8 @@ export function FilterDropdown<TData = any>({
     if (!groups || groups.length === 0) {
       return [
         {
-          id: "all",
-          label: "All Columns",
+          id: 'all',
+          label: 'All Columns',
           columns: filteredColumns,
           description: undefined,
           icon: undefined,
@@ -143,9 +137,7 @@ export function FilterDropdown<TData = any>({
 
     // Process each group
     groups.forEach((group) => {
-      const groupColumns = filteredColumns.filter((col) =>
-        group.columns.includes(col.id)
-      );
+      const groupColumns = filteredColumns.filter((col) => group.columns.includes(col.id));
 
       if (groupColumns.length > 0) {
         grouped.push({
@@ -161,16 +153,14 @@ export function FilterDropdown<TData = any>({
     });
 
     // Add ungrouped columns
-    const ungroupedColumns = filteredColumns.filter(
-      (col) => !assignedColumnIds.has(col.id)
-    );
+    const ungroupedColumns = filteredColumns.filter((col) => !assignedColumnIds.has(col.id));
 
     if (ungroupedColumns.length > 0) {
       grouped.push({
-        id: "other",
-        label: "Other",
+        id: 'other',
+        label: 'Other',
         columns: ungroupedColumns,
-        description: "Miscellaneous columns",
+        description: 'Miscellaneous columns',
       });
     }
 
@@ -182,9 +172,9 @@ export function FilterDropdown<TData = any>({
       if (disabled) return;
       onSelect(columnId);
       if (onSearchChange) {
-        onSearchChange("");
+        onSearchChange('');
       } else {
-        setInternalSearch("");
+        setInternalSearch('');
       }
       onOpenChange?.(false);
     },
@@ -193,19 +183,19 @@ export function FilterDropdown<TData = any>({
 
   const handleGroupSelect = React.useCallback(
     (groupId: string, groupLabel: string) => {
-      setCurrentView({ type: "group", groupId, groupLabel });
+      setCurrentView({ type: 'group', groupId, groupLabel });
       // Clear search when navigating to group
       if (onSearchChange) {
-        onSearchChange("");
+        onSearchChange('');
       } else {
-        setInternalSearch("");
+        setInternalSearch('');
       }
     },
     [onSearchChange]
   );
 
   const handleBackToGroups = React.useCallback(() => {
-    setCurrentView({ type: "groups" });
+    setCurrentView({ type: 'groups' });
   }, []);
 
   // Keyboard navigation for dropdown
@@ -214,7 +204,7 @@ export function FilterDropdown<TData = any>({
     () => onOpenChange?.(true),
     () => onOpenChange?.(false),
     (index) => {
-      if (currentView.type === "groups") {
+      if (currentView.type === 'groups') {
         // Navigate to group
         const group = groupedColumns[index];
         if (group) {
@@ -222,9 +212,7 @@ export function FilterDropdown<TData = any>({
         }
       } else {
         // Navigate to column within group
-        const currentGroup = groupedColumns.find(
-          (g) => g.id === currentView.groupId
-        );
+        const currentGroup = groupedColumns.find((g) => g.id === currentView.groupId);
         const column = currentGroup?.columns[index];
         if (column) {
           handleSelect(column.id);
@@ -236,7 +224,7 @@ export function FilterDropdown<TData = any>({
   // Enhanced keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({
     onEscape: () => {
-      if (currentView.type === "group") {
+      if (currentView.type === 'group') {
         handleBackToGroups();
       } else {
         onOpenChange?.(false);
@@ -248,10 +236,10 @@ export function FilterDropdown<TData = any>({
       }
     },
     shortcuts: {
-      "Ctrl+k": () => onOpenChange?.(true),
-      "Ctrl+f": () => onOpenChange?.(true),
+      'Ctrl+k': () => onOpenChange?.(true),
+      'Ctrl+f': () => onOpenChange?.(true),
       Backspace: () => {
-        if (currentView.type === "group") {
+        if (currentView.type === 'group') {
           handleBackToGroups();
         }
       },
@@ -277,15 +265,11 @@ export function FilterDropdown<TData = any>({
                 className="flex items-center justify-between py-3 cursor-pointer hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center">
-                  {Icon && (
-                    <Icon className="mr-3 h-4 w-4 text-muted-foreground" />
-                  )}
+                  {Icon && <Icon className="mr-3 h-4 w-4 text-muted-foreground" />}
                   <div className="flex flex-col">
                     <span className="font-medium">{group.label}</span>
                     {group.description && (
-                      <span className="text-xs text-muted-foreground">
-                        {group.description}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{group.description}</span>
                     )}
                   </div>
                 </div>
@@ -304,11 +288,9 @@ export function FilterDropdown<TData = any>({
 
   // Render individual group view
   const groupView = React.useMemo(() => {
-    if (currentView.type !== "group") return null;
+    if (currentView.type !== 'group') return null;
 
-    const currentGroup = groupedColumns.find(
-      (g) => g.id === currentView.groupId
-    );
+    const currentGroup = groupedColumns.find((g) => g.id === currentView.groupId);
     if (!currentGroup) return null;
 
     return (
@@ -327,7 +309,7 @@ export function FilterDropdown<TData = any>({
             <h3 className="font-medium text-sm">{currentView.groupLabel}</h3>
             <p className="text-xs text-muted-foreground">
               {currentGroup.columns.length} column
-              {currentGroup.columns.length !== 1 ? "s" : ""}
+              {currentGroup.columns.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -346,10 +328,8 @@ export function FilterDropdown<TData = any>({
                   disabled={disabled}
                   className="flex items-center pl-4 hover:bg-accent/50 transition-colors"
                 >
-                  <Check className={cn("mr-2 h-4 w-4", "opacity-0")} />
-                  {Icon && (
-                    <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  )}
+                  <Check className={cn('mr-2 h-4 w-4', 'opacity-0')} />
+                  {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
                   <span>{column.displayName}</span>
                 </CommandItem>
               );
@@ -364,7 +344,7 @@ export function FilterDropdown<TData = any>({
   const commandContent = (
     <Command onKeyDown={dropdownNavigation.handleKeyDown}>
       {/* Only show search in groups overview or when there's no grouping */}
-      {searchable && currentView.type === "groups" && (
+      {searchable && currentView.type === 'groups' && (
         <CommandInput
           placeholder={searchPlaceholder}
           value={search}
@@ -377,10 +357,8 @@ export function FilterDropdown<TData = any>({
       <div className="relative overflow-hidden">
         <div
           className={cn(
-            "flex transition-transform duration-300 ease-in-out",
-            currentView.type === "groups"
-              ? "translate-x-0"
-              : "-translate-x-full"
+            'flex transition-transform duration-300 ease-in-out',
+            currentView.type === 'groups' ? 'translate-x-0' : '-translate-x-full'
           )}
         >
           {/* Groups overview panel */}
@@ -396,57 +374,32 @@ export function FilterDropdown<TData = any>({
   // Mobile: Use Dialog, Desktop: Use Popover
   if (isMobile) {
     return (
-      <Dialog
-        open={open}
-        onOpenChange={disabled ? undefined : onOpenChange}
-      >
-        <DialogTrigger
-          asChild
-          disabled={disabled}
-        >
-          <div
-            onKeyDown={keyboardNavigation.onKeyDown}
-            {...keyboardNavigation.ariaAttributes}
-          >
+      <Dialog open={open} onOpenChange={disabled ? undefined : onOpenChange}>
+        <DialogTrigger asChild disabled={disabled}>
+          <div onKeyDown={keyboardNavigation.onKeyDown} {...keyboardNavigation.ariaAttributes}>
             {children}
           </div>
         </DialogTrigger>
         <DialogContent className="max-w-sm backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle className="text-left">
-              {currentView.type === "groups"
-                ? "Add Filter"
-                : currentView.groupLabel}
+              {currentView.type === 'groups' ? 'Add Filter' : currentView.groupLabel}
             </DialogTitle>
           </DialogHeader>
-          <div className="max-h-[70vh] overflow-y-auto -mx-6 px-6">
-            {commandContent}
-          </div>
+          <div className="max-h-[70vh] overflow-y-auto -mx-6 px-6">{commandContent}</div>
         </DialogContent>
       </Dialog>
     );
   }
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={disabled ? undefined : onOpenChange}
-    >
-      <PopoverTrigger
-        asChild
-        disabled={disabled}
-      >
-        <div
-          onKeyDown={keyboardNavigation.onKeyDown}
-          {...keyboardNavigation.ariaAttributes}
-        >
+    <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
+      <PopoverTrigger asChild disabled={disabled}>
+        <div onKeyDown={keyboardNavigation.onKeyDown} {...keyboardNavigation.ariaAttributes}>
           {children}
         </div>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[320px] p-0"
-        align="start"
-      >
+      <PopoverContent className="w-[320px] p-0" align="start">
         {commandContent}
       </PopoverContent>
     </Popover>

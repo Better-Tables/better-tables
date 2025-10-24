@@ -1,5 +1,8 @@
 'use client';
 
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { ChevronDown, X } from 'lucide-react';
+import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,9 +18,6 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFilterValidation } from '@/hooks/use-filter-validation';
 import { cn } from '@/lib/utils';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { ChevronDown, X } from 'lucide-react';
-import * as React from 'react';
 
 export interface MultiOptionFilterInputProps<TData = any> {
   /** Filter state */

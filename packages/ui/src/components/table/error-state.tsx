@@ -1,4 +1,4 @@
-import { ErrorStateProps as CoreErrorStateProps } from '@better-tables/core';
+import type { ErrorStateProps as CoreErrorStateProps } from '@better-tables/core';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';

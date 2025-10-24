@@ -1,5 +1,8 @@
 'use client';
 
+import type { ColumnDefinition, FilterOperator } from '@better-tables/core';
+import { getOperatorsForType } from '@better-tables/core';
+import * as React from 'react';
 import {
   Select,
   SelectContent,
@@ -7,9 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { ColumnDefinition, FilterOperator } from '@better-tables/core';
-import { getOperatorsForType } from '@better-tables/core';
-import * as React from 'react';
 
 export interface FilterOperatorSelectProps<TData = any> {
   /** Column definition */

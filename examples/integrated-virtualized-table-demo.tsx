@@ -1,13 +1,13 @@
 import {
   type ColumnDefinition,
+  createColumnBuilder,
   FilterManager,
   type FilterState,
   PaginationManager,
   type SortingState,
-  createColumnBuilder,
 } from '@better-tables/core';
 import { ActiveFilters, FilterBar, VirtualizedTable } from '@better-tables/ui';
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 /**
  * Sample data structure for the integrated demo

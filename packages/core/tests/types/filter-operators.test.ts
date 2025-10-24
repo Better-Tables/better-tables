@@ -1,22 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { expectTypeOf } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { ColumnType } from '../../src/types/column';
 import type { FilterOperator } from '../../src/types/filter';
 import {
   BOOLEAN_OPERATORS,
+  createOperatorRegistry,
   DATE_OPERATORS,
   FILTER_OPERATORS,
-  FilterOperatorKey,
+  type FilterOperatorKey,
+  getAllOperators,
+  getDefaultOperatorsForType,
+  getOperatorDefinition,
+  getOperatorsForType,
   JSON_OPERATORS,
   MULTI_OPTION_OPERATORS,
   NUMBER_OPERATORS,
   OPTION_OPERATORS,
   TEXT_OPERATORS,
-  createOperatorRegistry,
-  getAllOperators,
-  getDefaultOperatorsForType,
-  getOperatorDefinition,
-  getOperatorsForType,
   validateOperatorValues,
 } from '../../src/types/filter-operators';
 

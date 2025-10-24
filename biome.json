@@ -1,10 +1,8 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.5.3/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "$schema": "https://biomejs.dev/schemas/2.2.7/schema.json",
   "files": {
-    "ignore": [
+    "ignoreUnknown": false,
+    "experimentalScannerIgnores": [
       ".turbo/**",
       "**/dist/**",
       "**/node_modules/**",
@@ -21,7 +19,7 @@
       "recommended": true,
       "suspicious": {
         "noExplicitAny": "error",
-        "noConsoleLog": "warn",
+        "noConsole": "warn",
         "noDoubleEquals": "error"
       },
       "style": {
@@ -43,12 +41,12 @@
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
-      "trailingComma": "es5"
+      "trailingCommas": "es5"
     }
   },
   "overrides": [
     {
-      "include": ["packages/core/**"],
+      "includes": ["packages/core/**"],
       "linter": {
         "rules": {
           "style": {
@@ -61,7 +59,7 @@
       }
     },
     {
-      "include": ["packages/ui/**"],
+      "includes": ["packages/ui/**"],
       "linter": {
         "rules": {
           "style": {

@@ -1,19 +1,18 @@
 'use client';
 
+import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { CalendarIcon, Clock } from 'lucide-react';
+import * as React from 'react';
+import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { CalendarIcon, Clock } from 'lucide-react';
-import * as React from 'react';
-
 import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
 import { type DatePreset, getCommonPresets, getDatePresetConfig } from '@/lib/date-presets';
 import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
-import type { DateRange } from 'react-day-picker';
 
 export interface DateFilterInputProps<TData = any> {
   /** Filter state */
