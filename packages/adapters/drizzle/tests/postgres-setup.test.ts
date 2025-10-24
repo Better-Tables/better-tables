@@ -277,8 +277,8 @@ describe.skip('DrizzleAdapter - PostgreSQL', () => {
       const result = await adapter.fetchData({
         filters: [{ columnId: 'bio', type: 'text', operator: 'isNotEmpty', values: [] }],
       });
-      // This would need users with non-empty bio to test properly
-      expect(result.data).toHaveLength(0);
+      // Both John Doe and Jane Smith have non-empty bios
+      expect(result.data).toHaveLength(2);
     });
 
     it('should filter by text notEquals', async () => {

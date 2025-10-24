@@ -17,8 +17,9 @@ export default defineConfig({
     'better-sqlite3'
   ],
   esbuildOptions(options) {
-    options.banner = {
-      js: '"use client"',
-    };
+    // Remove the "use client" banner to keep this as a server-side adapter
+    // options.banner = {
+    //   js: '"use client"',
+    // };
   },
 });

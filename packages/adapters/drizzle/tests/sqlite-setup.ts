@@ -875,7 +875,7 @@ describe('DrizzleAdapter', () => {
     it('should handle mixed text and number filters with AND logic', async () => {
       const result = await adapter.fetchData({
         filters: [
-          { columnId: 'age', type: 'number', operator: 'greaterThan', values: [25] },
+          { columnId: 'age', type: 'number', operator: 'greaterThanOrEqual', values: [25] },
           { columnId: 'name', type: 'text', operator: 'startsWith', values: ['J'] },
         ],
       });

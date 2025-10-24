@@ -60,7 +60,7 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
     this.config.nullable = true;
     this.config.accessor = (data: TData) => {
       const value = accessor(data);
-      return value ?? defaultValue ?? ('' as TValue);
+      return value ?? defaultValue ?? (null as TValue);
     };
     return this;
   }

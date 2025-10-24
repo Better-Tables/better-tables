@@ -1,6 +1,10 @@
 import type { RelationshipManager } from './relationship-manager';
 import type { AggregateColumn, AnyTableType, ColumnPath } from './types';
-import { getColumnNames, getForeignKeyColumns } from './utils/drizzle-schema-utils';
+import {
+  getColumnNames,
+  getForeignKeyColumns,
+  getPrimaryKeyColumns,
+} from './utils/drizzle-schema-utils';
 
 /**
  * Data transformer that converts flat SQL results to nested structures
@@ -58,8 +62,13 @@ export class DataTransformer {
     const grouped = new Map<string, Record<string, unknown>[]>();
 
     for (const record of flatData) {
-      // Assume main table has an 'id' field - this could be made configurable
-      const mainKey = String(record.id || record[`${this.mainTable}_id`]);
+      // Get the primary key dynamically from the schema
+      const tableSchema = this.schema[this.mainTable];
+      if (!tableSchema) continue;
+      const primaryKeyName = this.getPrimaryKeyName(tableSchema);
+      const mainKey = String(
+        record[primaryKeyName] || record[`${this.mainTable}_${primaryKeyName}`]
+      );
 
       if (!grouped.has(mainKey)) {
         grouped.set(mainKey, []);
@@ -149,7 +158,8 @@ export class DataTransformer {
     }
 
     if (columnPath.relationshipPath && columnPath.relationshipPath.length > 0) {
-      const relationship = columnPath.relationshipPath[0];
+      // Use the last relationship in the path for multi-level relationships
+      const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
       if (!relationship) return;
 
       if (relationship.cardinality === 'one') {
@@ -226,7 +236,12 @@ export class DataTransformer {
     const relatedRecords = new Map<string, Record<string, unknown>>();
 
     for (const record of records) {
-      const relatedKey = String(record[`${realTableName}_id`] || '');
+      // Get the primary key name dynamically
+      const relatedTableSchema = this.schema[realTableName];
+      if (!relatedTableSchema) continue;
+      const primaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
+      const relatedKey = String(record[`${realTableName}_${primaryKeyName}`] || '');
+
       if (relatedKey && relatedKey !== 'undefined' && relatedKey !== 'null') {
         if (!relatedRecords.has(relatedKey)) {
           relatedRecords.set(relatedKey, {});
@@ -236,7 +251,6 @@ export class DataTransformer {
         if (!relatedData) continue;
 
         // Extract all columns from the related table using Drizzle schema utilities
-        const relatedTableSchema = this.schema[realTableName];
         const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
         for (const col of relatedColumns) {
           const flatKey = `${realTableName}_${col}`;
@@ -386,6 +400,14 @@ export class DataTransformer {
         case 'count':
           record[aggregateCol.columnId] = relatedRecords.length;
           break;
+        case 'distinct': {
+          // Count distinct values
+          const distinctValues = new Set(
+            relatedRecords.map((r: Record<string, unknown>) => r[aggregateCol.field])
+          );
+          record[aggregateCol.columnId] = distinctValues.size;
+          break;
+        }
         case 'sum':
           record[aggregateCol.columnId] = relatedRecords.reduce(
             (sum: number, r: Record<string, unknown>) => sum + (Number(r[aggregateCol.field]) || 0),
@@ -540,6 +562,15 @@ export class DataTransformer {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Get primary key name from table schema using Drizzle utilities
+   */
+  private getPrimaryKeyName(tableSchema: AnyTableType): string {
+    const primaryKeyColumns = getPrimaryKeyColumns(tableSchema);
+    // Return the first primary key column name, or 'id' as fallback
+    return primaryKeyColumns.length > 0 && primaryKeyColumns[0] ? primaryKeyColumns[0].name : 'id';
   }
 
   /**

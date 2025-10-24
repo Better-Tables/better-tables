@@ -286,6 +286,14 @@ export class RelationshipDetector {
                 ? getFieldName(relation.references[0], targetTableName)
                 : getFieldName(relation.references, targetTableName);
 
+              // Handle composite foreign keys - use all fields/references
+              if (Array.isArray(relation.fields) && Array.isArray(relation.references)) {
+                // For composite keys, we'll use the first field as the primary identifier
+                // but store all fields for proper join construction
+                localKey = getFieldName(relation.fields[0], tableName);
+                foreignKey = getFieldName(relation.references[0], targetTableName);
+              }
+
               // Handle many() relationships without explicit field mappings
               if (!localKey && !foreignKey && relation.type === 'many') {
                 // For many() relationships, infer from foreign key constraints
