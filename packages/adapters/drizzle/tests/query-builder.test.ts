@@ -164,7 +164,7 @@ describe('DrizzleQueryBuilder', () => {
         filters: [{ columnId: 'name' }],
       });
 
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const filteredQuery = queryBuilder.applyFilters(query, [
         {
           columnId: 'name',
@@ -182,7 +182,7 @@ describe('DrizzleQueryBuilder', () => {
         filters: [{ columnId: 'age' }],
       });
 
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const filteredQuery = queryBuilder.applyFilters(query, [
         {
           columnId: 'age',
@@ -200,7 +200,7 @@ describe('DrizzleQueryBuilder', () => {
         filters: [{ columnId: 'profile.bio' }],
       });
 
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const filteredQuery = queryBuilder.applyFilters(query, [
         {
           columnId: 'profile.bio',
@@ -220,7 +220,7 @@ describe('DrizzleQueryBuilder', () => {
         sorts: [{ columnId: 'name' }],
       });
 
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const sortedQuery = queryBuilder.applySorting(query, [
         {
           columnId: 'name',
@@ -236,7 +236,7 @@ describe('DrizzleQueryBuilder', () => {
         sorts: [{ columnId: 'age' }, { columnId: 'name' }],
       });
 
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const sortedQuery = queryBuilder.applySorting(query, [
         { columnId: 'age', direction: 'desc' },
         { columnId: 'name', direction: 'asc' },
@@ -250,7 +250,7 @@ describe('DrizzleQueryBuilder', () => {
         sorts: [{ columnId: 'profile.bio' }],
       });
 
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const sortedQuery = queryBuilder.applySorting(query, [
         {
           columnId: 'profile.bio',
@@ -265,7 +265,7 @@ describe('DrizzleQueryBuilder', () => {
   describe('Pagination Application', () => {
     it('should apply pagination', () => {
       const context = relationshipManager.buildQueryContext({});
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const paginatedQuery = queryBuilder.applyPagination(query, {
         page: 2,
         limit: 10,
@@ -276,7 +276,7 @@ describe('DrizzleQueryBuilder', () => {
 
     it('should handle first page pagination', () => {
       const context = relationshipManager.buildQueryContext({});
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
       const paginatedQuery = queryBuilder.applyPagination(query, {
         page: 1,
         limit: 5,
@@ -341,7 +341,7 @@ describe('DrizzleQueryBuilder', () => {
   describe('Query Validation', () => {
     it('should validate query before execution', () => {
       const context = relationshipManager.buildQueryContext({});
-      const query = queryBuilder.buildSelectQuery(context);
+      const { query } = queryBuilder.buildSelectQuery(context);
 
       expect(queryBuilder.validateQuery(query)).toBe(true);
     });

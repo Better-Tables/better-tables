@@ -779,31 +779,6 @@ export class RelationshipManager {
   }
 
   /**
-   * Validate that a field exists in the main table
-   */
-  private validateMainTableField(field: string): void {
-    const mainTableSchema = this.schema[this.mainTable];
-    if (!mainTableSchema) {
-      throw new RelationshipError(`Main table not found: ${this.mainTable}`, {
-        mainTable: this.mainTable,
-        availableTables: Object.keys(this.schema),
-      });
-    }
-
-    const fieldExists = (mainTableSchema as unknown as Record<string, AnyColumnType>)[field];
-    if (!fieldExists) {
-      const availableFields = Object.keys(mainTableSchema as unknown as Record<string, unknown>);
-      throw new RelationshipError(`Field '${field}' not found in main table '${this.mainTable}'`, {
-        field,
-        mainTable: this.mainTable,
-        availableFields: availableFields.slice(0, 10), // Show first 10 for brevity
-        totalFields: availableFields.length,
-        suggestion: this.findSimilarField(field, availableFields),
-      });
-    }
-  }
-
-  /**
    * Validate that a field exists in a related table
    */
   private validateRelatedTableField(tableName: string, field: string): void {
