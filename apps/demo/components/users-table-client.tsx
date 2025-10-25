@@ -1,31 +1,29 @@
 'use client';
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
-import { BetterTable } from '@better-tables/ui';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { useMemo } from 'react';
 import { defaultVisibleColumns, userColumns } from '@/lib/columns/user-columns';
+import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
+
+const TABLE_ID = 'users-table';
 
 interface UsersTableClientProps {
   // biome-ignore lint/suspicious/noExplicitAny: Data type is generic
   data: any[];
   totalCount: number;
-  pagination: PaginationState;
-  sorting: SortingState;
-  filters: FilterState[];
+  initialPagination: PaginationState;
+  initialSorting: SortingState;
+  initialFilters: FilterState[];
 }
 
 export function UsersTableClient({
   data,
   totalCount,
-  pagination: initialPagination,
-  sorting: initialSorting,
-  filters: initialFilters,
+  initialPagination,
+  initialSorting,
+  initialFilters,
 }: UsersTableClientProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-
   // Filter columns to only show visible ones
   // biome-ignore lint/suspicious/noExplicitAny: Column types are complex and vary
   const visibleColumns: any[] = useMemo(
@@ -33,95 +31,29 @@ export function UsersTableClient({
     []
   );
 
-  const updateURL = useCallback(
-    (updates: {
-      filters?: FilterState[];
-      sorting?: SortingState;
-      page?: number;
-      limit?: number;
-    }) => {
-      const params = new URLSearchParams(searchParams);
+  // Set up URL sync with Next.js adapter
+  const urlAdapter = useNextjsUrlAdapter();
 
-      if (updates.filters !== undefined) {
-        if (updates.filters.length > 0) {
-          params.set('filters', JSON.stringify(updates.filters));
-        } else {
-          params.delete('filters');
-        }
-        params.set('page', '1'); // Reset to page 1 on filter change
-      }
-
-      if (updates.sorting !== undefined) {
-        if (updates.sorting.length > 0) {
-          params.set('sorting', JSON.stringify(updates.sorting));
-        } else {
-          params.delete('sorting');
-        }
-        params.set('page', '1'); // Reset to page 1 on sort change
-      }
-
-      if (updates.page !== undefined) {
-        params.set('page', updates.page.toString());
-      }
-
-      if (updates.limit !== undefined) {
-        params.set('limit', updates.limit.toString());
-        params.set('page', '1'); // Reset to page 1 on limit change
-      }
-
-      router.push(`?${params.toString()}`);
+  useTableUrlSync(
+    TABLE_ID,
+    {
+      filters: true,
+      pagination: true,
+      sorting: true,
     },
-    [router, searchParams]
-  );
-
-  const handleFiltersChange = useCallback(
-    (filters: FilterState[]) => {
-      updateURL({ filters });
-      setSelectedRows(new Set());
-    },
-    [updateURL]
-  );
-
-  const handleSortingChange = useCallback(
-    (sorting: SortingState) => {
-      updateURL({ sorting });
-      setSelectedRows(new Set());
-    },
-    [updateURL]
-  );
-
-  const handlePageChange = useCallback(
-    (page: number) => {
-      updateURL({ page });
-      setSelectedRows(new Set());
-    },
-    [updateURL]
-  );
-
-  const handlePageSizeChange = useCallback(
-    (limit: number) => {
-      updateURL({ limit });
-      setSelectedRows(new Set());
-    },
-    [updateURL]
+    urlAdapter
   );
 
   return (
     <BetterTable
-      id={useId()}
+      id={TABLE_ID}
       name="Users"
       columns={visibleColumns}
       data={data}
       totalCount={totalCount}
-      paginationState={initialPagination}
-      onPageChange={handlePageChange}
-      onPageSizeChange={handlePageSizeChange}
-      sortingState={initialSorting}
-      onSortingChange={handleSortingChange}
-      filters={initialFilters}
-      onFiltersChange={handleFiltersChange}
-      selectedRows={selectedRows}
-      onRowSelectionChange={setSelectedRows}
+      initialPagination={initialPagination}
+      initialSorting={initialSorting}
+      initialFilters={initialFilters}
       features={{
         filtering: true,
         sorting: true,
