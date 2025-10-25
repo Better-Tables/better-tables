@@ -286,6 +286,7 @@ export function BetterTable<TData = unknown>({
                   <Checkbox
                     checked={allSelected}
                     onCheckedChange={(checked) => handleSelectAll(checked === true)}
+                    aria-label="Select all rows"
                   />
                 </TableHead>
               )}
