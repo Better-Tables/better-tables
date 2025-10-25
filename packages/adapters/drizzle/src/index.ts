@@ -1,3 +1,43 @@
+/**
+ * @fileoverview Main entry point for the Drizzle adapter package
+ * @module @better-tables/drizzle-adapter
+ *
+ * @description
+ * This is the main export file for the Drizzle adapter package. It exports all
+ * public APIs including classes, types, and utilities that developers need to
+ * integrate the adapter with their Drizzle ORM schemas.
+ *
+ * Main exports:
+ * - **DrizzleAdapter**: The main adapter class implementing TableAdapter
+ * - **DrizzleQueryBuilder**: Query builder with join optimization
+ * - **DataTransformer**: Transforms flat SQL results to nested structures
+ * - **FilterHandler**: Handles filter operator mapping to SQL
+ * - **RelationshipDetector**: Auto-detects relationships from Drizzle schemas
+ * - **RelationshipManager**: Manages relationship paths and joins
+ * - **Types**: All TypeScript types and interfaces
+ * - **Error Classes**: DrizzleAdapterError, QueryError, RelationshipError, SchemaError
+ *
+ * The package provides complete integration between Drizzle ORM and the Better Tables
+ * framework, enabling powerful table management with automatic relationship handling,
+ * type-safe queries, and efficient data operations.
+ *
+ * @example
+ * ```typescript
+ * import { DrizzleAdapter, DrizzleQueryBuilder } from '@better-tables/drizzle-adapter';
+ *
+ * const adapter = new DrizzleAdapter({
+ *   db: drizzleDb,
+ *   schema: { users, profiles },
+ *   driver: 'postgres'
+ * });
+ *
+ * const result = await adapter.fetchData({ columns: ['email', 'profile.bio'] });
+ * ```
+ *
+ * @see {@link https://github.com/drizzle-team/drizzle-orm|Drizzle ORM}
+ * @since 1.0.0
+ */
+
 // Main exports
 
 export { DataTransformer } from './data-transformer';

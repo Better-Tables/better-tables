@@ -1,3 +1,55 @@
+/**
+ * @fileoverview Main Drizzle ORM adapter implementation for Better Tables
+ * @module @better-tables/drizzle-adapter/drizzle-adapter
+ *
+ * @description
+ * This is the core adapter class that implements the TableAdapter interface from Better Tables.
+ * It provides a complete bridge between Drizzle ORM and the Better Tables framework, handling:
+ *
+ * - Automatic relationship detection from Drizzle schemas
+ * - Type-safe query building with smart joins across multiple tables
+ * - Efficient data fetching with filtering, sorting, and pagination
+ * - Cross-table filtering and relationship navigation
+ * - Data transformation from flat SQL results to nested structures
+ * - Query result caching for performance
+ * - Full CRUD operations (create, read, update, delete)
+ * - Bulk operations support
+ * - Export functionality (CSV, JSON)
+ * - Real-time event subscriptions
+ *
+ * Key features:
+ * - Works with PostgreSQL, MySQL, and SQLite
+ * - Supports complex nested relationships
+ * - Optimizes join paths automatically
+ * - Provides excellent error messages with suggestions
+ * - Thread-safe concurrent request handling
+ *
+ * @example
+ * ```typescript
+ * import { DrizzleAdapter } from '@better-tables/drizzle-adapter';
+ * import { drizzle } from 'drizzle-orm/node-postgres';
+ *
+ * // Initialize the adapter
+ * const adapter = new DrizzleAdapter({
+ *   db: drizzle(connectionString),
+ *   schema: { users, profiles, posts },
+ *   relations: { usersRelations, profilesRelations },
+ *   driver: 'postgres'
+ * });
+ *
+ * // Fetch data with filtering and sorting
+ * const result = await adapter.fetchData({
+ *   columns: ['id', 'email', 'profile.bio'],
+ *   filters: [{ columnId: 'email', operator: 'contains', values: ['@example.com'] }],
+ *   sorting: [{ columnId: 'id', direction: 'desc' }],
+ *   pagination: { page: 1, limit: 10 }
+ * });
+ * ```
+ *
+ * @see {@link TableAdapter} from @better-tables/core
+ * @since 1.0.0
+ */
+
 import type {
   AdapterFeatures,
   AdapterMeta,
@@ -28,7 +80,42 @@ import type {
 import { QueryError, SchemaError } from './types';
 
 /**
- * Drizzle adapter implementation for Better Tables
+ * Drizzle adapter implementation for Better Tables.
+ *
+ * This class serves as the main entry point for integrating Drizzle ORM with
+ * the Better Tables framework. It implements all required TableAdapter methods
+ * and provides additional functionality for relationship-aware queries.
+ *
+ * @class DrizzleAdapter
+ * @implements {TableAdapter}
+ * @template TSchema - The schema type containing all tables
+ * @description Main adapter class for Drizzle ORM integration with Better Tables
+ *
+ * @property {DrizzleDatabase} db - The Drizzle database instance
+ * @property {TSchema} schema - The schema containing all tables
+ * @property {RelationshipMap} relationships - Map of all relationships
+ * @property {RelationshipDetector} relationshipDetector - Detects relationships from schema
+ * @property {RelationshipManager} relationshipManager - Manages relationship paths
+ * @property {DrizzleQueryBuilder} queryBuilder - Builds SQL queries
+ * @property {DataTransformer} dataTransformer - Transforms flat SQL results to nested
+ * @property {Map} cache - Query result cache
+ * @property {Array} subscribers - Event subscribers
+ * @property {object} options - Adapter configuration options
+ * @property {AdapterMeta} meta - Adapter metadata including supported features
+ *
+ * @example
+ * ```typescript
+ * const adapter = new DrizzleAdapter({
+ *   db: drizzleDb,
+ *   schema: { users, profiles, posts },
+ *   relations: { usersRelations },
+ *   driver: 'postgres',
+ *   options: { cache: { enabled: true, ttl: 300000 } }
+ * });
+ * ```
+ *
+ * @see {@link TableAdapter} for the interface contract
+ * @since 1.0.0
  */
 export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   implements TableAdapter<InferSelectModel<TSchema[keyof TSchema]>>
@@ -54,6 +141,40 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
 
   public readonly meta: AdapterMeta;
 
+  /**
+   * Creates a new instance of the Drizzle adapter.
+   *
+   * Initializes all internal components including the relationship detector,
+   * relationship manager, query builder, and data transformer. Optionally
+   * auto-detects relationships from the provided schema or uses manual mappings.
+   *
+   * @param {DrizzleAdapterConfig<TSchema>} config - Configuration object for the adapter
+   * @param {DrizzleDatabase} config.db - The Drizzle database instance
+   * @param {TSchema} config.schema - The schema containing all Drizzle table definitions
+   * @param {DatabaseDriver} config.driver - The database driver being used ('postgres', 'mysql', 'sqlite')
+   * @param {boolean} [config.autoDetectRelationships=true] - Whether to automatically detect relationships from schema
+   * @param {Record<string, unknown>} [config.relations] - Raw Drizzle relations for auto-detection
+   * @param {RelationshipMap} [config.relationships] - Manual relationship mappings (overrides auto-detection)
+   * @param {DrizzleAdapterOptions} [config.options] - Optional adapter configuration
+   * @param {Partial<AdapterMeta>} [config.meta] - Optional custom metadata
+   *
+   * @throws {SchemaError} If no tables are found in the schema
+   *
+   * @example
+   * ```typescript
+   * const adapter = new DrizzleAdapter({
+   *   db: drizzle(connectionString),
+   *   schema: { users, profiles },
+   *   driver: 'postgres',
+   *   relations: { usersRelations },
+   *   options: {
+   *     cache: { enabled: true, ttl: 300000 }
+   *   }
+   * });
+   * ```
+   *
+   * @since 1.0.0
+   */
   constructor(config: DrizzleAdapterConfig<TSchema>) {
     this.db = config.db;
     this.schema = config.schema;
@@ -93,7 +214,31 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   }
 
   /**
-   * Determine the primary table from column configurations
+   * Determine the primary table from column configurations.
+   *
+   * Analyzes the provided column identifiers to determine which table should be
+   * used as the primary table for the query. This is critical for proper join
+   * planning and relationship resolution.
+   *
+   * @description
+   * The primary table is determined by:
+   * 1. Counting how many columns belong to each table
+   * 2. Selecting the table with the most column references
+   * 3. Falling back to the first table in the schema if unclear
+   *
+   * @param {string[]} [columns] - Array of column identifiers (e.g., ['email', 'profile.bio'])
+   * @returns {string} The name of the primary table
+   *
+   * @throws {SchemaError} If no tables are found in the schema
+   *
+   * @example
+   * ```typescript
+   * // Returns 'users' as it has 2 column references
+   * const table = this.determinePrimaryTable(['email', 'name', 'profile.bio']);
+   * ```
+   *
+   * @since 1.0.0
+   * @internal
    */
   private determinePrimaryTable(columns?: string[]): string {
     if (!columns || columns.length === 0) {
@@ -170,7 +315,25 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   }
 
   /**
-   * Check if a table has a specific column
+   * Check if a table has a specific column.
+   *
+   * @description
+   * Safely checks whether a column exists in a table schema by accessing
+   * Drizzle's internal metadata. Returns false for invalid schemas or
+   * missing columns rather than throwing errors.
+   *
+   * @param {AnyTableType} tableSchema - The table schema to check
+   * @param {string} columnName - The name of the column to check for
+   * @returns {boolean} True if the column exists, false otherwise
+   *
+   * @example
+   * ```typescript
+   * const hasEmail = this.hasColumn(users, 'email'); // true
+   * const hasBad = this.hasColumn(users, 'nonexistent'); // false
+   * ```
+   *
+   * @since 1.0.0
+   * @internal
    */
   private hasColumn(tableSchema: AnyTableType, columnName: string): boolean {
     try {
@@ -189,7 +352,51 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   }
 
   /**
-   * Fetch data with filtering, sorting, and pagination
+   * Fetch data with filtering, sorting, and pagination.
+   *
+   * This is the main method for retrieving data from the database. It handles:
+   * - Determining the appropriate primary table
+   * - Query result caching for performance
+   * - Building optimized SQL queries with smart joins
+   * - Transforming flat SQL results to nested structures
+   * - Applying filters, sorting, and pagination
+   * - Returning metadata about the query execution
+   *
+   * @description
+   * Executes a complete query pipeline including:
+   * 1. Cache lookup (if enabled)
+   * 2. Query context building
+   * 3. SQL query generation
+   * 4. Data transformation
+   * 5. Result caching
+   *
+   * @param {FetchDataParams} params - Query parameters
+   * @param {string[]} [params.columns] - Column identifiers to fetch (e.g., ['email', 'profile.bio'])
+   * @param {FilterState[]} [params.filters] - Filter conditions to apply
+   * @param {SortingParams[]} [params.sorting] - Sort configurations
+   * @param {PaginationParams} [params.pagination] - Pagination settings (page, limit)
+   * @returns {Promise<FetchDataResult>} Query result with data, total count, and metadata
+   *
+   * @throws {QueryError} If the query execution fails
+   * @throws {SchemaError} If the schema is invalid or tables are missing
+   *
+   * @example
+   * ```typescript
+   * const result = await adapter.fetchData({
+   *   columns: ['id', 'email', 'name', 'profile.bio'],
+   *   filters: [
+   *     { columnId: 'email', operator: 'contains', values: ['@example.com'] }
+   *   ],
+   *   sorting: [{ columnId: 'id', direction: 'desc' }],
+   *   pagination: { page: 1, limit: 10 }
+   * });
+   *
+   * console.log(result.data); // Array of nested objects
+   * console.log(result.total); // Total matching records
+   * console.log(result.pagination); // Pagination info
+   * ```
+   *
+   * @since 1.0.0
    */
   async fetchData(
     params: FetchDataParams
