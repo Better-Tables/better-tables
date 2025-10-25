@@ -1,4 +1,5 @@
 import type { ColumnType, FilterOperator, FilterState } from '@better-tables/core';
+import { getOperatorDefinition, validateOperatorValues } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import {
   and,
@@ -522,7 +523,14 @@ export class FilterHandler {
         if (condition) {
           conditions.push(condition);
         }
-      } catch {}
+      } catch (error) {
+        // Log the error for debugging but don't break the entire query
+        console.warn(`Failed to process filter for column ${filter.columnId}:`, error);
+        // Re-throw the error to surface the issue instead of silently ignoring it
+        throw new Error(
+          `Invalid filter configuration for column '${filter.columnId}': ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
     }
 
     return { conditions, requiredJoins };
@@ -579,66 +587,25 @@ export class FilterHandler {
    * Get expected value count for an operator
    */
   getExpectedValueCount(operator: FilterOperator): number {
-    switch (operator) {
-      case 'between':
-      case 'notBetween':
-        return 2;
-
-      case 'isAnyOf':
-      case 'isNoneOf':
-      case 'includesAny':
-      case 'includesAll':
-      case 'excludesAny':
-      case 'excludesAll':
-        return 1; // At least 1
-
-      case 'isEmpty':
-      case 'isNotEmpty':
-      case 'isNull':
-      case 'isNotNull':
-      case 'isToday':
-      case 'isYesterday':
-      case 'isThisWeek':
-      case 'isThisMonth':
-      case 'isThisYear':
-        return 0;
-
-      default:
-        return 1;
+    const definition = getOperatorDefinition(operator);
+    if (!definition) {
+      return 1; // Default fallback
     }
+
+    if (typeof definition.valueCount === 'number') {
+      return definition.valueCount;
+    }
+
+    // For operators that accept "at least 1" value (variable)
+    return 1;
   }
 
   /**
    * Validate filter values
    */
   validateFilterValues(operator: FilterOperator, values: unknown[]): boolean {
-    switch (operator) {
-      case 'between':
-      case 'notBetween':
-        return values.length >= 2;
-
-      case 'isAnyOf':
-      case 'isNoneOf':
-      case 'includesAny':
-      case 'includesAll':
-      case 'excludesAny':
-      case 'excludesAll':
-        return values.length > 0;
-
-      case 'isEmpty':
-      case 'isNotEmpty':
-      case 'isNull':
-      case 'isNotNull':
-      case 'isToday':
-      case 'isYesterday':
-      case 'isThisWeek':
-      case 'isThisMonth':
-      case 'isThisYear':
-        return values.length === 0;
-
-      default:
-        return values.length >= 1;
-    }
+    const result = validateOperatorValues(operator, values);
+    return result === true;
   }
 
   /**

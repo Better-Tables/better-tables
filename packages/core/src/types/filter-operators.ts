@@ -603,11 +603,6 @@ export function validateOperatorValues(
     return 'Unknown operator';
   }
 
-  // Allow empty values for newly created filters - validation will happen when user enters values
-  if (values.length === 0) {
-    return true;
-  }
-
   // First check basic value count validation
   if (definition.valueCount === 0) {
     if (values.length !== 0) {

@@ -82,7 +82,11 @@ export const userColumns = [
         pending: 'bg-yellow-100 text-yellow-800',
         suspended: 'bg-red-100 text-red-800',
       };
-      return <Badge className={colors[value as string] || ''}>{value as string}</Badge>;
+      return (
+        <Badge className={colors[value as string] || ''} variant="outline">
+          {value as string}
+        </Badge>
+      );
     })
     .build(),
 
@@ -112,14 +116,30 @@ export const userColumns = [
     .filterable()
     .cellRenderer(({ value }) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
+
+      // Validate URL to prevent XSS attacks
+      const url = value as string;
+      const isValidUrl = (url: string): boolean => {
+        try {
+          const parsedUrl = new URL(url);
+          return ['http:', 'https:', 'mailto:'].includes(parsedUrl.protocol);
+        } catch {
+          return false;
+        }
+      };
+
+      if (!isValidUrl(url)) {
+        return <span className="text-muted-foreground">{url}</span>;
+      }
+
       return (
         <a
-          href={value as string}
+          href={url}
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
         >
-          {value as string}
+          {url}
         </a>
       );
     })

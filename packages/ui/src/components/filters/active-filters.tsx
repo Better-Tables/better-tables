@@ -262,6 +262,7 @@ function FilterBadge<TData = unknown>({
           className="h-full rounded-none rounded-r-2xl px-3 py-2 hover:bg-muted"
           onClick={onRemove}
           disabled={disabled}
+          aria-label={`Remove ${column.displayName} filter`}
         >
           <X className="h-4 w-4" />
         </Button>
