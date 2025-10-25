@@ -38,3 +38,8 @@ export * from './components/ui/switch';
 export * from './hooks';
 export * from './lib/filter-value-utils';
 export * from './lib/utils';
+
+// Export stores and state management
+export * from './stores/table-registry';
+export * from './stores/url-sync-adapter';
+export type { TableState, TableStoreInitialState } from './stores/table-store';
