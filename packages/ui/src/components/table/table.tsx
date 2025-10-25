@@ -280,7 +280,7 @@ export function BetterTable<TData = unknown>({
             <TableRow>
               {rowSelection && (
                 <TableHead
-                  className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background"
+                  className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
                   style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
                 >
                   <Checkbox
@@ -347,7 +347,7 @@ export function BetterTable<TData = unknown>({
                 >
                   {rowSelection && (
                     <TableCell
-                      className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background"
+                      className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
                       style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
                     >
                       <Checkbox
