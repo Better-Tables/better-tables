@@ -84,17 +84,20 @@ export function FilterDropdown<TData = unknown>({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Use controlled search if provided, otherwise use internal state
+  const search = searchTerm !== undefined ? searchTerm : internalSearch;
+  const setSearch = onSearchChange || setInternalSearch;
+
   // Reset view when dropdown opens/closes
   React.useEffect(() => {
     if (open) {
       setCurrentView({ type: 'groups' });
       // Don't reset search when opening - keep the search term
+    } else {
+      // Clear search when popover closes
+      setSearch('');
     }
-  }, [open]);
-
-  // Use controlled search if provided, otherwise use internal state
-  const search = searchTerm !== undefined ? searchTerm : internalSearch;
-  const setSearch = onSearchChange || setInternalSearch;
+  }, [open, setSearch]);
 
   // Filter columns based on search
   const filteredColumns = React.useMemo(() => {
@@ -193,10 +196,11 @@ export function FilterDropdown<TData = unknown>({
     (columnId: string) => {
       if (disabled) return;
       onSelect(columnId);
-      // Don't clear search when selecting - keep it for potential multiple selections
+      // Clear search when selecting a column
+      setSearch('');
       onOpenChange?.(false);
     },
-    [disabled, onSelect, onOpenChange]
+    [disabled, onSelect, onOpenChange, setSearch]
   );
 
   const handleGroupSelect = React.useCallback((groupId: string, groupLabel: string) => {

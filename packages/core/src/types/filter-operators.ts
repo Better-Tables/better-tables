@@ -277,7 +277,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Is the specified option',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values) => values.length === 1 && values[0] != null && values[0] !== '',
   },
   {
     key: 'isNot',
@@ -285,7 +285,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Is not the specified option',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values) => values.length === 1 && values[0] != null && values[0] !== '',
   },
   {
     key: 'isAnyOf',
