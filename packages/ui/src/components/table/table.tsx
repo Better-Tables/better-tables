@@ -10,6 +10,7 @@ import { useCallback, useMemo } from 'react';
 import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
+import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { EmptyState } from './empty-state';
@@ -266,7 +267,6 @@ export function BetterTable<TData = unknown>({
 
   const allSelected =
     data.length > 0 && data.every((row, index) => selectedRows.has(getRowId(row, index)));
-  const someSelected = data.some((row, index) => selectedRows.has(getRowId(row, index)));
 
   return (
     <div className={cn('space-y-4', className)} {...props}>
@@ -280,14 +280,9 @@ export function BetterTable<TData = unknown>({
             <TableRow>
               {rowSelection && (
                 <TableHead className="w-[50px]">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allSelected}
-                    ref={(ref) => {
-                      if (ref) ref.indeterminate = someSelected && !allSelected;
-                    }}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                    onCheckedChange={(checked) => handleSelectAll(checked === true)}
                   />
                 </TableHead>
               )}
@@ -349,11 +344,9 @@ export function BetterTable<TData = unknown>({
                 >
                   {rowSelection && (
                     <TableCell>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isSelected}
-                        onChange={(e) => handleRowSelection(rowId, e.target.checked)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                        onCheckedChange={(checked) => handleRowSelection(rowId, checked === true)}
                       />
                     </TableCell>
                   )}

@@ -502,19 +502,27 @@ export class FilterHandler {
     const requiredJoins = new Set<string>();
 
     for (const filter of filters) {
-      const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId);
-
-      if (columnPath.isNested && columnPath.relationshipPath) {
-        // Add required joins
-        for (const relationship of columnPath.relationshipPath) {
-          requiredJoins.add(relationship.to);
+      try {
+        // Validate filter values before processing
+        if (!this.validateFilterValues(filter.operator, filter.values)) {
+          // Skip invalid filters silently
+          continue;
         }
-      }
 
-      const condition = this.buildFilterCondition(filter);
-      if (condition) {
-        conditions.push(condition);
-      }
+        const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId);
+
+        if (columnPath.isNested && columnPath.relationshipPath) {
+          // Add required joins
+          for (const relationship of columnPath.relationshipPath) {
+            requiredJoins.add(relationship.to);
+          }
+        }
+
+        const condition = this.buildFilterCondition(filter);
+        if (condition) {
+          conditions.push(condition);
+        }
+      } catch {}
     }
 
     return { conditions, requiredJoins };
@@ -565,6 +573,39 @@ export class FilterHandler {
     }
 
     return (table as unknown as Record<string, AnyColumnType>)[columnPath.field] || null;
+  }
+
+  /**
+   * Get expected value count for an operator
+   */
+  getExpectedValueCount(operator: FilterOperator): number {
+    switch (operator) {
+      case 'between':
+      case 'notBetween':
+        return 2;
+
+      case 'isAnyOf':
+      case 'isNoneOf':
+      case 'includesAny':
+      case 'includesAll':
+      case 'excludesAny':
+      case 'excludesAll':
+        return 1; // At least 1
+
+      case 'isEmpty':
+      case 'isNotEmpty':
+      case 'isNull':
+      case 'isNotNull':
+      case 'isToday':
+      case 'isYesterday':
+      case 'isThisWeek':
+      case 'isThisMonth':
+      case 'isThisYear':
+        return 0;
+
+      default:
+        return 1;
+    }
   }
 
   /**
