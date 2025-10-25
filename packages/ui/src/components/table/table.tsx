@@ -279,7 +279,10 @@ export function BetterTable<TData = unknown>({
           <TableHeader>
             <TableRow>
               {rowSelection && (
-                <TableHead className="w-[50px]">
+                <TableHead
+                  className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background"
+                  style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
+                >
                   <Checkbox
                     checked={allSelected}
                     onCheckedChange={(checked) => handleSelectAll(checked === true)}
@@ -343,7 +346,10 @@ export function BetterTable<TData = unknown>({
                   }}
                 >
                   {rowSelection && (
-                    <TableCell>
+                    <TableCell
+                      className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background"
+                      style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
+                    >
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={(checked) => handleRowSelection(rowId, checked === true)}
