@@ -26,10 +26,10 @@ export const FilterButton = React.forwardRef<HTMLButtonElement, FilterButtonProp
         className={cn('h-8 border-dashed', hasFilters && 'border-solid', className)}
         {...props}
       >
-        <Filter className="mr-2 h-4 w-4" />
+        <Filter className="mr-1 h-4 w-4" />
         {label}
         {hasFilters && (
-          <Badge variant="secondary" className="ml-2 rounded-sm px-1 font-normal">
+          <Badge variant="secondary" className="ml-1 rounded-sm px-1 font-normal">
             Active
           </Badge>
         )}

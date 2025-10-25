@@ -127,19 +127,25 @@ function FilterBadge<TData = unknown>({
     return operatorDef?.label ?? filter.operator;
   }, [filter.operator]);
 
+  // Check if operator needs no values (like isEmpty, isNotEmpty, isNull, isNotNull)
+  const needsNoValues = React.useMemo(() => {
+    const operatorDef = getOperatorDefinition(filter.operator);
+    return operatorDef?.valueCount === 0;
+  }, [filter.operator]);
+
   return (
     <div
       className={cn(
-        'flex items-center rounded-2xl border bg-background text-xs shadow-sm',
+        'flex items-center rounded-2xl border bg-background text-sm shadow-sm h-8',
         disabled && 'opacity-50 cursor-not-allowed',
         isProtected && 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
       )}
     >
       {/* Column Name */}
-      <div className="flex items-center gap-1 px-2 py-1">
-        {Icon && <Icon className="h-3 w-3" />}
+      <div className="flex items-center gap-1 px-3 py-2">
+        {Icon && <Icon className="h-4 w-4" />}
         <span className="font-medium">{column.displayName}</span>
-        {isProtected && <Lock className="ml-1 h-3 w-3 text-amber-600 dark:text-amber-400" />}
+        {isProtected && <Lock className="ml-1 h-4 w-4 text-amber-600 dark:text-amber-400" />}
       </div>
 
       <Separator orientation="vertical" className="h-6" />
@@ -150,13 +156,13 @@ function FilterBadge<TData = unknown>({
           <Button
             variant="ghost"
             className={cn(
-              'h-full rounded-none px-2 py-1 text-xs hover:bg-muted',
+              'h-full rounded-none px-3 py-2 text-sm hover:bg-muted',
               isProtected && 'cursor-not-allowed opacity-75'
             )}
             disabled={disabled || isProtected}
           >
             {operatorLabel}
-            {isProtected && <Lock className="ml-1 h-3 w-3" />}
+            {isProtected && <Lock className="ml-1 h-4 w-4" />}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-56 p-2" align="start">
@@ -176,87 +182,88 @@ function FilterBadge<TData = unknown>({
 
       <Separator orientation="vertical" className="h-6" />
 
-      {/* Value */}
-      {isMobile ? (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cn(
-                'h-full rounded-none px-2 py-1 text-xs hover:bg-muted',
-                isProtected && 'cursor-not-allowed opacity-75'
+      {/* Value - only show if operator needs values */}
+      {!needsNoValues &&
+        (isMobile ? (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className={cn(
+                  'h-full rounded-none px-3 py-2 text-sm hover:bg-muted',
+                  isProtected && 'cursor-not-allowed opacity-75'
+                )}
+                disabled={disabled || isProtected}
+              >
+                <FilterValueDisplay filter={filter} column={column} />
+                {isProtected && <Lock className="ml-1 h-4 w-4" />}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-sm">
+              <DialogHeader>
+                <DialogTitle>Edit Filter Value</DialogTitle>
+              </DialogHeader>
+              <FilterValueInput
+                filter={filter}
+                column={column}
+                onChange={(values) => onUpdate({ values })}
+                onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
+                disabled={disabled || isProtected}
+              />
+              {isProtected && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  This filter is protected and cannot be modified
+                </div>
               )}
-              disabled={disabled || isProtected}
-            >
-              <FilterValueDisplay filter={filter} column={column} />
-              {isProtected && <Lock className="ml-1 h-3 w-3" />}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-sm">
-            <DialogHeader>
-              <DialogTitle>Edit Filter Value</DialogTitle>
-            </DialogHeader>
-            <FilterValueInput
-              filter={filter}
-              column={column}
-              onChange={(values) => onUpdate({ values })}
-              onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
-              disabled={disabled || isProtected}
-            />
-            {isProtected && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                This filter is protected and cannot be modified
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cn(
-                'h-full rounded-none px-2 py-1 text-xs hover:bg-muted',
-                isProtected && 'cursor-not-allowed opacity-75'
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                className={cn(
+                  'h-full rounded-none px-3 py-2 text-sm hover:bg-muted',
+                  isProtected && 'cursor-not-allowed opacity-75'
+                )}
+                disabled={disabled || isProtected}
+              >
+                <FilterValueDisplay filter={filter} column={column} />
+                {isProtected && <Lock className="ml-1 h-4 w-4" />}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3" align="start">
+              <FilterValueInput
+                filter={filter}
+                column={column}
+                onChange={(values) => onUpdate({ values })}
+                onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
+                disabled={disabled || isProtected}
+              />
+              {isProtected && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  This filter is protected and cannot be modified
+                </div>
               )}
-              disabled={disabled || isProtected}
-            >
-              <FilterValueDisplay filter={filter} column={column} />
-              {isProtected && <Lock className="ml-1 h-3 w-3" />}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-3" align="start">
-            <FilterValueInput
-              filter={filter}
-              column={column}
-              onChange={(values) => onUpdate({ values })}
-              onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
-              disabled={disabled || isProtected}
-            />
-            {isProtected && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                This filter is protected and cannot be modified
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
-      )}
+            </PopoverContent>
+          </Popover>
+        ))}
 
       <Separator orientation="vertical" className="h-6" />
 
       {/* Remove Button */}
       {isProtected ? (
         <div className="flex h-full items-center px-2 text-muted-foreground">
-          <Lock className="h-3 w-3" />
+          <Lock className="h-4 w-4" />
         </div>
       ) : (
         <Button
           variant="ghost"
-          className="h-full rounded-none rounded-r-2xl px-2 py-1 hover:bg-muted"
+          className="h-full rounded-none rounded-r-2xl px-3 py-2 hover:bg-muted"
           onClick={onRemove}
           disabled={disabled}
         >
-          <X className="h-3 w-3" />
+          <X className="h-4 w-4" />
         </Button>
       )}
     </div>
@@ -431,11 +438,46 @@ function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisp
       );
 
     case 'option': {
-      const option = column.filter?.options?.find((o) => o.value === filter.values[0]);
-      const displayValue = option?.label ?? String(filter.values[0] ?? '');
+      // Handle single value operators (is, isNot)
+      if (filter.values.length === 1) {
+        const option = column.filter?.options?.find((o) => o.value === filter.values[0]);
+        const displayValue = option?.label ?? String(filter.values[0] ?? '');
+        return (
+          <span>
+            {truncateText(displayValue, 20)}
+            {nullIndicator}
+          </span>
+        );
+      }
+
+      // Handle multiple value operators (isAnyOf, isNoneOf)
+      const selectedOptions =
+        column.filter?.options?.filter((o) => (filter.values as string[]).includes(o.value)) ?? [];
+
+      if (selectedOptions.length === 0) {
+        return (
+          <span>
+            {filter.values.length} selected
+            {nullIndicator}
+          </span>
+        );
+      }
+
+      if (selectedOptions.length === 1) {
+        return (
+          <span>
+            {truncateText(selectedOptions[0].label, 20)}
+            {nullIndicator}
+          </span>
+        );
+      }
+
+      // Show all selected values as comma-separated text
+      const displayText = selectedOptions.map((option) => option.label).join(', ');
+
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-          {truncateText(displayValue, 20)}
+        <span>
+          {truncateText(displayText, 40)}
           {nullIndicator}
         </span>
       );
