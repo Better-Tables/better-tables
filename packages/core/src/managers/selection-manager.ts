@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Selection manager for handling table row selection state and operations.
+ *
+ * This module provides comprehensive row selection management including single/multiple
+ * selection modes, validation, event-based subscriptions, and bulk operations.
+ *
+ * @module managers/selection-manager
+ */
+
 import type {
   SelectionConfig,
   SelectionMode,
@@ -7,7 +16,30 @@ import type {
 } from '../types/selection';
 
 /**
- * Event types for selection manager
+ * Event types for selection manager.
+ *
+ * Defines the different types of events that can be emitted by the selection manager,
+ * enabling reactive updates and state synchronization for selection operations.
+ *
+ * @example
+ * ```typescript
+ * const unsubscribe = selectionManager.subscribe((event) => {
+ *   switch (event.type) {
+ *     case 'row_selected':
+ *       console.log(`Row ${event.rowId} ${event.selected ? 'selected' : 'deselected'}`);
+ *       break;
+ *     case 'all_selected':
+ *       console.log(`All rows ${event.selected ? 'selected' : 'deselected'}`);
+ *       break;
+ *     case 'selection_cleared':
+ *       console.log('Selection was cleared');
+ *       break;
+ *     case 'selection_replaced':
+ *       console.log(`Selection replaced with ${event.selectedIds.size} rows`);
+ *       break;
+ *   }
+ * });
+ * ```
  */
 export type SelectionManagerEvent =
   | { type: 'row_selected'; rowId: string; selected: boolean }
@@ -18,12 +50,62 @@ export type SelectionManagerEvent =
   | { type: 'selection_toggled'; rowId: string; selected: boolean };
 
 /**
- * Selection manager subscriber function type
+ * Selection manager subscriber function type.
+ *
+ * Defines the callback function signature for selection event subscribers.
+ *
+ * @param event - The selection event that occurred
+ *
+ * @example
+ * ```typescript
+ * const handleSelectionChange: SelectionManagerSubscriber = (event) => {
+ *   if (event.type === 'row_selected') {
+ *     // Update UI to reflect selection change
+ *     updateRowVisualState(event.rowId, event.selected);
+ *   }
+ * };
+ * ```
  */
 export type SelectionManagerSubscriber = (event: SelectionManagerEvent) => void;
 
 /**
- * Core selection manager class for managing row selection state and operations
+ * Core selection manager class for managing row selection state and operations.
+ *
+ * Provides comprehensive row selection management including single/multiple selection modes,
+ * validation against row availability and configuration constraints, event-based subscriptions,
+ * and bulk operations. Supports configurable selection limits, row ID extraction, and
+ * selection preservation across data updates.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const selectionManager = new SelectionManager<User>({
+ *   mode: 'multiple',
+ *   maxSelections: 100,
+ *   preserveSelection: true,
+ *   showSelectAll: true,
+ *   getRowId: (user) => user.id,
+ *   isSelectable: (user) => user.status !== 'deleted'
+ * }, users);
+ *
+ * // Subscribe to changes
+ * const unsubscribe = selectionManager.subscribe((event) => {
+ *   console.log('Selection changed:', event);
+ * });
+ *
+ * // Select rows
+ * selectionManager.selectRow('user-1');
+ * selectionManager.selectRows(['user-2', 'user-3']);
+ * selectionManager.selectAll();
+ *
+ * // Check state
+ * console.log('Selected count:', selectionManager.getSelectionCount());
+ * console.log('Is all selected:', selectionManager.isAllSelected());
+ *
+ * // Get selected data
+ * const selectedUsers = selectionManager.getSelectedRows();
+ * ```
  */
 export class SelectionManager<TData = unknown> {
   private selectionState: SelectionState = {
@@ -36,6 +118,28 @@ export class SelectionManager<TData = unknown> {
   private subscribers: SelectionManagerSubscriber[] = [];
   private config: SelectionConfig = {};
 
+  /**
+   * Create a new selection manager instance.
+   *
+   * Initializes the selection manager with configuration options and available rows.
+   * The manager will validate all selection operations against the provided configuration
+   * and emit events for state changes.
+   *
+   * @param config - Selection configuration options
+   * @param availableRows - Initial array of available rows
+   *
+   * @example
+   * ```typescript
+   * const selectionManager = new SelectionManager<User>({
+   *   mode: 'multiple',
+   *   maxSelections: 50,
+   *   preserveSelection: true,
+   *   showSelectAll: true,
+   *   getRowId: (user) => user.id,
+   *   isSelectable: (user) => user.status === 'active'
+   * }, users);
+   * ```
+   */
   constructor(config: SelectionConfig = {}, availableRows: TData[] = []) {
     this.config = {
       mode: 'multiple',
@@ -58,7 +162,21 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Get current selection state
+   * Get current selection state.
+   *
+   * Returns a copy of the current selection state including selected IDs,
+   * selection mode, and computed metadata (allSelected, someSelected).
+   *
+   * @returns Current selection state
+   *
+   * @example
+   * ```typescript
+   * const selection = selectionManager.getSelection();
+   * console.log(`Selected: ${selection.selectedIds.size} rows`);
+   * console.log(`All selected: ${selection.allSelected}`);
+   * console.log(`Some selected: ${selection.someSelected}`);
+   * console.log(`Mode: ${selection.mode}`);
+   * ```
    */
   getSelection(): SelectionState {
     return {
@@ -110,7 +228,24 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Select a row
+   * Select a row.
+   *
+   * Selects the specified row if it's available and selectable. In single selection mode,
+   * this will clear any existing selection first. Validates the selection against
+   * configuration constraints and emits appropriate events.
+   *
+   * @param rowId - Row identifier to select
+   * @throws {Error} If the selection is invalid
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   selectionManager.selectRow('user-123');
+   *   console.log('Row selected successfully');
+   * } catch (error) {
+   *   console.error('Invalid selection:', error.message);
+   * }
+   * ```
    */
   selectRow(rowId: string): void {
     if (this.config.mode === 'none') {
@@ -149,7 +284,23 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Toggle row selection
+   * Toggle row selection.
+   *
+   * Toggles the selection state of the specified row. If the row is currently
+   * selected, it will be deselected. If not selected, it will be selected.
+   * Emits both individual row events and a toggle event.
+   *
+   * @param rowId - Row identifier to toggle
+   *
+   * @example
+   * ```typescript
+   * // Toggle selection state
+   * selectionManager.toggleRow('user-123');
+   *
+   * // Check current state
+   * const isSelected = selectionManager.isRowSelected('user-123');
+   * console.log('Row is now', isSelected ? 'selected' : 'deselected');
+   * ```
    */
   toggleRow(rowId: string): void {
     const isSelected = this.selectionState.selectedIds.has(rowId);
@@ -233,7 +384,18 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Select all available rows
+   * Select all available rows.
+   *
+   * Selects all available and selectable rows. Only works in multiple selection mode.
+   * Respects the isSelectable configuration and selection limits. Emits an 'all_selected' event.
+   *
+   * @example
+   * ```typescript
+   * if (selectionManager.getSelectionMode() === 'multiple') {
+   *   selectionManager.selectAll();
+   *   console.log('All rows selected');
+   * }
+   * ```
    */
   selectAll(): void {
     if (this.config.mode === 'none' || this.config.mode === 'single') {
@@ -315,7 +477,25 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Get selection statistics
+   * Get selection statistics.
+   *
+   * Returns comprehensive statistics about the current selection including counts,
+   * percentages, and selection state flags. Useful for displaying selection
+   * summaries and managing UI state.
+   *
+   * @returns Detailed selection statistics
+   *
+   * @example
+   * ```typescript
+   * const stats = selectionManager.getSelectionStats();
+   * console.log(`Selected: ${stats.selectedCount}/${stats.totalCount} (${stats.selectionPercentage.toFixed(1)}%)`);
+   * console.log(`All selected: ${stats.allSelected}`);
+   * console.log(`Some selected: ${stats.someSelected}`);
+   *
+   * // Update UI elements
+   * updateSelectionSummary(stats);
+   * updateBulkActionButtons(stats);
+   * ```
    */
   getSelectionStats(): SelectionStats {
     const selectableRows = this.availableRows.filter((row) => this.config.isSelectable?.(row));
@@ -428,7 +608,40 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Subscribe to selection changes
+   * Subscribe to selection changes.
+   *
+   * Registers a callback function to be called whenever selection state changes.
+   * Returns an unsubscribe function to remove the subscription.
+   *
+   * @param callback - Function to call when selection changes
+   * @returns Unsubscribe function to remove the subscription
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = selectionManager.subscribe((event) => {
+   *   switch (event.type) {
+   *     case 'row_selected':
+   *       console.log(`Row ${event.rowId} ${event.selected ? 'selected' : 'deselected'}`);
+   *       updateRowVisualState(event.rowId, event.selected);
+   *       break;
+   *     case 'all_selected':
+   *       console.log(`All rows ${event.selected ? 'selected' : 'deselected'}`);
+   *       updateSelectAllButton(event.selected);
+   *       break;
+   *     case 'selection_cleared':
+   *       console.log('Selection was cleared');
+   *       updateSelectionSummary();
+   *       break;
+   *     case 'selection_replaced':
+   *       console.log(`Selection replaced with ${event.selectedIds.size} rows`);
+   *       updateBulkActions();
+   *       break;
+   *   }
+   * });
+   *
+   * // Later, unsubscribe
+   * unsubscribe();
+   * ```
    */
   subscribe(callback: SelectionManagerSubscriber): () => void {
     this.subscribers.push(callback);
@@ -454,7 +667,27 @@ export class SelectionManager<TData = unknown> {
   }
 
   /**
-   * Clone the selection manager with the same configuration
+   * Clone the selection manager with the same configuration.
+   *
+   * Creates a new selection manager instance with the same configuration
+   * and current state. Useful for creating backup instances or managing
+   * multiple selection contexts.
+   *
+   * @returns New selection manager instance with copied state
+   *
+   * @example
+   * ```typescript
+   * const originalManager = new SelectionManager(config, data);
+   * originalManager.selectRows(['user-1', 'user-2']);
+   *
+   * // Create a backup
+   * const backupManager = originalManager.clone();
+   * console.log('Backup created with same selection state');
+   *
+   * // Modify backup without affecting original
+   * backupManager.clearSelection();
+   * console.log('Original still has', originalManager.getSelectionCount(), 'selections');
+   * ```
    */
   clone(): SelectionManager<TData> {
     const cloned = new SelectionManager(this.config, this.availableRows);

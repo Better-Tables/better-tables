@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Column factory for type-safe column creation and management.
+ *
+ * This module provides factory functions and utilities for creating column builders
+ * with type safety, validation, and rapid prototyping capabilities.
+ *
+ * @module builders/column-factory
+ */
+
 import type { ColumnDefinition } from '../types/column';
 import { BooleanColumnBuilder } from './boolean-column-builder';
 import { ColumnBuilder } from './column-builder';
@@ -8,7 +17,32 @@ import { OptionColumnBuilder } from './option-column-builder';
 import { TextColumnBuilder } from './text-column-builder';
 
 /**
- * Column factory interface for type-safe column creation
+ * Column factory interface for type-safe column creation.
+ *
+ * Provides a fluent API for creating column builders with full type safety,
+ * enabling IntelliSense and compile-time validation for column configurations.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * interface User {
+ *   id: string;
+ *   name: string;
+ *   email: string;
+ *   age: number;
+ *   isActive: boolean;
+ * }
+ *
+ * const factory = createColumnBuilder<User>();
+ *
+ * const nameColumn = factory.text()
+ *   .id('name')
+ *   .displayName('Full Name')
+ *   .accessor(user => user.name)
+ *   .searchable()
+ *   .build();
+ * ```
  */
 export interface ColumnFactory<TData = unknown> {
   /** Create a text column builder */
@@ -82,12 +116,15 @@ export function createColumnBuilder<TData = unknown>(): ColumnFactory<TData> {
 }
 
 /**
- * Global column factory function (not type-safe)
- * Use this when you don't have a specific data type or need flexibility
+ * Global column factory function (not type-safe).
+ *
+ * Provides a global factory instance for cases where type safety is not needed
+ * or when working with dynamic data types. Use this when you don't have a
+ * specific data type or need maximum flexibility.
  *
  * @example
  * ```typescript
- ** // Create columns without type safety
+ * // Create columns without type safety
  * const columns = [
  *   column.text()
  *     .id('name')
@@ -95,21 +132,45 @@ export function createColumnBuilder<TData = unknown>(): ColumnFactory<TData> {
  *     .accessor(data => data.name)
  *     .searchable()
  *     .build(),
+ *
+ *   column.number()
+ *     .id('count')
+ *     .displayName('Count')
+ *     .accessor(data => data.count)
+ *     .range(0, 1000)
+ *     .build(),
  * ];
  * ```
  */
 export const column = createColumnBuilder();
 
 /**
- * Utility function to create a column builder with explicit type
+ * Utility function to create a column builder with explicit type.
+ *
+ * Provides a convenient way to create a typed column factory with
+ * a shorter, more readable syntax.
+ *
+ * @template TData - The type of row data
+ * @returns Typed column factory
  *
  * @example
  * ```typescript
- ** // Create a typed column builder
+ * interface User {
+ *   id: string;
+ *   name: string;
+ *   email: string;
+ * }
+ *
+ * // Create a typed column builder
  * const cb = createTypedColumnBuilder<User>();
  *
  * // Or use the shorter alias
  * const cb = typed<User>();
+ *
+ * const userColumns = [
+ *   cb.text().id('name').displayName('Name').accessor(u => u.name).build(),
+ *   cb.text().id('email').displayName('Email').accessor(u => u.email).build(),
+ * ];
  * ```
  */
 export function createTypedColumnBuilder<TData>(): ColumnFactory<TData> {
@@ -117,29 +178,72 @@ export function createTypedColumnBuilder<TData>(): ColumnFactory<TData> {
 }
 
 /**
- * Shorter alias for createTypedColumnBuilder
+ * Shorter alias for createTypedColumnBuilder.
+ *
+ * Provides a more concise way to create typed column builders
+ * for improved readability in column definitions.
+ *
+ * @template TData - The type of row data
+ * @returns Typed column factory
+ *
+ * @example
+ * ```typescript
+ * const cb = typed<User>();
+ * const columns = [
+ *   cb.text().id('name').displayName('Name').build(),
+ * ];
+ * ```
  */
 export const typed = createTypedColumnBuilder;
 
 /**
- * Utility function to create multiple column builders at once
+ * Utility function to create multiple column builders at once.
+ *
+ * Creates a set of typed column factories for different data types,
+ * useful when building tables for multiple entities in the same application.
+ *
+ * @template T - Record of data types mapped to keys
+ * @param types - Object with keys as names and values as type placeholders
+ * @returns Object with typed column factories for each key
  *
  * @example
  * ```typescript
- ** // Create multiple column builders
+ * interface User {
+ *   id: string;
+ *   name: string;
+ *   email: string;
+ * }
+ *
+ * interface Order {
+ *   id: string;
+ *   userId: string;
+ *   total: number;
+ *   status: string;
+ * }
+ *
+ * interface Product {
+ *   id: string;
+ *   name: string;
+ *   price: number;
+ *   category: string;
+ * }
+ *
+ * // Create multiple column builders
  * const { users, orders, products } = createColumnBuilders({
  *   users: {} as User,
  *   orders: {} as Order,
  *   products: {} as Product,
  * });
  *
- ** // Now you can use them independently
+ * // Now you can use them independently
  * const userColumns = [
- *   users.text().id('name').displayName('Name').build(),
+ *   users.text().id('name').displayName('Name').accessor(u => u.name).build(),
+ *   users.text().id('email').displayName('Email').accessor(u => u.email).build(),
  * ];
  *
  * const orderColumns = [
- *   orders.number().id('total').displayName('Total').build(),
+ *   orders.number().id('total').displayName('Total').accessor(o => o.total).build(),
+ *   orders.option().id('status').displayName('Status').accessor(o => o.status).build(),
  * ];
  * ```
  */
@@ -156,7 +260,13 @@ export function createColumnBuilders<T extends Record<string, unknown>>(
 }
 
 /**
- * Utility function to validate column definitions
+ * Utility function to validate column definitions.
+ *
+ * Performs comprehensive validation on an array of column definitions,
+ * checking for required fields, duplicate IDs, and other common issues.
+ *
+ * @param columns - Array of column definitions to validate
+ * @returns Validation result with success status and error messages
  *
  * @example
  * ```typescript
@@ -167,10 +277,11 @@ export function createColumnBuilders<T extends Record<string, unknown>>(
  *   cb.number().id('age').displayName('Age').accessor(c => c.age).build(),
  * ];
  *
- ** // Validate all columns
+ * // Validate all columns
  * const validation = validateColumns(columns);
  * if (!validation.valid) {
  *   console.error('Column validation errors:', validation.errors);
+ *   // Handle validation errors
  * }
  * ```
  */
@@ -216,16 +327,39 @@ export function validateColumns(columns: ColumnDefinition[]): {
 }
 
 /**
- * Utility function to create a column definition with minimal configuration
- * Useful for rapid prototyping or simple use cases
+ * Utility function to create a column definition with minimal configuration.
+ *
+ * Provides a quick way to create column definitions for rapid prototyping
+ * or simple use cases where the full builder API is not needed.
+ *
+ * @template TData - The type of row data
+ * @template TValue - The type of column value
+ * @param id - Unique column identifier
+ * @param displayName - Human-readable column name
+ * @param accessor - Function to extract value from row data
+ * @param options - Optional column configuration
+ * @returns Complete column definition
  *
  * @example
  * ```typescript
- ** // Quick column creation
+ * interface User {
+ *   id: string;
+ *   name: string;
+ *   email: string;
+ *   age: number;
+ * }
+ *
+ * // Quick column creation
  * const columns = [
- *   quickColumn('name', 'Name', data => data.name),
- *   quickColumn('email', 'Email', data => data.email, { type: 'email' }),
- *   quickColumn('age', 'Age', data => data.age, { type: 'number' }),
+ *   quickColumn('name', 'Name', user => user.name),
+ *   quickColumn('email', 'Email', user => user.email, { type: 'email' }),
+ *   quickColumn('age', 'Age', user => user.age, { type: 'number' }),
+ *   quickColumn('status', 'Status', user => user.isActive ? 'Active' : 'Inactive', {
+ *     type: 'option',
+ *     sortable: true,
+ *     filterable: true,
+ *     width: 120
+ *   }),
  * ];
  * ```
  */

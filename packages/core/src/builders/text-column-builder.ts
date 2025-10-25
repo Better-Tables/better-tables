@@ -1,8 +1,34 @@
+/**
+ * @fileoverview Text column builder with specialized text handling methods.
+ *
+ * This module provides a specialized column builder for text-based columns,
+ * including search functionality, text transformations, and type conversions.
+ *
+ * @module builders/text-column-builder
+ */
+
 import type { FilterConfig } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
 /**
- * Text column builder with text-specific methods
+ * Text column builder with text-specific methods.
+ *
+ * Extends the base column builder with specialized methods for text columns,
+ * including search functionality, text transformations, and type conversions.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const nameColumn = new TextColumnBuilder<User>()
+ *   .id('name')
+ *   .displayName('Full Name')
+ *   .accessor(user => user.name)
+ *   .searchable({ debounce: 500 })
+ *   .transform('capitalize')
+ *   .truncate({ maxLength: 50 })
+ *   .build();
+ * ```
  */
 export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string> {
   constructor() {
@@ -10,7 +36,27 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Enable search functionality with text operators
+   * Enable search functionality with text operators.
+   *
+   * Configures the column for text-based searching with debouncing,
+   * null handling, and custom validation options.
+   *
+   * @param options - Search configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const searchableColumn = new TextColumnBuilder<User>()
+   *   .id('email')
+   *   .displayName('Email')
+   *   .accessor(user => user.email)
+   *   .searchable({
+   *     debounce: 500,
+   *     includeNull: false,
+   *     validation: (value) => value.length > 2 || 'Minimum 3 characters'
+   *   })
+   *   .build();
+   * ```
    */
   searchable(
     options: {
@@ -36,7 +82,23 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Set specific text operators
+   * Set specific text operators for filtering.
+   *
+   * Configures which text-based filter operators are available
+   * for this column, allowing fine-grained control over filtering.
+   *
+   * @param operators - Array of text filter operators to enable
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const filteredColumn = new TextColumnBuilder<User>()
+   *   .id('name')
+   *   .displayName('Name')
+   *   .accessor(user => user.name)
+   *   .textOperators(['contains', 'equals', 'startsWith'])
+   *   .build();
+   * ```
    */
   textOperators(
     operators: Array<'contains' | 'equals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty'>
@@ -49,7 +111,22 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Configure for URL column type
+   * Configure column as URL type.
+   *
+   * Changes the column type to 'url' for specialized URL handling,
+   * including validation and formatting.
+   *
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const urlColumn = new TextColumnBuilder<User>()
+   *   .id('website')
+   *   .displayName('Website')
+   *   .accessor(user => user.website)
+   *   .asUrl()
+   *   .build();
+   * ```
    */
   asUrl(): this {
     this.config.type = 'url';
@@ -57,7 +134,22 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Configure for email column type
+   * Configure column as email type.
+   *
+   * Changes the column type to 'email' for specialized email handling,
+   * including validation and formatting.
+   *
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const emailColumn = new TextColumnBuilder<User>()
+   *   .id('email')
+   *   .displayName('Email Address')
+   *   .accessor(user => user.email)
+   *   .asEmail()
+   *   .build();
+   * ```
    */
   asEmail(): this {
     this.config.type = 'email';
@@ -65,7 +157,22 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Configure for phone column type
+   * Configure column as phone type.
+   *
+   * Changes the column type to 'phone' for specialized phone number handling,
+   * including validation and formatting.
+   *
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const phoneColumn = new TextColumnBuilder<User>()
+   *   .id('phone')
+   *   .displayName('Phone Number')
+   *   .accessor(user => user.phone)
+   *   .asPhone()
+   *   .build();
+   * ```
    */
   asPhone(): this {
     this.config.type = 'phone';
@@ -73,7 +180,27 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Set text truncation options
+   * Set text truncation options.
+   *
+   * Configures how long text values are displayed, including
+   * maximum length, tooltip behavior, and truncation suffix.
+   *
+   * @param options - Truncation configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const truncatedColumn = new TextColumnBuilder<User>()
+   *   .id('description')
+   *   .displayName('Description')
+   *   .accessor(user => user.description)
+   *   .truncate({
+   *     maxLength: 100,
+   *     showTooltip: true,
+   *     suffix: '...'
+   *   })
+   *   .build();
+   * ```
    */
   truncate(
     options: {
@@ -99,7 +226,23 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
   }
 
   /**
-   * Set text transformation options
+   * Set text transformation options.
+   *
+   * Applies text case transformations to displayed values,
+   * such as uppercase, lowercase, or capitalize.
+   *
+   * @param transformation - Text transformation to apply
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const transformedColumn = new TextColumnBuilder<User>()
+   *   .id('name')
+   *   .displayName('Name')
+   *   .accessor(user => user.name)
+   *   .transform('capitalize')
+   *   .build();
+   * ```
    */
   transform(transformation: 'uppercase' | 'lowercase' | 'capitalize' | 'none' = 'none'): this {
     this.config.meta = {

@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Filter manager for handling table filter state and operations.
+ *
+ * This module provides comprehensive filter management including validation, operator support,
+ * event-based subscriptions, and serialization for table column filtering operations.
+ *
+ * @module managers/filter-manager
+ */
+
 import type { ColumnDefinition, ColumnType } from '../types/column';
 import type { FilterOperator, FilterOperatorDefinition, FilterState } from '../types/filter';
 import {
@@ -8,7 +17,33 @@ import {
 } from '../types/filter-operators';
 
 /**
- * Event types for filter manager
+ * Event types for filter manager.
+ *
+ * Defines the different types of events that can be emitted by the filter manager,
+ * enabling reactive updates and state synchronization for filter operations.
+ *
+ * @example
+ * ```typescript
+ * const unsubscribe = filterManager.subscribe((event) => {
+ *   switch (event.type) {
+ *     case 'filter_added':
+ *       console.log('Filter added:', event.filter);
+ *       break;
+ *     case 'filter_updated':
+ *       console.log(`Filter updated for column ${event.columnId}:`, event.filter);
+ *       break;
+ *     case 'filter_removed':
+ *       console.log(`Filter removed for column ${event.columnId}`);
+ *       break;
+ *     case 'filters_cleared':
+ *       console.log('All filters cleared');
+ *       break;
+ *     case 'filters_replaced':
+ *       console.log('Filters replaced:', event.filters);
+ *       break;
+ *   }
+ * });
+ * ```
  */
 export type FilterManagerEvent =
   | { type: 'filter_added'; filter: FilterState }
@@ -18,12 +53,44 @@ export type FilterManagerEvent =
   | { type: 'filters_replaced'; filters: FilterState[] };
 
 /**
- * Filter manager subscriber function type
+ * Filter manager subscriber function type.
+ *
+ * Defines the callback function signature for filter event subscribers.
+ *
+ * @param event - The filter event that occurred
+ *
+ * @example
+ * ```typescript
+ * const handleFilterChange: FilterManagerSubscriber = (event) => {
+ *   if (event.type === 'filter_added') {
+ *     // Update UI to show new filter
+ *     addFilterToUI(event.filter);
+ *   }
+ * };
+ * ```
  */
 export type FilterManagerSubscriber = (event: FilterManagerEvent) => void;
 
 /**
- * Filter validation result
+ * Filter validation result interface.
+ *
+ * Contains the result of validating filter operations, including success status,
+ * error information, and optional warnings for filter configuration issues.
+ *
+ * @example
+ * ```typescript
+ * const validation = filterManager.validateFilter({
+ *   columnId: 'age',
+ *   operator: 'greaterThan',
+ *   values: [18]
+ * });
+ *
+ * if (!validation.valid) {
+ *   console.error('Invalid filter:', validation.error);
+ * } else if (validation.warning) {
+ *   console.warn('Filter warning:', validation.warning);
+ * }
+ * ```
  */
 export interface FilterValidationResult {
   /** Whether the filter is valid */
@@ -35,7 +102,20 @@ export interface FilterValidationResult {
 }
 
 /**
- * Filter serialization options
+ * Filter serialization options interface.
+ *
+ * Provides configuration options for serializing filter states to various formats,
+ * including metadata inclusion and compression settings.
+ *
+ * @example
+ * ```typescript
+ * const serializationOptions: FilterSerializationOptions = {
+ *   includeMeta: true,
+ *   compress: false
+ * };
+ *
+ * const serialized = filterManager.serializeFilters(serializationOptions);
+ * ```
  */
 export interface FilterSerializationOptions {
   /** Whether to include metadata */
@@ -45,7 +125,47 @@ export interface FilterSerializationOptions {
 }
 
 /**
- * Core filter manager class for managing filter state and operations
+ * Core filter manager class for managing filter state and operations.
+ *
+ * Provides comprehensive filter management including validation against column definitions,
+ * operator support, event-based subscriptions, and serialization capabilities. Supports
+ * both strict validation for data operations and lenient validation for UI editing states.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const filterManager = new FilterManager<User>(columns, [
+ *   { columnId: 'status', operator: 'is', values: ['active'] },
+ *   { columnId: 'age', operator: 'greaterThan', values: [18] }
+ * ]);
+ *
+ * // Subscribe to changes
+ * const unsubscribe = filterManager.subscribe((event) => {
+ *   console.log('Filter changed:', event);
+ * });
+ *
+ * // Add filters
+ * filterManager.addFilter({
+ *   columnId: 'name',
+ *   operator: 'contains',
+ *   values: ['John']
+ * });
+ *
+ * // Update existing filter
+ * filterManager.updateFilter('age', {
+ *   columnId: 'age',
+ *   operator: 'between',
+ *   values: [18, 65]
+ * });
+ *
+ * // Remove filter
+ * filterManager.removeFilter('status');
+ *
+ * // Get current filters
+ * const filters = filterManager.getFilters();
+ * console.log('Active filters:', filters);
+ * ```
  */
 export class FilterManager<TData = unknown> {
   private filters: FilterState[] = [];
@@ -53,6 +173,24 @@ export class FilterManager<TData = unknown> {
   private subscribers: FilterManagerSubscriber[] = [];
   private operatorDefinitions: Map<FilterOperator, FilterOperatorDefinition> = new Map();
 
+  /**
+   * Create a new filter manager instance.
+   *
+   * Initializes the filter manager with column definitions, initial filters,
+   * and operator registry. The manager will validate all filter operations
+   * against the provided column definitions and emit events for state changes.
+   *
+   * @param columns - Array of column definitions to validate filters against
+   * @param initialFilters - Optional initial filter states
+   *
+   * @example
+   * ```typescript
+   * const filterManager = new FilterManager<User>(columns, [
+   *   { columnId: 'status', operator: 'is', values: ['active'] },
+   *   { columnId: 'age', operator: 'greaterThan', values: [18] }
+   * ]);
+   * ```
+   */
   constructor(columns: ColumnDefinition<TData>[], initialFilters: FilterState[] = []) {
     this.columns = columns;
     this.operatorDefinitions = createOperatorRegistry(getAllOperators());
@@ -60,7 +198,22 @@ export class FilterManager<TData = unknown> {
   }
 
   /**
-   * Get current filters
+   * Get current filters.
+   *
+   * Returns a copy of the current filter states. The returned array is a shallow
+   * copy to prevent external mutations while allowing safe iteration and inspection.
+   *
+   * @returns Array of current filter states
+   *
+   * @example
+   * ```typescript
+   * const filters = filterManager.getFilters();
+   * console.log(`Active filters: ${filters.length}`);
+   *
+   * filters.forEach(filter => {
+   *   console.log(`${filter.columnId}: ${filter.operator} ${filter.values}`);
+   * });
+   * ```
    */
   getFilters(): FilterState[] {
     return [...this.filters];
@@ -85,8 +238,31 @@ export class FilterManager<TData = unknown> {
   }
 
   /**
-   * Add a new filter or update existing filter for the same column
-   * Uses lenient validation to allow incomplete filters with empty values for UI editing
+   * Add a new filter or update existing filter for the same column.
+   *
+   * Adds a new filter or updates an existing filter for the specified column.
+   * Uses lenient validation to allow incomplete filters with empty values for UI editing.
+   * Emits appropriate events based on whether the filter was added or updated.
+   *
+   * @param filter - The filter state to add or update
+   * @throws {Error} If the filter is invalid
+   *
+   * @example
+   * ```typescript
+   * // Add new filter
+   * filterManager.addFilter({
+   *   columnId: 'name',
+   *   operator: 'contains',
+   *   values: ['John']
+   * });
+   *
+   * // Update existing filter (replaces the previous filter for 'name')
+   * filterManager.addFilter({
+   *   columnId: 'name',
+   *   operator: 'startsWith',
+   *   values: ['J']
+   * });
+   * ```
    */
   addFilter(filter: FilterState): void {
     // Use lenient validation (strict = false) to allow incomplete filters in UI state

@@ -1,8 +1,33 @@
+/**
+ * @fileoverview Number column builder with specialized numeric handling methods.
+ *
+ * This module provides a specialized column builder for numeric columns,
+ * including range filtering, currency formatting, percentage display, and number formatting.
+ *
+ * @module builders/number-column-builder
+ */
+
 import type { FilterConfig } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
 /**
- * Number column builder with number-specific methods
+ * Number column builder with number-specific methods.
+ *
+ * Extends the base column builder with specialized methods for numeric columns,
+ * including range filtering, currency formatting, percentage display, and precision control.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const priceColumn = new NumberColumnBuilder<Product>()
+ *   .id('price')
+ *   .displayName('Price')
+ *   .accessor(product => product.price)
+ *   .currency({ currency: 'USD', locale: 'en-US' })
+ *   .range(0, 1000, { step: 0.01 })
+ *   .build();
+ * ```
  */
 export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, number> {
   constructor() {
@@ -10,7 +35,29 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Set min/max range for number filtering
+   * Set min/max range for number filtering.
+   *
+   * Configures numeric range filtering with validation, step size,
+   * and null handling options.
+   *
+   * @param min - Minimum allowed value
+   * @param max - Maximum allowed value
+   * @param options - Range configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const ageColumn = new NumberColumnBuilder<User>()
+   *   .id('age')
+   *   .displayName('Age')
+   *   .accessor(user => user.age)
+   *   .range(18, 100, {
+   *     includeNull: false,
+   *     step: 1,
+   *     validation: (value) => value >= 18 || 'Must be 18 or older'
+   *   })
+   *   .build();
+   * ```
    */
   range(
     min: number,
@@ -52,7 +99,23 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Set specific number operators
+   * Set specific number operators for filtering.
+   *
+   * Configures which numeric filter operators are available
+   * for this column, allowing fine-grained control over filtering.
+   *
+   * @param operators - Array of numeric filter operators to enable
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const scoreColumn = new NumberColumnBuilder<Test>()
+   *   .id('score')
+   *   .displayName('Score')
+   *   .accessor(test => test.score)
+   *   .numberOperators(['equals', 'greaterThan', 'lessThan', 'between'])
+   *   .build();
+   * ```
    */
   numberOperators(
     operators: Array<
@@ -74,7 +137,28 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Configure as currency column
+   * Configure as currency column.
+   *
+   * Changes the column type to 'currency' and configures
+   * currency-specific formatting and display options.
+   *
+   * @param options - Currency configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const priceColumn = new NumberColumnBuilder<Product>()
+   *   .id('price')
+   *   .displayName('Price')
+   *   .accessor(product => product.price)
+   *   .currency({
+   *     currency: 'EUR',
+   *     locale: 'de-DE',
+   *     minimumFractionDigits: 2,
+   *     showSymbol: true
+   *   })
+   *   .build();
+   * ```
    */
   currency(
     options: {
@@ -113,7 +197,28 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Configure as percentage column
+   * Configure as percentage column.
+   *
+   * Changes the column type to 'percentage' and configures
+   * percentage-specific formatting and display options.
+   *
+   * @param options - Percentage configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const completionColumn = new NumberColumnBuilder<Task>()
+   *   .id('completion')
+   *   .displayName('Completion %')
+   *   .accessor(task => task.completionPercentage)
+   *   .percentage({
+   *     locale: 'en-US',
+   *     minimumFractionDigits: 0,
+   *     maximumFractionDigits: 1,
+   *     format: 'percentage'
+   *   })
+   *   .build();
+   * ```
    */
   percentage(
     options: {
@@ -148,7 +253,29 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Set number formatting options
+   * Set number formatting options.
+   *
+   * Configures how numeric values are displayed, including
+   * locale settings, decimal places, and notation styles.
+   *
+   * @param options - Number formatting configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const countColumn = new NumberColumnBuilder<Item>()
+   *   .id('count')
+   *   .displayName('Count')
+   *   .accessor(item => item.count)
+   *   .format({
+   *     locale: 'en-US',
+   *     minimumFractionDigits: 0,
+   *     maximumFractionDigits: 0,
+   *     useGrouping: true,
+   *     notation: 'standard'
+   *   })
+   *   .build();
+   * ```
    */
   format(
     options: {
@@ -186,7 +313,23 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Set decimal precision
+   * Set decimal precision for display.
+   *
+   * Configures the number of decimal places to show
+   * for numeric values in the column.
+   *
+   * @param digits - Number of decimal places to display
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const ratingColumn = new NumberColumnBuilder<Review>()
+   *   .id('rating')
+   *   .displayName('Rating')
+   *   .accessor(review => review.rating)
+   *   .precision(2)
+   *   .build();
+   * ```
    */
   precision(digits: number): this {
     this.config.meta = {
@@ -197,7 +340,26 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
   }
 
   /**
-   * Set number display as compact notation (e.g., 1K, 1M)
+   * Set number display as compact notation (e.g., 1K, 1M).
+   *
+   * Configures numeric values to be displayed in compact
+   * notation for better readability of large numbers.
+   *
+   * @param options - Compact notation configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const viewsColumn = new NumberColumnBuilder<Video>()
+   *   .id('views')
+   *   .displayName('Views')
+   *   .accessor(video => video.viewCount)
+   *   .compact({
+   *     locale: 'en-US',
+   *     compactDisplay: 'short'
+   *   })
+   *   .build();
+   * ```
    */
   compact(
     options: {

@@ -1,7 +1,39 @@
+/**
+ * @fileoverview Pagination manager for handling table pagination state and operations.
+ *
+ * This module provides comprehensive pagination management including state tracking,
+ * navigation operations, validation, and event-based subscriptions for reactive updates.
+ *
+ * @module managers/pagination-manager
+ */
+
 import type { PaginationConfig, PaginationParams, PaginationState } from '../types/pagination';
 
 /**
- * Event types for pagination manager
+ * Event types for pagination manager.
+ *
+ * Defines the different types of events that can be emitted by the pagination manager,
+ * enabling reactive updates and state synchronization.
+ *
+ * @example
+ * ```typescript
+ * const unsubscribe = paginationManager.subscribe((event) => {
+ *   switch (event.type) {
+ *     case 'page_changed':
+ *       console.log(`Page changed from ${event.previousPage} to ${event.page}`);
+ *       break;
+ *     case 'page_size_changed':
+ *       console.log(`Page size changed from ${event.previousPageSize} to ${event.pageSize}`);
+ *       break;
+ *     case 'total_updated':
+ *       console.log(`Total updated from ${event.previousTotal} to ${event.total}`);
+ *       break;
+ *     case 'pagination_reset':
+ *       console.log('Pagination was reset');
+ *       break;
+ *   }
+ * });
+ * ```
  */
 export type PaginationManagerEvent =
   | { type: 'page_changed'; page: number; previousPage: number }
@@ -10,22 +42,81 @@ export type PaginationManagerEvent =
   | { type: 'pagination_reset' };
 
 /**
- * Pagination manager subscriber function type
+ * Pagination manager subscriber function type.
+ *
+ * Defines the callback function signature for pagination event subscribers.
+ *
+ * @param event - The pagination event that occurred
+ *
+ * @example
+ * ```typescript
+ * const handlePaginationChange: PaginationManagerSubscriber = (event) => {
+ *   if (event.type === 'page_changed') {
+ *     // Handle page change
+ *     fetchData(event.page);
+ *   }
+ * };
+ * ```
  */
 export type PaginationManagerSubscriber = (event: PaginationManagerEvent) => void;
 
 /**
- * Pagination validation result
+ * Pagination validation result interface.
+ *
+ * Contains the result of validating pagination operations,
+ * including success status and error information.
+ *
+ * @example
+ * ```typescript
+ * const validation = paginationManager.validatePage(5);
+ * if (!validation.valid) {
+ *   console.error(validation.error);
+ * }
+ * ```
  */
 export interface PaginationValidationResult {
-  /** Whether the pagination is valid */
+  /** Whether the pagination operation is valid */
   valid: boolean;
-  /** Error message if invalid */
+  /** Error message if the operation is invalid */
   error?: string;
 }
 
 /**
- * Core pagination manager class for managing pagination state and operations
+ * Core pagination manager class for managing pagination state and operations.
+ *
+ * Provides comprehensive pagination management including state tracking,
+ * navigation operations, validation, and event-based subscriptions.
+ * Supports configurable page sizes, validation rules, and reactive updates.
+ *
+ * @example
+ * ```typescript
+ * const paginationManager = new PaginationManager({
+ *   defaultPageSize: 20,
+ *   pageSizeOptions: [10, 20, 50, 100],
+ *   maxPageSize: 1000,
+ *   showPageSizeSelector: true,
+ *   showPageNumbers: true,
+ *   pageNumbersToShow: 7,
+ *   showFirstLastButtons: true
+ * });
+ *
+ * // Subscribe to changes
+ * const unsubscribe = paginationManager.subscribe((event) => {
+ *   console.log('Pagination changed:', event);
+ * });
+ *
+ * // Navigate pages
+ * paginationManager.goToPage(2);
+ * paginationManager.nextPage();
+ * paginationManager.prevPage();
+ *
+ * // Change page size
+ * paginationManager.changePageSize(50);
+ *
+ * // Update total and reset
+ * paginationManager.setTotal(1000);
+ * paginationManager.reset();
+ * ```
  */
 export class PaginationManager {
   private paginationState: PaginationState = {
@@ -39,6 +130,30 @@ export class PaginationManager {
   private subscribers: PaginationManagerSubscriber[] = [];
   private config: PaginationConfig = {};
 
+  /**
+   * Create a new pagination manager instance.
+   *
+   * Initializes the pagination manager with configuration options and optional
+   * initial state. The manager will validate all operations against the provided
+   * configuration and emit events for state changes.
+   *
+   * @param config - Pagination configuration options
+   * @param initialState - Optional initial pagination state
+   *
+   * @example
+   * ```typescript
+   * const paginationManager = new PaginationManager({
+   *   defaultPageSize: 25,
+   *   pageSizeOptions: [10, 25, 50, 100],
+   *   maxPageSize: 500,
+   *   showPageSizeSelector: true,
+   *   pageNumbersToShow: 5
+   * }, {
+   *   page: 1,
+   *   limit: 25
+   * });
+   * ```
+   */
   constructor(config: PaginationConfig = {}, initialState?: Partial<PaginationState>) {
     this.config = {
       defaultPageSize: 10,
@@ -66,14 +181,37 @@ export class PaginationManager {
   }
 
   /**
-   * Get current pagination state
+   * Get current pagination state.
+   *
+   * Returns a copy of the current pagination state including page number,
+   * page size, total pages, and navigation flags.
+   *
+   * @returns Current pagination state
+   *
+   * @example
+   * ```typescript
+   * const state = paginationManager.getPagination();
+   * console.log(`Page ${state.page} of ${state.totalPages}`);
+   * console.log(`Has next: ${state.hasNext}, Has prev: ${state.hasPrev}`);
+   * ```
    */
   getPagination(): PaginationState {
     return { ...this.paginationState };
   }
 
   /**
-   * Get current pagination params for API requests
+   * Get current pagination params for API requests.
+   *
+   * Returns the current page and limit parameters formatted for API requests.
+   * This is the minimal data needed for server-side pagination.
+   *
+   * @returns Pagination parameters for API calls
+   *
+   * @example
+   * ```typescript
+   * const params = paginationManager.getPaginationParams();
+   * const response = await fetch(`/api/data?page=${params.page}&limit=${params.limit}`);
+   * ```
    */
   getPaginationParams(): PaginationParams {
     return {
@@ -83,7 +221,22 @@ export class PaginationManager {
   }
 
   /**
-   * Set total count and update pagination state
+   * Set total count and update pagination state.
+   *
+   * Updates the total number of items and recalculates pagination metadata
+   * including total pages and navigation flags. Emits a 'total_updated' event.
+   *
+   * @param total - Total number of items across all pages
+   *
+   * @example
+   * ```typescript
+   * // After fetching data from API
+   * const response = await fetch('/api/data');
+   * const data = await response.json();
+   *
+   * paginationManager.setTotal(data.total);
+   * // This will recalculate totalPages, hasNext, hasPrev, etc.
+   * ```
    */
   setTotal(total: number): void {
     const previousTotal = this.total;
@@ -100,7 +253,23 @@ export class PaginationManager {
   }
 
   /**
-   * Go to specific page
+   * Go to specific page.
+   *
+   * Navigates to the specified page number with validation. Throws an error
+   * if the page number is invalid. Emits a 'page_changed' event on success.
+   *
+   * @param page - Page number to navigate to (1-based)
+   * @throws {Error} If the page number is invalid
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   paginationManager.goToPage(3);
+   *   console.log('Successfully navigated to page 3');
+   * } catch (error) {
+   *   console.error('Invalid page:', error.message);
+   * }
+   * ```
    */
   goToPage(page: number): void {
     const validation = this.validatePage(page);
@@ -114,7 +283,17 @@ export class PaginationManager {
   }
 
   /**
-   * Go to next page
+   * Go to next page.
+   *
+   * Navigates to the next page if available. Does nothing if already on
+   * the last page. Emits a 'page_changed' event if navigation occurs.
+   *
+   * @example
+   * ```typescript
+   * if (paginationManager.hasNext()) {
+   *   paginationManager.nextPage();
+   * }
+   * ```
    */
   nextPage(): void {
     if (this.paginationState.hasNext) {
@@ -123,7 +302,17 @@ export class PaginationManager {
   }
 
   /**
-   * Go to previous page
+   * Go to previous page.
+   *
+   * Navigates to the previous page if available. Does nothing if already on
+   * the first page. Emits a 'page_changed' event if navigation occurs.
+   *
+   * @example
+   * ```typescript
+   * if (paginationManager.hasPrev()) {
+   *   paginationManager.prevPage();
+   * }
+   * ```
    */
   prevPage(): void {
     if (this.paginationState.hasPrev) {
@@ -148,7 +337,24 @@ export class PaginationManager {
   }
 
   /**
-   * Change page size
+   * Change page size.
+   *
+   * Updates the number of items per page and recalculates the current page
+   * to maintain the user's position in the dataset. Validates the page size
+   * against configuration constraints. Emits a 'page_size_changed' event.
+   *
+   * @param pageSize - New page size (items per page)
+   * @throws {Error} If the page size is invalid
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   paginationManager.changePageSize(50);
+   *   console.log('Page size changed to 50');
+   * } catch (error) {
+   *   console.error('Invalid page size:', error.message);
+   * }
+   * ```
    */
   changePageSize(pageSize: number): void {
     const validation = this.validatePageSize(pageSize);
@@ -172,7 +378,17 @@ export class PaginationManager {
   }
 
   /**
-   * Reset pagination to initial state
+   * Reset pagination to initial state.
+   *
+   * Resets the pagination manager to its initial state with page 1,
+   * default page size, and zero total. Emits a 'pagination_reset' event.
+   *
+   * @example
+   * ```typescript
+   * // Clear all data and reset pagination
+   * paginationManager.reset();
+   * console.log('Pagination reset to initial state');
+   * ```
    */
   reset(): void {
     this.updateState({
@@ -222,7 +438,24 @@ export class PaginationManager {
   }
 
   /**
-   * Get page numbers to show in pagination UI
+   * Get page numbers to show in pagination UI.
+   *
+   * Calculates which page numbers should be displayed in the pagination
+   * UI based on the current page and configuration. Handles edge cases
+   * for beginning and end of page ranges.
+   *
+   * @returns Array of page numbers to display
+   *
+   * @example
+   * ```typescript
+   * const pageNumbers = paginationManager.getPageNumbers();
+   * // Returns something like [1, 2, 3, 4, 5] or [3, 4, 5, 6, 7]
+   *
+   * // Render pagination buttons
+   * pageNumbers.forEach(pageNum => {
+   *   renderPageButton(pageNum, pageNum === paginationManager.getCurrentPage());
+   * });
+   * ```
    */
   getPageNumbers(): number[] {
     const { page, totalPages } = this.paginationState;
@@ -352,7 +585,36 @@ export class PaginationManager {
   }
 
   /**
-   * Subscribe to pagination changes
+   * Subscribe to pagination changes.
+   *
+   * Registers a callback function to be called whenever pagination state changes.
+   * Returns an unsubscribe function to remove the subscription.
+   *
+   * @param callback - Function to call when pagination changes
+   * @returns Unsubscribe function to remove the subscription
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = paginationManager.subscribe((event) => {
+   *   switch (event.type) {
+   *     case 'page_changed':
+   *       console.log(`Page changed to ${event.page}`);
+   *       break;
+   *     case 'page_size_changed':
+   *       console.log(`Page size changed to ${event.pageSize}`);
+   *       break;
+   *     case 'total_updated':
+   *       console.log(`Total updated to ${event.total}`);
+   *       break;
+   *     case 'pagination_reset':
+   *       console.log('Pagination was reset');
+   *       break;
+   *   }
+   * });
+   *
+   * // Later, unsubscribe
+   * unsubscribe();
+   * ```
    */
   subscribe(callback: PaginationManagerSubscriber): () => void {
     this.subscribers.push(callback);
@@ -378,7 +640,24 @@ export class PaginationManager {
   }
 
   /**
-   * Clone the pagination manager with the same configuration
+   * Clone the pagination manager with the same configuration.
+   *
+   * Creates a new pagination manager instance with the same configuration
+   * and current state. Useful for creating backup instances or managing
+   * multiple pagination contexts.
+   *
+   * @returns New pagination manager instance with copied state
+   *
+   * @example
+   * ```typescript
+   * const originalManager = new PaginationManager(config);
+   * originalManager.setTotal(1000);
+   * originalManager.goToPage(5);
+   *
+   * // Create a backup
+   * const backupManager = originalManager.clone();
+   * console.log('Backup created with same state');
+   * ```
    */
   clone(): PaginationManager {
     const cloned = new PaginationManager(this.config, this.paginationState);

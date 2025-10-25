@@ -1,8 +1,43 @@
+/**
+ * @fileoverview Sorting manager for handling table sorting state and operations.
+ *
+ * This module provides comprehensive sorting management including single and multi-column
+ * sorting, validation, event-based subscriptions, and configuration management.
+ *
+ * @module managers/sorting-manager
+ */
+
 import type { ColumnDefinition } from '../types/column';
 import type { SortDirection, SortingConfig, SortingParams, SortingState } from '../types/sorting';
 
 /**
- * Event types for sorting manager
+ * Event types for sorting manager.
+ *
+ * Defines the different types of events that can be emitted by the sorting manager,
+ * enabling reactive updates and state synchronization.
+ *
+ * @example
+ * ```typescript
+ * const unsubscribe = sortingManager.subscribe((event) => {
+ *   switch (event.type) {
+ *     case 'sort_added':
+ *       console.log(`Sort added for column ${event.sort.columnId}`);
+ *       break;
+ *     case 'sort_updated':
+ *       console.log(`Sort updated for column ${event.columnId}`);
+ *       break;
+ *     case 'sort_removed':
+ *       console.log(`Sort removed for column ${event.columnId}`);
+ *       break;
+ *     case 'sorts_cleared':
+ *       console.log('All sorts cleared');
+ *       break;
+ *     case 'direction_toggled':
+ *       console.log(`Direction toggled for ${event.columnId} to ${event.direction}`);
+ *       break;
+ *   }
+ * });
+ * ```
  */
 export type SortingManagerEvent =
   | { type: 'sort_added'; sort: SortingParams }
@@ -13,22 +48,79 @@ export type SortingManagerEvent =
   | { type: 'direction_toggled'; columnId: string; direction: SortDirection };
 
 /**
- * Sorting manager subscriber function type
+ * Sorting manager subscriber function type.
+ *
+ * Defines the callback function signature for sorting event subscribers.
+ *
+ * @param event - The sorting event that occurred
+ *
+ * @example
+ * ```typescript
+ * const handleSortingChange: SortingManagerSubscriber = (event) => {
+ *   if (event.type === 'sort_added') {
+ *     // Handle new sort
+ *     updateTableData();
+ *   }
+ * };
+ * ```
  */
 export type SortingManagerSubscriber = (event: SortingManagerEvent) => void;
 
 /**
- * Sorting validation result
+ * Sorting validation result interface.
+ *
+ * Contains the result of validating sorting operations,
+ * including success status and error information.
+ *
+ * @example
+ * ```typescript
+ * const validation = sortingManager.validateSort({ columnId: 'name', direction: 'asc' });
+ * if (!validation.valid) {
+ *   console.error(validation.error);
+ * }
+ * ```
  */
 export interface SortingValidationResult {
-  /** Whether the sort is valid */
+  /** Whether the sorting operation is valid */
   valid: boolean;
-  /** Error message if invalid */
+  /** Error message if the operation is invalid */
   error?: string;
 }
 
 /**
- * Core sorting manager class for managing sorting state and operations
+ * Core sorting manager class for managing sorting state and operations.
+ *
+ * Provides comprehensive sorting management including single and multi-column sorting,
+ * validation against column definitions, event-based subscriptions, and configuration
+ * management. Supports both client-side and server-side sorting patterns.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const sortingManager = new SortingManager(columns, {
+ *   enabled: true,
+ *   multiSort: true,
+ *   maxSortColumns: 3,
+ *   resetOnClick: false
+ * });
+ *
+ * // Subscribe to changes
+ * const unsubscribe = sortingManager.subscribe((event) => {
+ *   console.log('Sorting changed:', event);
+ * });
+ *
+ * // Add sorts
+ * sortingManager.addSort('name', 'asc');
+ * sortingManager.addSort('age', 'desc');
+ *
+ * // Toggle sorting
+ * sortingManager.toggleSort('name');
+ *
+ * // Check state
+ * console.log('Is sorted:', sortingManager.isSorted('name'));
+ * console.log('Sort direction:', sortingManager.getSortDirection('name'));
+ * ```
  */
 export class SortingManager<TData = unknown> {
   private sortingState: SortingState = [];
@@ -36,6 +128,30 @@ export class SortingManager<TData = unknown> {
   private subscribers: SortingManagerSubscriber[] = [];
   private config: SortingConfig = {};
 
+  /**
+   * Create a new sorting manager instance.
+   *
+   * Initializes the sorting manager with column definitions, configuration options,
+   * and optional initial sorting state. The manager will validate all sorting
+   * operations against the column definitions and emit events for state changes.
+   *
+   * @param columns - Array of column definitions to validate sorts against
+   * @param config - Sorting configuration options
+   * @param initialSort - Optional initial sorting state
+   *
+   * @example
+   * ```typescript
+   * const sortingManager = new SortingManager(columns, {
+   *   enabled: true,
+   *   multiSort: true,
+   *   maxSortColumns: 3,
+   *   resetOnClick: false
+   * }, [
+   *   { columnId: 'name', direction: 'asc' },
+   *   { columnId: 'age', direction: 'desc' }
+   * ]);
+   * ```
+   */
   constructor(
     columns: ColumnDefinition<TData>[],
     config: SortingConfig = {},
@@ -59,14 +175,40 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Get current sorting state
+   * Get current sorting state.
+   *
+   * Returns a copy of the current sorting state including all active sorts
+   * in priority order (first sort has highest priority).
+   *
+   * @returns Current sorting state
+   *
+   * @example
+   * ```typescript
+   * const sorts = sortingManager.getSorting();
+   * console.log('Active sorts:', sorts);
+   * // Output: [{ columnId: 'name', direction: 'asc' }, { columnId: 'age', direction: 'desc' }]
+   * ```
    */
   getSorting(): SortingState {
     return [...this.sortingState];
   }
 
   /**
-   * Set sorting state (replaces all existing sorts)
+   * Set sorting state (replaces all existing sorts).
+   *
+   * Replaces the current sorting state with the provided sorts. Validates
+   * all sorts against column definitions and enforces multi-sort limits.
+   * Emits a 'sorts_replaced' event.
+   *
+   * @param sorts - New sorting state to set
+   *
+   * @example
+   * ```typescript
+   * sortingManager.setSorting([
+   *   { columnId: 'name', direction: 'asc' },
+   *   { columnId: 'age', direction: 'desc' }
+   * ]);
+   * ```
    */
   setSorting(sorts: SortingState): void {
     if (!this.config.enabled) {
@@ -92,7 +234,25 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Toggle sorting for a column
+   * Toggle sorting for a column.
+   *
+   * Cycles through sort states for a column: none → asc → desc → none (if resetOnClick).
+   * If the column is not currently sorted, adds it with 'asc' direction.
+   * If already sorted, toggles the direction or removes the sort based on configuration.
+   *
+   * @param columnId - Column identifier to toggle sorting for
+   *
+   * @example
+   * ```typescript
+   * // First click: sort asc
+   * sortingManager.toggleSort('name');
+   *
+   ** Second click: sort desc
+   * sortingManager.toggleSort('name');
+   *
+   ** Third click: remove sort (if resetOnClick is enabled)
+   * sortingManager.toggleSort('name');
+   * ```
    */
   toggleSort(columnId: string): void {
     if (!this.config.enabled) {
@@ -119,7 +279,26 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Add or update sorting for a column
+   * Add or update sorting for a column.
+   *
+   * Adds a new sort or updates an existing sort for the specified column.
+   * Validates the sort against column definitions and enforces multi-sort limits.
+   * In single-sort mode, replaces all existing sorts. In multi-sort mode, adds to the list.
+   *
+   * @param columnId - Column identifier to sort by
+   * @param direction - Sort direction ('asc' or 'desc')
+   * @throws {Error} If the sort is invalid
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   sortingManager.addSort('name', 'asc');
+   *   sortingManager.addSort('age', 'desc');
+   *   console.log('Sorts added successfully');
+   * } catch (error) {
+   *   console.error('Invalid sort:', error.message);
+   * }
+   * ```
    */
   addSort(columnId: string, direction: SortDirection): void {
     if (!this.config.enabled) {
@@ -164,7 +343,19 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Update sorting direction for a column
+   * Update sorting direction for a column.
+   *
+   * Updates the sort direction for an existing sort. Does nothing if the column
+   * is not currently sorted. Emits both 'sort_updated' and 'direction_toggled' events.
+   *
+   * @param columnId - Column identifier to update
+   * @param direction - New sort direction ('asc' or 'desc')
+   *
+   * @example
+   * ** Change existing sort from asc to desc
+   * ```typescript
+   * sortingManager.updateSort('name', 'desc');
+   * ```
    */
   updateSort(columnId: string, direction: SortDirection): void {
     const index = this.sortingState.findIndex((s) => s.columnId === columnId);
@@ -181,7 +372,18 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Remove sorting for a column
+   * Remove sorting for a column.
+   *
+   * Removes the sort for the specified column if it exists. Does nothing
+   * if the column is not currently sorted. Emits a 'sort_removed' event.
+   *
+   * @param columnId - Column identifier to remove sorting for
+   *
+   * @example
+   * ```typescript
+   * sortingManager.removeSort('name');
+   * console.log('Sort removed for name column');
+   * ```
    */
   removeSort(columnId: string): void {
     const index = this.sortingState.findIndex((s) => s.columnId === columnId);
@@ -192,7 +394,16 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Clear all sorting
+   * Clear all sorting.
+   *
+   * Removes all active sorts and resets the sorting state to empty.
+   * Emits a 'sorts_cleared' event.
+   *
+   * @example
+   * ```typescript
+   * sortingManager.clearSorting();
+   * console.log('All sorts cleared');
+   * ```
    */
   clearSorting(): void {
     this.sortingState = [];
@@ -207,14 +418,41 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Check if column is currently sorted
+   * Check if column is currently sorted.
+   *
+   * Determines whether the specified column has an active sort,
+   * regardless of direction.
+   *
+   * @param columnId - Column identifier to check
+   * @returns True if the column is currently sorted
+   *
+   * @example
+   * ```typescript
+   * if (sortingManager.isSorted('name')) {
+   *   console.log('Name column is sorted');
+   * }
+   * ```
    */
   isSorted(columnId: string): boolean {
     return this.sortingState.some((s) => s.columnId === columnId);
   }
 
   /**
-   * Get sort direction for a column
+   * Get sort direction for a column.
+   *
+   * Returns the current sort direction for the specified column,
+   * or undefined if the column is not currently sorted.
+   *
+   * @param columnId - Column identifier to get direction for
+   * @returns Sort direction ('asc' or 'desc') or undefined
+   *
+   * @example
+   * ```typescript
+   * const direction = sortingManager.getSortDirection('name');
+   * if (direction) {
+   *   console.log(`Name column is sorted ${direction}`);
+   * }
+   * ```
    */
   getSortDirection(columnId: string): SortDirection | undefined {
     const sort = this.sortingState.find((s) => s.columnId === columnId);
@@ -222,7 +460,21 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Get sort priority for a column (lower number = higher priority)
+   * Get sort priority for a column (lower number = higher priority).
+   *
+   * Returns the priority index of the specified column in the sorting order.
+   * Lower numbers indicate higher priority (0 = highest priority).
+   *
+   * @param columnId - Column identifier to get priority for
+   * @returns Priority index (0-based) or undefined if not sorted
+   *
+   * @example
+   * ```typescript
+   * const priority = sortingManager.getSortPriority('name');
+   * if (priority !== undefined) {
+   *   console.log(`Name column has priority ${priority}`);
+   * }
+   * ```
    */
   getSortPriority(columnId: string): number | undefined {
     const index = this.sortingState.findIndex((s) => s.columnId === columnId);
@@ -251,7 +503,25 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Validate a sort against column definitions
+   * Validate a sort against column definitions.
+   *
+   * Checks whether a sort operation is valid by verifying the column exists,
+   * is sortable, and has a valid direction.
+   *
+   * @param sort - Sort parameters to validate
+   * @returns Validation result with success status and error information
+   *
+   * @example
+   * ```typescript
+   * const validation = sortingManager.validateSort({
+   *   columnId: 'name',
+   *   direction: 'asc'
+   * });
+   *
+   * if (!validation.valid) {
+   *   console.error('Invalid sort:', validation.error);
+   * }
+   * ```
    */
   validateSort(sort: SortingParams): SortingValidationResult {
     const column = this.columns.find((c) => c.id === sort.columnId);
@@ -274,7 +544,39 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Subscribe to sorting changes
+   * Subscribe to sorting changes.
+   *
+   * Registers a callback function to be called whenever sorting state changes.
+   * Returns an unsubscribe function to remove the subscription.
+   *
+   * @param callback - Function to call when sorting changes
+   * @returns Unsubscribe function to remove the subscription
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = sortingManager.subscribe((event) => {
+   *   switch (event.type) {
+   *     case 'sort_added':
+   *       console.log(`Sort added for ${event.sort.columnId}`);
+   *       break;
+   *     case 'sort_updated':
+   *       console.log(`Sort updated for ${event.columnId}`);
+   *       break;
+   *     case 'sort_removed':
+   *       console.log(`Sort removed for ${event.columnId}`);
+   *       break;
+   *     case 'sorts_cleared':
+   *       console.log('All sorts cleared');
+   *       break;
+   *     case 'direction_toggled':
+   *       console.log(`Direction toggled for ${event.columnId} to ${event.direction}`);
+   *       break;
+   *   }
+   * });
+   *
+   * // Later, unsubscribe
+   * unsubscribe();
+   * ```
    */
   subscribe(callback: SortingManagerSubscriber): () => void {
     this.subscribers.push(callback);
@@ -326,7 +628,23 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
-   * Clone the sorting manager with the same configuration
+   * Clone the sorting manager with the same configuration.
+   *
+   * Creates a new sorting manager instance with the same configuration
+   * and current state. Useful for creating backup instances or managing
+   * multiple sorting contexts.
+   *
+   * @returns New sorting manager instance with copied state
+   *
+   * @example
+   * ```typescript
+   * const originalManager = new SortingManager(columns, config);
+   * originalManager.addSort('name', 'asc');
+   *
+   * // Create a backup
+   * const backupManager = originalManager.clone();
+   * console.log('Backup created with same state');
+   * ```
    */
   clone(): SortingManager<TData> {
     return new SortingManager(this.columns, this.config, this.sortingState);
