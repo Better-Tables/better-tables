@@ -105,7 +105,9 @@ export function createTableStore(initialState: TableStoreInitialState) {
             return state;
           }
 
+          // IMPORTANT: Must preserve manager reference and all actions
           return {
+            ...state, // Preserve manager and all action functions
             filters: event.state.filters,
             pagination: event.state.pagination,
             sorting: event.state.sorting,
