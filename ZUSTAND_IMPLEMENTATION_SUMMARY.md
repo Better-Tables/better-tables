@@ -26,7 +26,6 @@ Successfully refactored Better Tables to use internal Zustand state management, 
   - `useTablePagination()` - Selective subscription to pagination
   - `useTableSorting()` - Selective subscription to sorting
   - `useTableSelection()` - Selective subscription to row selection
-  - `useTableInit()` - Initialize store with initial state
 
 - **`src/stores/url-sync-adapter.ts`**: Framework-agnostic URL synchronization
   - `UrlSyncAdapter` interface for custom implementations

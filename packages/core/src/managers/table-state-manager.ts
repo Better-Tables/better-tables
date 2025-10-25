@@ -529,5 +529,15 @@ export class TableStateManager<TData = unknown> {
     // Reinitialize filter manager with new columns
     const currentFilters = this.filterManager.getFilters();
     this.filterManager = new FilterManager(columns, currentFilters);
+
+    // Re-establish subscription to new FilterManager
+    this.filterManager.subscribe(() => {
+      // Listen to all filter events and update state
+      // Invalidate cache to force new reference
+      this.cachedFilters = null;
+      const filters = this.filterManager.getFilters();
+      this.notifySubscribers({ type: 'filters_changed', filters });
+      this.notifyStateChanged();
+    });
   }
 }

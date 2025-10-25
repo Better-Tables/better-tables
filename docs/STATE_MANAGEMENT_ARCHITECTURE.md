@@ -170,15 +170,15 @@ The architecture is designed to be composable - you can use features independent
 function MyTable() {
   const urlAdapter = useNextjsUrlAdapter();
   
-  // BetterTable creates the store
-  <BetterTable id="my-table" columns={columns} data={data} />
-  
   // useTableUrlSync syncs it with URL
   useTableUrlSync('my-table', {
     filters: true,
     pagination: true,
     sorting: true
   }, urlAdapter);
+
+  // BetterTable creates the store
+  return <BetterTable id="my-table" columns={columns} data={data} />;
 }
 ```
 

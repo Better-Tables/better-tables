@@ -9,7 +9,7 @@ import {
 } from '../../hooks/use-table-store';
 import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
-import { getOrCreateTableStore } from '../../stores/table-registry';
+import { destroyTableStore, getOrCreateTableStore } from '../../stores/table-registry';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
@@ -144,6 +144,13 @@ export function BetterTable<TData = unknown>({
   const { pagination, setPage, setPageSize } = useTablePagination(id);
   const { sorting: sortingState, toggleSort } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
+
+  // Cleanup store on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      destroyTableStore(id);
+    };
+  }, [id]);
 
   // Update pagination totalPages when totalCount changes
   useEffect(() => {
