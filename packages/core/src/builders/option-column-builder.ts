@@ -1,8 +1,36 @@
+/**
+ * @fileoverview Option column builder for single-select dropdown columns.
+ *
+ * This module provides a specialized column builder for single-select option columns,
+ * including predefined status/priority configurations and async option loading.
+ *
+ * @module builders/option-column-builder
+ */
+
 import type { FilterConfig, FilterOption } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
 /**
- * Option column builder for single-select dropdown columns
+ * Option column builder for single-select dropdown columns.
+ *
+ * Extends the base column builder with specialized methods for single-select
+ * option columns, including status, priority, and category configurations.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const statusColumn = new OptionColumnBuilder<User>()
+ *   .id('status')
+ *   .displayName('Status')
+ *   .accessor(user => user.status)
+ *   .status([
+ *     { value: 'active', label: 'Active', color: 'green' },
+ *     { value: 'inactive', label: 'Inactive', color: 'red' }
+ *   ])
+ *   .showBadges({ variant: 'default' })
+ *   .build();
+ * ```
  */
 export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string> {
   constructor() {
@@ -10,7 +38,32 @@ export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, s
   }
 
   /**
-   * Set available options for the column
+   * Set available options for the column.
+   *
+   * Configures the available options for single-select filtering
+   * with validation, search capabilities, and placeholder text.
+   *
+   * @param options - Array of available filter options
+   * @param config - Option configuration settings
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const departmentColumn = new OptionColumnBuilder<Employee>()
+   *   .id('department')
+   *   .displayName('Department')
+   *   .accessor(employee => employee.department)
+   *   .options([
+   *     { value: 'engineering', label: 'Engineering', color: 'blue' },
+   *     { value: 'marketing', label: 'Marketing', color: 'purple' },
+   *     { value: 'sales', label: 'Sales', color: 'green' }
+   *   ], {
+   *     includeNull: false,
+   *     searchable: true,
+   *     placeholder: 'Select department...'
+   *   })
+   *   .build();
+   * ```
    */
   options(
     options: FilterOption[],
@@ -47,7 +100,23 @@ export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, s
   }
 
   /**
-   * Set specific option operators
+   * Set specific option operators for filtering.
+   *
+   * Configures which option-based filter operators are available
+   * for this column, allowing fine-grained control over filtering.
+   *
+   * @param operators - Array of option filter operators to enable
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const categoryColumn = new OptionColumnBuilder<Product>()
+   *   .id('category')
+   *   .displayName('Category')
+   *   .accessor(product => product.category)
+   *   .optionOperators(['is', 'isNot', 'isAnyOf'])
+   *   .build();
+   * ```
    */
   optionOperators(operators: Array<'is' | 'isNot' | 'isAnyOf' | 'isNoneOf'>): this {
     this.config.filter = {
@@ -58,7 +127,31 @@ export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, s
   }
 
   /**
-   * Load options from an async source
+   * Load options from an async source.
+   *
+   * Configures the column to load options dynamically from an async source,
+   * useful for large datasets or when options change frequently.
+   *
+   * @param optionsLoader - Function that returns a promise of options
+   * @param config - Async option configuration settings
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const countryColumn = new OptionColumnBuilder<User>()
+   *   .id('country')
+   *   .displayName('Country')
+   *   .accessor(user => user.country)
+   *   .asyncOptions(
+   *     () => fetch('/api/countries').then(res => res.json()),
+   *     {
+   *       searchable: true,
+   *       placeholder: 'Select country...',
+   *       loadingPlaceholder: 'Loading countries...'
+   *     }
+   *   )
+   *   .build();
+   * ```
    */
   asyncOptions(
     optionsLoader: () => Promise<FilterOption[]>,

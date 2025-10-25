@@ -1,8 +1,36 @@
+/**
+ * @fileoverview Multi-option column builder for multi-select columns.
+ *
+ * This module provides a specialized column builder for multi-select option columns,
+ * including tags, categories, roles, and validation configurations.
+ *
+ * @module builders/multi-option-column-builder
+ */
+
 import type { FilterConfig, FilterOption } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
 /**
- * Multi-option column builder for multi-select columns
+ * Multi-option column builder for multi-select columns.
+ *
+ * Extends the base column builder with specialized methods for multi-select
+ * option columns, including tags, categories, roles, and validation configurations.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const tagsColumn = new MultiOptionColumnBuilder<Article>()
+ *   .id('tags')
+ *   .displayName('Tags')
+ *   .accessor(article => article.tags)
+ *   .tags([
+ *     { value: 'javascript', label: 'JavaScript', color: 'yellow' },
+ *     { value: 'react', label: 'React', color: 'blue' }
+ *   ], { allowCreate: true, maxTags: 5 })
+ *   .showBadges({ removable: true })
+ *   .build();
+ * ```
  */
 export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string[]> {
   constructor() {
@@ -10,7 +38,34 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
   }
 
   /**
-   * Set available options for the multi-select column
+   * Set available options for the multi-select column.
+   *
+   * Configures the available options for multi-select filtering
+   * with validation, search capabilities, and selection limits.
+   *
+   * @param options - Array of available filter options
+   * @param config - Multi-option configuration settings
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const skillsColumn = new MultiOptionColumnBuilder<Developer>()
+   *   .id('skills')
+   *   .displayName('Skills')
+   *   .accessor(developer => developer.skills)
+   *   .options([
+   *     { value: 'javascript', label: 'JavaScript', color: 'yellow' },
+   *     { value: 'python', label: 'Python', color: 'green' },
+   *     { value: 'react', label: 'React', color: 'blue' }
+   *   ], {
+   *     includeNull: false,
+   *     searchable: true,
+   *     maxSelections: 10,
+   *     minSelections: 1,
+   *     placeholder: 'Select skills...'
+   *   })
+   *   .build();
+   * ```
    */
   options(
     options: FilterOption[],
@@ -67,7 +122,23 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
   }
 
   /**
-   * Set specific multi-option operators
+   * Set specific multi-option operators for filtering.
+   *
+   * Configures which multi-option filter operators are available
+   * for this column, allowing fine-grained control over filtering.
+   *
+   * @param operators - Array of multi-option filter operators to enable
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const categoriesColumn = new MultiOptionColumnBuilder<Product>()
+   *   .id('categories')
+   *   .displayName('Categories')
+   *   .accessor(product => product.categories)
+   *   .multiOptionOperators(['includes', 'excludes', 'includesAny'])
+   *   .build();
+   * ```
    */
   multiOptionOperators(
     operators: Array<
@@ -82,7 +153,32 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
   }
 
   /**
-   * Load options from an async source
+   * Load options from an async source for multi-select.
+   *
+   * Configures the column to load options dynamically from an async source,
+   * useful for large datasets or when options change frequently.
+   *
+   * @param optionsLoader - Function that returns a promise of options
+   * @param config - Async multi-option configuration settings
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const permissionsColumn = new MultiOptionColumnBuilder<User>()
+   *   .id('permissions')
+   *   .displayName('Permissions')
+   *   .accessor(user => user.permissions)
+   *   .asyncOptions(
+   *     () => fetch('/api/permissions').then(res => res.json()),
+   *     {
+   *       searchable: true,
+   *       maxSelections: 20,
+   *       placeholder: 'Select permissions...',
+   *       loadingPlaceholder: 'Loading permissions...'
+   *     }
+   *   )
+   *   .build();
+   * ```
    */
   asyncOptions(
     optionsLoader: () => Promise<FilterOption[]>,
@@ -143,7 +239,33 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
   }
 
   /**
-   * Configure as tags column
+   * Configure as tags column.
+   *
+   * Sets up the column for tag-based multi-selection with optional
+   * tag creation and count display capabilities.
+   *
+   * @param tags - Array of available tag options
+   * @param config - Tags configuration settings
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const tagsColumn = new MultiOptionColumnBuilder<Article>()
+   *   .id('tags')
+   *   .displayName('Tags')
+   *   .accessor(article => article.tags)
+   *   .tags([
+   *     { value: 'javascript', label: 'JavaScript', color: 'yellow' },
+   *     { value: 'react', label: 'React', color: 'blue' },
+   *     { value: 'typescript', label: 'TypeScript', color: 'blue' }
+   *   ], {
+   *     allowCreate: true,
+   *     maxTags: 5,
+   *     minTags: 1,
+   *     searchable: true
+   *   })
+   *   .build();
+   * ```
    */
   tags(
     tags: FilterOption[],
@@ -250,7 +372,28 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
   }
 
   /**
-   * Set display format for multiple values
+   * Set display format for multiple values.
+   *
+   * Configures how multiple selected values are displayed in the column,
+   * including chips, comma-separated, count, or first-item formats.
+   *
+   * @param format - Display format configuration
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const skillsColumn = new MultiOptionColumnBuilder<Developer>()
+   *   .id('skills')
+   *   .displayName('Skills')
+   *   .accessor(developer => developer.skills)
+   *   .displayFormat({
+   *     type: 'chips',
+   *     maxVisible: 3,
+   *     truncateText: '+{count} more',
+   *     showTooltip: true
+   *   })
+   *   .build();
+   * ```
    */
   displayFormat(format: {
     /** How to display multiple values (default: 'chips') */

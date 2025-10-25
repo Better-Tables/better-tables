@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Table configuration and feature types for better-tables setup.
+ *
+ * This module defines the main table configuration interface along with
+ * feature flags, bulk actions, export options, and UI state configurations.
+ *
+ * @module types/table
+ */
+
 import type { ComponentType } from 'react';
 import type { TableAdapter } from './adapter';
 import type { ColumnDefinition } from './column';
@@ -7,75 +16,119 @@ import type { PaginationConfig } from './pagination';
 import type { SortingConfig } from './sorting';
 
 /**
- * Table configuration
+ * Main table configuration interface.
+ *
+ * Defines the complete configuration for a table instance, including
+ * columns, features, adapters, and UI customization options.
+ *
+ * @template TData - The type of data managed by the table
+ *
+ * @example
+ * ```typescript
+ * const tableConfig: TableConfig<User> = {
+ *   id: 'users-table',
+ *   name: 'User Management',
+ *   columns: userColumns,
+ *   groups: filterGroups,
+ *   defaultFilters: [{ columnId: 'status', operator: 'equals', values: ['active'] }],
+ *   pagination: { defaultPageSize: 20 },
+ *   sorting: { enabled: true, multiSort: true },
+ *   bulkActions: [deleteAction, exportAction],
+ *   exportOptions: { formats: ['csv', 'excel'] },
+ *   adapter: userAdapter,
+ *   theme: darkTheme,
+ *   features: { filtering: true, sorting: true, pagination: true }
+ * };
+ * ```
  */
-export interface TableConfig<TData = any> {
-  /** Unique identifier for the table */
+export interface TableConfig<TData = unknown> {
+  /** Unique identifier for the table instance */
   id: string;
 
-  /** Display name for the table */
+  /** Human-readable display name for the table */
   name: string;
 
-  /** Column definitions */
+  /** Column definitions for the table */
   columns: ColumnDefinition<TData>[];
 
-  /** Filter group definitions */
+  /** Filter group definitions for organized filtering */
   groups?: FilterGroup[];
 
-  /** Default filters */
+  /** Default filters to apply on initialization */
   defaultFilters?: FilterState[];
 
-  /** Pagination configuration */
+  /** Pagination configuration and options */
   pagination?: PaginationConfig;
 
-  /** Sorting configuration */
+  /** Sorting configuration and options */
   sorting?: SortingConfig;
 
-  /** Bulk actions */
+  /** Bulk actions available for selected rows */
   bulkActions?: BulkActionDefinition<TData>[];
 
-  /** Export options */
+  /** Export configuration and options */
   exportOptions?: ExportConfig<TData>;
 
-  /** Adapter for data access */
+  /** Data adapter for table operations */
   adapter: TableAdapter<TData>;
 
-  /** UI theme */
+  /** UI theme and styling configuration */
   theme?: TableTheme;
 
-  /** Feature flags */
+  /** Feature flags to enable/disable table capabilities */
   features?: TableFeatures;
 
-  /** Row configuration */
+  /** Row-specific configuration and behavior */
   rowConfig?: RowConfig<TData>;
 
-  /** Empty state configuration */
+  /** Empty state configuration and customization */
   emptyState?: EmptyStateConfig;
 
-  /** Loading state configuration */
+  /** Loading state configuration and customization */
   loadingState?: LoadingStateConfig;
 
-  /** Error state configuration */
+  /** Error state configuration and customization */
   errorState?: ErrorStateConfig;
 }
 
 /**
- * Table features that can be enabled/disabled
+ * Table feature flags interface.
+ *
+ * Controls which features are enabled or disabled for the table,
+ * allowing fine-grained control over table capabilities.
+ *
+ * @example
+ * ```typescript
+ * const features: TableFeatures = {
+ *   filtering: true,
+ *   sorting: true,
+ *   pagination: true,
+ *   bulkActions: true,
+ *   export: true,
+ *   columnResizing: true,
+ *   columnReordering: false,
+ *   rowSelection: true,
+ *   virtualScrolling: false,
+ *   realTimeUpdates: true,
+ *   columnVisibility: true,
+ *   rowExpansion: false
+ * };
+ * ```
  */
 export interface TableFeatures {
-  /** Enable filtering */
+  /** Enable column filtering functionality */
   filtering?: boolean;
 
-  /** Enable sorting */
+  /** Enable column sorting functionality */
   sorting?: boolean;
 
-  /** Enable pagination */
+  /** Enable pagination functionality */
   pagination?: boolean;
 
-  /** Enable bulk actions */
+  /** Enable bulk actions for selected rows */
   bulkActions?: boolean;
 
-  /** Enable export */
+  /** Enable data export functionality */
   export?: boolean;
 
   /** Enable column resizing */
@@ -87,119 +140,213 @@ export interface TableFeatures {
   /** Enable row selection */
   rowSelection?: boolean;
 
-  /** Enable virtual scrolling */
+  /** Enable virtual scrolling for large datasets */
   virtualScrolling?: boolean;
 
-  /** Enable real-time updates */
+  /** Enable real-time data updates */
   realTimeUpdates?: boolean;
 
   /** Enable column visibility toggle */
   columnVisibility?: boolean;
 
-  /** Enable row expansion */
+  /** Enable row expansion functionality */
   rowExpansion?: boolean;
 }
 
 /**
- * Bulk action definition
+ * Bulk action definition interface.
+ *
+ * Defines actions that can be performed on multiple selected rows,
+ * including custom components and confirmation dialogs.
+ *
+ * @template TData - The type of data being acted upon
+ *
+ * @example
+ * ```typescript
+ * const deleteAction: BulkActionDefinition<User> = {
+ *   id: 'delete',
+ *   label: 'Delete Selected',
+ *   icon: TrashIcon,
+ *   variant: 'destructive',
+ *   handler: async (selectedIds, data) => {
+ *     await deleteUsers(selectedIds);
+ *   },
+ *   requiresConfirmation: true,
+ *   confirmationMessage: 'Are you sure you want to delete these users?'
+ * };
+ * ```
  */
-export interface BulkActionDefinition<TData = any> {
-  /** Action identifier */
+export interface BulkActionDefinition<TData = unknown> {
+  /** Unique identifier for the action */
   id: string;
 
-  /** Display label */
+  /** Display label for the action */
   label: string;
 
-  /** Action icon */
+  /** Icon component for the action */
   icon?: IconComponent;
 
-  /** Action variant */
+  /** Visual variant/style for the action */
   variant?: 'default' | 'primary' | 'secondary' | 'destructive';
 
-  /** Custom component for action */
+  /** Custom component for complex actions */
   component?: ComponentType<BulkActionProps>;
 
-  /** Action handler */
+  /** Action handler function */
   handler?: (selectedIds: string[], data?: TData[]) => void | Promise<void>;
 
-  /** Whether action requires confirmation */
+  /** Whether the action requires user confirmation */
   requiresConfirmation?: boolean;
 
-  /** Confirmation message */
+  /** Confirmation message to display */
   confirmationMessage?: string;
 }
 
 /**
- * Props for bulk action components
+ * Props interface for bulk action components.
+ *
+ * Provides necessary props for custom bulk action components,
+ * including selected data and event handlers.
+ *
+ * @example
+ * ```typescript
+ * const BulkDeleteComponent: React.FC<BulkActionProps> = ({
+ *   selectedIds,
+ *   onClose,
+ *   onSuccess,
+ *   onError
+ * }) => {
+ *   const handleDelete = async () => {
+ *     try {
+ *       await deleteUsers(selectedIds);
+ *       onSuccess();
+ *     } catch (error) {
+ *       onError(error);
+ *     }
+ *   };
+ *
+ *   return <button onClick={handleDelete}>Delete {selectedIds.length} users</button>;
+ * };
+ * ```
  */
 export interface BulkActionProps {
-  /** Selected row IDs */
+  /** Array of selected row identifiers */
   selectedIds: string[];
 
-  /** Close action handler */
+  /** Function to close the bulk action interface */
   onClose: () => void;
 
-  /** Success handler */
+  /** Function to call on successful action completion */
   onSuccess: () => void;
 
-  /** Error handler */
+  /** Function to call when an error occurs */
   onError: (error: Error) => void;
 }
 
 /**
- * Export configuration
+ * Export configuration interface.
+ *
+ * Configures data export options including available formats,
+ * custom handlers, and export behavior.
+ *
+ * @template TData - The type of data being exported
+ *
+ * @example
+ * ```typescript
+ * const exportConfig: ExportConfig<User> = {
+ *   formats: ['csv', 'excel', 'json'],
+ *   defaultFormat: 'csv',
+ *   customHandler: async (format, data) => {
+ *     if (format === 'custom') {
+ *       await customExport(data);
+ *     }
+ *   },
+ *   includeHiddenColumns: false
+ * };
+ * ```
  */
-export interface ExportConfig<TData = any> {
+export interface ExportConfig<TData = unknown> {
   /** Available export formats */
   formats?: ('csv' | 'json' | 'excel')[];
 
-  /** Default export format */
+  /** Default export format to use */
   defaultFormat?: 'csv' | 'json' | 'excel';
 
-  /** Custom export handler */
+  /** Custom export handler for special cases */
   customHandler?: (format: string, data: TData[]) => void | Promise<void>;
 
-  /** Whether to include hidden columns */
+  /** Whether to include hidden columns in exports */
   includeHiddenColumns?: boolean;
 }
 
 /**
- * Row configuration
+ * Row configuration interface.
+ *
+ * Configures row-specific behavior including selection, expansion,
+ * styling, and event handling.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const rowConfig: RowConfig<User> = {
+ *   getId: (user) => user.id,
+ *   isSelectable: (user) => user.status !== 'deleted',
+ *   isExpandable: (user) => user.hasDetails,
+ *   expandedContent: (user) => <UserDetails user={user} />,
+ *   onClick: (user) => navigateToUser(user.id),
+ *   className: (user) => user.status === 'active' ? 'active-row' : '',
+ *   style: (user) => ({ backgroundColor: user.isHighlighted ? '#fff3cd' : undefined })
+ * };
+ * ```
  */
-export interface RowConfig<TData = any> {
-  /** Row ID accessor */
+export interface RowConfig<TData = unknown> {
+  /** Function to extract unique row identifier */
   getId?: (row: TData) => string;
 
-  /** Whether row is selectable */
+  /** Function to determine if a row is selectable */
   isSelectable?: (row: TData) => boolean;
 
-  /** Whether row is expandable */
+  /** Function to determine if a row is expandable */
   isExpandable?: (row: TData) => boolean;
 
-  /** Expanded row content */
+  /** Function to render expanded row content */
   expandedContent?: (row: TData) => React.ReactNode;
 
-  /** Row click handler */
+  /** Click handler for row interactions */
   onClick?: EventHandler<TData>;
 
-  /** Row class name */
+  /** CSS class name or function to generate class name */
   className?: string | ((row: TData) => string);
 
-  /** Row styles */
+  /** CSS styles or function to generate styles */
   style?: React.CSSProperties | ((row: TData) => React.CSSProperties);
 }
 
 /**
- * Empty state configuration
+ * Empty state configuration interface.
+ *
+ * Configures the appearance and behavior of the empty state
+ * when no data is available to display.
+ *
+ * @example
+ * ```typescript
+ * const emptyState: EmptyStateConfig = {
+ *   title: 'No users found',
+ *   description: 'Try adjusting your filters or add some users to get started.',
+ *   icon: UsersIcon,
+ *   component: CustomEmptyState
+ * };
+ * ```
  */
 export interface EmptyStateConfig {
-  /** Empty state title */
+  /** Title text for the empty state */
   title?: string;
 
-  /** Empty state description */
+  /** Description text for the empty state */
   description?: string;
 
-  /** Empty state icon */
+  /** Icon component to display */
   icon?: IconComponent;
 
   /** Custom empty state component */
@@ -207,21 +354,50 @@ export interface EmptyStateConfig {
 }
 
 /**
- * Props for empty state component
+ * Props interface for empty state components.
+ *
+ * Provides necessary props for custom empty state components,
+ * including filter state and clear actions.
+ *
+ * @example
+ * ```typescript
+ * const CustomEmptyState: React.FC<EmptyStateProps> = ({
+ *   hasFilters,
+ *   onClearFilters
+ * }) => (
+ *   <div className="empty-state">
+ *     <h3>No data found</h3>
+ *     {hasFilters && (
+ *       <button onClick={onClearFilters}>Clear filters</button>
+ *     )}
+ *   </div>
+ * );
+ * ```
  */
 export interface EmptyStateProps {
-  /** Whether filters are applied */
+  /** Whether filters are currently applied */
   hasFilters: boolean;
 
-  /** Clear filters handler */
+  /** Function to clear all applied filters */
   onClearFilters: () => void;
 }
 
 /**
- * Loading state configuration
+ * Loading state configuration interface.
+ *
+ * Configures the appearance and behavior of the loading state
+ * while data is being fetched or processed.
+ *
+ * @example
+ * ```typescript
+ * const loadingState: LoadingStateConfig = {
+ *   message: 'Loading users...',
+ *   component: CustomLoadingSpinner
+ * };
+ * ```
  */
 export interface LoadingStateConfig {
-  /** Loading message */
+  /** Loading message to display */
   message?: string;
 
   /** Custom loading component */
@@ -229,26 +405,57 @@ export interface LoadingStateConfig {
 }
 
 /**
- * Error state configuration
+ * Error state configuration interface.
+ *
+ * Configures the appearance and behavior of error states
+ * when data loading or operations fail.
+ *
+ * @example
+ * ```typescript
+ * const errorState: ErrorStateConfig = {
+ *   title: 'Failed to load data',
+ *   component: CustomErrorComponent,
+ *   onRetry: () => refetchData()
+ * };
+ * ```
  */
 export interface ErrorStateConfig {
-  /** Error title */
+  /** Error title text */
   title?: string;
 
   /** Custom error component */
   component?: ComponentType<ErrorStateProps>;
 
-  /** Retry handler */
+  /** Retry handler function */
   onRetry?: () => void;
 }
 
 /**
- * Props for error state component
+ * Props interface for error state components.
+ *
+ * Provides necessary props for custom error state components,
+ * including error information and retry functionality.
+ *
+ * @example
+ * ```typescript
+ * const CustomErrorState: React.FC<ErrorStateProps> = ({
+ *   error,
+ *   onRetry
+ * }) => (
+ *   <div className="error-state">
+ *     <h3>Something went wrong</h3>
+ *     <p>{error.message}</p>
+ *     {onRetry && (
+ *       <button onClick={onRetry}>Try again</button>
+ *     )}
+ *   </div>
+ * );
+ * ```
  */
 export interface ErrorStateProps {
-  /** Error object */
+  /** Error object containing details about the failure */
   error: Error;
 
-  /** Retry handler */
+  /** Optional retry handler function */
   onRetry?: () => void;
 }

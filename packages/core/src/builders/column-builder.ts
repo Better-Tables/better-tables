@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Base column builder class with fluent API for creating column definitions.
+ *
+ * This module provides the foundational column builder class that implements the fluent API
+ * pattern for creating column definitions. All specialized column builders extend this base
+ * class to inherit common functionality while adding type-specific features.
+ *
+ * @module builders/column-builder
+ */
+
 import type { ReactNode } from 'react';
 import type {
   CellRendererProps,
@@ -10,11 +20,61 @@ import type { IconComponent } from '../types/common';
 import type { FilterConfig } from '../types/filter';
 
 /**
- * Base column builder class with fluent API
+ * Base column builder class with fluent API.
+ *
+ * Provides the foundational builder pattern implementation for creating column definitions
+ * with a fluent, chainable API. All specialized column builders extend this class to inherit
+ * common functionality while adding type-specific features and validation.
+ *
+ * @template TData - The type of row data
+ * @template TValue - The type of column value
+ *
+ * @example
+ * ```typescript
+ * // Create a basic text column
+ * const nameColumn = new ColumnBuilder<User, string>('text')
+ *   .id('name')
+ *   .displayName('Full Name')
+ *   .accessor(user => `${user.firstName} ${user.lastName}`)
+ *   .sortable()
+ *   .filterable()
+ *   .width(200)
+ *   .build();
+ *
+ * // Create a custom column with renderers
+ * const statusColumn = new ColumnBuilder<User, string>('custom')
+ *   .id('status')
+ *   .displayName('Status')
+ *   .accessor(user => user.status)
+ *   .cellRenderer(({ value }) => (
+ *     <span className={`status-${value}`}>{value}</span>
+ *   ))
+ *   .headerRenderer(({ column }) => (
+ *     <div className="status-header">
+ *       <Icon name="status" />
+ *       {column.displayName}
+ *     </div>
+ *   ))
+ *   .build();
+ * ```
  */
 export class ColumnBuilder<TData = unknown, TValue = unknown> {
   protected config: Partial<ColumnDefinition<TData, TValue>>;
 
+  /**
+   * Create a new column builder instance.
+   *
+   * Initializes the column builder with the specified column type and default configuration.
+   * The builder will use sensible defaults for common properties while allowing customization
+   * through the fluent API methods.
+   *
+   * @param type - The column type (text, number, date, boolean, option, multiOption, custom, json)
+   *
+   * @example
+   * ```typescript
+   * const builder = new ColumnBuilder<User, string>('text');
+   * ```
+   */
   constructor(type: ColumnType) {
     this.config = {
       type,
@@ -27,7 +87,21 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
-   * Set the column identifier
+   * Set the column identifier.
+   *
+   * Sets the unique identifier for the column. This ID is used for sorting, filtering,
+   * and other operations. Must be unique within the table.
+   *
+   * @param id - Unique column identifier
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const column = new ColumnBuilder<User, string>('text')
+   *   .id('userName')
+   *   .displayName('User Name')
+   *   .build();
+   * ```
    */
   id(id: string): this {
     this.config.id = id;
@@ -43,7 +117,22 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
-   * Set the data accessor function
+   * Set the data accessor function.
+   *
+   * Sets the function that extracts the column value from row data. This function
+   * is called for each row to get the value to display, sort, and filter.
+   *
+   * @param accessor - Function that extracts the column value from row data
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const column = new ColumnBuilder<User, string>('text')
+   *   .id('fullName')
+   *   .displayName('Full Name')
+   *   .accessor(user => `${user.firstName} ${user.lastName}`)
+   *   .build();
+   * ```
    */
   accessor(accessor: (data: TData) => TValue): this {
     this.config.accessor = accessor;
@@ -179,7 +268,29 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
-   * Build the column definition
+   * Build the final column definition.
+   *
+   * Creates and returns the complete column definition object with all configured
+   * properties. This method should be called last in the builder chain to finalize
+   * the column configuration.
+   *
+   * @returns Complete column definition
+   * @throws {Error} If required properties are missing
+   *
+   * @example
+   * ```typescript
+   * const column = new ColumnBuilder<User, string>('text')
+   *   .id('name')
+   *   .displayName('Full Name')
+   *   .accessor(user => `${user.firstName} ${user.lastName}`)
+   *   .sortable()
+   *   .filterable()
+   *   .width(200)
+   *   .build();
+   *
+   * // Use the column definition
+   * const columns = [column];
+   * ```
    */
   build(): ColumnDefinition<TData, TValue> {
     this.validateConfig();

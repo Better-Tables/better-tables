@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Central table state manager for coordinating all table operations.
+ *
+ * This module provides a unified state management system that coordinates between
+ * filter, pagination, sorting, and selection managers while maintaining performance
+ * through structural sharing and intelligent caching.
+ *
+ * @module managers/table-state-manager
+ */
+
 import type { ColumnDefinition } from '../types/column';
 import type { FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
@@ -7,7 +17,23 @@ import { FilterManager } from './filter-manager';
 import { PaginationManager } from './pagination-manager';
 
 /**
- * Configuration for table state manager
+ * Configuration for table state manager.
+ *
+ * Provides configuration options for the central table state manager,
+ * primarily focused on pagination settings that affect the overall table behavior.
+ *
+ * @example
+ * ```typescript
+ * const config: TableStateConfig = {
+ *   pagination: {
+ *     defaultPageSize: 25,
+ *     pageSizeOptions: [10, 25, 50, 100],
+ *     maxPageSize: 500,
+ *     showPageSizeSelector: true,
+ *     showPageNumbers: true
+ *   }
+ * };
+ * ```
  */
 export interface TableStateConfig {
   /** Pagination configuration */
@@ -15,17 +41,71 @@ export interface TableStateConfig {
 }
 
 /**
- * Complete table state
+ * Complete table state interface.
+ *
+ * Represents the complete state of a table including filters, pagination,
+ * sorting, and row selection. Used as the single source of truth for
+ * table state management.
+ *
+ * @example
+ * ```typescript
+ * const tableState: TableState = {
+ *   filters: [
+ *     { columnId: 'status', operator: 'is', values: ['active'] }
+ *   ],
+ *   pagination: {
+ *     page: 1,
+ *     limit: 20,
+ *     totalPages: 5,
+ *     hasNext: true,
+ *     hasPrev: false
+ *   },
+ *   sorting: [
+ *     { columnId: 'name', direction: 'asc' }
+ *   ],
+ *   selectedRows: new Set(['user-1', 'user-2'])
+ * };
+ * ```
  */
 export interface TableState {
+  /** Current active filters */
   filters: FilterState[];
+  /** Current pagination state */
   pagination: PaginationState;
+  /** Current sorting configuration */
   sorting: SortingState;
+  /** Currently selected row IDs */
   selectedRows: Set<string>;
 }
 
 /**
- * Event types for table state manager
+ * Event types for table state manager.
+ *
+ * Defines the different types of events that can be emitted by the table state manager,
+ * enabling reactive updates and state synchronization across the entire table system.
+ *
+ * @example
+ * ```typescript
+ * const unsubscribe = tableStateManager.subscribe((event) => {
+ *   switch (event.type) {
+ *     case 'state_changed':
+ *       console.log('Complete state changed:', event.state);
+ *       break;
+ *     case 'filters_changed':
+ *       console.log('Filters updated:', event.filters);
+ *       break;
+ *     case 'pagination_changed':
+ *       console.log('Page changed:', event.pagination);
+ *       break;
+ *     case 'sorting_changed':
+ *       console.log('Sorting changed:', event.sorting);
+ *       break;
+ *     case 'selection_changed':
+ *       console.log('Selection changed:', event.selectedRows);
+ *       break;
+ *   }
+ * });
+ * ```
  */
 export type TableStateEvent =
   | { type: 'state_changed'; state: TableState }
@@ -35,14 +115,70 @@ export type TableStateEvent =
   | { type: 'selection_changed'; selectedRows: Set<string> };
 
 /**
- * Table state manager subscriber function type
+ * Table state manager subscriber function type.
+ *
+ * Defines the callback function signature for table state event subscribers.
+ *
+ * @param event - The table state event that occurred
+ *
+ * @example
+ * ```typescript
+ * const handleStateChange: TableStateSubscriber = (event) => {
+ *   if (event.type === 'state_changed') {
+ *     // Update entire table based on new state
+ *     updateTableDisplay(event.state);
+ *   }
+ * };
+ * ```
  */
 export type TableStateSubscriber = (event: TableStateEvent) => void;
 
 /**
- * Central table state manager
- * Single source of truth for all table state
- * Framework agnostic - can be used with or without React
+ * Central table state manager.
+ *
+ * Single source of truth for all table state, coordinating between filter, pagination,
+ * sorting, and selection managers. Framework agnostic design supports both React and
+ * vanilla JavaScript implementations. Uses structural sharing and intelligent caching
+ * for optimal performance.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const tableStateManager = new TableStateManager<User>(columns, {
+ *   filters: [{ columnId: 'status', operator: 'is', values: ['active'] }],
+ *   pagination: { page: 1, limit: 20 },
+ *   sorting: [{ columnId: 'name', direction: 'asc' }],
+ *   selectedRows: new Set()
+ * }, {
+ *   pagination: { defaultPageSize: 20 }
+ * });
+ *
+ * // Subscribe to state changes
+ * const unsubscribe = tableStateManager.subscribe((event) => {
+ *   console.log('Table state changed:', event);
+ * });
+ *
+ * // Update filters
+ * tableStateManager.setFilters([
+ *   { columnId: 'status', operator: 'is', values: ['active'] },
+ *   { columnId: 'age', operator: 'greaterThan', values: [18] }
+ * ]);
+ *
+ * // Update pagination
+ * tableStateManager.setPagination({ page: 2, limit: 50 });
+ * tableStateManager.setTotal(1000);
+ *
+ * // Update sorting
+ * tableStateManager.setSorting([
+ *   { columnId: 'name', direction: 'asc' },
+ *   { columnId: 'createdAt', direction: 'desc' }
+ * ]);
+ *
+ * // Get complete state
+ * const state = tableStateManager.getState();
+ * console.log('Complete table state:', state);
+ * ```
  */
 export class TableStateManager<TData = unknown> {
   private filterManager: FilterManager<TData>;

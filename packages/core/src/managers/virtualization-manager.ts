@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Virtualization manager for handling virtual scrolling and rendering performance.
+ *
+ * This module provides comprehensive virtual scrolling management including row/column virtualization,
+ * dynamic height measurements, performance metrics, and scroll-to functionality for large datasets.
+ *
+ * @module managers/virtualization-manager
+ */
+
 import type {
   RowMeasurement,
   ScrollInfo,
@@ -11,7 +20,37 @@ import type {
 } from '../types/virtualization';
 
 /**
- * Event types for virtualization manager
+ * Event types for virtualization manager.
+ *
+ * Defines the different types of events that can be emitted by the virtualization manager,
+ * enabling reactive updates and state synchronization for virtual scrolling operations.
+ *
+ * @example
+ * ```typescript
+ * const unsubscribe = virtualizationManager.subscribe((event) => {
+ *   switch (event.type) {
+ *     case 'scroll':
+ *       console.log(`Scrolled to ${event.scrollInfo.scrollTop}`);
+ *       break;
+ *     case 'virtual_items_changed':
+ *       console.log(`Rendering ${event.virtualRows.length} rows`);
+ *       updateVisibleRows(event.virtualRows);
+ *       break;
+ *     case 'row_measured':
+ *       console.log(`Row ${event.rowIndex} measured as ${event.height}px`);
+ *       break;
+ *     case 'viewport_changed':
+ *       console.log(`Viewport: ${event.startIndex} to ${event.endIndex}`);
+ *       break;
+ *     case 'total_size_changed':
+ *       console.log(`Total size: ${event.totalHeight}x${event.totalWidth}`);
+ *       break;
+ *     case 'configuration_updated':
+ *       console.log('Virtualization config updated');
+ *       break;
+ *   }
+ * });
+ * ```
  */
 export type VirtualizationManagerEvent =
   | { type: 'scroll'; scrollInfo: ScrollInfo }
@@ -26,12 +65,71 @@ export type VirtualizationManagerEvent =
   | { type: 'configuration_updated'; config: VirtualizationConfig };
 
 /**
- * Virtualization manager subscriber function type
+ * Virtualization manager subscriber function type.
+ *
+ * Defines the callback function signature for virtualization event subscribers.
+ *
+ * @param event - The virtualization event that occurred
+ *
+ * @example
+ * ```typescript
+ * const handleVirtualizationChange: VirtualizationManagerSubscriber = (event) => {
+ *   if (event.type === 'virtual_items_changed') {
+ *     // Update the rendered rows and columns
+ *     renderVirtualRows(event.virtualRows);
+ *     renderVirtualColumns(event.virtualColumns);
+ *   }
+ * };
+ * ```
  */
 export type VirtualizationManagerSubscriber = (event: VirtualizationManagerEvent) => void;
 
 /**
- * Core virtualization manager class for managing virtual scrolling and rendering
+ * Core virtualization manager class for managing virtual scrolling and rendering.
+ *
+ * Provides comprehensive virtual scrolling management including row/column virtualization,
+ * dynamic height measurements, performance metrics, scroll-to functionality, and resize observation.
+ * Optimized for handling large datasets with minimal DOM nodes and efficient scrolling.
+ *
+ * @example
+ * ```typescript
+ * const virtualizationManager = new VirtualizationManager({
+ *   containerHeight: 600,
+ *   defaultRowHeight: 50,
+ *   overscan: 5,
+ *   smoothScrolling: true,
+ *   scrollBehavior: 'smooth',
+ *   dynamicRowHeight: true,
+ *   horizontalVirtualization: true,
+ *   defaultColumnWidth: 200,
+ *   containerWidth: 1200
+ * }, 10000, 50); // 10k rows, 50 columns
+ *
+ * // Subscribe to changes
+ * const unsubscribe = virtualizationManager.subscribe((event) => {
+ *   if (event.type === 'virtual_items_changed') {
+ *     renderVirtualRows(event.virtualRows);
+ *     renderVirtualColumns(event.virtualColumns);
+ *   }
+ * });
+ *
+ * // Update scroll position
+ * virtualizationManager.updateScroll({
+ *   scrollTop: 5000,
+ *   scrollLeft: 1000,
+ *   clientHeight: 600,
+ *   clientWidth: 1200
+ * });
+ *
+ * // Scroll to specific row
+ * virtualizationManager.scrollTo({
+ *   rowIndex: 100,
+ *   align: 'center'
+ * });
+ *
+ * // Measure dynamic row height
+ * virtualizationManager.measureRow(50, 75);
+ * ```
  */
 export class VirtualizationManager {
   private state: VirtualizationState = {
@@ -86,6 +184,28 @@ export class VirtualizationManager {
     },
   };
 
+  /**
+   * Create a new virtualization manager instance.
+   *
+   * Initializes the virtualization manager with configuration options, total item counts,
+   * and sets up resize observation for dynamic content. The manager will immediately
+   * calculate virtual items and emit appropriate events.
+   *
+   * @param config - Virtualization configuration options (partial)
+   * @param totalRows - Total number of rows in the dataset
+   * @param totalColumns - Total number of columns (default: 0)
+   *
+   * @example
+   * ```typescript
+   * const virtualizationManager = new VirtualizationManager({
+   *   containerHeight: 600,
+   *   defaultRowHeight: 40,
+   *   overscan: 3,
+   *   dynamicRowHeight: true,
+   *   horizontalVirtualization: false
+   * }, 100000, 20); // 100k rows, 20 columns
+   * ```
+   */
   constructor(config: Partial<VirtualizationConfig> = {}, totalRows = 0, totalColumns = 0) {
     this.config = { ...this.config, ...config };
     this.totalRows = totalRows;
@@ -96,7 +216,20 @@ export class VirtualizationManager {
   }
 
   /**
-   * Get current virtualization state
+   * Get current virtualization state.
+   *
+   * Returns a copy of the current virtualization state including virtual rows/columns,
+   * scroll information, viewport indices, and total dimensions.
+   *
+   * @returns Current virtualization state
+   *
+   * @example
+   * ```typescript
+   * const state = virtualizationManager.getState();
+   * console.log(`Viewport: rows ${state.startIndex}-${state.endIndex}`);
+   * console.log(`Virtual rows: ${state.virtualRows.length}`);
+   * console.log(`Total size: ${state.totalHeight}x${state.totalWidth}`);
+   * ```
    */
   getState(): VirtualizationState {
     return { ...this.state };
@@ -117,7 +250,26 @@ export class VirtualizationManager {
   }
 
   /**
-   * Update scroll position and recalculate virtual items
+   * Update scroll position and recalculate virtual items.
+   *
+   * Updates the current scroll position and recalculates which rows and columns
+   * should be rendered. This triggers virtual item recalculation and emits events
+   * for scroll and virtual item changes.
+   *
+   * @param scrollInfo - Partial scroll information to update
+   *
+   * @example
+   * ```typescript
+   * // Update scroll position from scroll event
+   * const handleScroll = (event) => {
+   *   virtualizationManager.updateScroll({
+   *     scrollTop: event.target.scrollTop,
+   *     scrollLeft: event.target.scrollLeft,
+   *     clientHeight: event.target.clientHeight,
+   *     clientWidth: event.target.clientWidth
+   *   });
+   * };
+   * ```
    */
   updateScroll(scrollInfo: Partial<ScrollInfo>): void {
     const prevScrollInfo = this.state.scrollInfo;
@@ -173,7 +325,36 @@ export class VirtualizationManager {
   }
 
   /**
-   * Scroll to a specific row/column
+   * Scroll to a specific row/column.
+   *
+   * Smoothly scrolls to the specified row and/or column with configurable alignment.
+   * Supports different alignment modes (start, center, end, auto) and offset positioning.
+   * Automatically calculates the target scroll position based on row measurements.
+   *
+   * @param options - Scroll to options including target position and alignment
+   *
+   * @example
+   * ```typescript
+   * // Scroll to row 100, centered in viewport
+   * virtualizationManager.scrollTo({
+   *   rowIndex: 100,
+   *   align: 'center'
+   * });
+   *
+   * // Scroll to row 50 with 20px offset from top
+   * virtualizationManager.scrollTo({
+   *   rowIndex: 50,
+   *   align: 'start',
+   *   offset: 20
+   * });
+   *
+   * // Scroll to both row and column
+   * virtualizationManager.scrollTo({
+   *   rowIndex: 100,
+   *   columnIndex: 5,
+   *   align: 'center'
+   * });
+   * ```
    */
   scrollTo(options: ScrollToOptions): void {
     const { rowIndex, columnIndex, align = 'auto', offset = 0 } = options;
@@ -533,7 +714,26 @@ export class VirtualizationManager {
   }
 
   /**
-   * Get performance metrics
+   * Get performance metrics.
+   *
+   * Returns current performance metrics including render efficiency, memory usage,
+   * and item counts. Useful for monitoring and optimizing virtualization performance.
+   *
+   * @returns Current performance metrics
+   *
+   * @example
+   * ```typescript
+   * const metrics = virtualizationManager.getPerformanceMetrics();
+   * console.log(`Rendering ${metrics.renderedRows} of ${metrics.totalRows} rows`);
+   * console.log(`Efficiency: ${metrics.efficiency.toFixed(1)}%`);
+   * console.log(`Memory: ${metrics.memoryUsage.estimatedKB}KB estimated`);
+   * console.log(`DOM nodes: ${metrics.memoryUsage.domNodes}`);
+   *
+   * // Performance monitoring
+   * if (metrics.efficiency < 90) {
+   *   console.warn('Virtualization efficiency is low');
+   * }
+   * ```
    */
   getPerformanceMetrics(): VirtualizationMetrics {
     return { ...this.performanceMetrics };
@@ -621,7 +821,46 @@ export class VirtualizationManager {
   }
 
   /**
-   * Subscribe to virtualization changes
+   * Subscribe to virtualization changes.
+   *
+   * Registers a callback function to be called whenever virtualization state changes.
+   * Returns an unsubscribe function to remove the subscription. Useful for reactive
+   * rendering and performance monitoring.
+   *
+   * @param callback - Function to call when virtualization state changes
+   * @returns Unsubscribe function to remove the subscription
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = virtualizationManager.subscribe((event) => {
+   *   switch (event.type) {
+   *     case 'virtual_items_changed':
+   *       // Update rendered rows and columns
+   *       renderVirtualRows(event.virtualRows);
+   *       renderVirtualColumns(event.virtualColumns);
+   *       break;
+   *     case 'scroll':
+   *       // Update scroll indicators or loading states
+   *       updateScrollPosition(event.scrollInfo);
+   *       break;
+   *     case 'row_measured':
+   *       // Update row height in UI
+   *       updateRowHeight(event.rowIndex, event.height);
+   *       break;
+   *     case 'viewport_changed':
+   *       // Update visible range indicators
+   *       updateViewportInfo(event.startIndex, event.endIndex);
+   *       break;
+   *     case 'performance_metrics_updated':
+   *       // Monitor performance
+   *       console.log(`Efficiency: ${event.metrics.efficiency}%`);
+   *       break;
+   *   }
+   * });
+   *
+   * // Later, unsubscribe
+   * unsubscribe();
+   * ```
    */
   subscribe(callback: VirtualizationManagerSubscriber): () => void {
     this.subscribers.push(callback);
@@ -685,7 +924,28 @@ export class VirtualizationManager {
   }
 
   /**
-   * Clone the virtualization manager with the same configuration
+   * Clone the virtualization manager with the same configuration.
+   *
+   * Creates a new virtualization manager instance with the same configuration,
+   * measurements, and current state. Useful for creating backup instances or
+   * managing multiple virtualization contexts.
+   *
+   * @returns New virtualization manager instance with copied state
+   *
+   * @example
+   * ```typescript
+   * const originalManager = new VirtualizationManager(config, 10000, 50);
+   * originalManager.updateScroll({ scrollTop: 5000 });
+   * originalManager.measureRow(100, 75);
+   *
+   * // Create a backup with all measurements and state
+   * const backupManager = originalManager.clone();
+   * console.log('Backup created with same measurements and scroll position');
+   *
+   * // Modify backup without affecting original
+   * backupManager.updateScroll({ scrollTop: 0 });
+   * console.log('Original scroll position preserved');
+   * ```
    */
   clone(): VirtualizationManager {
     const cloned = new VirtualizationManager(this.config, this.totalRows, this.totalColumns);
