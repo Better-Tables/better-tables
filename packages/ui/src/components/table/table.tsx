@@ -1,14 +1,15 @@
-import type {
-  FilterState,
-  PaginationState,
-  SortDirection,
-  SortingState,
-  TableConfig,
-} from '@better-tables/core';
+import type { FilterState, PaginationState, SortingState, TableConfig } from '@better-tables/core';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import {
+  useTableFilters,
+  useTablePagination,
+  useTableSelection,
+  useTableSorting,
+} from '../../hooks/use-table-store';
 import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
+import { destroyTableStore, getOrCreateTableStore } from '../../stores/table-registry';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
@@ -20,6 +21,7 @@ import { TablePagination } from './table-pagination';
 /**
  * UI-specific props for the BetterTable component
  * Data fetching is handled by parent component
+ * State is now managed internally with Zustand
  */
 export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TData>, 'adapter'> {
   /** Table data */
@@ -34,31 +36,38 @@ export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TDat
   /** Error state */
   error?: Error | null;
 
-  /** Current filter state */
-  filters?: FilterState[];
-
-  /** Filter change handler */
-  onFiltersChange?: (filters: FilterState[]) => void;
-
-  /** Current sorting state */
-  sortingState?: SortingState;
-
-  /** Callback when sorting changes */
-  onSortingChange?: (sorting: SortingState) => void;
-
   /** Total number of items (for pagination) */
   totalCount?: number;
 
-  /** Current pagination state */
-  paginationState?: PaginationState;
+  /** Initial filter state (only used on mount) */
+  initialFilters?: FilterState[];
 
-  /** Pagination handlers */
+  /** Initial sorting state (only used on mount) */
+  initialSorting?: SortingState;
+
+  /** Initial pagination state (only used on mount) */
+  initialPagination?: PaginationState;
+
+  /** Initial selected rows (only used on mount) */
+  initialSelectedRows?: Set<string>;
+
+  /** Optional callback when filters change (for side effects) */
+  onFiltersChange?: (filters: FilterState[]) => void;
+
+  /** Optional callback when sorting changes (for side effects) */
+  onSortingChange?: (sorting: SortingState) => void;
+
+  /** Optional callback when pagination changes (for side effects) */
+  onPaginationChange?: (pagination: PaginationState) => void;
+
+  /** Optional callback when page changes (for side effects) */
   onPageChange?: (page: number) => void;
+
+  /** Optional callback when page size changes (for side effects) */
   onPageSizeChange?: (pageSize: number) => void;
 
-  /** Row selection state */
-  selectedRows?: Set<string>;
-  onRowSelectionChange?: (selected: Set<string>) => void;
+  /** Optional callback when selection changes (for side effects) */
+  onSelectionChange?: (selected: Set<string>) => void;
 
   /** UI-specific styling and behavior */
   className?: string;
@@ -75,6 +84,7 @@ export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TDat
 
 export function BetterTable<TData = unknown>({
   // Core table config (minus adapter)
+  id,
   columns,
   features = {},
   rowConfig,
@@ -87,16 +97,21 @@ export function BetterTable<TData = unknown>({
   error = null,
   totalCount,
 
-  // UI-specific props
-  filters = [],
+  // Initial state (only used on mount)
+  initialFilters = [],
+  initialSorting = [],
+  initialPagination = { page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrev: false },
+  initialSelectedRows = new Set<string>(),
+
+  // Optional callbacks for side effects
   onFiltersChange,
-  sortingState = [] as SortingState,
   onSortingChange,
-  paginationState,
+  onPaginationChange,
   onPageChange,
   onPageSizeChange,
-  selectedRows = new Set(),
-  onRowSelectionChange,
+  onSelectionChange,
+
+  // UI props
   className,
   onRowClick,
   emptyMessage,
@@ -105,87 +120,117 @@ export function BetterTable<TData = unknown>({
 }: BetterTableProps<TData>) {
   const {
     filtering = true,
-    sorting = true,
+    sorting: sortingEnabled = true,
     pagination: paginationEnabled = true,
     rowSelection = false,
   } = features;
+
+  // Initialize store synchronously during render
+  // The store creation is idempotent - it only creates once per ID
+  // All state management is delegated to the TableStateManager
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only create once per table ID
+  const store = useMemo(() => {
+    return getOrCreateTableStore(id, {
+      columns,
+      filters: initialFilters,
+      pagination: initialPagination,
+      sorting: initialSorting,
+      selectedRows: initialSelectedRows,
+    });
+  }, [id]); // Only depend on id - we don't want to recreate on every prop change
+
+  // Subscribe to store state
+  const { filters, setFilters, clearFilters } = useTableFilters(id);
+  const { pagination, setPage, setPageSize } = useTablePagination(id);
+  const { sorting: sortingState, toggleSort } = useTableSorting(id);
+  const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
+
+  // Cleanup store on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      destroyTableStore(id);
+    };
+  }, [id]);
+
+  // Update pagination totalPages when totalCount changes
+  useEffect(() => {
+    if (totalCount !== undefined) {
+      const state = store.getState();
+      state.setTotal(totalCount);
+    }
+  }, [store, totalCount]);
+
+  // Call optional callbacks when state changes
+  useEffect(() => {
+    onFiltersChange?.(filters);
+  }, [filters, onFiltersChange]);
+
+  useEffect(() => {
+    onSortingChange?.(sortingState);
+  }, [sortingState, onSortingChange]);
+
+  useEffect(() => {
+    onPaginationChange?.(pagination);
+  }, [pagination, onPaginationChange]);
+
+  useEffect(() => {
+    onPageChange?.(pagination.page);
+  }, [pagination.page, onPageChange]);
+
+  useEffect(() => {
+    onPageSizeChange?.(pagination.limit);
+  }, [pagination.limit, onPageSizeChange]);
+
+  useEffect(() => {
+    onSelectionChange?.(selectedRows);
+  }, [selectedRows, onSelectionChange]);
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
     return rowConfig?.getId || ((_row: TData, index: number) => `row-${index}`);
   }, [rowConfig?.getId]);
 
-  // Handle filter changes
+  // Handle filter changes - just update store
   const handleFiltersChange = useCallback(
     (newFilters: FilterState[]) => {
-      onFiltersChange?.(newFilters);
+      setFilters(newFilters);
     },
-    [onFiltersChange]
+    [setFilters]
   );
 
-  // Handle sorting changes
+  // Handle sorting changes - use store's toggleSort
   const handleSortingChange = useCallback(
     (columnId: string) => {
-      if (!onSortingChange) return;
-
-      const currentSort = sortingState.find((s) => s.columnId === columnId);
-      let newSorting: SortingState;
-
-      if (currentSort) {
-        // Cycle through: asc -> desc -> none
-        if (currentSort.direction === 'asc') {
-          newSorting = sortingState.map((s) =>
-            s.columnId === columnId ? { ...s, direction: 'desc' as SortDirection } : s
-          );
-        } else {
-          // Remove from sorting
-          newSorting = sortingState.filter((s) => s.columnId !== columnId);
-        }
-      } else {
-        // Add new sort (asc)
-        newSorting = [...sortingState, { columnId, direction: 'asc' as SortDirection }];
-      }
-
-      onSortingChange(newSorting);
+      toggleSort(columnId);
     },
-    [sortingState, onSortingChange]
+    [toggleSort]
   );
 
   // Handle row selection
   const handleRowSelection = useCallback(
-    (rowId: string, selected: boolean) => {
-      if (!onRowSelectionChange) return;
-
-      const newSelected = new Set(selectedRows);
-      if (selected) {
-        newSelected.add(rowId);
-      } else {
-        newSelected.delete(rowId);
-      }
-      onRowSelectionChange(newSelected);
+    (rowId: string, _selected: boolean) => {
+      toggleRow(rowId);
     },
-    [selectedRows, onRowSelectionChange]
+    [toggleRow]
   );
 
   // Handle select all
   const handleSelectAll = useCallback(
     (selected: boolean) => {
-      if (!onRowSelectionChange) return;
-
       if (selected) {
         const allIds = data.map((row, index) => getRowId(row, index));
-        onRowSelectionChange(new Set(allIds));
+        selectAll(allIds);
       } else {
-        onRowSelectionChange(new Set());
+        clearSelection();
       }
     },
-    [data, getRowId, onRowSelectionChange]
+    [data, getRowId, selectAll, clearSelection]
   );
 
   // Clear filters handler
   const handleClearFilters = useCallback(() => {
-    onFiltersChange?.([]);
-  }, [onFiltersChange]);
+    clearFilters();
+  }, [clearFilters]);
 
   // Render loading state
   if (loading) {
@@ -292,7 +337,7 @@ export function BetterTable<TData = unknown>({
               )}
               {columns.map((column) => {
                 const currentSort = sortingState.find((s) => s.columnId === column.id);
-                const isSortable = sorting && column.sortable !== false;
+                const isSortable = sortingEnabled && column.sortable !== false;
 
                 return (
                   <TableHead
@@ -388,14 +433,14 @@ export function BetterTable<TData = unknown>({
         </Table>
       </div>
 
-      {paginationEnabled && paginationState && onPageChange && onPageSizeChange && (
+      {paginationEnabled && (
         <TablePagination
-          currentPage={paginationState.page}
-          totalPages={paginationState.totalPages}
-          onPageChange={onPageChange}
-          pageSize={paginationState.limit}
-          onPageSizeChange={onPageSizeChange}
-          totalItems={totalCount ?? paginationState.totalPages * paginationState.limit}
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={setPage}
+          pageSize={pagination.limit}
+          onPageSizeChange={setPageSize}
+          totalItems={totalCount ?? pagination.totalPages * pagination.limit}
         />
       )}
     </div>

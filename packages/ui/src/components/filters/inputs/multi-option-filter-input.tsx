@@ -30,6 +30,14 @@ export interface MultiOptionFilterInputProps<TData = unknown> {
   disabled?: boolean;
 }
 
+/**
+ * Multi-option filter input component
+ * 
+ * Pattern: Controlled component with minimal local UI state
+ * - Data state (selected values) comes from filter.values
+ * - UI state (popover open, search) managed locally
+ * - Updates sent immediately to parent via onChange
+ */
 export function MultiOptionFilterInput<TData = unknown>({
   filter,
   column,
@@ -39,6 +47,8 @@ export function MultiOptionFilterInput<TData = unknown>({
   const options = column.filter?.options || [];
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
   const selectedValues = (filter.values || []) as string[];
+  
+  // UI-only state for popover and search
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
 
