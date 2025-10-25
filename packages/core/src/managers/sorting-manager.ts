@@ -247,10 +247,10 @@ export class SortingManager<TData = unknown> {
    * // First click: sort asc
    * sortingManager.toggleSort('name');
    *
-   ** Second click: sort desc
+   * // Second click: sort desc
    * sortingManager.toggleSort('name');
    *
-   ** Third click: remove sort (if resetOnClick is enabled)
+   * // Third click: remove sort (if resetOnClick is enabled)
    * sortingManager.toggleSort('name');
    * ```
    */

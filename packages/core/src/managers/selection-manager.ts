@@ -404,8 +404,31 @@ export class SelectionManager<TData = unknown> {
 
     const selectableRows = this.availableRows.filter((row) => this.config.isSelectable?.(row));
 
-    for (const row of selectableRows) {
-      this.selectionState.selectedIds.add(this.getRowId(row));
+    // Check if there's a maxSelections limit
+    if (this.config.maxSelections) {
+      const currentCount = this.selectionState.selectedIds.size;
+
+      // If already at or over limit, don't select any new rows
+      if (currentCount >= this.config.maxSelections) {
+        console.warn(`Maximum selections reached (${this.config.maxSelections})`);
+        return;
+      }
+
+      const remainingSlots = this.config.maxSelections - currentCount;
+
+      // Only select up to the remaining slots
+      const idsToSelect = selectableRows
+        .filter((row) => !this.selectionState.selectedIds.has(this.getRowId(row)))
+        .slice(0, remainingSlots);
+
+      for (const row of idsToSelect) {
+        this.selectionState.selectedIds.add(this.getRowId(row));
+      }
+    } else {
+      // No maxSelections limit - select all selectable rows
+      for (const row of selectableRows) {
+        this.selectionState.selectedIds.add(this.getRowId(row));
+      }
     }
 
     this.updateSelectionState();

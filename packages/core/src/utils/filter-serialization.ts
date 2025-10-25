@@ -46,9 +46,9 @@ export interface URLSerializationOptions {
  * @example
  * ```typescript
  * const result: URLSerializationResult = {
- *   value: 'eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0',
+ *   value: 'JTVCJTdCJTIyYyUyMiUzQSUyMnVzZXJuYW1lJTIyJTJDJTIydCUyMiUzQSUyMnRleHQlMjIlMkMlMjJvJTIyJTNBJTIyZXF1YWxzJTIyJTJDJTIydiUyMiUzQSU1QiUyMmpvaG4lMjIlNUQlN0QlNUQ',
  *   compressed: false,
- *   size: 64
+ *   size: 151
  * };
  * ```
  */
@@ -141,11 +141,11 @@ export function serializeFiltersToURL(
  *
  * @example
  * ```typescript
- * const urlString = 'eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0';
+ * const urlString = 'JTVCJTdCJTIyYyUyMiUzQSUyMnVzZXJuYW1lJTIyJTJDJTIydCUyMiUzQSUyMnRleHQlMjIlMkMlMjJvJTIyJTNBJTIyZXF1YWxzJTIyJTJDJTIydiUyMiUzQSU1QiUyMmpvaG4lMjIlNUQlN0QlNUQ';
  *
  * try {
  *   const filters = deserializeFiltersFromURL(urlString);
- *   console.log(filters); // [{ columnId: 'name', type: 'text', operator: 'equals', values: ['john'] }]
+ *   console.log(filters); // [{ columnId: 'username', type: 'text', operator: 'equals', values: ['john'] }]
  * } catch (error) {
  *   console.error('Failed to deserialize filters:', error);
  * }
@@ -202,7 +202,7 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
  *
  * @example
  * ```typescript
- * // URL: https://example.com/table?filters=eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0
+ * // URL: https://example.com/table?filters=JTVCJTdCJTIyYyUyMiUzQSUyMnVzZXJuYW1lJTIyJTJDJTIydCUyMiUzQSUyMnRleHQlMjIlMkMlMjJvJTIyJTNBJTIyZXF1YWxzJTIyJTJDJTIydiUyMiUzQSU1QiUyMmpvaG4lMjIlNUQlN0QlNUQ
  * const filters = getFiltersFromURL({ paramName: 'filters' });
  * console.log(filters); // Filter states from URL
  * ```
@@ -298,7 +298,7 @@ export function setFiltersInURL(
  * );
  *
  * console.log(shareableUrl);
- * // https://example.com/employees?filters=eyJjIjoiZGVwYXJ0bWVudCIsInQiOiJvcHRpb24iLCJvIjoiZXF1YWxzIiwidiI6WyJlbmdpbmVlcmluZyJdfQ
+ * // https://example.com/employees?filters=JTVCJTdCJTIyYyUyMiUzQSUyMmRlcGFydG1lbnQlMjIlMkMlMjJ0JTIyJTNBJTIyb3B0aW9uJTIyJTJDJTIybyUyMiUzQSUyMmVxdWFscyUyMiUyQyUyMnYlMjIlM0ElNUIlMjJlbmdpbmVlcmluZyUyMiU1RCU3RCU1RA
  * ```
  */
 export function createShareableURL(
@@ -329,7 +329,7 @@ export function createShareableURL(
  *
  * @example
  * ```typescript
- * const isValid = validateFilterURL('eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0');
+ * const isValid = validateFilterURL('JTVCJTdCJTIyYyUyMiUzQSUyMnVzZXJuYW1lJTIyJTJDJTIydCUyMiUzQSUyMnRleHQlMjIlMkMlMjJvJTIyJTNBJTIyZXF1YWxzJTIyJTJDJTIydiUyMiUzQSU1QiUyMmpvaG4lMjIlNUQlN0QlNUQ');
  * console.log(isValid); // true
  *
  * const isInvalid = validateFilterURL('invalid-string');
