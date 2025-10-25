@@ -44,9 +44,8 @@ export type AggregateFunction = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'disti
 export type AggregateResult<
   TColumnId extends string,
   TSchema extends Record<string, AnyTableType> = Record<string, AnyTableType>,
-  TMainTable extends keyof TSchema = keyof TSchema,
 > = {
-  value: InferColumnType<TColumnId, TSchema, TMainTable>;
+  value: InferColumnType<TColumnId, TSchema>;
   count: number;
   aggregate: number;
 };
@@ -57,10 +56,9 @@ export type AggregateResult<
 export type MinMaxResult<
   TColumnId extends string,
   TSchema extends Record<string, AnyTableType> = Record<string, AnyTableType>,
-  TMainTable extends keyof TSchema = keyof TSchema,
 > = {
-  min: InferColumnType<TColumnId, TSchema, TMainTable>;
-  max: InferColumnType<TColumnId, TSchema, TMainTable>;
+  min: InferColumnType<TColumnId, TSchema>;
+  max: InferColumnType<TColumnId, TSchema>;
 };
 
 /**
@@ -69,10 +67,9 @@ export type MinMaxResult<
 export type InferColumnType<
   TColumnId extends string,
   TSchema extends Record<string, AnyTableType>,
-  TMainTable extends keyof TSchema,
 > = TColumnId extends `${infer TTable}.${infer TField}`
   ? InferFieldType<TTable, TField, TSchema>
-  : InferMainTableFieldType<TColumnId, TSchema, TMainTable>;
+  : InferAnyTableFieldType<TColumnId, TSchema>;
 
 /**
  * Infer field type from table and field names using Drizzle's InferSelectModel
@@ -90,19 +87,18 @@ export type InferFieldType<
   : never;
 
 /**
- * Infer field type from main table using Drizzle's InferSelectModel
+ * Infer field type from any table using Drizzle's InferSelectModel
  */
-export type InferMainTableFieldType<
+export type InferAnyTableFieldType<
   TField extends string,
   TSchema extends Record<string, AnyTableType>,
-  TMainTable extends keyof TSchema,
-> = TMainTable extends keyof TSchema
-  ? TSchema[TMainTable] extends AnyTableType
-    ? TField extends keyof InferSelectModel<TSchema[TMainTable]>
-      ? InferSelectModel<TSchema[TMainTable]>[TField]
+> = {
+  [K in keyof TSchema]: TSchema[K] extends AnyTableType
+    ? TField extends keyof InferSelectModel<TSchema[K]>
+      ? InferSelectModel<TSchema[K]>[TField]
       : never
-    : never
-  : never;
+    : never;
+}[keyof TSchema];
 
 /**
  * Get column type from Drizzle table using the `_` property
@@ -185,9 +181,6 @@ export interface DrizzleAdapterConfig<TSchema extends Record<string, AnyTableTyp
 
   /** Schema containing tables and relations */
   schema: TSchema;
-
-  /** Main table to query from */
-  mainTable: keyof TSchema;
 
   /** Database driver type */
   driver: DatabaseDriver;

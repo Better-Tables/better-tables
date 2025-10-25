@@ -10,6 +10,7 @@ import { useCallback, useMemo } from 'react';
 import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
+import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { EmptyState } from './empty-state';
@@ -20,9 +21,12 @@ import { TablePagination } from './table-pagination';
  * UI-specific props for the BetterTable component
  * Data fetching is handled by parent component
  */
-export interface BetterTableProps<TData = unknown> extends TableConfig<TData> {
+export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TData>, 'adapter'> {
   /** Table data */
   data: TData[];
+
+  /** Adapter (optional when data is provided directly) */
+  adapter?: TableConfig<TData>['adapter'];
 
   /** Loading state */
   loading?: boolean;
@@ -86,7 +90,7 @@ export function BetterTable<TData = unknown>({
   // UI-specific props
   filters = [],
   onFiltersChange,
-  sortingState = [],
+  sortingState = [] as SortingState,
   onSortingChange,
   paginationState,
   onPageChange,
@@ -210,20 +214,24 @@ export function BetterTable<TData = unknown>({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-row-${index}`}>
-                  {rowSelection && (
-                    <TableCell>
-                      <Skeleton className="h-4 w-4" />
-                    </TableCell>
-                  )}
-                  {columns.map((column) => (
-                    <TableCell key={column.id}>
-                      <Skeleton className="h-4 w-[100px]" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+              {[...Array(5)].map((_, rowIdx) => {
+                // Use skeleton row+column combo as key to avoid using only index
+                const rowKey = `skeleton-row-${rowIdx}`;
+                return (
+                  <TableRow key={rowKey}>
+                    {rowSelection && (
+                      <TableCell>
+                        <Skeleton className="h-4 w-4" />
+                      </TableCell>
+                    )}
+                    {columns.map((column) => (
+                      <TableCell key={`${rowKey}-col-${column.id}`}>
+                        <Skeleton className="h-4 w-[100px]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -259,7 +267,6 @@ export function BetterTable<TData = unknown>({
 
   const allSelected =
     data.length > 0 && data.every((row, index) => selectedRows.has(getRowId(row, index)));
-  const someSelected = data.some((row, index) => selectedRows.has(getRowId(row, index)));
 
   return (
     <div className={cn('space-y-4', className)} {...props}>
@@ -272,15 +279,14 @@ export function BetterTable<TData = unknown>({
           <TableHeader>
             <TableRow>
               {rowSelection && (
-                <TableHead className="w-[50px]">
-                  <input
-                    type="checkbox"
+                <TableHead
+                  className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
+                  style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
+                >
+                  <Checkbox
                     checked={allSelected}
-                    ref={(ref) => {
-                      if (ref) ref.indeterminate = someSelected && !allSelected;
-                    }}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                    onCheckedChange={(checked) => handleSelectAll(checked === true)}
+                    aria-label="Select all rows"
                   />
                 </TableHead>
               )}
@@ -341,12 +347,13 @@ export function BetterTable<TData = unknown>({
                   }}
                 >
                   {rowSelection && (
-                    <TableCell>
-                      <input
-                        type="checkbox"
+                    <TableCell
+                      className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
+                      style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
+                    >
+                      <Checkbox
                         checked={isSelected}
-                        onChange={(e) => handleRowSelection(rowId, e.target.checked)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                        onCheckedChange={(checked) => handleRowSelection(rowId, checked === true)}
                       />
                     </TableCell>
                   )}
