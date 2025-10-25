@@ -27,6 +27,15 @@ export interface NumberFilterInputProps<TData = unknown> {
   disabled?: boolean;
 }
 
+/**
+ * Number filter input component
+ *
+ * Pattern: Controlled component with local UI state
+ * - Data state comes from parent (filter.values)
+ * - UI state (formatted input strings) managed locally
+ * - Updates sent back to parent
+ * - Syncs from parent only when values actually change
+ */
 export function NumberFilterInput<TData = unknown>({
   filter,
   column,
@@ -39,6 +48,7 @@ export function NumberFilterInput<TData = unknown>({
     [column.type, column.meta]
   );
 
+  // UI-only state: formatted strings for display
   const [values, setValues] = React.useState(() => {
     const val0 = getFilterValueAsNumber(filter, 0);
     const val1 = getFilterValueAsNumber(filter, 1);
@@ -52,6 +62,12 @@ export function NumberFilterInput<TData = unknown>({
   const needsTwoValues = filter.operator === 'between' || filter.operator === 'notBetween';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
 
+  // Store onChange in ref to prevent effect dependencies
+  const onChangeRef = React.useRef(onChange);
+  React.useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   // Prepare values for validation
   const validationValues = React.useMemo(() => {
     if (needsNoValues) return [];
@@ -62,10 +78,9 @@ export function NumberFilterInput<TData = unknown>({
       if (min !== null) validValues.push(min);
       if (max !== null) validValues.push(max);
       return validValues;
-    } else {
-      const single = parseFormattedNumber(values.single, numberConfig);
-      return single !== null ? [single] : [];
     }
+    const single = parseFormattedNumber(values.single, numberConfig);
+    return single !== null ? [single] : [];
   }, [values, needsTwoValues, needsNoValues, numberConfig]);
 
   // Validate the current values
@@ -110,33 +125,41 @@ export function NumberFilterInput<TData = unknown>({
     return { isValid: true };
   }, [validation, numberValidation]);
 
-  // Update parent when values change
+  // Sync TO parent when values change
   React.useEffect(() => {
     if (needsNoValues) {
-      onChange([]);
+      onChangeRef.current([]);
     } else if (needsTwoValues) {
       const min = parseFormattedNumber(values.min, numberConfig);
       const max = parseFormattedNumber(values.max, numberConfig);
       const newValues = [];
       if (min !== null) newValues.push(min);
       if (max !== null) newValues.push(max);
-      onChange(newValues);
+      onChangeRef.current(newValues);
     } else {
       const single = parseFormattedNumber(values.single, numberConfig);
-      onChange(single !== null ? [single] : []);
+      onChangeRef.current(single !== null ? [single] : []);
     }
-  }, [values, onChange, needsTwoValues, needsNoValues, numberConfig]);
+  }, [values, needsTwoValues, needsNoValues, numberConfig]);
 
-  // Sync local values when filter values change externally
+  // Sync FROM parent when filter values change
+  // Only update if the values are actually different
+  const externalVal0 = getFilterValueAsNumber(filter, 0);
+  const externalVal1 = getFilterValueAsNumber(filter, 1);
+
   React.useEffect(() => {
-    const val0 = getFilterValueAsNumber(filter, 0);
-    const val1 = getFilterValueAsNumber(filter, 1);
-    setValues({
-      single: val0 !== null ? formatNumber(val0, numberConfig) : '',
-      min: val0 !== null ? formatNumber(val0, numberConfig) : '',
-      max: val1 !== null ? formatNumber(val1, numberConfig) : '',
+    const formattedSingle = externalVal0 !== null ? formatNumber(externalVal0, numberConfig) : '';
+    const formattedMin = externalVal0 !== null ? formatNumber(externalVal0, numberConfig) : '';
+    const formattedMax = externalVal1 !== null ? formatNumber(externalVal1, numberConfig) : '';
+
+    // Only update if values changed to prevent loops
+    setValues((prev) => {
+      const needsUpdate =
+        prev.single !== formattedSingle || prev.min !== formattedMin || prev.max !== formattedMax;
+
+      return needsUpdate ? { single: formattedSingle, min: formattedMin, max: formattedMax } : prev;
     });
-  }, [filter.values, numberConfig, filter]);
+  }, [externalVal0, externalVal1, numberConfig]);
 
   // Keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({

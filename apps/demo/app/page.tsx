@@ -15,18 +15,16 @@ interface PageProps {
 export default async function DemoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
-  // Parse URL params
+  // Parse URL params for SSR initial data fetch
   const page = Number.parseInt(params.page || '1', 10);
   const limit = Number.parseInt(params.limit || '10', 10);
 
   let filters: FilterState[] = [];
   if (params.filters) {
     try {
-      const parsedFilters = JSON.parse(params.filters);
-      // Filter out invalid filters: date filters (but allow empty values for new filters)
-      filters = parsedFilters.filter((f: FilterState) => f.type !== 'date');
-    } catch (_e) {
-      // Ignore parse errors
+      filters = JSON.parse(params.filters);
+    } catch (e) {
+      console.error('Error parsing filters:', e);
     }
   }
 
@@ -34,8 +32,8 @@ export default async function DemoPage({ searchParams }: PageProps) {
   if (params.sorting) {
     try {
       sorting = JSON.parse(params.sorting);
-    } catch (_e) {
-      // Ignore parse errors
+    } catch (e) {
+      console.error('Error parsing sorting:', e);
     }
   }
 
@@ -105,9 +103,17 @@ export default async function DemoPage({ searchParams }: PageProps) {
           <UsersTableClient
             data={result.data}
             totalCount={result.total}
-            pagination={result.pagination || { page: 1, limit: 10, totalPages: 1 }}
-            sorting={sorting}
-            filters={filters}
+            initialPagination={
+              result.pagination || {
+                page: 1,
+                limit: 10,
+                totalPages: 1,
+                hasNext: false,
+                hasPrev: false,
+              }
+            }
+            initialSorting={sorting}
+            initialFilters={filters}
           />
         </div>
 

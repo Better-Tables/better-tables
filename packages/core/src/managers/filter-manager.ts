@@ -68,10 +68,12 @@ export class FilterManager<TData = unknown> {
 
   /**
    * Set filters (replaces all existing filters)
+   * Uses lenient validation to allow incomplete filters with empty values for UI editing
    */
   setFilters(filters: FilterState[]): void {
     const validFilters = filters.filter((filter) => {
-      const validation = this.validateFilter(filter);
+      // Use lenient validation (strict = false) to allow incomplete filters in UI state
+      const validation = this.validateFilter(filter, false);
       if (!validation.valid) {
         return false;
       }
@@ -84,9 +86,11 @@ export class FilterManager<TData = unknown> {
 
   /**
    * Add a new filter or update existing filter for the same column
+   * Uses lenient validation to allow incomplete filters with empty values for UI editing
    */
   addFilter(filter: FilterState): void {
-    const validation = this.validateFilter(filter);
+    // Use lenient validation (strict = false) to allow incomplete filters in UI state
+    const validation = this.validateFilter(filter, false);
     if (!validation.valid) {
       throw new Error(`Invalid filter for column ${filter.columnId}: ${validation.error}`);
     }
@@ -115,12 +119,14 @@ export class FilterManager<TData = unknown> {
 
   /**
    * Update filter values or operator
+   * Uses lenient validation to allow incomplete filters with empty values for UI editing
    */
   updateFilter(columnId: string, updates: Partial<FilterState>): void {
     const index = this.filters.findIndex((f) => f.columnId === columnId);
     if (index >= 0) {
       const updatedFilter = { ...this.filters[index], ...updates } as FilterState;
-      const validation = this.validateFilter(updatedFilter);
+      // Use lenient validation (strict = false) to allow incomplete filters in UI state
+      const validation = this.validateFilter(updatedFilter, false);
 
       if (!validation.valid) {
         throw new Error(`Invalid filter update for column ${columnId}: ${validation.error}`);
@@ -169,8 +175,13 @@ export class FilterManager<TData = unknown> {
 
   /**
    * Validate a filter against column definitions and operator rules
+   *
+   * @param filter - Filter state to validate
+   * @param strict - Whether to enforce strict validation (default: false)
+   *                 When false, allows incomplete filters with empty values for UI editing
+   *                 When true, enforces all validation rules for query execution
    */
-  validateFilter(filter: FilterState): FilterValidationResult {
+  validateFilter(filter: FilterState, strict = false): FilterValidationResult {
     const column = this.columns.find((c) => c.id === filter.columnId);
     if (!column) {
       return { valid: false, error: `Column ${filter.columnId} not found` };
@@ -209,6 +220,13 @@ export class FilterManager<TData = unknown> {
       typeof operatorDef.valueCount === 'number' &&
       filter.values.length !== operatorDef.valueCount
     ) {
+      // In lenient mode, allow incomplete filters with missing values for UI editing
+      if (!strict && filter.values.length === 0) {
+        return {
+          valid: true,
+          warning: `Filter incomplete - needs ${operatorDef.valueCount} values`,
+        };
+      }
       return {
         valid: false,
         error: `Operator ${filter.operator} requires exactly ${operatorDef.valueCount} values`,
@@ -216,16 +234,22 @@ export class FilterManager<TData = unknown> {
     }
 
     if (operatorDef.valueCount === 'variable' && filter.values.length === 0) {
+      // In lenient mode, allow incomplete filters with empty values for UI editing
+      if (!strict) {
+        return { valid: true, warning: 'Filter incomplete - needs at least one value' };
+      }
       return { valid: false, error: `Operator ${filter.operator} requires at least one value` };
     }
 
-    // Run operator validation
-    if (operatorDef.validate && !operatorDef.validate(filter.values)) {
-      return { valid: false, error: `Invalid values for operator ${filter.operator}` };
+    // Run operator validation - only in strict mode or if values are present
+    if (strict || filter.values.length > 0) {
+      if (operatorDef.validate && !operatorDef.validate(filter.values)) {
+        return { valid: false, error: `Invalid values for operator ${filter.operator}` };
+      }
     }
 
-    // Run column-specific validation
-    if (column.filter?.validation) {
+    // Run column-specific validation - only in strict mode or if values are present
+    if ((strict || filter.values.length > 0) && column.filter?.validation) {
       for (const value of filter.values) {
         const result = column.filter.validation(value);
         if (result !== true) {

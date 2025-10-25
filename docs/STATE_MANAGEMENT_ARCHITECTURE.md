@@ -1,0 +1,384 @@
+# State Management Architecture
+
+## Overview
+
+Better Tables uses a **layered state management architecture** that provides composability, extensibility, and performance while maintaining a clear separation of concerns.
+
+## Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  React Components                    │
+│                  (BetterTable, etc.)                │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────┴──────────────────────────────┐
+│               Zustand Store (UI Layer)               │
+│          Thin wrapper for React reactivity           │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────┴──────────────────────────────┐
+│          TableStateManager (Core Layer)              │
+│           Single source of truth                     │
+│         Framework-agnostic business logic            │
+└──────────────────────┬──────────────────────────────┘
+                       │
+         ┌─────────────┴─────────────┐
+         │                           │
+┌────────┴─────────┐        ┌────────┴─────────┐
+│  FilterManager   │        │ PaginationManager │
+│  (Validation &   │        │  (Navigation &    │
+│   Operations)    │        │   Calculations)   │
+└──────────────────┘        └──────────────────┘
+```
+
+## Core Principles
+
+### 1. Single Source of Truth
+
+**TableStateManager** is the single source of truth for all table state:
+- Filters
+- Pagination
+- Sorting
+- Selection
+
+All state updates flow through the manager, ensuring consistency and enabling:
+- Validation
+- Business logic enforcement
+- Event notifications
+- State synchronization
+
+### 2. Structural Sharing
+
+**Problem**: Every state update creating new object references causes unnecessary re-renders and infinite loops.
+
+**Solution**: The architecture implements **structural sharing** at multiple levels:
+
+#### Level 1: TableStateManager
+
+```typescript
+class TableStateManager {
+  private cachedFilters: FilterState[] | null = null;
+  private cachedPagination: PaginationState | null = null;
+  
+  getFilters(): FilterState[] {
+    const filters = this.filterManager.getFilters();
+    
+    // Return cached reference if arrays are shallow equal
+    if (this.cachedFilters && shallowEqualArrays(this.cachedFilters, filters)) {
+      return this.cachedFilters;
+    }
+    
+    this.cachedFilters = filters;
+    return filters;
+  }
+}
+```
+
+#### Level 2: Change Detection
+
+```typescript
+private notifyStateChanged(): void {
+  const currentState = this.getState();
+  
+  // Only notify if state has actually changed (deep equality)
+  if (!this.lastNotifiedState || !deepEqual(this.lastNotifiedState, currentState)) {
+    this.lastNotifiedState = currentState;
+    this.notifySubscribers({ type: 'state_changed', state: currentState });
+  }
+}
+```
+
+#### Level 3: Zustand Store
+
+```typescript
+manager.subscribe((event: TableStateEvent) => {
+  if (event.type === 'state_changed') {
+    set((state) => {
+      // Reference equality check - manager already did deep equality
+      const hasChanged =
+        state.filters !== event.state.filters ||
+        state.pagination !== event.state.pagination ||
+        state.sorting !== event.state.sorting ||
+        state.selectedRows !== event.state.selectedRows;
+      
+      // Return same state object if nothing changed
+      return hasChanged ? {
+        filters: event.state.filters,
+        pagination: event.state.pagination,
+        sorting: event.state.sorting,
+        selectedRows: event.state.selectedRows,
+      } : state;
+    });
+  }
+});
+```
+
+### 3. Controlled Components with Local UI State
+
+Input components follow a **controlled component pattern** while maintaining local state for UI concerns:
+
+```typescript
+function TextFilterInput({ filter, onChange }) {
+  // UI-only state: what user sees while typing
+  const [localValue, setLocalValue] = useState('');
+  const [isUserTyping, setIsUserTyping] = useState(false);
+  
+  // Debounce and sync TO parent
+  const debouncedValue = useDebounce(localValue, 500);
+  useEffect(() => {
+    onChange([debouncedValue]);
+    setIsUserTyping(false);
+  }, [debouncedValue]);
+  
+  // Sync FROM parent (only when not typing)
+  const externalValue = getFilterValueAsString(filter, 0);
+  useEffect(() => {
+    if (!isUserTyping && externalValue !== localValue) {
+      setLocalValue(externalValue);
+    }
+  }, [externalValue, isUserTyping, localValue]);
+}
+```
+
+**Key principles**:
+- **Data state** (`filter.values`) = controlled by parent
+- **UI state** (`localValue`, `isUserTyping`) = managed locally
+- Debouncing for performance
+- Prevent external sync during user interaction
+- Only update when values actually change
+
+### 4. Composability
+
+The architecture is designed to be composable - you can use features independently:
+
+#### Usage Pattern 1: Basic (No URL Sync)
+
+```tsx
+<BetterTable
+  id="my-table"
+  columns={columns}
+  data={data}
+  initialFilters={[]}
+  initialPagination={{ page: 1, limit: 10 }}
+/>
+```
+
+#### Usage Pattern 2: With URL Sync
+
+```tsx
+function MyTable() {
+  const urlAdapter = useNextjsUrlAdapter();
+  
+  // useTableUrlSync syncs it with URL
+  useTableUrlSync('my-table', {
+    filters: true,
+    pagination: true,
+    sorting: true
+  }, urlAdapter);
+
+  // BetterTable creates the store
+  return <BetterTable id="my-table" columns={columns} data={data} />;
+}
+```
+
+#### Usage Pattern 3: Custom State Management
+
+```tsx
+function MyTable() {
+  // Access the manager directly
+  const { manager } = useTableStore('my-table');
+  
+  // Custom logic
+  useEffect(() => {
+    manager.setFilters(myCustomFilters);
+  }, [myCustomFilters]);
+}
+```
+
+## Data Flow
+
+### Initialization Flow
+
+```
+1. BetterTable renders
+   ├─> Creates TableStateManager with columns + initial state
+   ├─> Wraps in Zustand store for React reactivity
+   └─> Registers in global registry
+
+2. useTableUrlSync hook runs (if used)
+   ├─> Waits for store to exist
+   ├─> Reads URL params
+   └─> Updates manager via manager.updateState()
+
+3. Components subscribe to Zustand store
+   └─> Receive stable references (structural sharing)
+```
+
+### Update Flow
+
+```
+User Action (e.g., typing in filter)
+   │
+   ├─> Local state updates (immediate UI feedback)
+   │
+   ├─> Debounced value changes
+   │
+   ├─> Component calls onChange([newValue])
+   │
+   ├─> BetterTable calls manager.setFilters()
+   │
+   ├─> FilterManager validates & updates
+   │
+   ├─> Manager checks if state actually changed (deep equality)
+   │
+   ├─> If changed: notifies subscribers
+   │
+   ├─> Zustand store updates (reference equality check)
+   │
+   ├─> Subscribed components re-render (only if their slice changed)
+   │
+   └─> URL adapter syncs to URL (if enabled)
+```
+
+### Why This Works
+
+1. **Structural sharing** prevents infinite loops by returning same references
+2. **Deep equality checks** prevent notifications when nothing changed
+3. **Local UI state** in inputs prevents external sync during typing
+4. **Controlled component pattern** ensures parent state is always the source of truth
+5. **Single source of truth** (manager) eliminates race conditions
+
+## Key Files
+
+| File | Purpose | Layer |
+|------|---------|-------|
+| `packages/core/src/managers/table-state-manager.ts` | Central state manager | Core |
+| `packages/core/src/managers/filter-manager.ts` | Filter logic & validation | Core |
+| `packages/core/src/managers/pagination-manager.ts` | Pagination logic | Core |
+| `packages/core/src/utils/equality.ts` | Structural sharing utilities | Core |
+| `packages/ui/src/stores/table-store.ts` | Zustand wrapper for React | UI |
+| `packages/ui/src/stores/table-registry.ts` | Global store registry | UI |
+| `packages/ui/src/stores/url-sync-adapter.ts` | URL synchronization | UI |
+| `packages/ui/src/components/table/table.tsx` | Main table component | UI |
+| `packages/ui/src/components/filters/inputs/*` | Filter input components | UI |
+
+## Migration Guide
+
+### From Old Architecture
+
+**Before**:
+```tsx
+// Multiple sources of truth
+// Race conditions between effects
+// Duplicated logic in store
+```
+
+**After**:
+```tsx
+// Single source of truth (TableStateManager)
+// Synchronous initialization
+// Business logic in core managers
+// Structural sharing prevents loops
+```
+
+### Breaking Changes
+
+1. `getOrCreateTableStore` now requires `columns` on first creation
+2. `TableState` interface includes `manager` property
+3. Internal methods (`_initializeManagers`, `_updateState`) removed
+4. Store initialization is synchronous (no effects)
+
+## Performance Optimizations
+
+### 1. Structural Sharing
+
+Prevents unnecessary re-renders by returning the same object references when values haven't changed.
+
+### 2. Shallow Equality for Arrays
+
+```typescript
+// Fast comparison for sorting/filter arrays
+if (shallowEqualArrays(cachedSorting, newSorting)) {
+  return cachedSorting; // Same reference
+}
+```
+
+### 3. Deep Equality for Objects
+
+```typescript
+// Accurate comparison for pagination/complex state
+if (deepEqual(cachedPagination, newPagination)) {
+  return cachedPagination; // Same reference
+}
+```
+
+### 4. Zustand's useShallow
+
+```typescript
+// Only re-render when accessed properties change
+const { filters, setFilters } = useTableFilters(tableId);
+// Uses useShallow internally
+```
+
+## Testing Strategy
+
+### Unit Tests
+
+- Test `TableStateManager` methods independently
+- Test structural sharing behavior
+- Test change detection logic
+
+### Integration Tests
+
+- Test BetterTable + URL sync together
+- Test state updates from multiple sources
+- Test that no infinite loops occur
+
+### Manual Testing Checklist
+
+- ✅ Filter input doesn't loop
+- ✅ Pagination changes work
+- ✅ Sorting updates correctly
+- ✅ URL sync bidirectional
+- ✅ Multiple tables on same page
+- ✅ Hash fragments preserved
+- ✅ No unnecessary re-renders
+
+## Troubleshooting
+
+### Issue: Infinite Loop
+
+**Cause**: Component updating state in effect without proper change detection
+
+**Solution**: Check that:
+1. Manager uses structural sharing
+2. Components check if value actually changed before updating
+3. Effects have correct dependencies
+
+### Issue: State Not Updating
+
+**Cause**: Store not found or initialization order wrong
+
+**Solution**: 
+1. Ensure `BetterTable` renders before hooks access store
+2. Check that columns are passed on store creation
+3. Verify `useTableUrlSync` is called after `BetterTable`
+
+### Issue: URL Not Syncing
+
+**Cause**: Adapter not configured or store subscription not working
+
+**Solution**:
+1. Verify adapter methods are called
+2. Check that `useTableUrlSync` dependencies are correct
+3. Ensure hash preservation logic is working
+
+## Future Enhancements
+
+1. **Middleware Support**: Add middleware hooks to manager for logging, persistence, etc.
+2. **Time Travel**: Track state history for undo/redo
+3. **Optimistic Updates**: Support optimistic UI updates with rollback
+4. **Selective Sync**: More granular control over what syncs to URL
+5. **State Persistence**: Auto-save state to localStorage/sessionStorage
+

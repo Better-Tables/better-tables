@@ -26,6 +26,15 @@ export interface DateFilterInputProps<TData = unknown> {
   disabled?: boolean;
 }
 
+/**
+ * Date filter input component
+ * 
+ * Pattern: Controlled component with local UI state
+ * - Data state comes from parent (filter.values as dates)
+ * - UI state (selected dates in calendar) managed locally
+ * - Updates sent back to parent immediately (no debounce needed)
+ * - Syncs from parent only when date values actually change
+ */
 export function DateFilterInput<TData = unknown>({
   filter,
   column,
@@ -47,7 +56,7 @@ export function DateFilterInput<TData = unknown>({
   const dateFormat = React.useMemo(() => {
     const filterConfig = column.filter;
     return {
-      format: filterConfig?.format || 'PPP', // Default to date-fns 'PPP' format
+      format: filterConfig?.format || 'PPP',
       locale: 'en-US',
       showTime: filterConfig?.includeTime || false,
       showRelative: false,
@@ -67,18 +76,15 @@ export function DateFilterInput<TData = unknown>({
     return getCommonPresets();
   }, [presetConfig]);
 
-  // Keyboard navigation
-  const keyboardNavigation = useKeyboardNavigation({
-    onEscape: () => {
-      // Clear dates on escape
-      setSingleDate(undefined);
-      setDateRange(undefined);
-    },
-  });
+  // Store onChange in ref to prevent effect dependencies
+  const onChangeRef = React.useRef(onChange);
+  React.useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
+  // UI-only state: selected dates in calendar
   const [singleDate, setSingleDate] = React.useState<Date | undefined>(() => {
-    const date = getFilterValueAsDate(filter, 0);
-    return date || undefined;
+    return getFilterValueAsDate(filter, 0) || undefined;
   });
 
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(() => {
@@ -92,6 +98,14 @@ export function DateFilterInput<TData = unknown>({
     return undefined;
   });
 
+  // Keyboard navigation
+  const keyboardNavigation = useKeyboardNavigation({
+    onEscape: () => {
+      setSingleDate(undefined);
+      setDateRange(undefined);
+    },
+  });
+
   // Prepare values for validation
   const validationValues = React.useMemo(() => {
     if (needsNoValues) return [];
@@ -100,9 +114,8 @@ export function DateFilterInput<TData = unknown>({
       if (dateRange?.from) values.push(dateRange.from);
       if (dateRange?.to) values.push(dateRange.to);
       return values;
-    } else {
-      return singleDate ? [singleDate] : [];
     }
+    return singleDate ? [singleDate] : [];
   }, [singleDate, dateRange, needsDateRange, needsNoValues]);
 
   // Validate the current values
@@ -113,36 +126,59 @@ export function DateFilterInput<TData = unknown>({
     immediate: validationValues.length > 0 || needsNoValues,
   });
 
-  // Update parent when dates change
+  // Sync TO parent when dates change
   React.useEffect(() => {
     if (needsNoValues) {
-      onChange([]);
+      onChangeRef.current([]);
     } else if (needsDateRange) {
       if (dateRange?.from && dateRange?.to) {
-        onChange([dateRange.from, dateRange.to]);
+        onChangeRef.current([dateRange.from, dateRange.to]);
       } else if (dateRange?.from) {
-        onChange([dateRange.from]);
+        onChangeRef.current([dateRange.from]);
       } else {
-        onChange([]);
+        onChangeRef.current([]);
       }
     } else {
-      onChange(singleDate ? [singleDate] : []);
+      onChangeRef.current(singleDate ? [singleDate] : []);
     }
-  }, [singleDate, dateRange, onChange, needsDateRange, needsNoValues]);
+  }, [singleDate, dateRange, needsDateRange, needsNoValues]);
 
-  // Sync local dates when filter values change externally
+  // Sync FROM parent when filter values change
+  // Get external values and compare timestamps to detect actual changes
+  const externalFrom = getFilterValueAsDate(filter, 0);
+  const externalTo = getFilterValueAsDate(filter, 1);
+
   React.useEffect(() => {
     if (needsDateRange && filter.values.length >= 2) {
-      const from = getFilterValueAsDate(filter, 0);
-      const to = getFilterValueAsDate(filter, 1);
+      const from = externalFrom;
+      const to = externalTo;
+      
+      // Only update if dates actually changed (compare timestamps)
       if (from && to) {
-        setDateRange({ from, to });
+        setDateRange((prev) => {
+          const needsUpdate =
+            !prev?.from ||
+            !prev?.to ||
+            prev.from.getTime() !== from.getTime() ||
+            prev.to.getTime() !== to.getTime();
+          
+          return needsUpdate ? { from, to } : prev;
+        });
       }
     } else if (!needsDateRange) {
-      const date = getFilterValueAsDate(filter, 0);
-      setSingleDate(date || undefined);
+      const date = externalFrom;
+      
+      // Only update if date actually changed
+      setSingleDate((prev) => {
+        const needsUpdate =
+          (!prev && date) ||
+          (prev && !date) ||
+          (prev && date && prev.getTime() !== date.getTime());
+        
+        return needsUpdate ? date || undefined : prev;
+      });
     }
-  }, [filter.values, needsDateRange, filter]);
+  }, [externalFrom, externalTo, needsDateRange, filter.values.length]);
 
   // Handle preset selection
   const handlePresetSelect = React.useCallback(
@@ -152,7 +188,6 @@ export function DateFilterInput<TData = unknown>({
       if (needsDateRange) {
         setDateRange({ from: range.from, to: range.to });
       } else {
-        // For single date, use the from date
         setSingleDate(range.from);
       }
     },
