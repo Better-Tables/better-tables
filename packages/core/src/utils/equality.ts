@@ -91,8 +91,7 @@ export function deepEqual(a: unknown, b: unknown): boolean {
       const objA = a as Record<string, unknown>;
       const objB = b as Record<string, unknown>;
 
-      // biome-ignore lint/suspicious/noPrototypeBuiltins: Need es2020 compatibility
-      if (!objB.hasOwnProperty(key)) return false;
+      if (!Object.hasOwn(objB, key)) return false;
       if (!deepEqual(objA[key], objB[key])) return false;
     }
 
