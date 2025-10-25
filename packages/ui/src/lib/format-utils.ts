@@ -3,6 +3,7 @@
  */
 
 import type { ColumnType } from '@better-tables/core';
+import { formatDateWithConfig } from './date-utils';
 
 export interface NumberFormatConfig {
   locale?: string;
@@ -186,14 +187,40 @@ export function formatPhone(phone: string | null | undefined): string {
 /**
  * Truncate text with ellipsis
  */
-export function truncateText(text: string | null | undefined, maxLength = 50): string {
+export function truncateText(
+  text: string | null | undefined,
+  maxLength = 50,
+  options?: { suffix?: string }
+): string {
   if (!text) return '';
 
   if (text.length <= maxLength) {
     return text;
   }
 
-  return `${text.slice(0, maxLength - 3)}...`;
+  const suffix = options?.suffix || '...';
+  return `${text.slice(0, maxLength - suffix.length)}${suffix}`;
+}
+
+/**
+ * Apply text transformations (uppercase, lowercase, capitalize)
+ */
+function applyTextTransform(
+  text: string,
+  transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none'
+): string {
+  if (!transform || transform === 'none') return text;
+
+  switch (transform) {
+    case 'uppercase':
+      return text.toUpperCase();
+    case 'lowercase':
+      return text.toLowerCase();
+    case 'capitalize':
+      return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+    default:
+      return text;
+  }
 }
 
 /**
@@ -254,9 +281,31 @@ export function getFormatterForType(
       return formatUrl(typeof value === 'string' ? value : null);
     case 'phone':
       return formatPhone(typeof value === 'string' ? value : null);
+    case 'date':
+      if (value instanceof Date || (value && typeof value === 'object' && 'getTime' in value)) {
+        const dateConfig = meta?.dateFormat as Record<string, unknown> | undefined;
+        return formatDateWithConfig(value as Date, dateConfig || {});
+      }
+      return String(value || '');
     case 'json':
       return formatJson(value, { pretty: false });
-    default:
-      return truncateText(String(value || ''));
+    default: {
+      // For text columns, apply transformations and truncation
+      const textValue = String(value || '');
+      const transformed = applyTextTransform(
+        textValue,
+        meta?.textTransform as 'uppercase' | 'lowercase' | 'capitalize' | 'none' | undefined
+      );
+
+      // Apply truncation if configured in meta
+      if (meta?.truncate && typeof meta.truncate === 'object') {
+        const truncateConfig = meta.truncate as { maxLength?: number; suffix?: string };
+        return truncateText(transformed, truncateConfig.maxLength || 50, {
+          suffix: truncateConfig.suffix,
+        });
+      }
+
+      return transformed;
+    }
   }
 }

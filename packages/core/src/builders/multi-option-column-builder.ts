@@ -389,8 +389,7 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
    *   .displayFormat({
    *     type: 'chips',
    *     maxVisible: 3,
-   *     truncateText: '+{count} more',
-   *     showTooltip: true
+   *     truncateText: '+{count} more'
    *   })
    *   .build();
    * ```
@@ -402,8 +401,6 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
     maxVisible?: number;
     /** Text to show when truncated (default: '+{count} more') */
     truncateText?: string;
-    /** Whether to show tooltip with all values (default: true) */
-    showTooltip?: boolean;
     /** Separator for comma format (default: ', ') */
     separator?: string;
   }): this {
@@ -411,7 +408,6 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
       type = 'chips',
       maxVisible = 3,
       truncateText = '+{count} more',
-      showTooltip = true,
       separator = ', ',
     } = format;
 
@@ -421,7 +417,6 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
         type,
         maxVisible,
         truncateText,
-        showTooltip,
         separator,
       },
     };
