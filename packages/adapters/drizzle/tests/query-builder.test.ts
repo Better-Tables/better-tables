@@ -115,10 +115,10 @@ describe('DrizzleQueryBuilder', () => {
     // Initialize relationship manager
     const detector = new RelationshipDetector();
     const relationships = detector.detectFromSchema(relationsSchema, schema);
-    relationshipManager = new RelationshipManager(schema, relationships, 'users');
+    relationshipManager = new RelationshipManager(schema, relationships);
 
     // Initialize query builder
-    queryBuilder = new DrizzleQueryBuilder(db, schema, relationshipManager, 'users', 'sqlite');
+    queryBuilder = new DrizzleQueryBuilder(db, schema, relationshipManager, 'sqlite');
   });
 
   afterEach(() => {
@@ -129,86 +129,113 @@ describe('DrizzleQueryBuilder', () => {
 
   describe('Query Building', () => {
     it('should build basic select query', () => {
-      const context = relationshipManager.buildQueryContext({
-        columns: ['name', 'email'],
-      });
+      const context = relationshipManager.buildQueryContext(
+        {
+          columns: ['name', 'email'],
+        },
+        'users'
+      );
 
-      const query = queryBuilder.buildSelectQuery(context, ['name', 'email']);
+      const query = queryBuilder.buildSelectQuery(context, 'users', ['name', 'email']);
       expect(query).toBeDefined();
     });
 
     it('should build query with joins', () => {
-      const context = relationshipManager.buildQueryContext({
-        columns: ['name', 'profile.bio'],
-      });
+      const context = relationshipManager.buildQueryContext(
+        {
+          columns: ['name', 'profile.bio'],
+        },
+        'users'
+      );
 
-      const query = queryBuilder.buildSelectQuery(context, ['name', 'profile.bio']);
+      const query = queryBuilder.buildSelectQuery(context, 'users', ['name', 'profile.bio']);
       expect(query).toBeDefined();
     });
 
     it('should build count query', () => {
-      const context = relationshipManager.buildQueryContext({});
-      const query = queryBuilder.buildCountQuery(context);
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const query = queryBuilder.buildCountQuery(context, 'users');
       expect(query).toBeDefined();
     });
 
     it('should build aggregate query', () => {
-      const query = queryBuilder.buildAggregateQuery('age', 'count');
+      const query = queryBuilder.buildAggregateQuery('age', 'count', 'users');
       expect(query).toBeDefined();
     });
   });
 
   describe('Filter Application', () => {
     it('should apply text filters', () => {
-      const context = relationshipManager.buildQueryContext({
-        filters: [{ columnId: 'name' }],
-      });
-
-      const { query } = queryBuilder.buildSelectQuery(context);
-      const filteredQuery = queryBuilder.applyFilters(query, [
+      const context = relationshipManager.buildQueryContext(
         {
-          columnId: 'name',
-          type: 'text',
-          operator: 'contains',
-          values: ['John'],
+          filters: [{ columnId: 'name' }],
         },
-      ]);
+        'users'
+      );
+
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+      const filteredQuery = queryBuilder.applyFilters(
+        query,
+        [
+          {
+            columnId: 'name',
+            type: 'text',
+            operator: 'contains',
+            values: ['John'],
+          },
+        ],
+        'users'
+      );
 
       expect(filteredQuery).toBeDefined();
     });
 
     it('should apply number filters', () => {
-      const context = relationshipManager.buildQueryContext({
-        filters: [{ columnId: 'age' }],
-      });
-
-      const { query } = queryBuilder.buildSelectQuery(context);
-      const filteredQuery = queryBuilder.applyFilters(query, [
+      const context = relationshipManager.buildQueryContext(
         {
-          columnId: 'age',
-          type: 'number',
-          operator: 'greaterThan',
-          values: [25],
+          filters: [{ columnId: 'age' }],
         },
-      ]);
+        'users'
+      );
+
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+      const filteredQuery = queryBuilder.applyFilters(
+        query,
+        [
+          {
+            columnId: 'age',
+            type: 'number',
+            operator: 'greaterThan',
+            values: [25],
+          },
+        ],
+        'users'
+      );
 
       expect(filteredQuery).toBeDefined();
     });
 
     it('should apply cross-table filters', () => {
-      const context = relationshipManager.buildQueryContext({
-        filters: [{ columnId: 'profile.bio' }],
-      });
-
-      const { query } = queryBuilder.buildSelectQuery(context);
-      const filteredQuery = queryBuilder.applyFilters(query, [
+      const context = relationshipManager.buildQueryContext(
         {
-          columnId: 'profile.bio',
-          type: 'text',
-          operator: 'contains',
-          values: ['developer'],
+          filters: [{ columnId: 'profile.bio' }],
         },
-      ]);
+        'users'
+      );
+
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+      const filteredQuery = queryBuilder.applyFilters(
+        query,
+        [
+          {
+            columnId: 'profile.bio',
+            type: 'text',
+            operator: 'contains',
+            values: ['developer'],
+          },
+        ],
+        'users'
+      );
 
       expect(filteredQuery).toBeDefined();
     });
@@ -216,47 +243,68 @@ describe('DrizzleQueryBuilder', () => {
 
   describe('Sorting Application', () => {
     it('should apply single column sorting', () => {
-      const context = relationshipManager.buildQueryContext({
-        sorts: [{ columnId: 'name' }],
-      });
-
-      const { query } = queryBuilder.buildSelectQuery(context);
-      const sortedQuery = queryBuilder.applySorting(query, [
+      const context = relationshipManager.buildQueryContext(
         {
-          columnId: 'name',
-          direction: 'asc',
+          sorts: [{ columnId: 'name' }],
         },
-      ]);
+        'users'
+      );
+
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+      const sortedQuery = queryBuilder.applySorting(
+        query,
+        [
+          {
+            columnId: 'name',
+            direction: 'asc',
+          },
+        ],
+        'users'
+      );
 
       expect(sortedQuery).toBeDefined();
     });
 
     it('should apply multi-column sorting', () => {
-      const context = relationshipManager.buildQueryContext({
-        sorts: [{ columnId: 'age' }, { columnId: 'name' }],
-      });
+      const context = relationshipManager.buildQueryContext(
+        {
+          sorts: [{ columnId: 'age' }, { columnId: 'name' }],
+        },
+        'users'
+      );
 
-      const { query } = queryBuilder.buildSelectQuery(context);
-      const sortedQuery = queryBuilder.applySorting(query, [
-        { columnId: 'age', direction: 'desc' },
-        { columnId: 'name', direction: 'asc' },
-      ]);
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+      const sortedQuery = queryBuilder.applySorting(
+        query,
+        [
+          { columnId: 'age', direction: 'desc' },
+          { columnId: 'name', direction: 'asc' },
+        ],
+        'users'
+      );
 
       expect(sortedQuery).toBeDefined();
     });
 
     it('should apply cross-table sorting', () => {
-      const context = relationshipManager.buildQueryContext({
-        sorts: [{ columnId: 'profile.bio' }],
-      });
-
-      const { query } = queryBuilder.buildSelectQuery(context);
-      const sortedQuery = queryBuilder.applySorting(query, [
+      const context = relationshipManager.buildQueryContext(
         {
-          columnId: 'profile.bio',
-          direction: 'asc',
+          sorts: [{ columnId: 'profile.bio' }],
         },
-      ]);
+        'users'
+      );
+
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+      const sortedQuery = queryBuilder.applySorting(
+        query,
+        [
+          {
+            columnId: 'profile.bio',
+            direction: 'asc',
+          },
+        ],
+        'users'
+      );
 
       expect(sortedQuery).toBeDefined();
     });
@@ -264,8 +312,8 @@ describe('DrizzleQueryBuilder', () => {
 
   describe('Pagination Application', () => {
     it('should apply pagination', () => {
-      const context = relationshipManager.buildQueryContext({});
-      const { query } = queryBuilder.buildSelectQuery(context);
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
       const paginatedQuery = queryBuilder.applyPagination(query, {
         page: 2,
         limit: 10,
@@ -275,8 +323,8 @@ describe('DrizzleQueryBuilder', () => {
     });
 
     it('should handle first page pagination', () => {
-      const context = relationshipManager.buildQueryContext({});
-      const { query } = queryBuilder.buildSelectQuery(context);
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
       const paginatedQuery = queryBuilder.applyPagination(query, {
         page: 1,
         limit: 5,
@@ -300,6 +348,7 @@ describe('DrizzleQueryBuilder', () => {
         ],
         sorting: [{ columnId: 'name', direction: 'asc' }],
         pagination: { page: 1, limit: 10 },
+        primaryTable: 'users',
       });
 
       expect(dataQuery).toBeDefined();
@@ -307,7 +356,9 @@ describe('DrizzleQueryBuilder', () => {
     });
 
     it('should build query with minimal parameters', () => {
-      const { dataQuery, countQuery } = queryBuilder.buildCompleteQuery({});
+      const { dataQuery, countQuery } = queryBuilder.buildCompleteQuery({
+        primaryTable: 'users',
+      });
 
       expect(dataQuery).toBeDefined();
       expect(countQuery).toBeDefined();
@@ -316,32 +367,32 @@ describe('DrizzleQueryBuilder', () => {
 
   describe('Filter Options Query', () => {
     it('should build filter options query for direct column', () => {
-      const query = queryBuilder.buildFilterOptionsQuery('name');
+      const query = queryBuilder.buildFilterOptionsQuery('name', 'users');
       expect(query).toBeDefined();
     });
 
     it('should build filter options query for related column', () => {
-      const query = queryBuilder.buildFilterOptionsQuery('profile.bio');
+      const query = queryBuilder.buildFilterOptionsQuery('profile.bio', 'users');
       expect(query).toBeDefined();
     });
   });
 
   describe('Min/Max Query', () => {
     it('should build min/max query for direct column', () => {
-      const query = queryBuilder.buildMinMaxQuery('age');
+      const query = queryBuilder.buildMinMaxQuery('age', 'users');
       expect(query).toBeDefined();
     });
 
     it('should build min/max query for related column', () => {
-      const query = queryBuilder.buildMinMaxQuery('profile.id');
+      const query = queryBuilder.buildMinMaxQuery('profile.id', 'users');
       expect(query).toBeDefined();
     });
   });
 
   describe('Query Validation', () => {
     it('should validate query before execution', () => {
-      const context = relationshipManager.buildQueryContext({});
-      const { query } = queryBuilder.buildSelectQuery(context);
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
 
       expect(queryBuilder.validateQuery(query)).toBe(true);
     });
@@ -356,13 +407,7 @@ describe('DrizzleQueryBuilder', () => {
   describe('Error Handling', () => {
     it('should handle invalid column IDs', () => {
       expect(() => {
-        queryBuilder.buildFilterOptionsQuery('invalid.column');
-      }).toThrow();
-    });
-
-    it('should handle invalid main table', () => {
-      expect(() => {
-        new DrizzleQueryBuilder(db, schema, relationshipManager, 'invalid_table');
+        queryBuilder.buildFilterOptionsQuery('invalid.column', 'users');
       }).toThrow();
     });
   });

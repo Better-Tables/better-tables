@@ -88,13 +88,9 @@ export function FilterDropdown<TData = unknown>({
   React.useEffect(() => {
     if (open) {
       setCurrentView({ type: 'groups' });
-      if (onSearchChange) {
-        onSearchChange('');
-      } else {
-        setInternalSearch('');
-      }
+      // Don't reset search when opening - keep the search term
     }
-  }, [open, onSearchChange]);
+  }, [open]);
 
   // Use controlled search if provided, otherwise use internal state
   const search = searchTerm !== undefined ? searchTerm : internalSearch;
@@ -135,27 +131,51 @@ export function FilterDropdown<TData = unknown>({
     }> = [];
     const assignedColumnIds = new Set<string>();
 
-    // Process each group
+    // Process each group - filter columns within each group based on search
     groups.forEach((group) => {
-      const groupColumns = filteredColumns.filter((col) => group.columns.includes(col.id));
+      // Get all columns that belong to this group (from original columns)
+      const groupColumnIds = group.columns;
+      const groupColumns = columns.filter((col) => groupColumnIds.includes(col.id));
 
-      if (groupColumns.length > 0) {
+      // Apply search filter to the group's columns
+      const filteredGroupColumns =
+        !searchable || !search
+          ? groupColumns
+          : groupColumns.filter((col) => {
+              const searchLower = search.toLowerCase();
+              return (
+                col.displayName.toLowerCase().includes(searchLower) ||
+                col.id.toLowerCase().includes(searchLower)
+              );
+            });
+
+      if (filteredGroupColumns.length > 0) {
         grouped.push({
           id: group.id,
           label: group.label,
           icon: group.icon as React.ComponentType<{ className?: string }>,
-          columns: groupColumns,
+          columns: filteredGroupColumns,
           description: group.description,
         });
 
-        groupColumns.forEach((col) => {
+        filteredGroupColumns.forEach((col) => {
           assignedColumnIds.add(col.id);
         });
       }
     });
 
     // Add ungrouped columns
-    const ungroupedColumns = filteredColumns.filter((col) => !assignedColumnIds.has(col.id));
+    const ungroupedColumns =
+      !searchable || !search
+        ? columns.filter((col) => !assignedColumnIds.has(col.id))
+        : columns.filter((col) => {
+            const searchLower = search.toLowerCase();
+            return (
+              !assignedColumnIds.has(col.id) &&
+              (col.displayName.toLowerCase().includes(searchLower) ||
+                col.id.toLowerCase().includes(searchLower))
+            );
+          });
 
     if (ungroupedColumns.length > 0) {
       grouped.push({
@@ -167,34 +187,22 @@ export function FilterDropdown<TData = unknown>({
     }
 
     return grouped;
-  }, [groups, filteredColumns]);
+  }, [groups, columns, filteredColumns, search, searchable]);
 
   const handleSelect = React.useCallback(
     (columnId: string) => {
       if (disabled) return;
       onSelect(columnId);
-      if (onSearchChange) {
-        onSearchChange('');
-      } else {
-        setInternalSearch('');
-      }
+      // Don't clear search when selecting - keep it for potential multiple selections
       onOpenChange?.(false);
     },
-    [disabled, onSelect, onSearchChange, onOpenChange]
+    [disabled, onSelect, onOpenChange]
   );
 
-  const handleGroupSelect = React.useCallback(
-    (groupId: string, groupLabel: string) => {
-      setCurrentView({ type: 'group', groupId, groupLabel });
-      // Clear search when navigating to group
-      if (onSearchChange) {
-        onSearchChange('');
-      } else {
-        setInternalSearch('');
-      }
-    },
-    [onSearchChange]
-  );
+  const handleGroupSelect = React.useCallback((groupId: string, groupLabel: string) => {
+    setCurrentView({ type: 'group', groupId, groupLabel });
+    // Keep search active when navigating to group
+  }, []);
 
   const handleBackToGroups = React.useCallback(() => {
     setCurrentView({ type: 'groups' });
@@ -256,8 +264,36 @@ export function FilterDropdown<TData = unknown>({
   });
 
   // Render groups overview
-  const groupsOverview = React.useMemo(
-    () => (
+  const groupsOverview = React.useMemo(() => {
+    // If there's a search term, show filtered columns directly
+    if (searchable && search && search.trim() !== '') {
+      return (
+        <CommandList>
+          <CommandEmpty>{emptyMessage}</CommandEmpty>
+          <CommandGroup>
+            {filteredColumns.map((column) => {
+              const Icon = column.icon;
+              return (
+                <CommandItem
+                  key={column.id}
+                  value={column.id}
+                  onSelect={() => handleSelect(column.id)}
+                  disabled={disabled}
+                  className="flex items-center pl-4 hover:bg-accent/50 transition-colors"
+                >
+                  <Check className={cn('mr-2 h-4 w-4', 'opacity-0')} />
+                  {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+                  <span>{column.displayName}</span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        </CommandList>
+      );
+    }
+
+    // Otherwise, show groups as before
+    return (
       <CommandList>
         <CommandEmpty>{emptyMessage}</CommandEmpty>
         <CommandGroup>
@@ -291,9 +327,17 @@ export function FilterDropdown<TData = unknown>({
           })}
         </CommandGroup>
       </CommandList>
-    ),
-    [groupedColumns, disabled, emptyMessage, handleGroupSelect]
-  );
+    );
+  }, [
+    groupedColumns,
+    filteredColumns,
+    disabled,
+    emptyMessage,
+    handleGroupSelect,
+    handleSelect,
+    searchable,
+    search,
+  ]);
 
   // Render individual group view
   const groupView = React.useMemo(() => {
@@ -351,14 +395,15 @@ export function FilterDropdown<TData = unknown>({
 
   // Command content component for reuse
   const commandContent = (
-    <Command onKeyDown={dropdownNavigation.handleKeyDown}>
-      {/* Only show search in groups overview or when there's no grouping */}
+    <Command onKeyDown={dropdownNavigation.handleKeyDown} shouldFilter={false}>
+      {/* Only show search in groups overview */}
       {searchable && currentView.type === 'groups' && (
         <CommandInput
           placeholder={searchPlaceholder}
           value={search}
           onValueChange={setSearch}
           disabled={disabled}
+          className="focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent focus-visible:bg-transparent"
         />
       )}
 

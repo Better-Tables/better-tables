@@ -42,9 +42,11 @@ export class FilterHandler {
 
   /**
    * Build filter condition from filter state
+   * @param filter - The filter state to build condition for
+   * @param primaryTable - The primary table for this query context
    */
-  buildFilterCondition(filter: FilterState): SQL | SQLWrapper {
-    const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId);
+  buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper {
+    const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
     const column = this.getColumn(columnPath);
 
     if (!column) {
@@ -495,7 +497,10 @@ export class FilterHandler {
   /**
    * Handle cross-table filters
    */
-  handleCrossTableFilters(filters: FilterState[]): {
+  handleCrossTableFilters(
+    filters: FilterState[],
+    primaryTable: string
+  ): {
     conditions: (SQL | SQLWrapper)[];
     requiredJoins: Set<string>;
   } {
@@ -510,7 +515,10 @@ export class FilterHandler {
           continue;
         }
 
-        const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId);
+        const columnPath = this.relationshipManager.resolveColumnPath(
+          filter.columnId,
+          primaryTable
+        );
 
         if (columnPath.isNested && columnPath.relationshipPath) {
           // Add required joins
@@ -519,13 +527,11 @@ export class FilterHandler {
           }
         }
 
-        const condition = this.buildFilterCondition(filter);
+        const condition = this.buildFilterCondition(filter, primaryTable);
         if (condition) {
           conditions.push(condition);
         }
       } catch (error) {
-        // Log the error for debugging but don't break the entire query
-        console.warn(`Failed to process filter for column ${filter.columnId}:`, error);
         // Re-throw the error to surface the issue instead of silently ignoring it
         throw new Error(
           `Invalid filter configuration for column '${filter.columnId}': ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -541,9 +547,10 @@ export class FilterHandler {
    */
   buildCompoundConditions(
     filters: FilterState[],
+    primaryTable: string,
     operator: 'and' | 'or' = 'and'
   ): SQL | SQLWrapper {
-    const { conditions } = this.handleCrossTableFilters(filters);
+    const { conditions } = this.handleCrossTableFilters(filters, primaryTable);
 
     if (conditions.length === 0) {
       return sql`1=1`;

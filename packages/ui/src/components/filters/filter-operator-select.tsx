@@ -3,13 +3,9 @@
 import type { ColumnDefinition, FilterOperator } from '@better-tables/core';
 import { getOperatorsForType } from '@better-tables/core';
 import * as React from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { useId } from 'react';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 export interface FilterOperatorSelectProps<TData = unknown> {
   /** Column definition */
@@ -28,6 +24,8 @@ export function FilterOperatorSelect<TData = unknown>({
   onChange,
   disabled = false,
 }: FilterOperatorSelectProps<TData>) {
+  const id = useId();
+
   // Get available operators for this column type
   const customOperators = column.filter?.operators;
   const operators = React.useMemo(() => {
@@ -41,28 +39,52 @@ export function FilterOperatorSelect<TData = unknown>({
     return availableOperators;
   }, [column.type, customOperators]);
 
+  const handleValueChange = React.useCallback(
+    (newValue: string) => {
+      onChange(newValue as FilterOperator);
+    },
+    [onChange]
+  );
+
   return (
-    <div className="space-y-2">
-      <label htmlFor={`operator-${column.id}`} className="text-sm font-medium">
-        Operator
-      </label>
-      <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger id={`operator-${column.id}`}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {operators.map((operator) => (
-            <SelectItem key={operator.key} value={operator.key}>
-              <div>
-                <div className="font-medium">{operator.label}</div>
-                {operator.description && (
-                  <div className="text-xs text-muted-foreground">{operator.description}</div>
-                )}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="space-y-3">
+      <Label className="text-sm font-medium">Operator</Label>
+      <RadioGroup
+        value={value}
+        onValueChange={handleValueChange}
+        disabled={disabled}
+        className="gap-4"
+      >
+        {operators.map((operator) => (
+          <div key={operator.key} className="flex items-start gap-2">
+            <RadioGroupItem
+              value={operator.key}
+              id={`${id}-${operator.key}`}
+              aria-describedby={
+                operator.description ? `${id}-${operator.key}-description` : undefined
+              }
+              disabled={disabled}
+              className="cursor-pointer mt-1"
+            />
+            <div className="grid grow gap-0.5">
+              <Label
+                htmlFor={`${id}-${operator.key}`}
+                className="text-sm font-medium cursor-pointer"
+              >
+                {operator.label}
+              </Label>
+              {operator.description && (
+                <p
+                  id={`${id}-${operator.key}-description`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {operator.description}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </RadioGroup>
     </div>
   );
 }
