@@ -1,6 +1,6 @@
 /**
  * @fileoverview Data transformation utilities for Drizzle ORM adapter
- * @module @better-tables/drizzle-adapter/data-transformer
+ * @module @better-tables/adapters-drizzle/data-transformer
  *
  * @description
  * Provides utilities for transforming flat SQL query results into nested data structures

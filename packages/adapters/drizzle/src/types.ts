@@ -24,11 +24,7 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 /**
  * Database driver types supported by the Drizzle adapter.
  *
- * @typedef {string} DatabaseDriver
  * @description Identifies which database driver is being used
- * @property {'postgres'} postgres - PostgreSQL database
- * @property {'mysql'} mysql - MySQL database
- * @property {'sqlite'} sqlite - SQLite database
  *
  * @example
  * ```typescript

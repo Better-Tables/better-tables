@@ -42,7 +42,7 @@
  *
  * // Used in error messages to suggest corrections
  * const availableFields = ['email', 'username', 'created_at'];
- * const userInput = 'emailAddress';
+ * const userInput = 'emaill';
  * const suggestions = availableFields.filter(f =>
  *   calculateLevenshteinDistance(f, userInput) <= 2
  * ); // ['email']

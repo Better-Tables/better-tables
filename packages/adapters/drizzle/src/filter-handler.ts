@@ -128,8 +128,11 @@ export class FilterHandler {
     if (this.databaseType === 'sqlite') {
       // SQLite doesn't support ilike, so we use like with LOWER() function
       return like(sql`LOWER(${column})`, pattern.toLowerCase());
+    } else if (this.databaseType === 'mysql') {
+      // MySQL doesn't support ilike, so we use like with LOWER() function
+      return like(sql`LOWER(${column})`, pattern.toLowerCase());
     } else {
-      // PostgreSQL and other databases support ilike
+      // PostgreSQL supports ilike
       return ilike(column, pattern);
     }
   }
