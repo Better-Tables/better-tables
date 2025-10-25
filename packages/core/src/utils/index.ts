@@ -4,6 +4,7 @@
 // export * from './sort-comparator';
 // export * from './export-utils';
 // export * from './validation';
+export * from './equality';
 export * from './filter-serialization';
 export * from './meta-accessors';
 export * from './type-guards';

@@ -1,8 +1,7 @@
-import { useEffect } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { getOrCreateTableStore } from '../stores/table-registry';
-import type { TableState, TableStoreInitialState } from '../stores/table-store';
+import { getTableStore } from '../stores/table-registry';
+import type { TableState } from '../stores/table-store';
 
 /**
  * Hook to access the complete table store
@@ -19,7 +18,12 @@ import type { TableState, TableStoreInitialState } from '../stores/table-store';
  * ```
  */
 export function useTableStore(tableId: string): TableState {
-  const store = getOrCreateTableStore(tableId);
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
   return useStore(store);
 }
 
@@ -36,7 +40,12 @@ export function useTableStore(tableId: string): TableState {
  * ```
  */
 export function useTableFilters(tableId: string) {
-  const store = getOrCreateTableStore(tableId);
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
   return useStore(
     store,
     useShallow((state) => ({
@@ -62,7 +71,12 @@ export function useTableFilters(tableId: string) {
  * ```
  */
 export function useTablePagination(tableId: string) {
-  const store = getOrCreateTableStore(tableId);
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
   return useStore(
     store,
     useShallow((state) => ({
@@ -70,6 +84,9 @@ export function useTablePagination(tableId: string) {
       setPage: state.setPage,
       setPageSize: state.setPageSize,
       setPagination: state.setPagination,
+      setTotal: state.setTotal,
+      nextPage: state.nextPage,
+      prevPage: state.prevPage,
     }))
   );
 }
@@ -87,7 +104,12 @@ export function useTablePagination(tableId: string) {
  * ```
  */
 export function useTableSorting(tableId: string) {
-  const store = getOrCreateTableStore(tableId);
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
   return useStore(
     store,
     useShallow((state) => ({
@@ -112,7 +134,12 @@ export function useTableSorting(tableId: string) {
  * ```
  */
 export function useTableSelection(tableId: string) {
-  const store = getOrCreateTableStore(tableId);
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
   return useStore(
     store,
     useShallow((state) => ({
@@ -123,29 +150,4 @@ export function useTableSelection(tableId: string) {
       setSelectedRows: state.setSelectedRows,
     }))
   );
-}
-
-/**
- * Hook to initialize a table store with initial state
- * Useful for setting up initial state from URL params or props
- * Note: This only initializes once - subsequent changes to initialState are ignored
- *
- * @param tableId - Unique table identifier
- * @param initialState - Initial state to set
- *
- * @example
- * ```tsx
- * useTableInit('my-table', {
- *   filters: initialFilters,
- *   pagination: { page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrev: false }
- * });
- * ```
- */
-export function useTableInit(tableId: string, initialState: TableStoreInitialState) {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Only initialize once on mount
-  useEffect(() => {
-    // Initialize the store with initial state
-    // This only happens once when the component mounts
-    getOrCreateTableStore(tableId, initialState);
-  }, [tableId]); // Only depend on tableId, not initialState - we want one-time initialization
 }
