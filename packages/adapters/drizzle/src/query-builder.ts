@@ -1,3 +1,50 @@
+/**
+ * @fileoverview SQL query builder for Drizzle ORM with join optimization
+ * @module @better-tables/drizzle-adapter/query-builder
+ *
+ * @description
+ * Builds efficient SQL queries with smart join optimization. This module is responsible for:
+ * - Generating SELECT queries with proper column selections
+ * - Building COUNT queries for pagination totals
+ * - Constructing aggregate queries (COUNT, SUM, AVG, MIN, MAX)
+ * - Applying filters as WHERE conditions
+ * - Applying sorting with ORDER BY clauses
+ * - Applying pagination with LIMIT and OFFSET
+ * - Optimizing join order for performance
+ * - Validating queries before execution
+ *
+ * Key features:
+ * - Smart column selection based on relationships
+ * - Automatic join condition generation
+ * - Supports all filter operators
+ * - Database-agnostic query building
+ * - Type-safe query construction
+ * - Comprehensive error messages with suggestions
+ *
+ * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
+ * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ *
+ * @example
+ * ```typescript
+ * const builder = new DrizzleQueryBuilder(db, schema, relationshipManager, 'postgres');
+ *
+ * const { dataQuery, countQuery } = builder.buildCompleteQuery({
+ *   columns: ['id', 'email', 'profile.bio'],
+ *   filters: [{ columnId: 'email', operator: 'contains', values: ['@example.com'] }],
+ *   sorting: [{ columnId: 'id', direction: 'desc' }],
+ *   pagination: { page: 1, limit: 10 },
+ *   primaryTable: 'users'
+ * });
+ *
+ * const data = await dataQuery.execute();
+ * const count = await countQuery.execute();
+ * ```
+ *
+ * @see {@link FilterHandler} for filter condition building
+ * @see {@link RelationshipManager} for join optimization
+ * @since 1.0.0
+ */
+
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import { and, asc, avg, count, desc, eq, isNotNull, max, min, sum } from 'drizzle-orm';
@@ -20,14 +67,34 @@ import { calculateLevenshteinDistance } from './utils/levenshtein';
 import { getPrimaryKeyMap } from './utils/schema-introspection';
 
 /**
- * Type for accessing table columns by name
+ * Type for accessing table columns by name.
+ *
+ * @typedef {object} TableWithColumns
+ * @description Helper type for safely accessing columns from Drizzle table objects
+ *
+ * @since 1.0.0
  */
 type TableWithColumns = Record<string, AnyColumnType>;
 
 /**
- * Query builder that generates efficient SQL queries with smart joins
- * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
- * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ * Query builder that generates efficient SQL queries with smart joins.
+ *
+ * @class DrizzleQueryBuilder
+ * @description Builds optimized SQL queries with automatic join handling
+ *
+ * @property {DrizzleDatabase} db - The Drizzle database instance
+ * @property {Record<string, AnyTableType>} schema - The schema containing all tables
+ * @property {RelationshipManager} relationshipManager - Manager for resolving relationships
+ * @property {FilterHandler} filterHandler - Handler for building filter conditions
+ * @property {Record<string, object>} primaryKeyMap - Map of primary keys for each table
+ *
+ * @example
+ * ```typescript
+ * const builder = new DrizzleQueryBuilder(db, schema, manager, 'postgres');
+ * const { dataQuery, countQuery, columnMetadata } = builder.buildCompleteQuery({ ... });
+ * ```
+ *
+ * @since 1.0.0
  */
 export class DrizzleQueryBuilder {
   private db: DrizzleDatabase;

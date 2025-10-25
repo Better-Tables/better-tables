@@ -1,3 +1,52 @@
+/**
+ * @fileoverview Relationship path resolution and join optimization for Drizzle ORM
+ * @module @better-tables/drizzle-adapter/relationship-manager
+ *
+ * @description
+ * Manages relationship paths and optimizes join strategies for efficient query execution.
+ * This module is responsible for:
+ * - Resolving column paths with dot notation (e.g., 'profile.bio')
+ * - Determining which tables need to be joined
+ * - Optimizing join order for best performance
+ * - Building join conditions from relationships
+ * - Validating column access
+ * - Providing helpful error messages with suggestions
+ *
+ * Key features:
+ * - Resolves simple fields: 'email' → main table column
+ * - Resolves relationship fields: 'profile.bio' → joins profile table and accesses bio column
+ * - Resolves multi-level paths: 'profile.company.name' → joins profile and company
+ * - Optimizes join order to minimize query complexity
+ * - Caches join paths for performance
+ * - Provides detailed error messages with suggestions
+ *
+ * @note This class maintains internal caches for performance optimization. While the class
+ * is designed to be safe for concurrent use (all methods accept primaryTable as a parameter
+ * rather than storing it as mutable state), the internal cache may be mutated during operations.
+ * Call clearJoinPathCache() if you need to reset cached state.
+ *
+ * @example
+ * ```typescript
+ * const manager = new RelationshipManager(schema, relationships);
+ *
+ * // Resolve a column path
+ * const path = manager.resolveColumnPath('profile.bio', 'users');
+ * // Returns: { columnId: 'profile.bio', table: 'profile', field: 'bio', isNested: true, ... }
+ *
+ * // Get required joins
+ * const joins = manager.getRequiredJoins(['profile.bio', 'posts.title'], 'users');
+ * // Returns: Map of required join paths
+ *
+ * // Optimize join order
+ * const optimized = manager.optimizeJoinOrder(joins, 'users');
+ * // Returns: Array of relationships in optimal order
+ * ```
+ *
+ * @see {@link RelationshipPath} for relationship structure
+ * @see {@link ColumnPath} for column path structure
+ * @since 1.0.0
+ */
+
 import type { SQL } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import type {
@@ -15,9 +64,25 @@ import { getColumnNames } from './utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from './utils/levenshtein';
 
 /**
- * Relationship manager that handles column path resolution and join optimization
- * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
- * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ * Relationship manager that handles column path resolution and join optimization.
+ *
+ * @class RelationshipManager
+ * @description Manages relationships between tables and optimizes query joins
+ *
+ * @property {RelationshipMap} relationships - Map of all relationships
+ * @property {Record<string, AnyTableType>} schema - The schema containing all tables
+ * @property {Map} joinPathCache - Cache for join paths to improve performance
+ *
+ * @example
+ * ```typescript
+ * const manager = new RelationshipManager(schema, relationships);
+ * const context = manager.buildQueryContext(
+ *   { columns: ['email', 'profile.bio'] },
+ *   'users'
+ * );
+ * ```
+ *
+ * @since 1.0.0
  */
 export class RelationshipManager {
   private relationships: RelationshipMap;

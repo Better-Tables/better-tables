@@ -1,3 +1,40 @@
+/**
+ * @fileoverview Relationship detection and parsing for Drizzle ORM
+ * @module @better-tables/drizzle-adapter/relationship-detector
+ *
+ * @description
+ * Automatically detects and parses relationships from Drizzle ORM schemas.
+ * This module inspects Drizzle's relation definitions to extract information about
+ * table relationships, including cardinality, foreign keys, and join conditions.
+ *
+ * Key capabilities:
+ * - Parses Drizzle Relations objects
+ * - Extracts relationship paths between tables
+ * - Infers cardinality (one-to-one, one-to-many)
+ * - Builds relationship graph for path resolution
+ * - Detects circular relationships
+ * - Validates relationship integrity
+ * - Handles composite foreign keys
+ *
+ * The detector works by calling Drizzle's config() function on Relations objects
+ * and extracting the relationship metadata. It builds both forward and backward
+ * relationship paths to support bidirectional navigation.
+ *
+ * @example
+ * ```typescript
+ * const detector = new RelationshipDetector();
+ * const relationships = detector.detectFromSchema(
+ *   { users: usersRelations },
+ *   { users, profiles }
+ * );
+ * // Returns: { 'users.profile': { from: 'users', to: 'profiles', ... }, ... }
+ * ```
+ *
+ * @see {@link RelationshipMap} for the relationship structure
+ * @see {@link RelationshipPath} for the path structure
+ * @since 1.0.0
+ */
+
 import type { Relations } from 'drizzle-orm';
 import type { AnyTableType, RelationshipMap, RelationshipPath } from './types';
 import { RelationshipError } from './types';
@@ -13,7 +50,18 @@ type DrizzleRelationConfig = {
 };
 
 /**
- * Relationship detector that parses Drizzle schema relations
+ * Relationship detector that parses Drizzle schema relations.
+ *
+ * @class RelationshipDetector
+ * @description Automatically extracts relationship information from Drizzle schemas
+ *
+ * @example
+ * ```typescript
+ * const detector = new RelationshipDetector();
+ * const relationships = detector.detectFromSchema(relations, schema);
+ * ```
+ *
+ * @since 1.0.0
  */
 export class RelationshipDetector {
   private relationships: Map<string, RelationshipPath> = new Map();

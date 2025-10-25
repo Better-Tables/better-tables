@@ -1,3 +1,44 @@
+/**
+ * @fileoverview Data transformation utilities for Drizzle ORM adapter
+ * @module @better-tables/adapters-drizzle/data-transformer
+ *
+ * @description
+ * Provides utilities for transforming flat SQL query results into nested data structures
+ * that reflect relationships between tables. This is a critical component that converts
+ * the flat structure returned by SQL joins into the nested, hierarchical data structures
+ * expected by the Better Tables framework.
+ *
+ * Key capabilities:
+ * - Transforms flat SQL results with joined tables into nested objects
+ * - Handles one-to-one and one-to-many relationships
+ * - Groups related records together
+ * - Applies aggregations to nested relationships
+ * - Validates transformed data structure
+ * - Handles null values gracefully
+ *
+ * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
+ * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ *
+ * @example
+ * ```typescript
+ * // Flat SQL result
+ * const flat = [
+ *   { id: 1, email: 'user1@example.com', profile_bio: 'Bio 1', posts_id: 1, posts_title: 'Post 1' },
+ *   { id: 1, email: 'user1@example.com', profile_bio: 'Bio 1', posts_id: 2, posts_title: 'Post 2' }
+ * ];
+ *
+ * // Transformed to nested structure
+ * const nested = transformer.transformToNested(flat, 'users', ['email', 'profile.bio', 'posts.title']);
+ * // [{
+ * //   id: 1, email: 'user1@example.com',
+ * //   profile: { bio: 'Bio 1' },
+ * //   posts: [{ id: 1, title: 'Post 1' }, { id: 2, title: 'Post 2' }]
+ * // }]
+ * ```
+ *
+ * @since 1.0.0
+ */
+
 import type { RelationshipManager } from './relationship-manager';
 import type { AggregateColumn, AnyTableType, ColumnPath } from './types';
 import {
@@ -7,9 +48,21 @@ import {
 } from './utils/drizzle-schema-utils';
 
 /**
- * Data transformer that converts flat SQL results to nested structures
- * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
- * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ * Data transformer that converts flat SQL results to nested structures.
+ *
+ * @class DataTransformer
+ * @description Converts flat SQL join results into nested, relationship-aware data structures
+ *
+ * @property {Record<string, AnyTableType>} schema - The schema containing all tables
+ * @property {RelationshipManager} relationshipManager - Manager for resolving relationships
+ *
+ * @example
+ * ```typescript
+ * const transformer = new DataTransformer(schema, relationshipManager);
+ * const nested = transformer.transformToNested(flatResults, 'users', ['email', 'profile.bio']);
+ * ```
+ *
+ * @since 1.0.0
  */
 export class DataTransformer {
   private schema: Record<string, AnyTableType>;

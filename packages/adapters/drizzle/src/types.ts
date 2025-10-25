@@ -1,3 +1,20 @@
+/**
+ * @fileoverview Core type definitions for Drizzle ORM adapter
+ * @module @better-tables/drizzle-adapter/types
+ *
+ * @description
+ * This module provides all the core type definitions, interfaces, and error classes
+ * for the Drizzle adapter. These types enable:
+ * - Type-safe query building across different database drivers
+ * - Relationship mapping and navigation
+ * - Query context tracking
+ * - Error handling with detailed context
+ * - Configuration and options management
+ *
+ * All types are designed to work seamlessly across PostgreSQL, MySQL, and SQLite
+ * databases while maintaining full TypeScript type safety.
+ */
+
 import type { AdapterMeta } from '@better-tables/core';
 import type { AnyColumn, InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
@@ -5,22 +22,63 @@ import type { PgTable } from 'drizzle-orm/pg-core';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 /**
- * Database driver types supported by Drizzle
+ * Database driver types supported by the Drizzle adapter.
+ *
+ * @description Identifies which database driver is being used
+ *
+ * @example
+ * ```typescript
+ * const driver: DatabaseDriver = 'postgres';
+ * ```
+ *
+ * @since 1.0.0
  */
 export type DatabaseDriver = 'postgres' | 'mysql' | 'sqlite';
 
 /**
- * Generic table type that works across all database drivers
+ * Generic table type that works across all database drivers.
+ *
+ * @typedef {object} AnyTableType
+ * @description Union type for all supported Drizzle table types
+ * @see {@link SQLiteTable} from drizzle-orm/sqlite-core
+ * @see {@link PgTable} from drizzle-orm/pg-core
+ * @see {@link MySqlTable} from drizzle-orm/mysql-core
+ *
+ * @since 1.0.0
  */
 export type AnyTableType = SQLiteTable | PgTable | MySqlTable;
 
 /**
- * Generic column type that works across all database drivers
+ * Generic column type that works across all database drivers.
+ *
+ * @typedef {object} AnyColumnType
+ * @description Union type for all supported Drizzle column types
+ * @alias AnyColumn from drizzle-orm
+ *
+ * @since 1.0.0
  */
 export type AnyColumnType = AnyColumn;
 
 /**
- * Primary key introspection result
+ * Primary key information extracted from a Drizzle table schema.
+ *
+ * @interface PrimaryKeyInfo
+ * @description Stores the primary key column information for a table
+ *
+ * @property {string} columnName - The name of the primary key column (e.g., 'id')
+ * @property {AnyColumnType} column - The Drizzle column object for the primary key
+ * @property {boolean} isComposite - Whether this is a composite primary key (multiple columns)
+ *
+ * @example
+ * ```typescript
+ * const pkInfo: PrimaryKeyInfo = {
+ *   columnName: 'id',
+ *   column: users.id,
+ *   isComposite: false
+ * };
+ * ```
+ *
+ * @since 1.0.0
  */
 export interface PrimaryKeyInfo {
   /** The primary key column name */
@@ -34,12 +92,42 @@ export interface PrimaryKeyInfo {
 }
 
 /**
- * Supported aggregate functions
+ * Supported aggregate functions for query operations.
+ *
+ * @typedef {string} AggregateFunction
+ * @description Defines which aggregate functions can be applied to columns
+ *
+ * @property {'count'} count - Count all rows
+ * @property {'sum'} sum - Sum numeric values
+ * @property {'avg'} avg - Average numeric values
+ * @property {'min'} min - Minimum value
+ * @property {'max'} max - Maximum value
+ * @property {'distinct'} distinct - Count distinct values
+ *
+ * @example
+ * ```typescript
+ * const fn: AggregateFunction = 'count';
+ * ```
+ *
+ * @since 1.0.0
  */
 export type AggregateFunction = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'distinct';
 
 /**
- * Result type for aggregate queries with proper type inference
+ * Result type for aggregate queries with proper type inference.
+ *
+ * @template TColumnId - The column identifier (e.g., 'users.email')
+ * @template TSchema - The schema containing all tables
+ * @description Represents the result structure from aggregate queries
+ * @returns An object with the value, count, and aggregate result
+ *
+ * @example
+ * ```typescript
+ * type Result = AggregateResult<'users.age', Schema>;
+ * // { value: number, count: number, aggregate: number }
+ * ```
+ *
+ * @since 1.0.0
  */
 export type AggregateResult<
   TColumnId extends string,
@@ -51,7 +139,20 @@ export type AggregateResult<
 };
 
 /**
- * Result type for min/max queries with proper type inference
+ * Result type for min/max queries with proper type inference.
+ *
+ * @template TColumnId - The column identifier
+ * @template TSchema - The schema containing all tables
+ * @description Represents the result structure from min/max queries
+ * @returns An object with min and max values
+ *
+ * @example
+ * ```typescript
+ * type Result = MinMaxResult<'users.age', Schema>;
+ * // { min: number, max: number }
+ * ```
+ *
+ * @since 1.0.0
  */
 export type MinMaxResult<
   TColumnId extends string,

@@ -1,3 +1,41 @@
+/**
+ * @fileoverview Filter condition builder for Drizzle ORM
+ * @module @better-tables/drizzle-adapter/filter-handler
+ *
+ * @description
+ * Handles the translation of Better Tables filter operators to Drizzle ORM SQL conditions.
+ * This module provides a comprehensive mapping of all supported filter operators to their
+ * corresponding Drizzle SQL expressions, ensuring type-safe and database-agnostic filtering.
+ *
+ * Key capabilities:
+ * - Maps filter operators to Drizzle SQL conditions
+ * - Handles text, number, date, boolean, and custom column types
+ * - Supports case-insensitive search across all database drivers
+ * - Handles array/JSON column filtering
+ * - Provides database-specific optimizations
+ * - Validates filter values before application
+ *
+ * Supported operators include:
+ * - Text: contains, equals, startsWith, endsWith, isEmpty, isNotEmpty, notEquals
+ * - Number: equals, notEquals, greaterThan, lessThan, between, etc.
+ * - Date: is, isNot, before, after, isToday, isThisWeek, isThisMonth, isThisYear
+ * - Boolean: isTrue, isFalse
+ * - Option: equals, notEquals, isAnyOf, isNoneOf
+ * - Multi-Option: includes, excludes, includesAny, includesAll, excludesAny, excludesAll
+ *
+ * @example
+ * ```typescript
+ * const handler = new FilterHandler(schema, relationshipManager, 'postgres');
+ * const condition = handler.buildFilterCondition(
+ *   { columnId: 'email', operator: 'contains', values: ['@example.com'] },
+ *   'users'
+ * );
+ * ```
+ *
+ * @see {@link FilterState} from @better-tables/core
+ * @since 1.0.0
+ */
+
 import type { ColumnType, FilterOperator, FilterState } from '@better-tables/core';
 import { getOperatorDefinition, validateOperatorValues } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
@@ -23,7 +61,25 @@ import type { AnyColumnType, AnyTableType, ColumnPath, DatabaseDriver } from './
 import { QueryError } from './types';
 
 /**
- * Filter handler that maps Better Tables filter operators to Drizzle conditions
+ * Filter handler that maps Better Tables filter operators to Drizzle conditions.
+ *
+ * @class FilterHandler
+ * @description Handles conversion of filter states to SQL WHERE conditions
+ *
+ * @property {Record<string, AnyTableType>} schema - The schema containing all tables
+ * @property {RelationshipManager} relationshipManager - Manager for resolving relationships
+ * @property {DatabaseDriver} databaseType - The database driver being used
+ *
+ * @example
+ * ```typescript
+ * const handler = new FilterHandler(schema, relationshipManager, 'postgres');
+ * const condition = handler.buildFilterCondition(
+ *   { columnId: 'email', operator: 'contains', values: ['test'] },
+ *   'users'
+ * );
+ * ```
+ *
+ * @since 1.0.0
  */
 export class FilterHandler {
   private schema: Record<string, AnyTableType>;
@@ -72,8 +128,11 @@ export class FilterHandler {
     if (this.databaseType === 'sqlite') {
       // SQLite doesn't support ilike, so we use like with LOWER() function
       return like(sql`LOWER(${column})`, pattern.toLowerCase());
+    } else if (this.databaseType === 'mysql') {
+      // MySQL doesn't support ilike, so we use like with LOWER() function
+      return like(sql`LOWER(${column})`, pattern.toLowerCase());
     } else {
-      // PostgreSQL and other databases support ilike
+      // PostgreSQL supports ilike
       return ilike(column, pattern);
     }
   }
