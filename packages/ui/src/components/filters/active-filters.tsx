@@ -133,6 +133,15 @@ function FilterBadge<TData = unknown>({
     return operatorDef?.valueCount === 0;
   }, [filter.operator]);
 
+  // Check if operator supports null values (needed for include-null toggle)
+  const supportsNull = React.useMemo(() => {
+    const operatorDef = getOperatorDefinition(filter.operator);
+    return operatorDef?.supportsNull ?? false;
+  }, [filter.operator]);
+
+  // Show value panel if operator needs values OR supports null (for include-null toggle)
+  const shouldShowValuePanel = !needsNoValues || supportsNull;
+
   return (
     <div
       className={cn(
@@ -182,8 +191,8 @@ function FilterBadge<TData = unknown>({
 
       <Separator orientation="vertical" className="h-6" />
 
-      {/* Value - only show if operator needs values */}
-      {!needsNoValues &&
+      {/* Value - show if operator needs values OR supports null (for include-null toggle) */}
+      {shouldShowValuePanel &&
         (isMobile ? (
           <Dialog>
             <DialogTrigger asChild>
@@ -280,7 +289,19 @@ interface FilterValueDisplayProps<TData = unknown> {
 }
 
 function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisplayProps<TData>) {
+  // Check if this is a zero-value operator
+  const operatorDef = getOperatorDefinition(filter.operator);
+  const needsNoValues = operatorDef?.valueCount === 0;
+
   if (!filter.values || filter.values.length === 0) {
+    // For zero-value operators, show the operator description instead of "Empty"
+    if (needsNoValues) {
+      return (
+        <span className="text-muted-foreground">
+          {operatorDef?.description || 'No values needed'}
+        </span>
+      );
+    }
     return <span className="text-muted-foreground">Empty</span>;
   }
 

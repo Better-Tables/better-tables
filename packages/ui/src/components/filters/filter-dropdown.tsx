@@ -380,6 +380,30 @@ export function FilterDropdown<TData = unknown>({
     </Command>
   );
 
+  // Create merged keyboard handler that preserves consumer's onKeyDown
+  const createMergedKeyboardHandler = React.useCallback(
+    (existingOnKeyDown?: React.KeyboardEventHandler<HTMLElement>) => {
+      return (event: React.KeyboardEvent<HTMLElement>) => {
+        // Call consumer's handler first
+        existingOnKeyDown?.(event);
+
+        // Only call internal handler if event wasn't handled/prevented
+        if (!event.defaultPrevented) {
+          keyboardNavigation.onKeyDown(event);
+        }
+      };
+    },
+    [keyboardNavigation.onKeyDown]
+  );
+
+  // Helper to safely extract onKeyDown from children props
+  const getExistingOnKeyDown = React.useCallback((child: React.ReactElement) => {
+    const props = child.props as Record<string, unknown>;
+    return typeof props.onKeyDown === 'function'
+      ? (props.onKeyDown as React.KeyboardEventHandler<HTMLElement>)
+      : undefined;
+  }, []);
+
   // Mobile: Use Dialog, Desktop: Use Popover
   if (isMobile) {
     return (
@@ -388,7 +412,7 @@ export function FilterDropdown<TData = unknown>({
           {React.isValidElement(children)
             ? React.cloneElement(children, {
                 tabIndex: disabled ? -1 : 0,
-                onKeyDown: keyboardNavigation.onKeyDown,
+                onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
                 ...keyboardNavigation.ariaAttributes,
               } as React.HTMLAttributes<HTMLElement>)
             : children}
@@ -411,7 +435,7 @@ export function FilterDropdown<TData = unknown>({
         {React.isValidElement(children)
           ? React.cloneElement(children, {
               tabIndex: disabled ? -1 : 0,
-              onKeyDown: keyboardNavigation.onKeyDown,
+              onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
               ...keyboardNavigation.ariaAttributes,
             } as React.HTMLAttributes<HTMLElement>)
           : children}
