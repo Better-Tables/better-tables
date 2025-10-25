@@ -1,8 +1,33 @@
+/**
+ * @fileoverview Boolean column builder with specialized boolean handling methods.
+ *
+ * This module provides a specialized column builder for boolean columns,
+ * including display formatting, filtering options, and interactive controls.
+ *
+ * @module builders/boolean-column-builder
+ */
+
 import type { FilterConfig } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
 /**
- * Boolean column builder with boolean-specific methods
+ * Boolean column builder with boolean-specific methods.
+ *
+ * Extends the base column builder with specialized methods for boolean columns,
+ * including display formatting, filtering options, and interactive controls.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const activeColumn = new BooleanColumnBuilder<User>()
+ *   .id('isActive')
+ *   .displayName('Active')
+ *   .accessor(user => user.isActive)
+ *   .activeInactive({ showBadges: true })
+ *   .booleanFilter({ includeNull: false })
+ *   .build();
+ * ```
  */
 export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, boolean> {
   constructor() {
@@ -10,7 +35,23 @@ export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, 
   }
 
   /**
-   * Set specific boolean operators
+   * Set specific boolean operators for filtering.
+   *
+   * Configures which boolean filter operators are available
+   * for this column, allowing fine-grained control over filtering.
+   *
+   * @param operators - Array of boolean filter operators to enable
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const statusColumn = new BooleanColumnBuilder<User>()
+   *   .id('isActive')
+   *   .displayName('Status')
+   *   .accessor(user => user.isActive)
+   *   .booleanOperators(['isTrue', 'isFalse', 'isNull'])
+   *   .build();
+   * ```
    */
   booleanOperators(operators: Array<'isTrue' | 'isFalse' | 'isNull' | 'isNotNull'>): this {
     this.config.filter = {
@@ -21,7 +62,27 @@ export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, 
   }
 
   /**
-   * Configure boolean filtering
+   * Configure boolean filtering.
+   *
+   * Sets up comprehensive boolean filtering with validation,
+   * null handling, and default value options.
+   *
+   * @param options - Boolean filter configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const verifiedColumn = new BooleanColumnBuilder<User>()
+   *   .id('isVerified')
+   *   .displayName('Verified')
+   *   .accessor(user => user.isVerified)
+   *   .booleanFilter({
+   *     includeNull: false,
+   *     defaultValue: false,
+   *     validation: (value) => typeof value === 'boolean' || 'Must be true or false'
+   *   })
+   *   .build();
+   * ```
    */
   booleanFilter(
     options: {
@@ -54,7 +115,30 @@ export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, 
   }
 
   /**
-   * Configure display format for boolean values
+   * Configure display format for boolean values.
+   *
+   * Sets how boolean values are displayed in the column,
+   * including text, badges, icons, checkboxes, or switches.
+   *
+   * @param format - Display format configuration
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const statusColumn = new BooleanColumnBuilder<User>()
+   *   .id('isActive')
+   *   .displayName('Status')
+   *   .accessor(user => user.isActive)
+   *   .displayFormat({
+   *     type: 'badge',
+   *     trueText: 'Active',
+   *     falseText: 'Inactive',
+   *     trueColor: 'green',
+   *     falseColor: 'red',
+   *     showIcons: true
+   *   })
+   *   .build();
+   * ```
    */
   displayFormat(
     format: {
@@ -104,7 +188,29 @@ export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, 
   }
 
   /**
-   * Configure as yes/no column
+   * Configure as yes/no column.
+   *
+   * Sets up the column to display boolean values as "Yes"/"No" text
+   * with optional badge styling and custom colors.
+   *
+   * @param options - Yes/No configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const confirmedColumn = new BooleanColumnBuilder<Order>()
+   *   .id('isConfirmed')
+   *   .displayName('Confirmed')
+   *   .accessor(order => order.isConfirmed)
+   *   .yesNo({
+   *     yesText: 'Yes',
+   *     noText: 'No',
+   *     showBadges: true,
+   *     yesColor: 'green',
+   *     noColor: 'red'
+   *   })
+   *   .build();
+   * ```
    */
   yesNo(
     options: {
@@ -140,7 +246,29 @@ export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, 
   }
 
   /**
-   * Configure as active/inactive column
+   * Configure as active/inactive column.
+   *
+   * Sets up the column to display boolean values as "Active"/"Inactive" text
+   * with badge styling and appropriate colors.
+   *
+   * @param options - Active/Inactive configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const statusColumn = new BooleanColumnBuilder<User>()
+   *   .id('isActive')
+   *   .displayName('Status')
+   *   .accessor(user => user.isActive)
+   *   .activeInactive({
+   *     activeText: 'Active',
+   *     inactiveText: 'Inactive',
+   *     showBadges: true,
+   *     activeColor: 'green',
+   *     inactiveColor: 'gray'
+   *   })
+   *   .build();
+   * ```
    */
   activeInactive(
     options: {

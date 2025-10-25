@@ -1,8 +1,30 @@
+/**
+ * @fileoverview Filter serialization utilities for URL state persistence.
+ *
+ * This module provides utilities for serializing and deserializing filter states
+ * to/from URL parameters, enabling bookmarkable filter states and shareable URLs.
+ *
+ * @module utils/filter-serialization
+ */
+
 import type { ColumnType, FilterOperator } from '../types';
 import type { FilterState } from '../types/filter';
 
 /**
- * Options for URL serialization
+ * Options for URL serialization.
+ *
+ * Configures how filters are serialized to URL parameters,
+ * including compression and metadata inclusion.
+ *
+ * @example
+ * ```typescript
+ * const options: URLSerializationOptions = {
+ *   paramName: 'filters',
+ *   compress: true,
+ *   includeMeta: false,
+ *   maxLength: 2000
+ * };
+ * ```
  */
 export interface URLSerializationOptions {
   /** URL parameter name for filters */
@@ -16,7 +38,19 @@ export interface URLSerializationOptions {
 }
 
 /**
- * Result of URL serialization
+ * Result of URL serialization.
+ *
+ * Contains the serialized string along with metadata about
+ * the serialization process.
+ *
+ * @example
+ * ```typescript
+ * const result: URLSerializationResult = {
+ *   value: 'eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0',
+ *   compressed: false,
+ *   size: 64
+ * };
+ * ```
  */
 export interface URLSerializationResult {
   /** The serialized string */
@@ -27,15 +61,33 @@ export interface URLSerializationResult {
   size: number;
 }
 
-/**
- * Filter serialization utilities for URL state persistence
- */
-
+// Default configuration constants
 const DEFAULT_PARAM_NAME = 'filters';
 const DEFAULT_MAX_LENGTH = 2000; // Conservative URL length limit
 
 /**
- * Serialize filters to URL-safe string
+ * Serialize filters to URL-safe string.
+ *
+ * Converts filter states to a compact, URL-safe representation
+ * that can be stored in URL parameters for bookmarking and sharing.
+ *
+ * @param filters - Array of filter states to serialize
+ * @param options - Serialization options
+ * @returns Serialization result with URL-safe string
+ *
+ * @example
+ * ```typescript
+ * const filters: FilterState[] = [
+ *   { columnId: 'name', type: 'text', operator: 'contains', values: ['john'] }
+ * ];
+ *
+ * const result = serializeFiltersToURL(filters, {
+ *   compress: true,
+ *   paramName: 'filters'
+ * });
+ *
+ * console.log(result.value); // URL-safe encoded string
+ * ```
  */
 export function serializeFiltersToURL(
   filters: FilterState[],
@@ -78,7 +130,26 @@ export function serializeFiltersToURL(
 }
 
 /**
- * Deserialize filters from URL string
+ * Deserialize filters from URL string.
+ *
+ * Converts a URL-safe string back to filter states,
+ * handling both compressed and uncompressed formats.
+ *
+ * @param urlString - URL-safe encoded string containing filters
+ * @returns Array of deserialized filter states
+ * @throws {Error} If the string cannot be deserialized
+ *
+ * @example
+ * ```typescript
+ * const urlString = 'eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0';
+ *
+ * try {
+ *   const filters = deserializeFiltersFromURL(urlString);
+ *   console.log(filters); // [{ columnId: 'name', type: 'text', operator: 'equals', values: ['john'] }]
+ * } catch (error) {
+ *   console.error('Failed to deserialize filters:', error);
+ * }
+ * ```
  */
 export function deserializeFiltersFromURL(urlString: string): FilterState[] {
   if (!urlString || urlString.trim() === '') {
@@ -121,7 +192,20 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
 }
 
 /**
- * Get filters from current URL
+ * Get filters from current URL parameters.
+ *
+ * Extracts and deserializes filters from the current page's URL,
+ * with safe fallback for server-side rendering.
+ *
+ * @param options - Options for parameter name
+ * @returns Array of filter states from URL
+ *
+ * @example
+ * ```typescript
+ * // URL: https://example.com/table?filters=eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0
+ * const filters = getFiltersFromURL({ paramName: 'filters' });
+ * console.log(filters); // Filter states from URL
+ * ```
  */
 export function getFiltersFromURL(
   options: Pick<URLSerializationOptions, 'paramName'> = {}
@@ -148,7 +232,23 @@ export function getFiltersFromURL(
 }
 
 /**
- * Set filters in current URL
+ * Set filters in current URL parameters.
+ *
+ * Updates the current page's URL with serialized filter states,
+ * enabling bookmarkable filter states without page reload.
+ *
+ * @param filters - Filter states to serialize and store
+ * @param options - Serialization options
+ *
+ * @example
+ * ```typescript
+ * const filters: FilterState[] = [
+ *   { columnId: 'status', type: 'option', operator: 'equals', values: ['active'] }
+ * ];
+ *
+ * setFiltersInURL(filters, { paramName: 'filters' });
+ * // URL updated with serialized filters
+ * ```
  */
 export function setFiltersInURL(
   filters: FilterState[],
@@ -175,7 +275,31 @@ export function setFiltersInURL(
 }
 
 /**
- * Create shareable URL with filters
+ * Create shareable URL with filters.
+ *
+ * Generates a complete URL with serialized filters that can be
+ * shared with others to reproduce the same filter state.
+ *
+ * @param filters - Filter states to include in URL
+ * @param baseUrl - Base URL to use (defaults to current URL)
+ * @param options - Serialization options
+ * @returns Complete URL with serialized filters
+ *
+ * @example
+ * ```typescript
+ * const filters: FilterState[] = [
+ *   { columnId: 'department', type: 'option', operator: 'equals', values: ['engineering'] }
+ * ];
+ *
+ * const shareableUrl = createShareableURL(
+ *   filters,
+ *   'https://example.com/employees',
+ *   { paramName: 'filters' }
+ * );
+ *
+ * console.log(shareableUrl);
+ * // https://example.com/employees?filters=eyJjIjoiZGVwYXJ0bWVudCIsInQiOiJvcHRpb24iLCJvIjoiZXF1YWxzIiwidiI6WyJlbmdpbmVlcmluZyJdfQ
+ * ```
  */
 export function createShareableURL(
   filters: FilterState[],
@@ -195,7 +319,22 @@ export function createShareableURL(
 }
 
 /**
- * Validate that URL string can be deserialized
+ * Validate that URL string can be deserialized.
+ *
+ * Checks if a URL string contains valid serialized filters
+ * without actually deserializing them.
+ *
+ * @param urlString - URL string to validate
+ * @returns True if the string can be deserialized successfully
+ *
+ * @example
+ * ```typescript
+ * const isValid = validateFilterURL('eyJjIjoidXNlcm5hbWUiLCJ0IjoidGV4dCIsIm8iOiJlcXVhbHMiLCJ2IjpbImpvaG4iXX0');
+ * console.log(isValid); // true
+ *
+ * const isInvalid = validateFilterURL('invalid-string');
+ * console.log(isInvalid); // false
+ * ```
  */
 export function validateFilterURL(urlString: string): boolean {
   try {
@@ -207,7 +346,29 @@ export function validateFilterURL(urlString: string): boolean {
 }
 
 /**
- * Get serialization info without actually serializing
+ * Get serialization information without actually serializing.
+ *
+ * Provides estimates about serialization size and compression
+ * requirements without performing the actual serialization.
+ *
+ * @param filters - Filter states to analyze
+ * @param options - Serialization options
+ * @returns Information about estimated serialization
+ *
+ * @example
+ * ```typescript
+ * const filters: FilterState[] = [
+ *   { columnId: 'name', type: 'text', operator: 'contains', values: ['john'] }
+ * ];
+ *
+ * const info = getSerializationInfo(filters, { maxLength: 2000 });
+ * console.log(info);
+ * // {
+ * //   estimatedSize: 64,
+ * //   wouldCompress: false,
+ * //   filterCount: 1
+ * // }
+ * ```
  */
 export function getSerializationInfo(
   filters: FilterState[],
@@ -236,14 +397,30 @@ export function getSerializationInfo(
 }
 
 /**
- * Encode string to URL-safe format
+ * Encode string to URL-safe format.
+ *
+ * Converts a string to a URL-safe base64 encoding by replacing
+ * characters that could cause issues in URLs.
+ *
+ * @param str - String to encode
+ * @returns URL-safe encoded string
+ *
+ * @internal
  */
 function encodeToURL(str: string): string {
   return btoa(encodeURIComponent(str)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 /**
- * Decode string from URL-safe format
+ * Decode string from URL-safe format.
+ *
+ * Converts a URL-safe base64 string back to its original form
+ * by reversing the URL-safe character replacements.
+ *
+ * @param str - URL-safe encoded string
+ * @returns Decoded original string
+ *
+ * @internal
  */
 function decodeFromURL(str: string): string {
   // Add padding if needed
@@ -253,7 +430,12 @@ function decodeFromURL(str: string): string {
 }
 
 /**
- * Key mapping for compression
+ * Key mapping for compression optimization.
+ *
+ * Maps long property names to short abbreviations to reduce
+ * serialized data size while maintaining readability.
+ *
+ * @internal
  */
 const COMPRESSION_KEY_MAP: Record<string, string> = {
   columnId: 'c',
@@ -265,14 +447,28 @@ const COMPRESSION_KEY_MAP: Record<string, string> = {
 };
 
 /**
- * Reverse key mapping for decompression
+ * Reverse key mapping for decompression.
+ *
+ * Maps compressed abbreviations back to full property names
+ * during deserialization.
+ *
+ * @internal
  */
 const DECOMPRESSION_KEY_MAP: Record<string, string> = Object.fromEntries(
   Object.entries(COMPRESSION_KEY_MAP).map(([long, short]) => [short, long])
 );
 
 /**
- * Recursively rename object keys using the provided key map
+ * Recursively rename object keys using the provided key map.
+ *
+ * Traverses nested objects and arrays to apply key transformations
+ * throughout the entire data structure.
+ *
+ * @param obj - Object to transform
+ * @param keyMap - Mapping of old keys to new keys
+ * @returns Object with renamed keys
+ *
+ * @internal
  */
 function renameKeys(obj: unknown, keyMap: Record<string, string>): unknown {
   if (obj === null || typeof obj !== 'object') {
@@ -293,8 +489,15 @@ function renameKeys(obj: unknown, keyMap: Record<string, string>): unknown {
 }
 
 /**
- * Safe compression using key shortening only
- * Operates on parsed JSON to avoid corrupting values
+ * Safe compression using key shortening only.
+ *
+ * Compresses data by shortening property names while preserving
+ * all values. Operates on parsed JSON to avoid corrupting data.
+ *
+ * @param str - JSON string to compress
+ * @returns Compressed JSON string
+ *
+ * @internal
  */
 function compressData(str: string): string {
   try {
@@ -309,8 +512,15 @@ function compressData(str: string): string {
 }
 
 /**
- * Decompress data by reversing key shortening
- * Operates on parsed JSON to avoid corrupting values
+ * Decompress data by reversing key shortening.
+ *
+ * Restores full property names from compressed abbreviations.
+ * Operates on parsed JSON to avoid corrupting data.
+ *
+ * @param str - Compressed JSON string
+ * @returns Decompressed JSON string
+ *
+ * @internal
  */
 function decompressData(str: string): string {
   try {

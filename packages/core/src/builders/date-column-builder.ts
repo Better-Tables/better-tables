@@ -1,8 +1,33 @@
+/**
+ * @fileoverview Date column builder with specialized date handling methods.
+ *
+ * This module provides a specialized column builder for date columns,
+ * including date formatting, range filtering, and relative time display.
+ *
+ * @module builders/date-column-builder
+ */
+
 import type { FilterConfig } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
 /**
- * Date column builder with date-specific methods
+ * Date column builder with date-specific methods.
+ *
+ * Extends the base column builder with specialized methods for date columns,
+ * including formatting, range filtering, and relative time display.
+ *
+ * @template TData - The type of row data
+ *
+ * @example
+ * ```typescript
+ * const createdColumn = new DateColumnBuilder<User>()
+ *   .id('createdAt')
+ *   .displayName('Created')
+ *   .accessor(user => user.createdAt)
+ *   .format('MMM dd, yyyy', { locale: 'en-US' })
+ *   .dateRange({ includeNull: false })
+ *   .build();
+ * ```
  */
 export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Date> {
   constructor() {
@@ -10,7 +35,28 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Set date format for display
+   * Set date format for display.
+   *
+   * Configures how date values are formatted and displayed,
+   * including locale, timezone, and time display options.
+   *
+   * @param formatString - Date format string
+   * @param options - Formatting configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const dateColumn = new DateColumnBuilder<Event>()
+   *   .id('eventDate')
+   *   .displayName('Event Date')
+   *   .accessor(event => event.date)
+   *   .format('MMMM dd, yyyy', {
+   *     locale: 'en-US',
+   *     timeZone: 'America/New_York',
+   *     showTime: false
+   *   })
+   *   .build();
+   * ```
    */
   format(
     formatString: string,
@@ -41,7 +87,23 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Set specific date operators
+   * Set specific date operators for filtering.
+   *
+   * Configures which date-based filter operators are available
+   * for this column, allowing fine-grained control over filtering.
+   *
+   * @param operators - Array of date filter operators to enable
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const dateColumn = new DateColumnBuilder<Event>()
+   *   .id('eventDate')
+   *   .displayName('Event Date')
+   *   .accessor(event => event.date)
+   *   .dateOperators(['is', 'before', 'after', 'isToday', 'isThisWeek'])
+   *   .build();
+   * ```
    */
   dateOperators(
     operators: Array<
@@ -64,7 +126,28 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Enable date range filtering
+   * Enable date range filtering.
+   *
+   * Configures comprehensive date filtering with validation,
+   * null handling, and optional min/max date constraints.
+   *
+   * @param options - Date range configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const dateColumn = new DateColumnBuilder<Event>()
+   *   .id('eventDate')
+   *   .displayName('Event Date')
+   *   .accessor(event => event.date)
+   *   .dateRange({
+   *     includeNull: false,
+   *     minDate: new Date('2024-01-01'),
+   *     maxDate: new Date('2024-12-31'),
+   *     validation: (date) => date >= new Date() || 'Event must be in the future'
+   *   })
+   *   .build();
+   * ```
    */
   dateRange(
     options: {
@@ -109,7 +192,26 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Configure as date-only (no time)
+   * Configure as date-only (no time).
+   *
+   * Sets the column to display only date information without time,
+   * useful for birth dates, event dates, etc.
+   *
+   * @param options - Date-only configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const birthDateColumn = new DateColumnBuilder<User>()
+   *   .id('birthDate')
+   *   .displayName('Birth Date')
+   *   .accessor(user => user.birthDate)
+   *   .dateOnly({
+   *     format: 'yyyy-MM-dd',
+   *     locale: 'en-US'
+   *   })
+   *   .build();
+   * ```
    */
   dateOnly(
     options: {
@@ -133,7 +235,27 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Configure as date-time
+   * Configure as date-time.
+   *
+   * Sets the column to display both date and time information,
+   * useful for timestamps, log entries, etc.
+   *
+   * @param options - Date-time configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const timestampColumn = new DateColumnBuilder<Log>()
+   *   .id('timestamp')
+   *   .displayName('Timestamp')
+   *   .accessor(log => log.timestamp)
+   *   .dateTime({
+   *     format: 'yyyy-MM-dd HH:mm:ss',
+   *     locale: 'en-US',
+   *     timeZone: 'UTC'
+   *   })
+   *   .build();
+   * ```
    */
   dateTime(
     options: {
@@ -160,7 +282,28 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Configure as time-only
+   * Configure as time-only.
+   *
+   * Sets the column to display only time information without date,
+   * useful for meeting times, opening hours, etc.
+   *
+   * @param options - Time-only configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const meetingTimeColumn = new DateColumnBuilder<Meeting>()
+   *   .id('meetingTime')
+   *   .displayName('Meeting Time')
+   *   .accessor(meeting => meeting.time)
+   *   .timeOnly({
+   *     format: 'HH:mm',
+   *     locale: 'en-US',
+   *     timeZone: 'America/New_York',
+   *     showSeconds: false
+   *   })
+   *   .build();
+   * ```
    */
   timeOnly(
     options: {
@@ -190,7 +333,27 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Show relative time (e.g., "2 hours ago", "in 3 days")
+   * Show relative time (e.g., "2 hours ago", "in 3 days").
+   *
+   * Configures the column to display relative time instead of absolute dates,
+   * useful for showing how recent or upcoming events are.
+   *
+   * @param options - Relative time configuration options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const lastActiveColumn = new DateColumnBuilder<User>()
+   *   .id('lastActive')
+   *   .displayName('Last Active')
+   *   .accessor(user => user.lastActiveAt)
+   *   .relative({
+   *     locale: 'en-US',
+   *     numeric: 'auto',
+   *     style: 'short'
+   *   })
+   *   .build();
+   * ```
    */
   relative(
     options: {
@@ -220,7 +383,22 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
   }
 
   /**
-   * Set date sorting to be chronological
+   * Set date sorting to be chronological.
+   *
+   * Configures the column to sort dates in chronological order,
+   * ensuring proper temporal ordering regardless of format.
+   *
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const eventDateColumn = new DateColumnBuilder<Event>()
+   *   .id('eventDate')
+   *   .displayName('Event Date')
+   *   .accessor(event => event.date)
+   *   .chronological()
+   *   .build();
+   * ```
    */
   chronological(): this {
     this.config.meta = {
