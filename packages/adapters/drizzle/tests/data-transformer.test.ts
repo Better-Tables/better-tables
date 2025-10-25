@@ -88,8 +88,8 @@ describe('DataTransformer', () => {
   beforeEach(() => {
     const detector = new RelationshipDetector();
     relationships = detector.detectFromSchema(relationsSchema, schema);
-    relationshipManager = new RelationshipManager(schema, relationships, 'users');
-    transformer = new DataTransformer(schema, relationshipManager, 'users');
+    relationshipManager = new RelationshipManager(schema, relationships);
+    transformer = new DataTransformer(schema, relationshipManager);
   });
 
   describe('Basic Transformation', () => {
@@ -119,7 +119,7 @@ describe('DataTransformer', () => {
         },
       ];
 
-      const nestedData = transformer.transformToNested(flatData, [
+      const nestedData = transformer.transformToNested(flatData, 'users', [
         'name',
         'profile.bio',
         'posts.title',
@@ -135,14 +135,14 @@ describe('DataTransformer', () => {
     });
 
     it('should handle empty data', () => {
-      const nestedData = transformer.transformToNested([]);
+      const nestedData = transformer.transformToNested([], 'users');
       expect(nestedData).toHaveLength(0);
     });
 
     it('should handle data without relationships', () => {
       const flatData = [{ id: 1, name: 'John Doe', email: 'john@example.com' }];
 
-      const nestedData = transformer.transformToNested(flatData, ['name', 'email']);
+      const nestedData = transformer.transformToNested(flatData, 'users', ['name', 'email']);
 
       expect(nestedData).toHaveLength(1);
       expect(nestedData[0].name).toBe('John Doe');
@@ -163,7 +163,7 @@ describe('DataTransformer', () => {
         },
       ];
 
-      const nestedData = transformer.transformToNested(flatData, ['name', 'profile.bio']);
+      const nestedData = transformer.transformToNested(flatData, 'users', ['name', 'profile.bio']);
 
       expect((nestedData[0] as UserWithRelations).profile).toBeDefined();
       expect((nestedData[0] as UserWithRelations).profile?.bio).toBe('Software developer');
@@ -182,7 +182,7 @@ describe('DataTransformer', () => {
         },
       ];
 
-      const nestedData = transformer.transformToNested(flatData, ['name', 'profile.bio']);
+      const nestedData = transformer.transformToNested(flatData, 'users', ['name', 'profile.bio']);
 
       expect(nestedData[0].profile).toBeNull();
     });
@@ -209,7 +209,7 @@ describe('DataTransformer', () => {
         },
       ];
 
-      const nestedData = transformer.transformToNested(flatData, ['name', 'posts.title']);
+      const nestedData = transformer.transformToNested(flatData, 'users', ['name', 'posts.title']);
 
       expect((nestedData[0] as UserWithRelations).posts).toBeDefined();
       expect(Array.isArray((nestedData[0] as UserWithRelations).posts)).toBe(true);
@@ -230,7 +230,7 @@ describe('DataTransformer', () => {
         },
       ];
 
-      const nestedData = transformer.transformToNested(flatData, ['name', 'posts.title']);
+      const nestedData = transformer.transformToNested(flatData, 'users', ['name', 'posts.title']);
 
       expect(nestedData[0].posts).toBeDefined();
       expect(Array.isArray(nestedData[0].posts)).toBe(true);
@@ -439,7 +439,7 @@ describe('DataTransformer', () => {
         },
       ];
 
-      const result = transformer.handleNullValues(data);
+      const result = transformer.handleNullValues(data, 'users');
 
       expect(result[0].profile).toBeNull();
       expect(result[0].posts).toEqual([]);
@@ -450,15 +450,15 @@ describe('DataTransformer', () => {
     it('should validate transformed data structure', () => {
       const validData = [{ id: 1, name: 'John Doe', email: 'john@example.com' }];
 
-      expect(transformer.validateTransformedData(validData)).toBe(true);
+      expect(transformer.validateTransformedData(validData, 'users')).toBe(true);
     });
 
     it('should reject invalid data structure', () => {
       const invalidData: unknown[] = [null, undefined, 'not an object'];
 
-      expect(transformer.validateTransformedData(invalidData as Record<string, unknown>[])).toBe(
-        false
-      );
+      expect(
+        transformer.validateTransformedData(invalidData as Record<string, unknown>[], 'users')
+      ).toBe(false);
     });
   });
 

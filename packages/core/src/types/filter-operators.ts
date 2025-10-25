@@ -16,7 +16,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'equals',
     label: 'Equals',
-    description: 'Exactly matches the specified value',
+    description: 'Exactly matches the value',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,
@@ -62,7 +62,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'equals',
     label: 'Equals',
-    description: 'Exactly matches the specified value',
+    description: 'Exactly matches the value',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,

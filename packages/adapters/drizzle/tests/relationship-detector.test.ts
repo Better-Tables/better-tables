@@ -160,11 +160,11 @@ describe('RelationshipManager', () => {
   beforeEach(() => {
     const detector = new RelationshipDetector();
     relationships = detector.detectFromSchema(relationsSchema, schema);
-    manager = new RelationshipManager(schema, relationships, 'users');
+    manager = new RelationshipManager(schema, relationships);
   });
 
   it('should resolve direct column paths', () => {
-    const path = manager.resolveColumnPath('name');
+    const path = manager.resolveColumnPath('name', 'users');
 
     expect(path.table).toBe('users');
     expect(path.field).toBe('name');
@@ -172,7 +172,7 @@ describe('RelationshipManager', () => {
   });
 
   it('should resolve single-level relationship paths', () => {
-    const path = manager.resolveColumnPath('profile.bio');
+    const path = manager.resolveColumnPath('profile.bio', 'users');
 
     expect(path.table).toBe('profile');
     expect(path.field).toBe('bio');
@@ -181,7 +181,7 @@ describe('RelationshipManager', () => {
   });
 
   it('should resolve multi-level relationship paths', () => {
-    const path = manager.resolveColumnPath('posts.comments.content');
+    const path = manager.resolveColumnPath('posts.comments.content', 'users');
 
     expect(path.table).toBe('comments');
     expect(path.field).toBe('content');
@@ -190,7 +190,7 @@ describe('RelationshipManager', () => {
   });
 
   it('should get required joins for columns', () => {
-    const joins = manager.getRequiredJoins(['profile.bio', 'posts.title']);
+    const joins = manager.getRequiredJoins(['profile.bio', 'posts.title'], 'users');
 
     expect(joins.has('profile')).toBe(true);
     expect(joins.has('posts')).toBe(true);
@@ -224,7 +224,7 @@ describe('RelationshipManager', () => {
       ],
     ]);
 
-    const joinOrder = manager.optimizeJoinOrder(requiredJoins);
+    const joinOrder = manager.optimizeJoinOrder(requiredJoins, 'users');
 
     expect(joinOrder).toHaveLength(2);
     expect(joinOrder[0].to).toBe('posts');
@@ -232,13 +232,13 @@ describe('RelationshipManager', () => {
   });
 
   it('should validate column access', () => {
-    expect(manager.validateColumnAccess('name')).toBe(true);
-    expect(manager.validateColumnAccess('profile.bio')).toBe(true);
-    expect(manager.validateColumnAccess('invalid.column')).toBe(false);
+    expect(manager.validateColumnAccess('name', 'users')).toBe(true);
+    expect(manager.validateColumnAccess('profile.bio', 'users')).toBe(true);
+    expect(manager.validateColumnAccess('invalid.column', 'users')).toBe(false);
   });
 
   it('should get accessible columns', () => {
-    const columns = manager.getAccessibleColumns();
+    const columns = manager.getAccessibleColumns('users');
 
     expect(columns).toContain('name');
     expect(columns).toContain('email');
@@ -247,11 +247,14 @@ describe('RelationshipManager', () => {
   });
 
   it('should build query context', () => {
-    const context = manager.buildQueryContext({
-      columns: ['name', 'profile.bio'],
-      filters: [{ columnId: 'posts.title' }],
-      sorts: [{ columnId: 'profile.bio' }],
-    });
+    const context = manager.buildQueryContext(
+      {
+        columns: ['name', 'profile.bio'],
+        filters: [{ columnId: 'posts.title' }],
+        sorts: [{ columnId: 'profile.bio' }],
+      },
+      'users'
+    );
 
     expect(context.requiredTables.has('users')).toBe(true);
     expect(context.requiredTables.has('profile')).toBe(true);
@@ -262,9 +265,9 @@ describe('RelationshipManager', () => {
   });
 
   it('should check table reachability', () => {
-    expect(manager.isTableReachable('profiles')).toBe(true);
-    expect(manager.isTableReachable('comments')).toBe(true);
-    expect(manager.isTableReachable('posts')).toBe(true); // users has posts: many(posts)
+    expect(manager.isTableReachable('profiles', 'users')).toBe(true);
+    expect(manager.isTableReachable('comments', 'users')).toBe(true);
+    expect(manager.isTableReachable('posts', 'users')).toBe(true); // users has posts: many(posts)
   });
 
   it('should get relationship statistics', () => {

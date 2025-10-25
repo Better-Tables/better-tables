@@ -200,11 +200,6 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
       // Determine primary table from column configurations
       const primaryTable = this.determinePrimaryTable(params.columns);
 
-      // Configure managers with the primary table
-      this.relationshipManager.setPrimaryTable(primaryTable);
-      this.queryBuilder.setPrimaryTable(primaryTable);
-      this.dataTransformer.setPrimaryTable(primaryTable);
-
       // Check cache first
       const cacheKey = this.getCacheKey(params);
       const cached = this.getFromCache(cacheKey);
@@ -220,12 +215,13 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         };
       }
 
-      // Build queries
+      // Build queries - pass primaryTable to query builder
       const { dataQuery, countQuery, columnMetadata } = this.queryBuilder.buildCompleteQuery({
         columns: params.columns || [],
         filters: params.filters || [],
         sorting: params.sorting || [],
         pagination: params.pagination || { page: 1, limit: 10 },
+        primaryTable,
       });
 
       // Execute queries in parallel
@@ -233,10 +229,10 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
 
       const total = (countResult[0] as { count: number } | undefined)?.count || 0;
 
-      // Transform data to nested structure
+      // Transform data to nested structure - pass primaryTable to transformer
       const transformedData = this.dataTransformer.transformToNested<
         InferSelectModel<TSchema[keyof TSchema]>
-      >(data, params.columns, columnMetadata);
+      >(data, primaryTable, params.columns, columnMetadata);
 
       // Build result
       const result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> = {
@@ -281,7 +277,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async getFilterOptions(columnId: string): Promise<FilterOption[]> {
     try {
-      const query = this.queryBuilder.buildFilterOptionsQuery(columnId);
+      // Determine primary table from the column
+      const primaryTable = this.determinePrimaryTable([columnId]);
+      const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable);
       const results = await query.execute();
 
       return results.map((row: Record<string, unknown>) => ({
@@ -302,7 +300,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async getFacetedValues(columnId: string): Promise<Map<string, number>> {
     try {
-      const query = this.queryBuilder.buildAggregateQuery(columnId, 'count');
+      // Determine primary table from the column
+      const primaryTable = this.determinePrimaryTable([columnId]);
+      const query = this.queryBuilder.buildAggregateQuery(columnId, 'count', primaryTable);
       const results = await query.execute();
 
       const facetMap = new Map<string, number>();
@@ -326,7 +326,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async getMinMaxValues(columnId: string): Promise<[number, number]> {
     try {
-      const query = this.queryBuilder.buildMinMaxQuery(columnId);
+      // Determine primary table from the column
+      const primaryTable = this.determinePrimaryTable([columnId]);
+      const query = this.queryBuilder.buildMinMaxQuery(columnId, primaryTable);
       const results = await query.execute();
       const result = results[0] as { min: number | null; max: number | null } | undefined;
 
@@ -777,11 +779,16 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    * Utility methods
    */
   private getJoinCount(params: FetchDataParams): number {
-    const context = this.relationshipManager.buildQueryContext({
-      columns: params.columns || [],
-      filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
-      sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
-    });
+    // Determine primary table from params
+    const primaryTable = this.determinePrimaryTable(params.columns);
+    const context = this.relationshipManager.buildQueryContext(
+      {
+        columns: params.columns || [],
+        filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
+        sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
+      },
+      primaryTable
+    );
     return context.joinPaths.size;
   }
 

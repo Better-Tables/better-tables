@@ -133,14 +133,13 @@ function FilterBadge<TData = unknown>({
     return operatorDef?.valueCount === 0;
   }, [filter.operator]);
 
-  // Check if operator supports null values (needed for include-null toggle)
-  const supportsNull = React.useMemo(() => {
-    const operatorDef = getOperatorDefinition(filter.operator);
-    return operatorDef?.supportsNull ?? false;
+  // Check if operator is empty/not selected
+  const hasOperator = React.useMemo(() => {
+    return filter.operator && filter.operator.trim() !== '';
   }, [filter.operator]);
 
-  // Show value panel if operator needs values OR supports null (for include-null toggle)
-  const shouldShowValuePanel = !needsNoValues || supportsNull;
+  // Show value panel if operator is selected AND operator needs values (not for zero-value operators)
+  const shouldShowValuePanel = hasOperator && !needsNoValues;
 
   return (
     <div
