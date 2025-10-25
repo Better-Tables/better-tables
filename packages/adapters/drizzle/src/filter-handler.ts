@@ -1,4 +1,5 @@
 import type { ColumnType, FilterOperator, FilterState } from '@better-tables/core';
+import { getOperatorDefinition, validateOperatorValues } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import {
   and,
@@ -41,9 +42,11 @@ export class FilterHandler {
 
   /**
    * Build filter condition from filter state
+   * @param filter - The filter state to build condition for
+   * @param primaryTable - The primary table for this query context
    */
-  buildFilterCondition(filter: FilterState): SQL | SQLWrapper {
-    const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId);
+  buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper {
+    const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
     const column = this.getColumn(columnPath);
 
     if (!column) {
@@ -53,7 +56,13 @@ export class FilterHandler {
       });
     }
 
-    return this.mapOperatorToCondition(column, filter.operator, filter.values, filter.includeNull);
+    return this.mapOperatorToCondition(
+      column,
+      filter.operator,
+      filter.values,
+      filter.includeNull,
+      filter.type
+    );
   }
 
   /**
@@ -76,7 +85,8 @@ export class FilterHandler {
     column: AnyColumnType,
     operator: FilterOperator,
     values: unknown[],
-    includeNull?: boolean
+    includeNull?: boolean,
+    columnType?: string
   ): SQL | SQLWrapper {
     const conditions: (SQL | SQLWrapper)[] = [];
 
@@ -164,25 +174,35 @@ export class FilterHandler {
         }
         break;
 
-      // Date operators
+      // Date operators - only apply date parsing for date columns
       case 'is': {
-        const dateValue = this.parseFilterDate(values[0]);
-        // For SQLite with timestamp mode, compare as numbers
-        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
-          conditions.push(sql`${column} = ${dateValue}`);
+        if (columnType === 'date') {
+          const dateValue = this.parseFilterDate(values[0]);
+          // For SQLite with timestamp mode, compare as numbers
+          if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+            conditions.push(sql`${column} = ${dateValue}`);
+          } else {
+            conditions.push(eq(column, dateValue));
+          }
         } else {
-          conditions.push(eq(column, dateValue));
+          // For non-date columns, treat as equals
+          conditions.push(eq(column, values[0]));
         }
         break;
       }
 
       case 'isNot': {
-        const dateValue = this.parseFilterDate(values[0]);
-        // For SQLite with timestamp mode, compare as numbers
-        if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
-          conditions.push(sql`${column} != ${dateValue}`);
+        if (columnType === 'date') {
+          const dateValue = this.parseFilterDate(values[0]);
+          // For SQLite with timestamp mode, compare as numbers
+          if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
+            conditions.push(sql`${column} != ${dateValue}`);
+          } else {
+            conditions.push(not(eq(column, dateValue)));
+          }
         } else {
-          conditions.push(not(eq(column, dateValue)));
+          // For non-date columns, treat as not equals
+          conditions.push(not(eq(column, values[0])));
         }
         break;
       }
@@ -477,7 +497,10 @@ export class FilterHandler {
   /**
    * Handle cross-table filters
    */
-  handleCrossTableFilters(filters: FilterState[]): {
+  handleCrossTableFilters(
+    filters: FilterState[],
+    primaryTable: string
+  ): {
     conditions: (SQL | SQLWrapper)[];
     requiredJoins: Set<string>;
   } {
@@ -485,18 +508,34 @@ export class FilterHandler {
     const requiredJoins = new Set<string>();
 
     for (const filter of filters) {
-      const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId);
-
-      if (columnPath.isNested && columnPath.relationshipPath) {
-        // Add required joins
-        for (const relationship of columnPath.relationshipPath) {
-          requiredJoins.add(relationship.to);
+      try {
+        // Validate filter values before processing
+        if (!this.validateFilterValues(filter.operator, filter.values)) {
+          // Skip invalid filters silently
+          continue;
         }
-      }
 
-      const condition = this.buildFilterCondition(filter);
-      if (condition) {
-        conditions.push(condition);
+        const columnPath = this.relationshipManager.resolveColumnPath(
+          filter.columnId,
+          primaryTable
+        );
+
+        if (columnPath.isNested && columnPath.relationshipPath) {
+          // Add required joins
+          for (const relationship of columnPath.relationshipPath) {
+            requiredJoins.add(relationship.to);
+          }
+        }
+
+        const condition = this.buildFilterCondition(filter, primaryTable);
+        if (condition) {
+          conditions.push(condition);
+        }
+      } catch (error) {
+        // Re-throw the error to surface the issue instead of silently ignoring it
+        throw new Error(
+          `Invalid filter configuration for column '${filter.columnId}': ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -508,9 +547,10 @@ export class FilterHandler {
    */
   buildCompoundConditions(
     filters: FilterState[],
+    primaryTable: string,
     operator: 'and' | 'or' = 'and'
   ): SQL | SQLWrapper {
-    const { conditions } = this.handleCrossTableFilters(filters);
+    const { conditions } = this.handleCrossTableFilters(filters, primaryTable);
 
     if (conditions.length === 0) {
       return sql`1=1`;
@@ -551,36 +591,28 @@ export class FilterHandler {
   }
 
   /**
+   * Get expected value count for an operator
+   */
+  getExpectedValueCount(operator: FilterOperator): number {
+    const definition = getOperatorDefinition(operator);
+    if (!definition) {
+      return 1; // Default fallback
+    }
+
+    if (typeof definition.valueCount === 'number') {
+      return definition.valueCount;
+    }
+
+    // For operators that accept "at least 1" value (variable)
+    return 1;
+  }
+
+  /**
    * Validate filter values
    */
   validateFilterValues(operator: FilterOperator, values: unknown[]): boolean {
-    switch (operator) {
-      case 'between':
-      case 'notBetween':
-        return values.length >= 2;
-
-      case 'isAnyOf':
-      case 'isNoneOf':
-      case 'includesAny':
-      case 'includesAll':
-      case 'excludesAny':
-      case 'excludesAll':
-        return values.length > 0;
-
-      case 'isEmpty':
-      case 'isNotEmpty':
-      case 'isNull':
-      case 'isNotNull':
-      case 'isToday':
-      case 'isYesterday':
-      case 'isThisWeek':
-      case 'isThisMonth':
-      case 'isThisYear':
-        return values.length === 0;
-
-      default:
-        return values.length >= 1;
-    }
+    const result = validateOperatorValues(operator, values);
+    return result === true;
   }
 
   /**

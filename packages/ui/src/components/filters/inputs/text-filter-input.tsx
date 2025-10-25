@@ -30,8 +30,18 @@ export function TextFilterInput<TData = unknown>({
     return value || '';
   });
 
+  // Track if user is actively typing to prevent external sync interference
+  const isUserTypingRef = React.useRef(false);
+  const onChangeRef = React.useRef(onChange);
+  const lastSentValueRef = React.useRef<string | undefined>(undefined);
+
+  // Update ref when onChange changes
+  React.useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   // Debounce the onChange to avoid excessive updates
-  const debounceMs = column.filter?.debounce ?? 300;
+  const debounceMs = column.filter?.debounce ?? 500;
   const debouncedValue = useDebounce(localValue, debounceMs);
 
   // Validate the current values
@@ -44,20 +54,26 @@ export function TextFilterInput<TData = unknown>({
 
   // Update parent when debounced value changes (only if valid)
   React.useEffect(() => {
-    if (debouncedValue !== filter.values[0]) {
-      onChange(debouncedValue ? [debouncedValue] : []);
+    // Only update if the debounced value is different from what we last sent
+    // This prevents loops while still allowing updates when user types
+    if (debouncedValue !== lastSentValueRef.current) {
+      onChangeRef.current(debouncedValue ? [debouncedValue] : []);
+      lastSentValueRef.current = debouncedValue;
     }
-  }, [debouncedValue, onChange, filter.values]);
+    // Reset typing flag after debounce completes
+    isUserTypingRef.current = false;
+  }, [debouncedValue]); // Only depend on debouncedValue
 
-  // Sync local value when filter values change externally
+  // Sync local value when filter values change externally (only if user isn't typing)
   React.useEffect(() => {
-    const newValue = getFilterValueAsString(filter, 0) || '';
-    if (newValue !== localValue) {
+    if (!isUserTypingRef.current) {
+      const newValue = getFilterValueAsString(filter, 0) || '';
       setLocalValue(newValue);
     }
-  }, [filter.values, filter, localValue]);
+  }, [filter.values, filter]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    isUserTypingRef.current = true;
     setLocalValue(e.target.value);
   };
 

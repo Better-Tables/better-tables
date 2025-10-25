@@ -35,7 +35,6 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
 {
   private db: DrizzleDatabase;
   private schema: TSchema;
-  private mainTable: string;
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
@@ -58,7 +57,6 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   constructor(config: DrizzleAdapterConfig<TSchema>) {
     this.db = config.db;
     this.schema = config.schema;
-    this.mainTable = config.mainTable as string;
     this.options = config.options || {};
 
     // Initialize relationship detection
@@ -78,29 +76,116 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
       this.relationships = config.relationships || {};
     }
 
-    // Initialize managers
-    this.relationshipManager = new RelationshipManager(
-      this.schema,
-      this.relationships,
-      this.mainTable
-    );
+    // Initialize managers - they will be configured per query
+    this.relationshipManager = new RelationshipManager(this.schema, this.relationships);
 
     this.queryBuilder = new DrizzleQueryBuilder(
       this.db,
       this.schema,
       this.relationshipManager,
-      this.mainTable,
       config.driver,
       config.options?.primaryKey?.tableKeys
     );
-    this.dataTransformer = new DataTransformer(
-      this.schema,
-      this.relationshipManager,
-      this.mainTable
-    );
+    this.dataTransformer = new DataTransformer(this.schema, this.relationshipManager);
 
     // Initialize metadata
     this.meta = this.buildAdapterMeta(config.meta);
+  }
+
+  /**
+   * Determine the primary table from column configurations
+   */
+  private determinePrimaryTable(columns?: string[]): string {
+    if (!columns || columns.length === 0) {
+      // If no columns specified, use the first table in schema
+      const tableNames = Object.keys(this.schema);
+      if (tableNames.length === 0) {
+        throw new SchemaError('No tables found in schema', { schema: this.schema });
+      }
+      const firstTable = tableNames[0];
+      if (!firstTable) {
+        throw new SchemaError('No tables found in schema', { schema: this.schema });
+      }
+      return firstTable;
+    }
+
+    // Analyze columns to find the most common table
+    const tableCounts = new Map<string, number>();
+
+    for (const columnId of columns) {
+      const parts = columnId.split('.');
+      if (parts.length === 1) {
+        // Direct column - find which table it belongs to
+        const fieldName = parts[0];
+        if (!fieldName) continue;
+
+        for (const [tableName, tableSchema] of Object.entries(this.schema)) {
+          if (this.hasColumn(tableSchema, fieldName)) {
+            tableCounts.set(tableName, (tableCounts.get(tableName) || 0) + 1);
+            break;
+          }
+        }
+      } else if (parts.length >= 2) {
+        // Relationship column - the first part is the table alias
+        const tableAlias = parts[0];
+        if (!tableAlias) continue;
+
+        // Find the actual table name from relationships
+        for (const [relKey] of Object.entries(this.relationships)) {
+          if (relKey.endsWith(`.${tableAlias}`)) {
+            const sourceTable = relKey.split('.')[0];
+            if (sourceTable) {
+              tableCounts.set(sourceTable, (tableCounts.get(sourceTable) || 0) + 1);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // Return the table with the most column references
+    let primaryTable = '';
+    let maxCount = 0;
+    for (const [tableName, count] of tableCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        primaryTable = tableName;
+      }
+    }
+
+    // Fallback to first table if no clear primary table found
+    if (!primaryTable) {
+      const tableNames = Object.keys(this.schema);
+      if (tableNames.length === 0) {
+        throw new SchemaError('No tables found in schema', { schema: this.schema });
+      }
+      const firstTable = tableNames[0];
+      if (!firstTable) {
+        throw new SchemaError('No tables found in schema', { schema: this.schema });
+      }
+      primaryTable = firstTable;
+    }
+
+    return primaryTable;
+  }
+
+  /**
+   * Check if a table has a specific column
+   */
+  private hasColumn(tableSchema: AnyTableType, columnName: string): boolean {
+    try {
+      const tableObj = tableSchema as unknown as Record<string, unknown>;
+      if ('_' in tableObj && tableObj._ && typeof tableObj._ === 'object') {
+        const meta = tableObj._ as Record<string, unknown>;
+        if ('columns' in meta && meta.columns && typeof meta.columns === 'object') {
+          const columns = meta.columns as Record<string, unknown>;
+          return columnName in columns;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -112,6 +197,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
     const startTime = Date.now();
 
     try {
+      // Determine primary table from column configurations
+      const primaryTable = this.determinePrimaryTable(params.columns);
+
       // Check cache first
       const cacheKey = this.getCacheKey(params);
       const cached = this.getFromCache(cacheKey);
@@ -127,12 +215,13 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         };
       }
 
-      // Build queries
+      // Build queries - pass primaryTable to query builder
       const { dataQuery, countQuery, columnMetadata } = this.queryBuilder.buildCompleteQuery({
         columns: params.columns || [],
         filters: params.filters || [],
         sorting: params.sorting || [],
         pagination: params.pagination || { page: 1, limit: 10 },
+        primaryTable,
       });
 
       // Execute queries in parallel
@@ -140,10 +229,10 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
 
       const total = (countResult[0] as { count: number } | undefined)?.count || 0;
 
-      // Transform data to nested structure
+      // Transform data to nested structure - pass primaryTable to transformer
       const transformedData = this.dataTransformer.transformToNested<
         InferSelectModel<TSchema[keyof TSchema]>
-      >(data, params.columns, columnMetadata);
+      >(data, primaryTable, params.columns, columnMetadata);
 
       // Build result
       const result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> = {
@@ -188,7 +277,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async getFilterOptions(columnId: string): Promise<FilterOption[]> {
     try {
-      const query = this.queryBuilder.buildFilterOptionsQuery(columnId);
+      // Determine primary table from the column
+      const primaryTable = this.determinePrimaryTable([columnId]);
+      const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable);
       const results = await query.execute();
 
       return results.map((row: Record<string, unknown>) => ({
@@ -209,7 +300,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async getFacetedValues(columnId: string): Promise<Map<string, number>> {
     try {
-      const query = this.queryBuilder.buildAggregateQuery(columnId, 'count');
+      // Determine primary table from the column
+      const primaryTable = this.determinePrimaryTable([columnId]);
+      const query = this.queryBuilder.buildAggregateQuery(columnId, 'count', primaryTable);
       const results = await query.execute();
 
       const facetMap = new Map<string, number>();
@@ -233,7 +326,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async getMinMaxValues(columnId: string): Promise<[number, number]> {
     try {
-      const query = this.queryBuilder.buildMinMaxQuery(columnId);
+      // Determine primary table from the column
+      const primaryTable = this.determinePrimaryTable([columnId]);
+      const query = this.queryBuilder.buildMinMaxQuery(columnId, primaryTable);
       const results = await query.execute();
       const result = results[0] as { min: number | null; max: number | null } | undefined;
 
@@ -250,16 +345,36 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   }
 
   /**
+   * Determine table from data or use first table as fallback
+   */
+  private determineTableFromData(
+    _data?: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): string {
+    // For now, use the first table as fallback
+    // In a more sophisticated implementation, we could analyze the data structure
+    const tableNames = Object.keys(this.schema);
+    if (tableNames.length === 0) {
+      throw new SchemaError('No tables found in schema', { schema: this.schema });
+    }
+    const firstTable = tableNames[0];
+    if (!firstTable) {
+      throw new SchemaError('No tables found in schema', { schema: this.schema });
+    }
+    return firstTable;
+  }
+
+  /**
    * Create new record
    */
   async createRecord(
     data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
   ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
     try {
-      const mainTableSchema = this.schema[this.mainTable] as TableWithId;
+      const primaryTable = this.determineTableFromData(data);
+      const mainTableSchema = this.schema[primaryTable] as TableWithId;
       if (!mainTableSchema) {
-        throw new SchemaError(`Main table not found: ${this.mainTable}`, {
-          mainTable: this.mainTable,
+        throw new SchemaError(`Table not found: ${primaryTable}`, {
+          primaryTable,
         });
       }
 
@@ -286,10 +401,11 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
     data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
   ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
     try {
-      const mainTableSchema = this.schema[this.mainTable] as TableWithId;
+      const primaryTable = this.determineTableFromData(data);
+      const mainTableSchema = this.schema[primaryTable] as TableWithId;
       if (!mainTableSchema) {
-        throw new SchemaError(`Main table not found: ${this.mainTable}`, {
-          mainTable: this.mainTable,
+        throw new SchemaError(`Table not found: ${primaryTable}`, {
+          primaryTable,
         });
       }
 
@@ -321,10 +437,11 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async deleteRecord(id: string): Promise<void> {
     try {
-      const mainTableSchema = this.schema[this.mainTable] as TableWithId;
+      const primaryTable = this.determineTableFromData();
+      const mainTableSchema = this.schema[primaryTable] as TableWithId;
       if (!mainTableSchema) {
-        throw new SchemaError(`Main table not found: ${this.mainTable}`, {
-          mainTable: this.mainTable,
+        throw new SchemaError(`Table not found: ${primaryTable}`, {
+          primaryTable,
         });
       }
 
@@ -356,10 +473,11 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
     data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
   ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
     try {
-      const mainTableSchema = this.schema[this.mainTable] as TableWithId;
+      const primaryTable = this.determineTableFromData(data);
+      const mainTableSchema = this.schema[primaryTable] as TableWithId;
       if (!mainTableSchema) {
-        throw new SchemaError(`Main table not found: ${this.mainTable}`, {
-          mainTable: this.mainTable,
+        throw new SchemaError(`Table not found: ${primaryTable}`, {
+          primaryTable,
         });
       }
 
@@ -387,10 +505,11 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    */
   async bulkDelete(ids: string[]): Promise<void> {
     try {
-      const mainTableSchema = this.schema[this.mainTable] as TableWithId;
+      const primaryTable = this.determineTableFromData();
+      const mainTableSchema = this.schema[primaryTable] as TableWithId;
       if (!mainTableSchema) {
-        throw new SchemaError(`Main table not found: ${this.mainTable}`, {
-          mainTable: this.mainTable,
+        throw new SchemaError(`Table not found: ${primaryTable}`, {
+          primaryTable,
         });
       }
 
@@ -660,11 +779,16 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    * Utility methods
    */
   private getJoinCount(params: FetchDataParams): number {
-    const context = this.relationshipManager.buildQueryContext({
-      columns: params.columns || [],
-      filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
-      sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
-    });
+    // Determine primary table from params
+    const primaryTable = this.determinePrimaryTable(params.columns);
+    const context = this.relationshipManager.buildQueryContext(
+      {
+        columns: params.columns || [],
+        filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
+        sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
+      },
+      primaryTable
+    );
     return context.joinPaths.size;
   }
 

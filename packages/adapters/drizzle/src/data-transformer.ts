@@ -8,27 +8,28 @@ import {
 
 /**
  * Data transformer that converts flat SQL results to nested structures
+ * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
+ * rather than storing it as mutable state, preventing race conditions in concurrent requests.
  */
 export class DataTransformer {
   private schema: Record<string, AnyTableType>;
   private relationshipManager: RelationshipManager;
-  private mainTable: string;
 
-  constructor(
-    schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager,
-    mainTable: string
-  ) {
+  constructor(schema: Record<string, AnyTableType>, relationshipManager: RelationshipManager) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
-    this.mainTable = mainTable;
   }
 
   /**
    * Transform flat SQL result to nested structure
+   * @param flatData - Flat SQL results to transform
+   * @param primaryTable - The primary table for this query context
+   * @param columns - Optional list of columns to include
+   * @param columnMetadata - Optional metadata about column selections
    */
   transformToNested<TData = Record<string, unknown>>(
     flatData: Record<string, unknown>[],
+    primaryTable: string,
     columns?: string[],
     columnMetadata?: {
       selections: Record<string, unknown>;
@@ -40,13 +41,13 @@ export class DataTransformer {
     }
 
     // Group data by main table primary key
-    const groupedData = this.groupByMainTableKey(flatData);
+    const groupedData = this.groupByMainTableKey(flatData, primaryTable);
 
     // Transform each group to nested structure
     const nestedData: TData[] = [];
 
     for (const [, records] of groupedData) {
-      const nestedRecord = this.buildNestedRecord(records, columns, columnMetadata);
+      const nestedRecord = this.buildNestedRecord(records, primaryTable, columns, columnMetadata);
       nestedData.push(nestedRecord as TData);
     }
 
@@ -55,20 +56,21 @@ export class DataTransformer {
 
   /**
    * Group flat data by main table primary key
+   * @param flatData - Flat data records to group
+   * @param primaryTable - The primary table for this query context
    */
   private groupByMainTableKey(
-    flatData: Record<string, unknown>[]
+    flatData: Record<string, unknown>[],
+    primaryTable: string
   ): Map<string, Record<string, unknown>[]> {
     const grouped = new Map<string, Record<string, unknown>[]>();
 
     for (const record of flatData) {
       // Get the primary key dynamically from the schema
-      const tableSchema = this.schema[this.mainTable];
+      const tableSchema = this.schema[primaryTable];
       if (!tableSchema) continue;
       const primaryKeyName = this.getPrimaryKeyName(tableSchema);
-      const mainKey = String(
-        record[primaryKeyName] || record[`${this.mainTable}_${primaryKeyName}`]
-      );
+      const mainKey = String(record[primaryKeyName] || record[`${primaryTable}_${primaryKeyName}`]);
 
       if (!grouped.has(mainKey)) {
         grouped.set(mainKey, []);
@@ -85,9 +87,14 @@ export class DataTransformer {
 
   /**
    * Build nested record from grouped flat records
+   * @param records - Flat records to transform
+   * @param primaryTable - The primary table for this query context
+   * @param columns - Optional list of columns to include
+   * @param columnMetadata - Optional metadata about column selections
    */
   private buildNestedRecord(
     records: Record<string, unknown>[],
+    primaryTable: string,
     columns?: string[],
     columnMetadata?: {
       selections: Record<string, unknown>;
@@ -115,22 +122,22 @@ export class DataTransformer {
           // This is a relationship column - use first part as relationship key
           const relationshipKey = parts[0];
           if (relationshipKey && !processedRelationships.has(relationshipKey)) {
-            this.processColumn(nestedRecord, columnId, records);
+            this.processColumn(nestedRecord, columnId, records, primaryTable);
             processedRelationships.add(relationshipKey);
           }
         } else {
           // Direct column - process normally
-          this.processColumn(nestedRecord, columnId, records);
+          this.processColumn(nestedRecord, columnId, records, primaryTable);
         }
       }
     } else {
       // Process all available columns
       const firstRecord = records[0];
       if (firstRecord) {
-        const allColumns = this.getAllColumnIds(firstRecord, columnMetadata);
+        const allColumns = this.getAllColumnIds(firstRecord, primaryTable, columnMetadata);
         for (const columnId of allColumns) {
           try {
-            this.processColumn(nestedRecord, columnId, records);
+            this.processColumn(nestedRecord, columnId, records, primaryTable);
           } catch {
             // Skip columns that can't be resolved (e.g., table names, invalid paths)
             // This can happen with auto-detected columns from SQL joins
@@ -144,13 +151,18 @@ export class DataTransformer {
 
   /**
    * Process a single column to build nested structure
+   * @param nestedRecord - The nested record being built
+   * @param columnId - The column ID to process
+   * @param records - Flat records to extract data from
+   * @param primaryTable - The primary table for this query context
    */
   private processColumn(
     nestedRecord: Record<string, unknown>,
     columnId: string,
-    records: Record<string, unknown>[]
+    records: Record<string, unknown>[],
+    primaryTable: string
   ): void {
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId);
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
 
     if (!columnPath.isNested) {
       // Direct column - already in base record
@@ -267,9 +279,13 @@ export class DataTransformer {
   /**
    * Get all column IDs from a flat record using column metadata
    * Uses query builder metadata instead of manual parsing
+   * @param record - The flat record to extract column IDs from
+   * @param primaryTable - The primary table for this query context
+   * @param columnMetadata - Optional metadata about column selections
    */
   private getAllColumnIds(
     record: Record<string, unknown>,
+    primaryTable: string,
     columnMetadata?: {
       selections: Record<string, unknown>;
       columnMapping: Record<string, string>;
@@ -282,7 +298,7 @@ export class DataTransformer {
 
     // Fallback to manual parsing attempt
     const columnIds: string[] = [];
-    const mainTableColumns = this.getMainTableColumns();
+    const mainTableColumns = this.getMainTableColumns(primaryTable);
 
     for (const key of Object.keys(record)) {
       // Check if it's a main table column (no underscore processing needed)
@@ -291,9 +307,9 @@ export class DataTransformer {
         continue;
       }
 
-      // Check if this is a main table column with table name prefix (e.g., users_id, users_name)
-      if (key.startsWith(`${this.mainTable}_`)) {
-        const field = key.substring(this.mainTable.length + 1);
+      // Check if this is a primary table column with table name prefix (e.g., users_id, users_name)
+      if (key.startsWith(`${primaryTable}_`)) {
+        const field = key.substring(primaryTable.length + 1);
         if (mainTableColumns.includes(field)) {
           columnIds.push(field); // Use the field name without table prefix
           continue;
@@ -303,7 +319,7 @@ export class DataTransformer {
       // For joined columns, use Drizzle schema utilities
       if (key.includes('_')) {
         // Try to find a table name match (longest match first to handle edge cases)
-        const tableNames = Object.keys(this.schema).filter((t) => t !== this.mainTable);
+        const tableNames = Object.keys(this.schema).filter((t) => t !== primaryTable);
         // Sort by length descending to match longest table name first
         tableNames.sort((a, b) => b.length - a.length);
 
@@ -344,9 +360,10 @@ export class DataTransformer {
 
   /**
    * Get column names from main table
+   * @param primaryTable - The primary table for this query context
    */
-  private getMainTableColumns(): string[] {
-    const table = this.schema[this.mainTable];
+  private getMainTableColumns(primaryTable: string): string[] {
+    const table = this.schema[primaryTable];
     if (!table || typeof table !== 'object') {
       return [];
     }
@@ -469,9 +486,12 @@ export class DataTransformer {
 
   /**
    * Handle null/undefined values in related records
+   * @param data - Data to process
+   * @param primaryTable - The primary table for this query context
    */
   handleNullValues<TData extends Record<string, unknown> = Record<string, unknown>>(
-    data: TData[]
+    data: TData[],
+    primaryTable: string
   ): TData[] {
     return data.map((record) => {
       const processedRecord = { ...record };
@@ -480,7 +500,7 @@ export class DataTransformer {
       for (const [key, value] of Object.entries(processedRecord)) {
         if (value === null || value === undefined) {
           // Check if this is a relationship field
-          const columnPath = this.relationshipManager.resolveColumnPath(key);
+          const columnPath = this.relationshipManager.resolveColumnPath(key, primaryTable);
 
           if (columnPath.isNested) {
             // Set to null for one-to-one, empty array for one-to-many
@@ -541,9 +561,12 @@ export class DataTransformer {
 
   /**
    * Validate transformed data structure
+   * @param data - Data to validate
+   * @param primaryTable - The primary table for this query context
    */
   validateTransformedData<TData extends Record<string, unknown> = Record<string, unknown>>(
-    data: TData[]
+    data: TData[],
+    primaryTable: string
   ): boolean {
     try {
       for (const record of data) {
@@ -553,7 +576,7 @@ export class DataTransformer {
 
         // Check for required fields
         const recordObj = record as Record<string, unknown>;
-        if (!recordObj.id && !recordObj[`${this.mainTable}_id`]) {
+        if (!recordObj.id && !recordObj[`${primaryTable}_id`]) {
           return false;
         }
       }
