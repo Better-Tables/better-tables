@@ -1,3 +1,5 @@
+'use client';
+
 import type { UrlSyncAdapter } from '@better-tables/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -45,7 +47,9 @@ export function useNextjsUrlAdapter(): UrlSyncAdapter {
         }
       }
 
-      const newUrl = `?${params.toString()}`;
+      // Preserve hash fragment when updating URL
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      const newUrl = `?${params.toString()}${hash}`;
 
       // Push the new URL and refresh to trigger server re-fetch
       router.push(newUrl, { scroll: false });

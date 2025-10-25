@@ -125,52 +125,33 @@ export function BetterTable<TData = unknown>({
     rowSelection = false,
   } = features;
 
-  // Initialize store with initial state on mount
-  useEffect(() => {
-    getOrCreateTableStore(id, {
+  // Initialize store synchronously during render
+  // The store creation is idempotent - it only creates once per ID
+  // All state management is delegated to the TableStateManager
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only create once per table ID
+  const store = useMemo(() => {
+    return getOrCreateTableStore(id, {
+      columns,
       filters: initialFilters,
       pagination: initialPagination,
       sorting: initialSorting,
       selectedRows: initialSelectedRows,
     });
-  }, [id, initialFilters, initialPagination, initialSorting, initialSelectedRows]);
+  }, [id]); // Only depend on id - we don't want to recreate on every prop change
 
   // Subscribe to store state
   const { filters, setFilters, clearFilters } = useTableFilters(id);
-  const { pagination, setPage, setPageSize, setPagination } = useTablePagination(id);
+  const { pagination, setPage, setPageSize } = useTablePagination(id);
   const { sorting: sortingState, toggleSort } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
 
-  // Update pagination totalPages when totalCount or limit changes
+  // Update pagination totalPages when totalCount changes
   useEffect(() => {
     if (totalCount !== undefined) {
-      const calculatedTotalPages = Math.ceil(totalCount / pagination.limit);
-      const hasNext = pagination.page < calculatedTotalPages;
-      const hasPrev = pagination.page > 1;
-
-      if (
-        calculatedTotalPages !== pagination.totalPages ||
-        hasNext !== pagination.hasNext ||
-        hasPrev !== pagination.hasPrev
-      ) {
-        setPagination({
-          page: pagination.page,
-          limit: pagination.limit,
-          totalPages: calculatedTotalPages,
-          hasNext,
-          hasPrev,
-        });
-      }
+      const state = store.getState();
+      state.setTotal(totalCount);
     }
-  }, [
-    totalCount,
-    pagination.limit,
-    pagination.page,
-    pagination.totalPages,
-    pagination.hasNext,
-    pagination.hasPrev,
-    setPagination,
-  ]);
+  }, [store, totalCount]);
 
   // Call optional callbacks when state changes
   useEffect(() => {

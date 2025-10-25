@@ -1,5 +1,5 @@
 import type { StoreApi } from 'zustand/vanilla';
-import { type TableState, type TableStoreInitialState, createTableStore } from './table-store';
+import { createTableStore, type TableState, type TableStoreInitialState } from './table-store';
 
 /**
  * Global registry for table stores
@@ -9,20 +9,24 @@ const storeRegistry = new Map<string, StoreApi<TableState>>();
 
 /**
  * Get or create a table store by ID
- * If a store with the given ID already exists, return it
- * Otherwise, create a new store with the provided initial state
+ * The store must be initialized with columns on first creation
  *
  * @param id - Unique table identifier
- * @param initialState - Initial state for the store (only used if creating new store)
+ * @param initialState - Initial state for the store (required for new stores)
  * @returns The store instance
  */
 export function getOrCreateTableStore(
   id: string,
-  initialState?: TableStoreInitialState
+  initialState: TableStoreInitialState
 ): StoreApi<TableState> {
   let store = storeRegistry.get(id);
   if (!store) {
-    store = createTableStore(initialState || {});
+    if (!initialState.columns) {
+      throw new Error(
+        `Cannot create table store "${id}" without columns. Columns are required on first initialization.`
+      );
+    }
+    store = createTableStore(initialState);
     storeRegistry.set(id, store);
   }
   return store;
@@ -39,40 +43,18 @@ export function hasTableStore(id: string): boolean {
 }
 
 /**
- * Update a table store with new initial state
- * This will reset the store to the new initial state
+ * Get an existing table store without creating it
  *
  * @param id - Table identifier
- * @param initialState - New initial state
+ * @returns The store instance or undefined if it doesn't exist
  */
-export function updateTableStore(id: string, initialState: TableStoreInitialState): void {
-  const store = storeRegistry.get(id);
-  if (store) {
-    const state = store.getState();
-
-    // Update each piece of state if provided
-    if (initialState.filters !== undefined) {
-      state.setFilters(initialState.filters);
-    }
-    if (initialState.pagination !== undefined) {
-      state.setPagination(initialState.pagination);
-    }
-    if (initialState.sorting !== undefined) {
-      state.setSorting(initialState.sorting);
-    }
-    if (initialState.selectedRows !== undefined) {
-      state.setSelectedRows(initialState.selectedRows);
-    }
-  } else {
-    // Create new store if it doesn't exist
-    storeRegistry.set(id, createTableStore(initialState));
-  }
+export function getTableStore(id: string): StoreApi<TableState> | undefined {
+  return storeRegistry.get(id);
 }
 
 /**
  * Destroy a table store
  * Call this when a table unmounts to clean up memory
- * Note: You may want to keep stores around for navigation back scenarios
  *
  * @param id - Table identifier
  */
@@ -106,4 +88,3 @@ export function clearAllTableStores(): void {
 export function getAllTableIds(): string[] {
   return Array.from(storeRegistry.keys());
 }
-

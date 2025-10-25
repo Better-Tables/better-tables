@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { getOrCreateTableStore } from './table-registry';
+import { useEffect, useRef } from 'react';
+import { getTableStore } from './table-registry';
 
 /**
  * Framework-agnostic URL sync adapter interface
@@ -36,13 +36,17 @@ export interface UrlSyncConfig {
  * Hook to synchronize table state with URL query parameters
  * Framework-agnostic - requires a URL adapter implementation
  *
+ * This hook:
+ * 1. Reads URL params once on mount and updates the table manager
+ * 2. Subscribes to table state changes and syncs them to the URL
+ *
  * @param tableId - Unique table identifier
  * @param config - Configuration for which state to sync
  * @param adapter - Framework-specific URL adapter
  *
  * @example
  * ```tsx
- * // Next.js example (adapter implemented in your app)
+ * // Next.js example
  * const urlAdapter = useNextjsUrlAdapter();
  * useTableUrlSync('my-table', {
  *   filters: true,
@@ -56,19 +60,27 @@ export function useTableUrlSync(
   config: UrlSyncConfig,
   adapter: UrlSyncAdapter
 ): void {
-  const store = getOrCreateTableStore(tableId);
+  const hasHydratedFromUrl = useRef(false);
 
-  // Sync URL -> Store on mount
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Only sync from URL once on mount
+  // Hydrate from URL on mount
   useEffect(() => {
-    const state = store.getState();
+    if (hasHydratedFromUrl.current) return;
 
+    const store = getTableStore(tableId);
+    if (!store) {
+      // Store doesn't exist yet - will retry when dependencies change
+      return;
+    }
+
+    const manager = store.getState().manager;
+    const updates: Parameters<typeof manager.updateState>[0] = {};
+
+    // Parse URL params
     if (config.filters) {
       const filtersParam = adapter.getParam('filters');
       if (filtersParam) {
         try {
-          const filters = JSON.parse(filtersParam);
-          state.setFilters(filters);
+          updates.filters = JSON.parse(filtersParam);
         } catch {
           // Silently ignore parse errors
         }
@@ -79,17 +91,22 @@ export function useTableUrlSync(
       const pageParam = adapter.getParam('page');
       const limitParam = adapter.getParam('limit');
 
-      if (pageParam) {
-        const page = Number.parseInt(pageParam, 10);
-        if (!Number.isNaN(page)) {
-          state.setPage(page);
-        }
-      }
+      if (pageParam || limitParam) {
+        // Start with current pagination state
+        const currentPagination = manager.getPagination();
+        updates.pagination = { ...currentPagination };
 
-      if (limitParam) {
-        const limit = Number.parseInt(limitParam, 10);
-        if (!Number.isNaN(limit)) {
-          state.setPageSize(limit);
+        if (pageParam) {
+          const page = Number.parseInt(pageParam, 10);
+          if (!Number.isNaN(page)) {
+            updates.pagination.page = page;
+          }
+        }
+        if (limitParam) {
+          const limit = Number.parseInt(limitParam, 10);
+          if (!Number.isNaN(limit)) {
+            updates.pagination.limit = limit;
+          }
         }
       }
     }
@@ -98,38 +115,57 @@ export function useTableUrlSync(
       const sortingParam = adapter.getParam('sorting');
       if (sortingParam) {
         try {
-          const sorting = JSON.parse(sortingParam);
-          state.setSorting(sorting);
+          updates.sorting = JSON.parse(sortingParam);
         } catch {
           // Silently ignore parse errors
         }
       }
     }
-  }, [tableId]); // Only run on mount - intentionally not including other deps
 
-  // Sync Store -> URL on state changes
+    // Apply updates if we have any
+    if (Object.keys(updates).length > 0) {
+      manager.updateState(updates);
+    }
+
+    hasHydratedFromUrl.current = true;
+  }, [tableId, config, adapter]);
+
+  // Subscribe to state changes and sync to URL
   useEffect(() => {
-    const unsubscribe = store.subscribe((state) => {
-      const updates: Record<string, string | null> = {};
+    const store = getTableStore(tableId);
+    if (!store) return;
 
-      if (config.filters) {
-        updates.filters = state.filters.length > 0 ? JSON.stringify(state.filters) : null;
+    const manager = store.getState().manager;
+
+    // Subscribe to manager state changes
+    const unsubscribe = manager.subscribe((event) => {
+      // Only sync to URL after initial hydration to avoid loops
+      if (!hasHydratedFromUrl.current) return;
+
+      if (event.type === 'state_changed') {
+        const updates: Record<string, string | null> = {};
+
+        if (config.filters) {
+          updates.filters =
+            event.state.filters.length > 0 ? JSON.stringify(event.state.filters) : null;
+        }
+
+        if (config.pagination) {
+          updates.page = event.state.pagination.page.toString();
+          updates.limit = event.state.pagination.limit.toString();
+        }
+
+        if (config.sorting) {
+          updates.sorting =
+            event.state.sorting.length > 0 ? JSON.stringify(event.state.sorting) : null;
+        }
+
+        adapter.setParams(updates);
       }
-
-      if (config.pagination) {
-        updates.page = state.pagination.page.toString();
-        updates.limit = state.pagination.limit.toString();
-      }
-
-      if (config.sorting) {
-        updates.sorting = state.sorting.length > 0 ? JSON.stringify(state.sorting) : null;
-      }
-
-      adapter.setParams(updates);
     });
 
     return unsubscribe;
-  }, [store, config, adapter]);
+  }, [tableId, config, adapter]);
 }
 
 /**
@@ -162,9 +198,10 @@ export function createVanillaUrlAdapter(): UrlSyncAdapter {
         }
       }
 
-      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      // Preserve hash fragment when updating URL
+      const hash = window.location.hash;
+      const newUrl = `${window.location.pathname}?${params.toString()}${hash}`;
       window.history.replaceState({}, '', newUrl);
     },
   };
 }
-

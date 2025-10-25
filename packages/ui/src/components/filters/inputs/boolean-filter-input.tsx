@@ -14,32 +14,44 @@ export interface BooleanFilterInputProps<TData = unknown> {
   disabled?: boolean;
 }
 
+/**
+ * Boolean filter input component
+ * 
+ * Pattern: Purely controlled component (no local state needed)
+ * - Values are determined by the operator
+ * - Sends appropriate values when operator changes
+ * - No user input required - operator defines the value
+ */
 export function BooleanFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
   disabled = false,
 }: BooleanFilterInputProps<TData>) {
-  // Boolean filters with value-based operators don't need inputs
-  // since the operator itself defines the value (isTrue, isFalse, isNull, isNotNull)
-
+  // Store onChange in ref to prevent effect dependencies
+  const onChangeRef = React.useRef(onChange);
   React.useEffect(() => {
-    // Set the appropriate value based on the operator
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  // Set the appropriate value based on the operator
+  // Only run when operator changes
+  React.useEffect(() => {
     switch (filter.operator) {
       case 'isTrue':
-        onChange([true]);
+        onChangeRef.current([true]);
         break;
       case 'isFalse':
-        onChange([false]);
+        onChangeRef.current([false]);
         break;
       case 'isNull':
       case 'isNotNull':
-        onChange([]);
+        onChangeRef.current([]);
         break;
       default:
-        onChange([]);
+        onChangeRef.current([]);
     }
-  }, [filter.operator, onChange]);
+  }, [filter.operator]);
 
   const getDescription = () => {
     switch (filter.operator) {

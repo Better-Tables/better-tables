@@ -19,61 +19,68 @@ export interface TextFilterInputProps<TData = unknown> {
   disabled?: boolean;
 }
 
+/**
+ * Text filter input component
+ *
+ * Pattern: Controlled component with local UI state
+ * - Data state (filter.values) comes from parent (TableStateManager)
+ * - UI state (local input value, typing status) managed locally
+ * - Debounced updates sent back to parent
+ * - Syncs from parent only when not actively typing
+ */
 export function TextFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
   disabled = false,
 }: TextFilterInputProps<TData>) {
+  // UI-only state: what user sees while typing
   const [localValue, setLocalValue] = React.useState(() => {
-    const value = getFilterValueAsString(filter, 0);
-    return value || '';
+    return getFilterValueAsString(filter, 0) || '';
   });
 
-  // Track if user is actively typing to prevent external sync interference
-  const isUserTypingRef = React.useRef(false);
-  const onChangeRef = React.useRef(onChange);
-  const lastSentValueRef = React.useRef<string | undefined>(undefined);
+  // Track if user is actively typing (prevents external sync during interaction)
+  const [isUserTyping, setIsUserTyping] = React.useState(false);
 
-  // Update ref when onChange changes
+  // Store onChange in ref to prevent effect dependencies
+  const onChangeRef = React.useRef(onChange);
   React.useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Debounce the onChange to avoid excessive updates
+  // Debounce the value to avoid excessive updates
   const debounceMs = column.filter?.debounce ?? 500;
   const debouncedValue = useDebounce(localValue, debounceMs);
 
-  // Validate the current values
+  // Validate the current value
   const validation = useFilterValidation({
     filter,
     column,
     values: debouncedValue ? [debouncedValue] : [],
-    immediate: !!debouncedValue, // Only validate if there's a value
+    immediate: !!debouncedValue,
   });
 
-  // Update parent when debounced value changes (only if valid)
+  // Sync TO parent when debounced value changes
   React.useEffect(() => {
-    // Only update if the debounced value is different from what we last sent
-    // This prevents loops while still allowing updates when user types
-    if (debouncedValue !== lastSentValueRef.current) {
-      onChangeRef.current(debouncedValue ? [debouncedValue] : []);
-      lastSentValueRef.current = debouncedValue;
-    }
-    // Reset typing flag after debounce completes
-    isUserTypingRef.current = false;
-  }, [debouncedValue]); // Only depend on debouncedValue
+    // Send update to parent
+    onChangeRef.current(debouncedValue ? [debouncedValue] : []);
 
-  // Sync local value when filter values change externally (only if user isn't typing)
+    // Mark typing as complete
+    setIsUserTyping(false);
+  }, [debouncedValue]);
+
+  // Sync FROM parent when filter values change (only if not typing)
+  // Use the actual value from filter, not a stringified key
+  const externalValue = getFilterValueAsString(filter, 0) || '';
+
   React.useEffect(() => {
-    if (!isUserTypingRef.current) {
-      const newValue = getFilterValueAsString(filter, 0) || '';
-      setLocalValue(newValue);
+    if (!isUserTyping && externalValue !== localValue) {
+      setLocalValue(externalValue);
     }
-  }, [filter.values, filter]);
+  }, [externalValue, isUserTyping, localValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    isUserTypingRef.current = true;
+    setIsUserTyping(true);
     setLocalValue(e.target.value);
   };
 
