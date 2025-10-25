@@ -20,8 +20,10 @@
  * - Caches join paths for performance
  * - Provides detailed error messages with suggestions
  *
- * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
- * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ * @note This class maintains internal caches for performance optimization. While the class
+ * is designed to be safe for concurrent use (all methods accept primaryTable as a parameter
+ * rather than storing it as mutable state), the internal cache may be mutated during operations.
+ * Call clearJoinPathCache() if you need to reset cached state.
  *
  * @example
  * ```typescript

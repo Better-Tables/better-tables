@@ -1,6 +1,6 @@
 /**
  * @fileoverview Main entry point for the Drizzle adapter package
- * @module @better-tables/drizzle-adapter
+ * @module @better-tables/adapters-drizzle
  *
  * @description
  * This is the main export file for the Drizzle adapter package. It exports all

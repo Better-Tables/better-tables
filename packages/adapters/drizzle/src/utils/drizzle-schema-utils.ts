@@ -90,7 +90,7 @@ export interface ColumnInfo {
  * // ]
  * ```
  *
- * @throws Will return an empty array if the table schema is invalid or malformed
+ * @returns {ColumnInfo[]} An array of column information objects, or an empty array if the table schema is invalid or malformed
  *
  * @see {@link ColumnInfo} for the structure of returned objects
  *
@@ -99,6 +99,7 @@ export interface ColumnInfo {
  * @remarks
  * This function is used internally by all other introspection functions. It safely handles
  * malformed or invalid schemas by returning an empty array rather than throwing errors.
+ * It never throws - if the schema is invalid, it returns an empty array instead.
  */
 export function getTableColumns(tableSchema: AnyTableType): ColumnInfo[] {
   if (!tableSchema || typeof tableSchema !== 'object') {
