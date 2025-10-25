@@ -206,19 +206,16 @@ export class TextColumnBuilder<TData = unknown> extends ColumnBuilder<TData, str
     options: {
       /** Maximum characters to show (default: 100) */
       maxLength?: number;
-      /** Whether to show tooltip with full text (default: true) */
-      showTooltip?: boolean;
       /** Suffix to show when truncated (default: "...") */
       suffix?: string;
     } = {}
   ): this {
-    const { maxLength = 100, showTooltip = true, suffix = '...' } = options;
+    const { maxLength = 100, suffix = '...' } = options;
 
     this.config.meta = {
       ...this.config.meta,
       truncate: {
         maxLength,
-        showTooltip,
         suffix,
       },
     };
