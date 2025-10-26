@@ -74,12 +74,27 @@ export function DndSortableContext({
   items: unknown[];
   idExtractor?: (item: unknown) => string;
 }) {
-  // If no items or no extractor, don't enable sortable
+  // If no items, don't enable sortable
   if (!items.length) {
     return <>{children}</>;
   }
 
-  const ids = idExtractor ? items.map(idExtractor) : items.map((_, i) => String(i));
+  // If extractor provided, use it
+  // Otherwise, check if items have an 'id' property, or use index as fallback
+  const ids = idExtractor
+    ? items.map(idExtractor)
+    : items.map((item, i) => {
+        if (
+          typeof item === 'object' &&
+          item !== null &&
+          'id' in item &&
+          typeof item.id === 'string'
+        ) {
+          return item.id;
+        }
+        // Fallback to index only if no id property exists
+        return String(i);
+      });
 
   return <SortableContext items={ids}>{children}</SortableContext>;
 }

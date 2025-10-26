@@ -3,9 +3,11 @@
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { ChevronDown, X } from 'lucide-react';
 import * as React from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useFilterValidation } from '../../../hooks/use-filter-validation';
+import { cn } from '../../../lib/utils';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { Checkbox } from '../../ui/checkbox';
 import {
   Command,
   CommandEmpty,
@@ -13,11 +15,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useFilterValidation } from '@/hooks/use-filter-validation';
-import { cn } from '@/lib/utils';
+} from '../../ui/command';
+import { Label } from '../../ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 
 export interface MultiOptionFilterInputProps<TData = unknown> {
   /** Filter state */
@@ -32,7 +32,7 @@ export interface MultiOptionFilterInputProps<TData = unknown> {
 
 /**
  * Multi-option filter input component
- * 
+ *
  * Pattern: Controlled component with minimal local UI state
  * - Data state (selected values) comes from filter.values
  * - UI state (popover open, search) managed locally
@@ -47,7 +47,7 @@ export function MultiOptionFilterInput<TData = unknown>({
   const options = column.filter?.options || [];
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
   const selectedValues = (filter.values || []) as string[];
-  
+
   // UI-only state for popover and search
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');

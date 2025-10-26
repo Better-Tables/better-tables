@@ -3,7 +3,9 @@
 import type { ColumnDefinition, FilterGroup } from '@better-tables/core';
 import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
 import * as React from 'react';
-import { Button } from '@/components/ui/button';
+import { useFilterDropdownNavigation, useKeyboardNavigation } from '../../hooks';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
 import {
   Command,
   CommandEmpty,
@@ -11,17 +13,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useFilterDropdownNavigation, useKeyboardNavigation } from '@/hooks';
-import { cn } from '@/lib/utils';
+} from '../ui/command';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 export interface FilterDropdownProps<TData = unknown> {
   /** Available columns to filter */

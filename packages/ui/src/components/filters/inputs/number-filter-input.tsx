@@ -2,10 +2,8 @@
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import * as React from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
-import { getFilterValueAsNumber } from '@/lib/filter-value-utils';
+import { useFilterValidation, useKeyboardNavigation } from '../../../hooks';
+import { getFilterValueAsNumber } from '../../../lib/filter-value-utils';
 import {
   formatNumber,
   getFormattedPlaceholder,
@@ -13,8 +11,10 @@ import {
   getNumberInputStep,
   parseFormattedNumber,
   validateNumberInput,
-} from '@/lib/number-format-utils';
-import { cn } from '@/lib/utils';
+} from '../../../lib/number-format-utils';
+import { cn } from '../../../lib/utils';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 
 export interface NumberFilterInputProps<TData = unknown> {
   /** Filter state */

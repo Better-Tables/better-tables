@@ -4,16 +4,16 @@ import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { CalendarIcon, Clock } from 'lucide-react';
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
-import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
-import { type DatePreset, getCommonPresets, getDatePresetConfig } from '@/lib/date-presets';
-import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
-import { getFilterValueAsDate } from '@/lib/filter-value-utils';
-import { cn } from '@/lib/utils';
+import { useFilterValidation, useKeyboardNavigation } from '../../../hooks';
+import { type DatePreset, getCommonPresets, getDatePresetConfig } from '../../../lib/date-presets';
+import { formatDateRange, formatDateWithConfig } from '../../../lib/date-utils';
+import { getFilterValueAsDate } from '../../../lib/filter-value-utils';
+import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/button';
+import { Calendar } from '../../ui/calendar';
+import { Label } from '../../ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
+import { Separator } from '../../ui/separator';
 
 export interface DateFilterInputProps<TData = unknown> {
   /** Filter state */
@@ -28,7 +28,7 @@ export interface DateFilterInputProps<TData = unknown> {
 
 /**
  * Date filter input component
- * 
+ *
  * Pattern: Controlled component with local UI state
  * - Data state comes from parent (filter.values as dates)
  * - UI state (selected dates in calendar) managed locally
@@ -152,7 +152,7 @@ export function DateFilterInput<TData = unknown>({
     if (needsDateRange && filter.values.length >= 2) {
       const from = externalFrom;
       const to = externalTo;
-      
+
       // Only update if dates actually changed (compare timestamps)
       if (from && to) {
         setDateRange((prev) => {
@@ -161,20 +161,18 @@ export function DateFilterInput<TData = unknown>({
             !prev?.to ||
             prev.from.getTime() !== from.getTime() ||
             prev.to.getTime() !== to.getTime();
-          
+
           return needsUpdate ? { from, to } : prev;
         });
       }
     } else if (!needsDateRange) {
       const date = externalFrom;
-      
+
       // Only update if date actually changed
       setSingleDate((prev) => {
         const needsUpdate =
-          (!prev && date) ||
-          (prev && !date) ||
-          (prev && date && prev.getTime() !== date.getTime());
-        
+          (!prev && date) || (prev && !date) || (prev && date && prev.getTime() !== date.getTime());
+
         return needsUpdate ? date || undefined : prev;
       });
     }

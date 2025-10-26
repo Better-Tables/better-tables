@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo watch dev",
+    "dev:run": "turbo run dev",
     "test": "turbo run test",
     "clean": "turbo run clean",
     "format": "biome format --write .",

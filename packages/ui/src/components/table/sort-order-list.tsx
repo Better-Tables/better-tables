@@ -64,7 +64,7 @@ interface SortOrderItemProps {
 
 function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: String(index),
+    id: sort.columnId,
     data: {
       type: 'sort-item',
       sort,

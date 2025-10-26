@@ -36,8 +36,11 @@ interface TableHeaderContextMenuProps<TData = unknown> {
   /** Whether this column is visible */
   isVisible: boolean;
 
-  /** Toggle sorting handler */
-  onToggleSort: () => void;
+  /** Set sort to ascending handler */
+  onSetSortAsc: () => void;
+
+  /** Set sort to descending handler */
+  onSetSortDesc: () => void;
 
   /** Clear sort handler */
   onClearSort: () => void;
@@ -86,7 +89,8 @@ export function TableHeaderContextMenu<TData = unknown>({
   allSorts,
   multiSortEnabled,
   isVisible,
-  onToggleSort,
+  onSetSortAsc,
+  onSetSortDesc,
   onClearSort,
   onSortReorder,
   onToggleVisibility,
@@ -110,40 +114,31 @@ export function TableHeaderContextMenu<TData = unknown>({
         {isSortable && contextMenuConfig.showSortToggle && (
           <>
             <ContextMenuItem
-              onClick={() => {
-                // If not sorted, toggle to asc
-                // If sorted asc, toggle to desc
-                // If sorted desc, we'll clear it
-                if (currentSort?.direction === 'asc') {
-                  onToggleSort();
-                } else if (!currentSort) {
-                  onToggleSort();
-                } else {
-                  // Already desc, clicking should toggle to asc
-                  onToggleSort();
-                }
-              }}
+              onClick={onSetSortAsc}
               className="flex items-center gap-2"
+              aria-checked={currentSort?.direction === 'asc'}
             >
               <ArrowUp className="h-4 w-4" />
               Sort Ascending
               {currentSort?.direction === 'asc' && <CheckIcon />}
+              {currentSort?.direction === 'asc' && (
+                <span className="sr-only">Currently sorting by this column in ascending order</span>
+              )}
             </ContextMenuItem>
 
             <ContextMenuItem
-              onClick={() => {
-                // Set to desc
-                if (currentSort?.direction === 'desc') {
-                  // Do nothing, already desc
-                  return;
-                }
-                onToggleSort();
-              }}
+              onClick={onSetSortDesc}
               className="flex items-center gap-2"
+              aria-checked={currentSort?.direction === 'desc'}
             >
               <ArrowDown className="h-4 w-4" />
               Sort Descending
               {currentSort?.direction === 'desc' && <CheckIcon />}
+              {currentSort?.direction === 'desc' && (
+                <span className="sr-only">
+                  Currently sorting by this column in descending order
+                </span>
+              )}
             </ContextMenuItem>
 
             {currentSort && (

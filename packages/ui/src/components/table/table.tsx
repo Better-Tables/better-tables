@@ -394,7 +394,26 @@ export function BetterTable<TData = unknown>({
                     allSorts={sortingState}
                     multiSortEnabled={multiSortEnabled}
                     isVisible={columnVisibility[column.id] !== false}
-                    onToggleSort={() => handleSortingChange(column.id)}
+                    onSetSortAsc={() => {
+                      const newSorts = [...sortingState];
+                      const existingIndex = newSorts.findIndex((s) => s.columnId === column.id);
+                      if (existingIndex >= 0) {
+                        newSorts[existingIndex] = { columnId: column.id, direction: 'asc' };
+                      } else {
+                        newSorts.push({ columnId: column.id, direction: 'asc' });
+                      }
+                      setSorting(newSorts);
+                    }}
+                    onSetSortDesc={() => {
+                      const newSorts = [...sortingState];
+                      const existingIndex = newSorts.findIndex((s) => s.columnId === column.id);
+                      if (existingIndex >= 0) {
+                        newSorts[existingIndex] = { columnId: column.id, direction: 'desc' };
+                      } else {
+                        newSorts.push({ columnId: column.id, direction: 'desc' });
+                      }
+                      setSorting(newSorts);
+                    }}
                     onClearSort={() => {
                       const newSorts = sortingState.filter((s) => s.columnId !== column.id);
                       setSorting(newSorts);
@@ -410,6 +429,15 @@ export function BetterTable<TData = unknown>({
                         isSortable && 'cursor-pointer hover:bg-muted/50'
                       )}
                       onClick={isSortable ? () => handleSortingChange(column.id) : undefined}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={
+                        currentSort?.direction === 'asc'
+                          ? 'ascending'
+                          : currentSort?.direction === 'desc'
+                            ? 'descending'
+                            : 'none'
+                      }
                     >
                       {headerContent}
                     </TableHead>

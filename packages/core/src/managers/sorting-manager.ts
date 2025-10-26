@@ -439,7 +439,13 @@ export class SortingManager<TData = unknown> {
     const currentIds = new Set(this.sortingState.map((s) => s.columnId));
     const newIds = new Set(newOrder.map((s) => s.columnId));
 
-    if (currentIds.size !== newIds.size || ![...currentIds].every((id) => newIds.has(id))) {
+    // Check that sizes match (prevents duplicate columns)
+    if (currentIds.size !== newIds.size || currentIds.size !== newOrder.length) {
+      throw new Error('New sort order must contain exactly the same column IDs as current sorts');
+    }
+
+    // Check that all IDs match
+    if (![...currentIds].every((id) => newIds.has(id))) {
       throw new Error('New sort order must contain exactly the same column IDs as current sorts');
     }
 

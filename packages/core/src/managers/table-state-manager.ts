@@ -460,7 +460,9 @@ export class TableStateManager<TData = unknown> {
 
   toggleColumnVisibility(columnId: string): void {
     const newVisibility = { ...this.columnVisibility };
-    newVisibility[columnId] = !newVisibility[columnId];
+    // Treat undefined as visible (true) before toggling
+    const currentValue = newVisibility[columnId] ?? true;
+    newVisibility[columnId] = !currentValue;
     this.setColumnVisibility(newVisibility);
   }
 
