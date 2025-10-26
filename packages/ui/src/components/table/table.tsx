@@ -1,3 +1,5 @@
+'use client';
+
 import type { FilterState, PaginationState, SortingState, TableConfig } from '@better-tables/core';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';

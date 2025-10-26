@@ -4,7 +4,7 @@ import type { SortingParams, SortingState } from '@better-tables/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, GripVertical, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
 
 interface SortOrderListProps {
   /** Current sort state */

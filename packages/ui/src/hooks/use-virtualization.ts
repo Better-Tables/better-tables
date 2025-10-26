@@ -1,3 +1,5 @@
+'use client';
+
 import {
   type ScrollInfo,
   type ScrollToOptions,
