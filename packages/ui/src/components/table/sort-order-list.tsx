@@ -1,10 +1,12 @@
 'use client';
 
 import type { SortingParams, SortingState } from '@better-tables/core';
+import { useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, GripVertical, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { SortOrderDropIndicator } from './sort-order-drop-indicator';
 
 interface SortOrderListProps {
   /** Current sort state */
@@ -41,16 +43,22 @@ export function SortOrderList({ sorts, columns, onRemoveSort }: SortOrderListPro
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
+      {/* Drop zone before first item */}
+      <DropZone id={`sort-drop-before-0`} />
+
       {sorts.map((sort, index) => (
         <SortOrderItem
-          key={`${sort.columnId}-${index}`}
+          key={sort.columnId}
           sort={sort}
           index={index}
           columnName={getColumnName(sort.columnId)}
           onRemove={onRemoveSort}
         />
       ))}
+
+      {/* Drop zone after last item */}
+      <DropZone id={`sort-drop-after-${sorts.length - 1}`} />
     </div>
   );
 }
@@ -75,7 +83,6 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
@@ -84,7 +91,9 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
       style={style}
       className={cn(
         'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm',
-        'bg-muted/50 hover:bg-muted'
+        'bg-muted/50 hover:bg-muted',
+        'transition-opacity duration-200',
+        isDragging && 'opacity-30 scale-95'
       )}
     >
       {/* Drag handle */}
@@ -127,6 +136,24 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
           <X className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Drop zone component for between sortable items
+ */
+function DropZone({ id }: { id: string }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: {
+      type: 'drop-zone',
+    },
+  });
+
+  return (
+    <div ref={setNodeRef} className="h-0.5" aria-hidden="true">
+      <SortOrderDropIndicator isOver={isOver} />
     </div>
   );
 }

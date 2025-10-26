@@ -1,7 +1,8 @@
 'use client';
 
 import type { FilterState, PaginationState, SortingState, TableConfig } from '@better-tables/core';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { arrayMove } from '@dnd-kit/sortable';
+import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
   useTableColumnVisibility,
@@ -531,21 +532,79 @@ export function BetterTable<TData = unknown>({
 
   // Wrap with DnD provider if context menu is enabled
   const handleDragEnd = (event: { active: { id: string }; over: { id: string } | null }) => {
-    if (!event.over || event.active.id === event.over.id) return;
+    if (!event.over) return;
 
-    const oldIndex = parseInt(event.active.id);
-    const newIndex = parseInt(event.over.id);
+    const overId = event.over.id;
 
-    if (oldIndex !== newIndex) {
-      const newSorts = [...sortingState];
-      const [removed] = newSorts.splice(oldIndex, 1);
-      newSorts.splice(newIndex, 0, removed);
+    // Find indices by columnId matching
+    const oldIndex = sortingState.findIndex((s) => s.columnId === event.active.id);
+    const newIndex = sortingState.findIndex((s) => s.columnId === overId);
+
+    // Handle drop zones (they have IDs like "sort-drop-before-0")
+    if (oldIndex >= 0 && newIndex < 0) {
+      // Dropped on a drop zone - check if it's a valid zone
+      if (overId.startsWith('sort-drop-')) {
+        // Extract target index from drop zone ID
+        const dropMatch = overId.match(/sort-drop-(before|after)-(\d+)/);
+        if (dropMatch) {
+          const position = dropMatch[1];
+          const targetIndex = parseInt(dropMatch[2], 10);
+
+          const newSorts = [...sortingState];
+          const [removed] = newSorts.splice(oldIndex, 1);
+
+          // Insert before or after the target index
+          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+          newSorts.splice(insertIndex, 0, removed);
+
+          setSorting(newSorts);
+          return;
+        }
+      }
+      return;
+    }
+
+    // Normal reordering between items
+    if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+      const newSorts = arrayMove(sortingState, oldIndex, newIndex);
       setSorting(newSorts);
     }
   };
 
+  // Render function for drag overlay preview
+  const renderDragOverlay = (activeId: string) => {
+    const sort = sortingState.find((s) => s.columnId === activeId);
+    if (!sort) return null;
+
+    const column = columns.find((col) => col.id === sort.columnId);
+    const columnName = column?.displayName || sort.columnId;
+    const index = sortingState.findIndex((s) => s.columnId === activeId);
+
+    return (
+      <div
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm bg-background shadow-lg border"
+        style={{ opacity: 0.8 }}
+      >
+        <div className="cursor-grab">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+          {index + 1}
+        </span>
+        <span className="flex-1 truncate">{columnName}</span>
+        {sort.direction === 'asc' ? (
+          <ArrowUp className="h-3 w-3 text-muted-foreground" />
+        ) : (
+          <ArrowDown className="h-3 w-3 text-muted-foreground" />
+        )}
+      </div>
+    );
+  };
+
   return shouldShowContextMenu ? (
-    <TableDndProvider onDragEnd={handleDragEnd}>{tableContent}</TableDndProvider>
+    <TableDndProvider onDragEnd={handleDragEnd} renderDragOverlay={renderDragOverlay}>
+      {tableContent}
+    </TableDndProvider>
   ) : (
     tableContent
   );

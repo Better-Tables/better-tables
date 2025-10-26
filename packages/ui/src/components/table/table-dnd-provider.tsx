@@ -4,13 +4,17 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 
 interface TableDndProviderProps {
   /** Child components to wrap with DnD context */
@@ -18,6 +22,9 @@ interface TableDndProviderProps {
 
   /** Handle drag end event */
   onDragEnd?: (event: { active: { id: string }; over: { id: string } | null }) => void;
+
+  /** Optional function to render the drag overlay preview */
+  renderDragOverlay?: (activeId: string) => ReactNode;
 }
 
 /**
@@ -34,7 +41,14 @@ interface TableDndProviderProps {
  * </TableDndProvider>
  * ```
  */
-export function TableDndProvider({ children, onDragEnd }: TableDndProviderProps) {
+export function TableDndProvider({
+  children,
+  onDragEnd,
+  renderDragOverlay,
+}: TableDndProviderProps) {
+  // Track the currently dragging item
+  const [activeId, setActiveId] = useState<string | null>(null);
+
   // Configure sensors for mouse/touch and keyboard interactions
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -47,7 +61,12 @@ export function TableDndProvider({ children, onDragEnd }: TableDndProviderProps)
     })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     onDragEnd?.({
       active: { id: String(event.active.id) },
       over: event.over ? { id: String(event.over.id) } : null,
@@ -55,8 +74,17 @@ export function TableDndProvider({ children, onDragEnd }: TableDndProviderProps)
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       {children}
+      <DragOverlay>
+        {activeId && renderDragOverlay ? renderDragOverlay(activeId) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
