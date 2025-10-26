@@ -151,6 +151,9 @@ export interface TableFeatures {
 
   /** Enable row expansion functionality */
   rowExpansion?: boolean;
+
+  /** Configuration for header context menu */
+  headerContextMenu?: HeaderContextMenuConfig;
 }
 
 /**
@@ -428,6 +431,36 @@ export interface ErrorStateConfig {
 
   /** Retry handler function */
   onRetry?: () => void;
+}
+
+/**
+ * Header context menu configuration interface.
+ *
+ * Configures the behavior and options available in the table header
+ * right-click context menu.
+ *
+ * @example
+ * ```typescript
+ * const contextMenuConfig: HeaderContextMenuConfig = {
+ *   enabled: true,
+ *   showSortToggle: true,
+ *   allowSortReorder: true,
+ *   showColumnVisibility: true
+ * };
+ * ```
+ */
+export interface HeaderContextMenuConfig {
+  /** Whether the header context menu is enabled */
+  enabled: boolean;
+
+  /** Whether to show sort toggle options in the menu */
+  showSortToggle?: boolean;
+
+  /** Whether to allow reordering sorts via drag-and-drop */
+  allowSortReorder?: boolean;
+
+  /** Whether to show column visibility toggle */
+  showColumnVisibility?: boolean;
 }
 
 /**

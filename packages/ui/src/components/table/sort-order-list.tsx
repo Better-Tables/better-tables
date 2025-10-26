@@ -1,0 +1,132 @@
+'use client';
+
+import type { SortingParams, SortingState } from '@better-tables/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { ArrowDown, ArrowUp, GripVertical, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface SortOrderListProps {
+  /** Current sort state */
+  sorts: SortingState;
+
+  /** Column definitions for display names */
+  columns: Array<{ id: string; displayName: string }>;
+
+  /** Callback when a sort is removed */
+  onRemoveSort?: (columnId: string) => void;
+
+  /** Callback when sort order changes - not yet used */
+  onReorder?: (oldIndex: number, newIndex: number) => void;
+}
+
+/**
+ * Draggable sort order list component.
+ *
+ * Displays current sorts in priority order and allows drag-and-drop
+ * reordering. Shows direction icons and priority numbers.
+ *
+ * @example
+ * ```tsx
+ * <SortOrderList
+ *   sorts={[{ columnId: 'name', direction: 'asc' }, { columnId: 'age', direction: 'desc' }]}
+ *   onReorder={(newOrder) => handleSortReorder(newOrder)}
+ *   columns={columns}
+ * />
+ * ```
+ */
+export function SortOrderList({ sorts, columns, onRemoveSort }: SortOrderListProps) {
+  const getColumnName = (columnId: string): string => {
+    return columns.find((col) => col.id === columnId)?.displayName || columnId;
+  };
+
+  return (
+    <div className="space-y-1">
+      {sorts.map((sort, index) => (
+        <SortOrderItem
+          key={`${sort.columnId}-${index}`}
+          sort={sort}
+          index={index}
+          columnName={getColumnName(sort.columnId)}
+          onRemove={onRemoveSort}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface SortOrderItemProps {
+  sort: SortingParams;
+  index: number;
+  columnName: string;
+  onRemove?: (columnId: string) => void;
+}
+
+function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: String(index),
+    data: {
+      type: 'sort-item',
+      sort,
+      index,
+    },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm',
+        'bg-muted/50 hover:bg-muted'
+      )}
+    >
+      {/* Drag handle */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none"
+        aria-label={`Drag to reorder sort for ${columnName}`}
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </button>
+
+      {/* Priority number */}
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+        {index + 1}
+      </span>
+
+      {/* Column name */}
+      <span className="flex-1 truncate">{columnName}</span>
+
+      {/* Direction icon */}
+      {sort.direction === 'asc' ? (
+        <ArrowUp className="h-3 w-3 text-muted-foreground" />
+      ) : (
+        <ArrowDown className="h-3 w-3 text-muted-foreground" />
+      )}
+
+      {/* Remove button */}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(sort.columnId);
+          }}
+          className="ml-1 rounded-md p-0.5 hover:bg-muted"
+          aria-label={`Remove sort for ${columnName}`}
+        >
+          <X className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      )}
+    </div>
+  );
+}

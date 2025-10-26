@@ -411,6 +411,60 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
+   * Reorder the current sorts while preserving column IDs and directions.
+   *
+   * Validates that the new order contains the same column IDs as the current state,
+   * then replaces the sorting state with the new order. Useful for drag-and-drop
+   * reordering of multi-column sorts.
+   *
+   * @param newOrder - Array of sorting parameters in the desired order
+   * @throws {Error} If the new order doesn't match current sorts exactly
+   *
+   * @example
+   * ```typescript
+   * // Current: [{ columnId: 'name', direction: 'asc' }, { columnId: 'age', direction: 'desc' }]
+   * // Reorder to: [{ columnId: 'age', direction: 'desc' }, { columnId: 'name', direction: 'asc' }]
+   * sortingManager.reorderSorts([
+   *   { columnId: 'age', direction: 'desc' },
+   *   { columnId: 'name', direction: 'asc' }
+   * ]);
+   * ```
+   */
+  reorderSorts(newOrder: SortingState): void {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    // Validate that new order contains exactly the same column IDs (in any order)
+    const currentIds = new Set(this.sortingState.map((s) => s.columnId));
+    const newIds = new Set(newOrder.map((s) => s.columnId));
+
+    if (currentIds.size !== newIds.size || ![...currentIds].every((id) => newIds.has(id))) {
+      throw new Error('New sort order must contain exactly the same column IDs as current sorts');
+    }
+
+    // Validate all sorts in the new order
+    const validSorts = newOrder.filter((sort) => {
+      const validation = this.validateSort(sort);
+      if (!validation.valid) {
+        console.warn(`Invalid sort for column ${sort.columnId}: ${validation.error}`);
+        return false;
+      }
+      return true;
+    });
+
+    // If no valid sorts, clear sorting
+    if (validSorts.length === 0) {
+      this.clearSorting();
+      return;
+    }
+
+    // Apply the new order
+    this.sortingState = validSorts;
+    this.notifySubscribers({ type: 'sorts_replaced', sorts: validSorts });
+  }
+
+  /**
    * Get sorting for a specific column
    */
   getSort(columnId: string): SortingParams | undefined {

@@ -2,6 +2,7 @@ import type { FilterState, PaginationState, SortingState, TableConfig } from '@b
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
+  useTableColumnVisibility,
   useTableFilters,
   useTablePagination,
   useTableSelection,
@@ -16,6 +17,8 @@ import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
+import { TableDndProvider } from './table-dnd-provider';
+import { TableHeaderContextMenu } from './table-header-context-menu';
 import { TablePagination } from './table-pagination';
 
 /**
@@ -123,6 +126,7 @@ export function BetterTable<TData = unknown>({
     sorting: sortingEnabled = true,
     pagination: paginationEnabled = true,
     rowSelection = false,
+    headerContextMenu,
   } = features;
 
   // Initialize store synchronously during render
@@ -142,8 +146,9 @@ export function BetterTable<TData = unknown>({
   // Subscribe to store state
   const { filters, setFilters, clearFilters } = useTableFilters(id);
   const { pagination, setPage, setPageSize } = useTablePagination(id);
-  const { sorting: sortingState, toggleSort } = useTableSorting(id);
+  const { sorting: sortingState, toggleSort, setSorting } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
+  const { columnVisibility, toggleColumnVisibility } = useTableColumnVisibility(id);
 
   // Cleanup store on unmount to prevent memory leaks
   useEffect(() => {
@@ -232,6 +237,14 @@ export function BetterTable<TData = unknown>({
     clearFilters();
   }, [clearFilters]);
 
+  // Check if context menu is enabled
+  const contextMenuEnabled = headerContextMenu?.enabled ?? false;
+
+  // Filter columns by visibility (must be before any early returns)
+  const visibleColumns = useMemo(() => {
+    return columns.filter((col) => columnVisibility[col.id] !== false);
+  }, [columns, columnVisibility]);
+
   // Render loading state
   if (loading) {
     return (
@@ -313,7 +326,16 @@ export function BetterTable<TData = unknown>({
   const allSelected =
     data.length > 0 && data.every((row, index) => selectedRows.has(getRowId(row, index)));
 
-  return (
+  // Get sorting config to check multi-sort
+  const sortingConfig = props.sorting;
+  const multiSortEnabled = sortingConfig?.multiSort ?? false;
+
+  // Determine if context menu should be enabled
+  const shouldShowContextMenu =
+    contextMenuEnabled &&
+    (headerContextMenu?.showSortToggle || headerContextMenu?.showColumnVisibility);
+
+  const tableContent = (
     <div className={cn('space-y-4', className)} {...props}>
       {filtering && (
         <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
@@ -335,11 +357,64 @@ export function BetterTable<TData = unknown>({
                   />
                 </TableHead>
               )}
-              {columns.map((column) => {
+              {visibleColumns.map((column) => {
                 const currentSort = sortingState.find((s) => s.columnId === column.id);
                 const isSortable = sortingEnabled && column.sortable !== false;
 
-                return (
+                const headerContent = column.headerRenderer ? (
+                  column.headerRenderer({
+                    column,
+                    isSorted: !!currentSort,
+                    sortDirection: currentSort?.direction,
+                    onSort: isSortable ? () => handleSortingChange(column.id) : undefined,
+                  })
+                ) : (
+                  <div key={`header-${column.id}`} className="flex items-center gap-2">
+                    <span>{column.displayName}</span>
+                    {isSortable && (
+                      <span className="flex flex-col">
+                        {currentSort?.direction === 'asc' ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : currentSort?.direction === 'desc' ? (
+                          <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </span>
+                    )}
+                  </div>
+                );
+
+                return shouldShowContextMenu ? (
+                  <TableHeaderContextMenu
+                    key={column.id}
+                    column={column}
+                    contextMenuConfig={headerContextMenu || {}}
+                    currentSort={currentSort}
+                    allSorts={sortingState}
+                    multiSortEnabled={multiSortEnabled}
+                    isVisible={columnVisibility[column.id] !== false}
+                    onToggleSort={() => handleSortingChange(column.id)}
+                    onClearSort={() => {
+                      const newSorts = sortingState.filter((s) => s.columnId !== column.id);
+                      setSorting(newSorts);
+                    }}
+                    onSortReorder={setSorting}
+                    onToggleVisibility={() => toggleColumnVisibility(column.id)}
+                    columns={columns}
+                  >
+                    <TableHead
+                      className={cn(
+                        column.align === 'center' && 'text-center',
+                        column.align === 'right' && 'text-right',
+                        isSortable && 'cursor-pointer hover:bg-muted/50'
+                      )}
+                      onClick={isSortable ? () => handleSortingChange(column.id) : undefined}
+                    >
+                      {headerContent}
+                    </TableHead>
+                  </TableHeaderContextMenu>
+                ) : (
                   <TableHead
                     key={column.id}
                     className={cn(
@@ -349,29 +424,7 @@ export function BetterTable<TData = unknown>({
                     )}
                     onClick={isSortable ? () => handleSortingChange(column.id) : undefined}
                   >
-                    {column.headerRenderer ? (
-                      column.headerRenderer({
-                        column,
-                        isSorted: !!currentSort,
-                        sortDirection: currentSort?.direction,
-                        onSort: isSortable ? () => handleSortingChange(column.id) : undefined,
-                      })
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span>{column.displayName}</span>
-                        {isSortable && (
-                          <div className="flex flex-col">
-                            {currentSort?.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : currentSort?.direction === 'desc' ? (
-                              <ArrowDown className="h-3 w-3" />
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 opacity-50" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {headerContent}
                   </TableHead>
                 );
               })}
@@ -402,7 +455,7 @@ export function BetterTable<TData = unknown>({
                       />
                     </TableCell>
                   )}
-                  {columns.map((column) => {
+                  {visibleColumns.map((column) => {
                     const value = column.accessor(row);
 
                     return (
@@ -444,5 +497,26 @@ export function BetterTable<TData = unknown>({
         />
       )}
     </div>
+  );
+
+  // Wrap with DnD provider if context menu is enabled
+  const handleDragEnd = (event: { active: { id: string }; over: { id: string } | null }) => {
+    if (!event.over || event.active.id === event.over.id) return;
+
+    const oldIndex = parseInt(event.active.id);
+    const newIndex = parseInt(event.over.id);
+
+    if (oldIndex !== newIndex) {
+      const newSorts = [...sortingState];
+      const [removed] = newSorts.splice(oldIndex, 1);
+      newSorts.splice(newIndex, 0, removed);
+      setSorting(newSorts);
+    }
+  };
+
+  return shouldShowContextMenu ? (
+    <TableDndProvider onDragEnd={handleDragEnd}>{tableContent}</TableDndProvider>
+  ) : (
+    tableContent
   );
 }
