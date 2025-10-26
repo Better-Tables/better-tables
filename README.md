@@ -21,7 +21,7 @@ Most table libraries ask you to:
 - Wire up filtering logic across multiple files
 - Manually handle joins and relationships in your queries
 - Write the same filter UI components over and over
-a- Manually sync URL state for shareable views
+- Manually sync URL state for shareable views
 - Give up type safety between your database and UI
 - Rebuild pagination and sorting logic for every project
 
