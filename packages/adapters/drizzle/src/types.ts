@@ -23,6 +23,8 @@ import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import type { BaseQueryBuilder } from './query-builders';
+import type { RelationshipManager } from './relationship-manager';
 
 /**
  * Mapping of database drivers to their corresponding Drizzle database types.
@@ -350,6 +352,32 @@ export interface DatabaseOperations<TRecord> {
 export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
   db: DrizzleDatabase<TDriver>
 ) => DatabaseOperations<TRecord>;
+
+/**
+ * Factory function type for creating database query builders.
+ * This follows the Factory Pattern for query builder instantiation.
+ *
+ * @template TDriver - The database driver type
+ * @param db - The Drizzle database instance
+ * @param schema - The schema containing all tables
+ * @param relationshipManager - The relationship manager instance
+ * @param primaryKeyMap - Optional primary key mapping
+ * @returns The appropriate query builder implementation
+ *
+ * @example
+ * ```typescript
+ * const createQueryBuilder = getQueryBuilderFactory<'postgres'>();
+ * const queryBuilder = createQueryBuilder(postgresDb, schema, relationshipManager);
+ * ```
+ *
+ * @since 1.0.0
+ */
+export type QueryBuilderFactory<TDriver extends DatabaseDriver> = (
+  db: DrizzleDatabase<TDriver>,
+  schema: Record<string, AnyTableType>,
+  relationshipManager: RelationshipManager,
+  primaryKeyMap?: Record<string, string>
+) => BaseQueryBuilder;
 
 /**
  * Query builder interface for type safety

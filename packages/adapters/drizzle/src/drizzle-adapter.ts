@@ -67,7 +67,7 @@ import type { InferSelectModel, Relations } from 'drizzle-orm';
 
 import { DataTransformer } from './data-transformer';
 import { getOperationsFactory } from './operations';
-import { DrizzleQueryBuilder } from './query-builder';
+import { getQueryBuilderFactory, type BaseQueryBuilder } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
 import type {
@@ -133,7 +133,7 @@ export class DrizzleAdapter<
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
-  private queryBuilder: DrizzleQueryBuilder;
+  private queryBuilder: BaseQueryBuilder;
   private dataTransformer: DataTransformer;
   private cache: Map<
     string,
@@ -212,10 +212,8 @@ export class DrizzleAdapter<
     // Initialize managers - they will be configured per query
     this.relationshipManager = new RelationshipManager(this.schema, this.relationships);
 
-    this.queryBuilder = new DrizzleQueryBuilder(
-      this.db,
-      this.schema,
-      this.relationshipManager,
+    // Initialize query builder using factory pattern based on driver
+    this.queryBuilder = this.createQueryBuilderStrategy(
       config.driver,
       config.options?.primaryKey?.tableKeys
     );
@@ -238,6 +236,23 @@ export class DrizzleAdapter<
   ): DatabaseOperations<InferSelectModel<TSchema[keyof TSchema]>> {
     const createOperations = getOperationsFactory(driver);
     return createOperations<InferSelectModel<TSchema[keyof TSchema]>>(this.db);
+  }
+
+  /**
+   * Create the appropriate query builder strategy based on the driver.
+   * This uses the Factory Pattern to create the correct query builder implementation.
+   *
+   * @private
+   * @param driver - The database driver type
+   * @param primaryKeyMap - Optional primary key mapping
+   * @returns The query builder implementation for the driver
+   */
+  private createQueryBuilderStrategy(
+    driver: TDriver,
+    primaryKeyMap?: Record<string, string>
+  ): BaseQueryBuilder {
+    const createQueryBuilder = getQueryBuilderFactory(driver);
+    return createQueryBuilder(this.db, this.schema, this.relationshipManager, primaryKeyMap);
   }
 
   /**

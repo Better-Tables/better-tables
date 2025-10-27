@@ -9,7 +9,7 @@
  *
  * Main exports:
  * - **DrizzleAdapter**: The main adapter class implementing TableAdapter
- * - **DrizzleQueryBuilder**: Query builder with join optimization
+ * - **Query Builders**: Database-specific query builders (Postgres, MySQL, SQLite)
  * - **DataTransformer**: Transforms flat SQL results to nested structures
  * - **FilterHandler**: Handles filter operator mapping to SQL
  * - **RelationshipDetector**: Auto-detects relationships from Drizzle schemas
@@ -23,7 +23,7 @@
  *
  * @example
  * ```typescript
- * import { DrizzleAdapter, DrizzleQueryBuilder } from '@better-tables/drizzle-adapter';
+ * import { DrizzleAdapter } from '@better-tables/drizzle-adapter';
  *
  * const adapter = new DrizzleAdapter({
  *   db: drizzleDb,
@@ -43,7 +43,13 @@
 export { DataTransformer } from './data-transformer';
 export { DrizzleAdapter } from './drizzle-adapter';
 export { FilterHandler } from './filter-handler';
-export { DrizzleQueryBuilder } from './query-builder';
+export {
+  BaseQueryBuilder,
+  getQueryBuilderFactory,
+  MySQLQueryBuilder,
+  PostgresQueryBuilder,
+  SQLiteQueryBuilder,
+} from './query-builders';
 export { RelationshipDetector } from './relationship-detector';
 export { RelationshipManager } from './relationship-manager';
 export type {
@@ -78,6 +84,7 @@ export type {
   DatabaseDriver,
   DrizzleAdapterConfig,
   JoinConfig,
+  QueryBuilderFactory,
   QueryContext,
   QueryMetadata,
   RelationshipMap,
