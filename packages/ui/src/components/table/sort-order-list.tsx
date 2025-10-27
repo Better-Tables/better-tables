@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, GripVertical, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { SortOrderDropIndicator } from './sort-order-drop-indicator';
+import { DndSortableContext } from './table-dnd-provider';
 
 interface SortOrderListProps {
   /** Current sort state */
@@ -43,23 +44,25 @@ export function SortOrderList({ sorts, columns, onRemoveSort }: SortOrderListPro
   };
 
   return (
-    <div className="space-y-0.5">
-      {/* Drop zone before first item */}
-      <DropZone id={`sort-drop-before-0`} />
+    <DndSortableContext items={sorts} idExtractor={(sort) => (sort as SortingParams).columnId}>
+      <div className="space-y-0.5">
+        {/* Drop zone before first item */}
+        <DropZone id={`sort-drop-before-0`} />
 
-      {sorts.map((sort, index) => (
-        <SortOrderItem
-          key={sort.columnId}
-          sort={sort}
-          index={index}
-          columnName={getColumnName(sort.columnId)}
-          onRemove={onRemoveSort}
-        />
-      ))}
+        {sorts.map((sort, index) => (
+          <SortOrderItem
+            key={sort.columnId}
+            sort={sort}
+            index={index}
+            columnName={getColumnName(sort.columnId)}
+            onRemove={onRemoveSort}
+          />
+        ))}
 
-      {/* Drop zone after last item */}
-      <DropZone id={`sort-drop-after-${sorts.length - 1}`} />
-    </div>
+        {/* Drop zone after last item */}
+        <DropZone id={`sort-drop-after-${sorts.length - 1}`} />
+      </div>
+    </DndSortableContext>
   );
 }
 
