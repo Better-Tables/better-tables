@@ -110,7 +110,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'between',
     label: 'Between',
-    description: 'Between two values (inclusive)',
+    description: 'Between two values',
     valueCount: 2,
     supportsNull: false,
     validate: (values) => {
@@ -188,7 +188,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'between',
     label: 'Between',
-    description: 'Between dates (inclusive)',
+    description: 'Between two dates',
     valueCount: 2,
     supportsNull: false,
     validate: (values) => {

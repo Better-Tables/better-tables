@@ -97,11 +97,41 @@ export function DateFilterInput<TData = unknown>({
     }
     return undefined;
   });
-
   // Auto-open popover when there's no date value
   const [isOpen, setIsOpen] = React.useState(() => {
     return needsNoValues ? false : needsDateRange ? !dateRange?.from : !singleDate;
   });
+
+  // Convert dates when operator changes AND immediately sync to parent
+  const prevNeedsDateRangeRef = React.useRef(needsDateRange);
+
+  React.useEffect(() => {
+    const prevNeedsDateRange = prevNeedsDateRangeRef.current;
+    const operatorChanged = prevNeedsDateRange !== needsDateRange;
+
+    if (operatorChanged) {
+      // Convert from single to range: use single date (or first filter value) for both from/to
+      if (needsDateRange) {
+        const dateToUse = singleDate || getFilterValueAsDate(filter, 0);
+        if (dateToUse) {
+          setDateRange({ from: dateToUse, to: dateToUse });
+          // Immediately send both dates to parent to avoid validation error
+          onChangeRef.current([dateToUse, dateToUse]);
+        }
+      }
+      // Convert from range to single: use the from date (or first filter value)
+      else if (!needsDateRange) {
+        const dateToUse = dateRange?.from || getFilterValueAsDate(filter, 0);
+        if (dateToUse) {
+          setSingleDate(dateToUse);
+          // Immediately send the single date to parent
+          onChangeRef.current([dateToUse]);
+        }
+      }
+
+      prevNeedsDateRangeRef.current = needsDateRange;
+    }
+  }, [needsDateRange, singleDate, dateRange, filter]);
 
   // Keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({
@@ -151,14 +181,12 @@ export function DateFilterInput<TData = unknown>({
         onChangeRef.current([dateRange.from, dateRange.to]);
         // Close popover when both dates are selected
         setIsOpen(false);
-      } else {
-        // Don't send partial ranges - will show validation error
-        onChangeRef.current([]);
       }
     } else {
-      onChangeRef.current(singleDate ? [singleDate] : []);
-      // Close popover when date is selected
+      // Single date
       if (singleDate) {
+        onChangeRef.current([singleDate]);
+        // Close popover when date is selected
         setIsOpen(false);
       }
     }

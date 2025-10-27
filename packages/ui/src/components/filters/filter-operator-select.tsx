@@ -7,6 +7,7 @@ import { useId } from 'react';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { ScrollArea } from '../ui/scroll-area';
+import { Separator } from '../ui/separator';
 
 export interface FilterOperatorSelectProps<TData = unknown> {
   /** Column definition */
@@ -48,13 +49,10 @@ export function FilterOperatorSelect<TData = unknown>({
   );
 
   return (
-    <div className="space-y-3">
-      <Label className="text-sm font-medium">Operator</Label>
-      <ScrollArea
-        className="h-60"
-        maskHeight={40}
-        maskClassName="before:from-popover after:from-popover"
-      >
+    <div className="space-y-2">
+      <Label className="text-sm font-medium px-1">Operator</Label>
+      <Separator />
+      <ScrollArea className="h-60 px-1" maskHeight={40}>
         <RadioGroup
           value={value}
           onValueChange={handleValueChange}
