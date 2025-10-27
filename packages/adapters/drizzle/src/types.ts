@@ -265,6 +265,86 @@ export type TableWithId = AnyTableType & {
 export type DrizzleDatabase<TDriver extends DatabaseDriver> = DatabaseTypeMap[TDriver];
 
 /**
+ * Common interface for database operations across all drivers.
+ * This follows the Strategy Pattern and ensures consistent behavior.
+ *
+ * @template TRecord - The record type for the table
+ * @description Defines the contract that all database operation implementations must follow
+ *
+ * @example
+ * ```typescript
+ * const operations: DatabaseOperations<User> = new PostgresOperations(db);
+ * const user = await operations.insert(usersTable, { name: 'John' });
+ * ```
+ *
+ * @since 1.0.0
+ */
+export interface DatabaseOperations<TRecord> {
+  /**
+   * Insert a new record into the table
+   * @param table - The table to insert into
+   * @param data - The data to insert
+   * @returns Promise with the inserted record
+   */
+  insert(table: TableWithId, data: Partial<TRecord>): Promise<TRecord>;
+
+  /**
+   * Update an existing record by ID
+   * @param table - The table to update
+   * @param id - The ID of the record to update
+   * @param data - The data to update
+   * @returns Promise with the updated record
+   */
+  update(table: TableWithId, id: string, data: Partial<TRecord>): Promise<TRecord>;
+
+  /**
+   * Delete a record by ID
+   * @param table - The table to delete from
+   * @param id - The ID of the record to delete
+   * @returns Promise with the deleted record
+   */
+  delete(table: TableWithId, id: string): Promise<TRecord>;
+
+  /**
+   * Bulk update multiple records
+   * @param table - The table to update
+   * @param ids - Array of IDs to update
+   * @param data - The data to update
+   * @returns Promise with array of updated records
+   */
+  bulkUpdate(table: TableWithId, ids: string[], data: Partial<TRecord>): Promise<TRecord[]>;
+
+  /**
+   * Bulk delete multiple records
+   * @param table - The table to delete from
+   * @param ids - Array of IDs to delete
+   * @returns Promise with array of deleted records
+   */
+  bulkDelete(table: TableWithId, ids: string[]): Promise<TRecord[]>;
+}
+
+/**
+ * Factory function type for creating database operations.
+ * This follows the Factory Pattern for operations instantiation.
+ *
+ * @template TRecord - The record type for the table
+ * @template TDriver - The database driver type
+ * @param db - The Drizzle database instance
+ * @returns The appropriate database operations implementation
+ *
+ * @example
+ * ```typescript
+ * const createOperations = getOperationsFactory<'postgres'>();
+ * const operations = createOperations<User>(postgresDb);
+ * ```
+ *
+ * @since 1.0.0
+ */
+export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
+  db: DrizzleDatabase<TDriver>
+) => DatabaseOperations<TRecord>;
+
+/**
  * Query builder interface for type safety
  */
 export interface QueryBuilder {
