@@ -113,6 +113,10 @@ export function TableHeaderContextMenu<TData = unknown>({
         {/* Sorting controls */}
         {isSortable && contextMenuConfig.showSortToggle && (
           <>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+              Sort Direction
+            </div>
+            <ContextMenuSeparator />
             <ContextMenuItem
               onClick={onSetSortAsc}
               className="flex items-center gap-2"
@@ -144,10 +148,7 @@ export function TableHeaderContextMenu<TData = unknown>({
             {currentSort && (
               <>
                 <ContextMenuSeparator />
-                <ContextMenuItem
-                  onClick={onClearSort}
-                  className="flex items-center gap-2 text-muted-foreground"
-                >
+                <ContextMenuItem onClick={onClearSort} className="flex items-center gap-2">
                   <X className="h-4 w-4" />
                   Clear This Sort
                 </ContextMenuItem>
@@ -161,7 +162,7 @@ export function TableHeaderContextMenu<TData = unknown>({
                   onClick={() => {
                     onSortReorder([]);
                   }}
-                  className="flex items-center gap-2 text-muted-foreground"
+                  className="flex items-center gap-2"
                 >
                   <X className="h-4 w-4" />
                   Clear All Sorting

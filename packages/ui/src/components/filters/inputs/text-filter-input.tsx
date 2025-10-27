@@ -2,7 +2,6 @@
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import * as React from 'react';
-import { useDebounce } from '../../../hooks/use-debounce';
 import { useFilterValidation } from '../../../hooks/use-filter-validation';
 import { getFilterValueAsString } from '../../../lib/filter-value-utils';
 import { cn } from '../../../lib/utils';
@@ -25,7 +24,7 @@ export interface TextFilterInputProps<TData = unknown> {
  * Pattern: Controlled component with local UI state
  * - Data state (filter.values) comes from parent (TableStateManager)
  * - UI state (local input value, typing status) managed locally
- * - Debounced updates sent back to parent
+ * - Updates sent to parent only on blur or Enter key press
  * - Syncs from parent only when not actively typing
  */
 export function TextFilterInput<TData = unknown>({
@@ -48,26 +47,13 @@ export function TextFilterInput<TData = unknown>({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Debounce the value to avoid excessive updates
-  const debounceMs = column.filter?.debounce ?? 500;
-  const debouncedValue = useDebounce(localValue, debounceMs);
-
-  // Validate the current value
+  // Validate the current value (no debounce needed for validation)
   const validation = useFilterValidation({
     filter,
     column,
-    values: debouncedValue ? [debouncedValue] : [],
-    immediate: !!debouncedValue,
+    values: localValue ? [localValue] : [],
+    immediate: !!localValue,
   });
-
-  // Sync TO parent when debounced value changes
-  React.useEffect(() => {
-    // Send update to parent
-    onChangeRef.current(debouncedValue ? [debouncedValue] : []);
-
-    // Mark typing as complete
-    setIsUserTyping(false);
-  }, [debouncedValue]);
 
   // Sync FROM parent when filter values change (only if not typing)
   // Use the actual value from filter, not a stringified key
@@ -82,6 +68,24 @@ export function TextFilterInput<TData = unknown>({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIsUserTyping(true);
     setLocalValue(e.target.value);
+  };
+
+  // Commit the value to parent when user is done editing
+  const commitValue = React.useCallback(() => {
+    onChangeRef.current(localValue ? [localValue] : []);
+    setIsUserTyping(false);
+  }, [localValue]);
+
+  // Handle blur - commit the value
+  const handleBlur = () => {
+    commitValue();
+  };
+
+  // Handle Enter key - commit the value
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      commitValue();
+    }
   };
 
   const placeholder = React.useMemo(() => {
@@ -116,6 +120,8 @@ export function TextFilterInput<TData = unknown>({
         type="text"
         value={localValue}
         onChange={handleChange}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={cn(
           'w-full',
