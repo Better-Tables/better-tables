@@ -79,6 +79,12 @@ export interface FilterBarProps<TData = unknown> {
   columnVisibility?: ColumnVisibility;
   /** Handler to toggle column visibility */
   onToggleColumnVisibility?: (columnId: string) => void;
+  /** Current column order state */
+  columnOrder?: string[];
+  /** Handler to reset column order */
+  onResetColumnOrder?: () => void;
+  /** Whether column reordering is enabled */
+  enableColumnReordering?: boolean;
   /** Handler to reset all table state (filters, sorting, selection, etc.) */
   onReset?: () => void;
 }
@@ -103,6 +109,9 @@ export function FilterBar<TData = unknown>({
   showColumnVisibility = true,
   columnVisibility,
   onToggleColumnVisibility,
+  columnOrder,
+  onResetColumnOrder,
+  enableColumnReordering = false,
   onReset,
 }: FilterBarProps<TData>) {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
@@ -287,6 +296,9 @@ export function FilterBar<TData = unknown>({
             columns={columns}
             columnVisibility={columnVisibility}
             onToggleVisibility={onToggleColumnVisibility}
+            columnOrder={columnOrder}
+            onResetColumnOrder={onResetColumnOrder}
+            enableReordering={enableColumnReordering}
             disabled={disabled}
           />
         )}
