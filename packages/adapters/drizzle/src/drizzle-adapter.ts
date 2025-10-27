@@ -64,14 +64,21 @@ import type {
   TableAdapter,
 } from '@better-tables/core';
 import type { InferSelectModel, Relations } from 'drizzle-orm';
-
 import { eq, inArray } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { MySqlTable } from 'drizzle-orm/mysql-core';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
+import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+
 import { DataTransformer } from './data-transformer';
 import { DrizzleQueryBuilder } from './query-builder';
 import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
 import type {
   AnyTableType,
+  DatabaseDriver,
   DrizzleAdapterConfig,
   DrizzleDatabase,
   RelationshipMap,
@@ -89,10 +96,12 @@ import { QueryError, SchemaError } from './types';
  * @class DrizzleAdapter
  * @implements {TableAdapter}
  * @template TSchema - The schema type containing all tables
+ * @template TDriver - The database driver type (REQUIRED - must be explicitly specified)
  * @description Main adapter class for Drizzle ORM integration with Better Tables
  *
- * @property {DrizzleDatabase} db - The Drizzle database instance
+ * @property {DrizzleDatabase<TDriver>} db - The Drizzle database instance
  * @property {TSchema} schema - The schema containing all tables
+ * @property {TDriver} driver - The database driver type
  * @property {RelationshipMap} relationships - Map of all relationships
  * @property {RelationshipDetector} relationshipDetector - Detects relationships from schema
  * @property {RelationshipManager} relationshipManager - Manages relationship paths
@@ -105,8 +114,9 @@ import { QueryError, SchemaError } from './types';
  *
  * @example
  * ```typescript
- * const adapter = new DrizzleAdapter({
- *   db: drizzleDb,
+ * // REQUIRED: Specify the driver type explicitly for proper type safety
+ * const adapter = new DrizzleAdapter<typeof schema, 'postgres'>({
+ *   db: postgresDb,
  *   schema: { users, profiles, posts },
  *   relations: { usersRelations },
  *   driver: 'postgres',
@@ -117,11 +127,14 @@ import { QueryError, SchemaError } from './types';
  * @see {@link TableAdapter} for the interface contract
  * @since 1.0.0
  */
-export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
-  implements TableAdapter<InferSelectModel<TSchema[keyof TSchema]>>
+export class DrizzleAdapter<
+  TSchema extends Record<string, AnyTableType>,
+  TDriver extends DatabaseDriver,
+> implements TableAdapter<InferSelectModel<TSchema[keyof TSchema]>>
 {
-  private db: DrizzleDatabase;
+  private db: DrizzleDatabase<TDriver>;
   private schema: TSchema;
+  private driver: TDriver;
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
@@ -137,7 +150,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   > = new Map();
   private subscribers: Array<(event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>) => void> =
     [];
-  private options: DrizzleAdapterConfig<TSchema>['options'];
+  private options: DrizzleAdapterConfig<TSchema, TDriver>['options'];
 
   public readonly meta: AdapterMeta;
 
@@ -148,10 +161,10 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    * relationship manager, query builder, and data transformer. Optionally
    * auto-detects relationships from the provided schema or uses manual mappings.
    *
-   * @param {DrizzleAdapterConfig<TSchema>} config - Configuration object for the adapter
-   * @param {DrizzleDatabase} config.db - The Drizzle database instance
+   * @param {DrizzleAdapterConfig<TSchema, TDriver>} config - Configuration object for the adapter
+   * @param {DrizzleDatabase<TDriver>} config.db - The Drizzle database instance
    * @param {TSchema} config.schema - The schema containing all Drizzle table definitions
-   * @param {DatabaseDriver} config.driver - The database driver being used ('postgres', 'mysql', 'sqlite')
+   * @param {TDriver} config.driver - The database driver being used (REQUIRED: 'postgres', 'mysql', or 'sqlite')
    * @param {boolean} [config.autoDetectRelationships=true] - Whether to automatically detect relationships from schema
    * @param {Record<string, unknown>} [config.relations] - Raw Drizzle relations for auto-detection
    * @param {RelationshipMap} [config.relationships] - Manual relationship mappings (overrides auto-detection)
@@ -162,8 +175,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    *
    * @example
    * ```typescript
-   * const adapter = new DrizzleAdapter({
-   *   db: drizzle(connectionString),
+   * // REQUIRED: Specify the driver type explicitly for proper type safety
+   * const adapter = new DrizzleAdapter<typeof schema, 'postgres'>({
+   *   db: postgresDb,
    *   schema: { users, profiles },
    *   driver: 'postgres',
    *   relations: { usersRelations },
@@ -175,9 +189,10 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    *
    * @since 1.0.0
    */
-  constructor(config: DrizzleAdapterConfig<TSchema>) {
+  constructor(config: DrizzleAdapterConfig<TSchema, TDriver>) {
     this.db = config.db;
     this.schema = config.schema;
+    this.driver = config.driver;
     this.options = config.options || {};
 
     // Initialize relationship detection
@@ -211,6 +226,343 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
 
     // Initialize metadata
     this.meta = this.buildAdapterMeta(config.meta);
+  }
+
+  /**
+   * Execute insert operation - Strategy Pattern dispatcher.
+   * Delegates to the appropriate driver-specific implementation.
+   *
+   * @private
+   * @param table - The table to insert into
+   * @param data - The data to insert
+   * @returns Promise with the inserted record
+   */
+  private async executeInsert(
+    table: TableWithId,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    switch (this.driver) {
+      case 'postgres':
+        return this.executeInsertPostgres(table, data);
+      case 'mysql':
+        return this.executeInsertMySQL(table, data);
+      case 'sqlite':
+        return this.executeInsertSQLite(table, data);
+      default:
+        throw new QueryError(`Unsupported database driver: ${this.driver as string}`, {
+          driver: this.driver,
+        });
+    }
+  }
+
+  /**
+   * PostgreSQL-specific insert with .returning() support
+   * @private
+   */
+  private async executeInsertPostgres(
+    table: TableWithId,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as PostgresJsDatabase;
+    const pgTable = table as PgTable;
+    const result = await db.insert(pgTable).values(data).returning();
+    const [record] = result as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError('Insert operation returned no record', { table, data });
+    }
+    return record;
+  }
+
+  /**
+   * MySQL-specific insert without .returning() support
+   * @private
+   */
+  private async executeInsertMySQL(
+    table: TableWithId,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as MySql2Database;
+    const mysqlTable = table as MySqlTable;
+    const result = await db.insert(mysqlTable).values(data);
+    // MySQL returns [ResultSetHeader, FieldPacket[]], extract insertId
+    const insertId = Array.isArray(result)
+      ? (result[0] as { insertId: number }).insertId
+      : (result as { insertId: number }).insertId;
+    if (!insertId) {
+      throw new QueryError('Insert operation failed: no insertId returned', { table, data });
+    }
+    // Fetch the inserted record
+    const records = await db
+      .select()
+      .from(mysqlTable)
+      .where(eq(table.id, String(insertId)));
+    const [record] = records as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError('Failed to fetch inserted record', { table, insertId });
+    }
+    return record;
+  }
+
+  /**
+   * SQLite-specific insert with .returning() support
+   * @private
+   */
+  private async executeInsertSQLite(
+    table: TableWithId,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as BetterSQLite3Database;
+    const sqliteTable = table as SQLiteTable;
+    const result = await db.insert(sqliteTable).values(data).returning();
+    const [record] = result as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError('Insert operation returned no record', { table, data });
+    }
+    return record;
+  }
+
+  /**
+   * Execute update operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeUpdate(
+    table: TableWithId,
+    id: string,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    switch (this.driver) {
+      case 'postgres':
+        return this.executeUpdatePostgres(table, id, data);
+      case 'mysql':
+        return this.executeUpdateMySQL(table, id, data);
+      case 'sqlite':
+        return this.executeUpdateSQLite(table, id, data);
+      default:
+        throw new QueryError(`Unsupported database driver: ${this.driver as string}`, {
+          driver: this.driver,
+        });
+    }
+  }
+
+  private async executeUpdatePostgres(
+    table: TableWithId,
+    id: string,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as PostgresJsDatabase;
+    const pgTable = table as PgTable;
+    const result = await db.update(pgTable).set(data).where(eq(table.id, id)).returning();
+    const [record] = result as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+    }
+    return record;
+  }
+
+  private async executeUpdateMySQL(
+    table: TableWithId,
+    id: string,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as MySql2Database;
+    const mysqlTable = table as MySqlTable;
+    await db.update(mysqlTable).set(data).where(eq(table.id, id));
+    const records = await db.select().from(mysqlTable).where(eq(table.id, id));
+    const [record] = records as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+    }
+    return record;
+  }
+
+  private async executeUpdateSQLite(
+    table: TableWithId,
+    id: string,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as BetterSQLite3Database;
+    const sqliteTable = table as SQLiteTable;
+    const result = await db.update(sqliteTable).set(data).where(eq(table.id, id)).returning();
+    const [record] = result as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+    }
+    return record;
+  }
+
+  /**
+   * Execute delete operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeDelete(
+    table: TableWithId,
+    id: string
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    switch (this.driver) {
+      case 'postgres':
+        return this.executeDeletePostgres(table, id);
+      case 'mysql':
+        return this.executeDeleteMySQL(table, id);
+      case 'sqlite':
+        return this.executeDeleteSQLite(table, id);
+      default:
+        throw new QueryError(`Unsupported database driver: ${this.driver as string}`, {
+          driver: this.driver,
+        });
+    }
+  }
+
+  private async executeDeletePostgres(
+    table: TableWithId,
+    id: string
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as PostgresJsDatabase;
+    const pgTable = table as PgTable;
+    const result = await db.delete(pgTable).where(eq(table.id, id)).returning();
+    const [record] = result as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+    }
+    return record;
+  }
+
+  private async executeDeleteMySQL(
+    table: TableWithId,
+    id: string
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as MySql2Database;
+    const mysqlTable = table as MySqlTable;
+    const records = await db.select().from(mysqlTable).where(eq(table.id, id));
+    const [record] = records as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+    }
+    await db.delete(mysqlTable).where(eq(table.id, id));
+    return record;
+  }
+
+  private async executeDeleteSQLite(
+    table: TableWithId,
+    id: string
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    const db = this.db as BetterSQLite3Database;
+    const sqliteTable = table as SQLiteTable;
+    const result = await db.delete(sqliteTable).where(eq(table.id, id)).returning();
+    const [record] = result as [InferSelectModel<TSchema[keyof TSchema]>];
+    if (!record) {
+      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+    }
+    return record;
+  }
+
+  /**
+   * Execute bulk update operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeBulkUpdate(
+    table: TableWithId,
+    ids: string[],
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    switch (this.driver) {
+      case 'postgres':
+        return this.executeBulkUpdatePostgres(table, ids, data);
+      case 'mysql':
+        return this.executeBulkUpdateMySQL(table, ids, data);
+      case 'sqlite':
+        return this.executeBulkUpdateSQLite(table, ids, data);
+      default:
+        throw new QueryError(`Unsupported database driver: ${this.driver as string}`, {
+          driver: this.driver,
+        });
+    }
+  }
+
+  private async executeBulkUpdatePostgres(
+    table: TableWithId,
+    ids: string[],
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    const db = this.db as PostgresJsDatabase;
+    const pgTable = table as PgTable;
+    const result = await db.update(pgTable).set(data).where(inArray(table.id, ids)).returning();
+    return result as InferSelectModel<TSchema[keyof TSchema]>[];
+  }
+
+  private async executeBulkUpdateMySQL(
+    table: TableWithId,
+    ids: string[],
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    const db = this.db as MySql2Database;
+    const mysqlTable = table as MySqlTable;
+    await db.update(mysqlTable).set(data).where(inArray(table.id, ids));
+    const records = await db.select().from(mysqlTable).where(inArray(table.id, ids));
+    return records as InferSelectModel<TSchema[keyof TSchema]>[];
+  }
+
+  private async executeBulkUpdateSQLite(
+    table: TableWithId,
+    ids: string[],
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    const db = this.db as BetterSQLite3Database;
+    const sqliteTable = table as SQLiteTable;
+    const result = await db.update(sqliteTable).set(data).where(inArray(table.id, ids)).returning();
+    return result as InferSelectModel<TSchema[keyof TSchema]>[];
+  }
+
+  /**
+   * Execute bulk delete operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeBulkDelete(
+    table: TableWithId,
+    ids: string[]
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    switch (this.driver) {
+      case 'postgres':
+        return this.executeBulkDeletePostgres(table, ids);
+      case 'mysql':
+        return this.executeBulkDeleteMySQL(table, ids);
+      case 'sqlite':
+        return this.executeBulkDeleteSQLite(table, ids);
+      default:
+        throw new QueryError(`Unsupported database driver: ${this.driver as string}`, {
+          driver: this.driver,
+        });
+    }
+  }
+
+  private async executeBulkDeletePostgres(
+    table: TableWithId,
+    ids: string[]
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    const db = this.db as PostgresJsDatabase;
+    const pgTable = table as PgTable;
+    const result = await db.delete(pgTable).where(inArray(table.id, ids)).returning();
+    return result as InferSelectModel<TSchema[keyof TSchema]>[];
+  }
+
+  private async executeBulkDeleteMySQL(
+    table: TableWithId,
+    ids: string[]
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    const db = this.db as MySql2Database;
+    const mysqlTable = table as MySqlTable;
+    const records = await db.select().from(mysqlTable).where(inArray(table.id, ids));
+    await db.delete(mysqlTable).where(inArray(table.id, ids));
+    return records as InferSelectModel<TSchema[keyof TSchema]>[];
+  }
+
+  private async executeBulkDeleteSQLite(
+    table: TableWithId,
+    ids: string[]
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    const db = this.db as BetterSQLite3Database;
+    const sqliteTable = table as SQLiteTable;
+    const result = await db.delete(sqliteTable).where(inArray(table.id, ids)).returning();
+    return result as InferSelectModel<TSchema[keyof TSchema]>[];
   }
 
   /**
@@ -585,8 +937,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const insertResult = await this.db.insert(mainTableSchema).values(data).returning();
-      const [result] = insertResult as [InferSelectModel<TSchema[keyof TSchema]>];
+      const result = await this.executeInsert(mainTableSchema, data);
 
       this.emit({ type: 'insert', data: result });
       this.invalidateCache();
@@ -616,16 +967,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const updateResult = await this.db
-        .update(mainTableSchema)
-        .set(data)
-        .where(eq(mainTableSchema.id, id))
-        .returning();
-      const [result] = updateResult as [InferSelectModel<TSchema[keyof TSchema]>];
-
-      if (!result) {
-        throw new QueryError(`Record not found with id: ${id}`, { id });
-      }
+      const result = await this.executeUpdate(mainTableSchema, id, data);
 
       this.emit({ type: 'update', data: result });
       this.invalidateCache();
@@ -652,15 +994,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const deleteResult = await this.db
-        .delete(mainTableSchema)
-        .where(eq(mainTableSchema.id, id))
-        .returning();
-      const [result] = deleteResult as [InferSelectModel<TSchema[keyof TSchema]>];
-
-      if (!result) {
-        throw new QueryError(`Record not found with id: ${id}`, { id });
-      }
+      const result = await this.executeDelete(mainTableSchema, id);
 
       this.emit({ type: 'delete', data: result });
       this.invalidateCache();
@@ -688,12 +1022,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const bulkUpdateResult = await this.db
-        .update(mainTableSchema)
-        .set(data)
-        .where(inArray(mainTableSchema.id, ids))
-        .returning();
-      const results = bulkUpdateResult as InferSelectModel<TSchema[keyof TSchema]>[];
+      const results = await this.executeBulkUpdate(mainTableSchema, ids, data);
 
       this.emit({ type: 'update', data: results });
       this.invalidateCache();
@@ -720,11 +1049,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const bulkDeleteResult = await this.db
-        .delete(mainTableSchema)
-        .where(inArray(mainTableSchema.id, ids))
-        .returning();
-      const results = bulkDeleteResult as InferSelectModel<TSchema[keyof TSchema]>[];
+      const results = await this.executeBulkDelete(mainTableSchema, ids);
 
       this.emit({ type: 'delete', data: results });
       this.invalidateCache();

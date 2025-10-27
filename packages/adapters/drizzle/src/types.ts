@@ -17,14 +17,32 @@
 
 import type { AdapterMeta } from '@better-tables/core';
 import type { AnyColumn, InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+
+/**
+ * Mapping of database drivers to their corresponding Drizzle database types.
+ * This is the single source of truth for supported database drivers.
+ *
+ * @description This type ensures that every database driver has a corresponding
+ * database type. When you add a new driver, add it here and TypeScript will
+ * ensure type safety throughout the codebase.
+ */
+type DatabaseTypeMap = {
+  postgres: PostgresJsDatabase;
+  mysql: MySql2Database;
+  sqlite: BetterSQLite3Database;
+};
 
 /**
  * Database driver types supported by the Drizzle adapter.
  *
  * @description Identifies which database driver is being used
+ * Supported drivers are: postgres, mysql, sqlite.
  *
  * @example
  * ```typescript
@@ -33,7 +51,7 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
  *
  * @since 1.0.0
  */
-export type DatabaseDriver = 'postgres' | 'mysql' | 'sqlite';
+export type DatabaseDriver = keyof DatabaseTypeMap;
 
 /**
  * Generic table type that works across all database drivers.
@@ -230,26 +248,21 @@ export type TableWithId = AnyTableType & {
 /**
  * Database instance type for Drizzle ORM
  *
- * Drizzle supports multiple database drivers (SQLite, PostgreSQL, MySQL), each with
- * slightly different method signatures. TypeScript cannot reconcile union types with
- * different method signatures, which causes type errors when calling methods like
- * select(), insert(), update(), delete().
+ * @description Represents the actual Drizzle database instance returned by drizzle().
+ * It provides full type safety and access to all Drizzle methods like .select(), .insert(), etc.
  *
- * Following Drizzle's own adapter pattern and common ORM practices, we use `any` here
- * to support all three database types. The actual type safety is maintained through:
- * 1. The driver parameter which specifies which database is being used
- * 2. Runtime behavior that correctly handles each database type
- * 3. The schema type parameter which provides type safety for table operations
+ * @template TDriver - The specific database driver type
  *
- * This is the same approach used in Drizzle's documentation examples and other
- * multi-database ORMs.
+ * @example
+ * ```typescript
+ * // Specific driver - fully typed
+ * const db: DrizzleDatabase<'postgres'> = drizzle(connection);
  *
- *
+ * // Generic - requires runtime handling
+ * const db: DrizzleDatabase<DatabaseDriver> = drizzle(connection);
+ * ```
  */
-
-// TODO: should this have a proper type? ideally yes but we need to support all three database types
-// biome-ignore lint/suspicious/noExplicitAny: we need to support all three database types
-export type DrizzleDatabase = any;
+export type DrizzleDatabase<TDriver extends DatabaseDriver> = DatabaseTypeMap[TDriver];
 
 /**
  * Query builder interface for type safety
@@ -275,16 +288,35 @@ export interface QueryBuilderWithJoins {
 
 /**
  * Configuration for the Drizzle adapter
+ *
+ * @template TSchema - The schema containing all tables
+ * @template TDriver - The specific database driver type (REQUIRED - must be specified)
+ *
+ * @description Configuration object for creating a DrizzleAdapter instance.
+ * The driver type parameter is required and must be explicitly specified to ensure
+ * proper type safety for all database operations.
+ *
+ * @example
+ * ```typescript
+ * const config: DrizzleAdapterConfig<typeof schema, 'postgres'> = {
+ *   db: postgresDb,
+ *   schema: { users, profiles },
+ *   driver: 'postgres'
+ * };
+ * ```
  */
-export interface DrizzleAdapterConfig<TSchema extends Record<string, AnyTableType>> {
-  /** Drizzle database instance */
-  db: DrizzleDatabase;
+export interface DrizzleAdapterConfig<
+  TSchema extends Record<string, AnyTableType>,
+  TDriver extends DatabaseDriver,
+> {
+  /** Drizzle database instance - must match the driver type */
+  db: DrizzleDatabase<TDriver>;
 
   /** Schema containing tables and relations */
   schema: TSchema;
 
-  /** Database driver type */
-  driver: DatabaseDriver;
+  /** Database driver type - must be explicitly specified */
+  driver: TDriver;
 
   /** Auto-detect relationships from schema */
   autoDetectRelationships?: boolean;
