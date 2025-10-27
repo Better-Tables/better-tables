@@ -4,9 +4,9 @@ import type { ColumnDefinition, FilterGroup, FilterState } from '@better-tables/
 import { getDefaultOperatorsForType } from '@better-tables/core';
 import { Search, X } from 'lucide-react';
 import * as React from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { ActiveFilters } from './active-filters';
 import { FilterButton } from './filter-button';
 import { FilterDropdown } from './filter-dropdown';

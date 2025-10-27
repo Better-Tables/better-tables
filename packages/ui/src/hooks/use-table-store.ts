@@ -151,3 +151,32 @@ export function useTableSelection(tableId: string) {
     }))
   );
 }
+
+/**
+ * Hook to access column visibility state and actions
+ * More performant than useTableStore as it only subscribes to visibility changes
+ *
+ * @param tableId - Unique table identifier
+ * @returns Column visibility state and actions
+ *
+ * @example
+ * ```tsx
+ * const { columnVisibility, toggleColumnVisibility } = useTableColumnVisibility('my-table');
+ * ```
+ */
+export function useTableColumnVisibility(tableId: string) {
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
+  return useStore(
+    store,
+    useShallow((state) => ({
+      columnVisibility: state.columnVisibility,
+      toggleColumnVisibility: state.toggleColumnVisibility,
+      setColumnVisibility: state.setColumnVisibility,
+    }))
+  );
+}

@@ -1,3 +1,4 @@
+import type { ColumnVisibility } from '@better-tables/core';
 import {
   type ColumnDefinition,
   type FilterState,
@@ -22,6 +23,7 @@ export interface TableState {
   pagination: PaginationState;
   sorting: SortingState;
   selectedRows: Set<string>;
+  columnVisibility: ColumnVisibility;
 
   // Filter actions
   setFilters: (filters: FilterState[]) => void;
@@ -48,6 +50,10 @@ export interface TableState {
   clearSelection: () => void;
   setSelectedRows: (rows: Set<string>) => void;
 
+  // Column visibility actions
+  toggleColumnVisibility: (columnId: string) => void;
+  setColumnVisibility: (visibility: ColumnVisibility) => void;
+
   // Bulk operations
   updateState: (state: Partial<Omit<TableState, 'manager'>>) => void;
   reset: () => void;
@@ -61,6 +67,7 @@ export interface TableStoreInitialState {
   pagination?: PaginationState;
   sorting?: SortingState;
   selectedRows?: Set<string>;
+  columnVisibility?: ColumnVisibility;
   // biome-ignore lint/suspicious/noExplicitAny: Needs to work with any column type
   columns: ColumnDefinition<any>[];
   config?: TableStateConfig;
@@ -80,6 +87,7 @@ export function createTableStore(initialState: TableStoreInitialState) {
       pagination: initialState.pagination,
       sorting: initialState.sorting,
       selectedRows: initialState.selectedRows,
+      columnVisibility: initialState.columnVisibility,
     },
     initialState.config
   );
@@ -98,7 +106,8 @@ export function createTableStore(initialState: TableStoreInitialState) {
             state.filters !== event.state.filters ||
             state.pagination !== event.state.pagination ||
             state.sorting !== event.state.sorting ||
-            state.selectedRows !== event.state.selectedRows;
+            state.selectedRows !== event.state.selectedRows ||
+            state.columnVisibility !== event.state.columnVisibility;
 
           // If nothing changed, return same state object to prevent re-renders
           if (!hasChanged) {
@@ -112,8 +121,14 @@ export function createTableStore(initialState: TableStoreInitialState) {
             pagination: event.state.pagination,
             sorting: event.state.sorting,
             selectedRows: event.state.selectedRows,
+            columnVisibility: event.state.columnVisibility,
           };
         });
+      } else if (event.type === 'visibility_changed') {
+        set((state) => ({
+          ...state,
+          columnVisibility: event.columnVisibility,
+        }));
       }
     });
 
@@ -126,6 +141,7 @@ export function createTableStore(initialState: TableStoreInitialState) {
       pagination: managerState.pagination,
       sorting: managerState.sorting,
       selectedRows: managerState.selectedRows,
+      columnVisibility: managerState.columnVisibility,
 
       // Filter actions - delegate to manager
       setFilters: (filters) => {
@@ -203,6 +219,15 @@ export function createTableStore(initialState: TableStoreInitialState) {
 
       setSelectedRows: (rows) => {
         get().manager.setSelectedRows(rows);
+      },
+
+      // Column visibility actions - delegate to manager
+      toggleColumnVisibility: (columnId) => {
+        get().manager.toggleColumnVisibility(columnId);
+      },
+
+      setColumnVisibility: (visibility) => {
+        get().manager.setColumnVisibility(visibility);
       },
 
       // Bulk operations

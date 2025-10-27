@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
 import { getTableStore } from './table-registry';
 
@@ -30,6 +32,8 @@ export interface UrlSyncConfig {
   pagination?: boolean;
   /** Sync sorting to URL */
   sorting?: boolean;
+  /** Sync column visibility to URL */
+  columnVisibility?: boolean;
 }
 
 /**
@@ -122,6 +126,17 @@ export function useTableUrlSync(
       }
     }
 
+    if (config.columnVisibility) {
+      const visibilityParam = adapter.getParam('columnVisibility');
+      if (visibilityParam) {
+        try {
+          updates.columnVisibility = JSON.parse(visibilityParam);
+        } catch {
+          // Silently ignore parse errors
+        }
+      }
+    }
+
     // Apply updates if we have any
     if (Object.keys(updates).length > 0) {
       manager.updateState(updates);
@@ -158,6 +173,16 @@ export function useTableUrlSync(
         if (config.sorting) {
           updates.sorting =
             event.state.sorting.length > 0 ? JSON.stringify(event.state.sorting) : null;
+        }
+
+        if (config.columnVisibility) {
+          const visibilityKeys = Object.keys(event.state.columnVisibility);
+          const hasHiddenColumns = visibilityKeys.some(
+            (key) => event.state.columnVisibility[key] === false
+          );
+          updates.columnVisibility = hasHiddenColumns
+            ? JSON.stringify(event.state.columnVisibility)
+            : null;
         }
 
         adapter.setParams(updates);

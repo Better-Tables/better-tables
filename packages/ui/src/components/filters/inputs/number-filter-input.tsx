@@ -2,10 +2,8 @@
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import * as React from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useFilterValidation, useKeyboardNavigation } from '@/hooks';
-import { getFilterValueAsNumber } from '@/lib/filter-value-utils';
+import { useFilterValidation } from '../../../hooks';
+import { getFilterValueAsNumber } from '../../../lib/filter-value-utils';
 import {
   formatNumber,
   getFormattedPlaceholder,
@@ -13,8 +11,10 @@ import {
   getNumberInputStep,
   parseFormattedNumber,
   validateNumberInput,
-} from '@/lib/number-format-utils';
-import { cn } from '@/lib/utils';
+} from '../../../lib/number-format-utils';
+import { cn } from '../../../lib/utils';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 
 export interface NumberFilterInputProps<TData = unknown> {
   /** Filter state */
@@ -33,7 +33,7 @@ export interface NumberFilterInputProps<TData = unknown> {
  * Pattern: Controlled component with local UI state
  * - Data state comes from parent (filter.values)
  * - UI state (formatted input strings) managed locally
- * - Updates sent back to parent
+ * - Updates sent to parent only on blur or Enter key press
  * - Syncs from parent only when values actually change
  */
 export function NumberFilterInput<TData = unknown>({
@@ -58,6 +58,9 @@ export function NumberFilterInput<TData = unknown>({
       max: val1 !== null ? formatNumber(val1, numberConfig) : '',
     };
   });
+
+  // Track if user is actively typing (prevents automatic sync to parent)
+  const [isUserTyping, setIsUserTyping] = React.useState(false);
 
   const needsTwoValues = filter.operator === 'between' || filter.operator === 'notBetween';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
@@ -125,8 +128,8 @@ export function NumberFilterInput<TData = unknown>({
     return { isValid: true };
   }, [validation, numberValidation]);
 
-  // Sync TO parent when values change
-  React.useEffect(() => {
+  // Commit the value to parent when user is done editing
+  const commitValue = React.useCallback(() => {
     if (needsNoValues) {
       onChangeRef.current([]);
     } else if (needsTwoValues) {
@@ -140,14 +143,18 @@ export function NumberFilterInput<TData = unknown>({
       const single = parseFormattedNumber(values.single, numberConfig);
       onChangeRef.current(single !== null ? [single] : []);
     }
+    setIsUserTyping(false);
   }, [values, needsTwoValues, needsNoValues, numberConfig]);
 
-  // Sync FROM parent when filter values change
+  // Sync FROM parent when filter values change (only if not typing)
   // Only update if the values are actually different
   const externalVal0 = getFilterValueAsNumber(filter, 0);
   const externalVal1 = getFilterValueAsNumber(filter, 1);
 
   React.useEffect(() => {
+    // Don't sync from parent while user is actively typing
+    if (isUserTyping) return;
+
     const formattedSingle = externalVal0 !== null ? formatNumber(externalVal0, numberConfig) : '';
     const formattedMin = externalVal0 !== null ? formatNumber(externalVal0, numberConfig) : '';
     const formattedMax = externalVal1 !== null ? formatNumber(externalVal1, numberConfig) : '';
@@ -159,26 +166,37 @@ export function NumberFilterInput<TData = unknown>({
 
       return needsUpdate ? { single: formattedSingle, min: formattedMin, max: formattedMax } : prev;
     });
-  }, [externalVal0, externalVal1, numberConfig]);
-
-  // Keyboard navigation
-  const keyboardNavigation = useKeyboardNavigation({
-    onEscape: () => {
-      // Clear current input on escape
-      setValues((prev) => ({ ...prev, single: '', min: '', max: '' }));
-    },
-  });
+  }, [externalVal0, externalVal1, numberConfig, isUserTyping]);
 
   const handleSingleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsUserTyping(true);
     setValues((prev) => ({ ...prev, single: e.target.value }));
   };
 
   const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsUserTyping(true);
     setValues((prev) => ({ ...prev, min: e.target.value }));
   };
 
   const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsUserTyping(true);
     setValues((prev) => ({ ...prev, max: e.target.value }));
+  };
+
+  // Handle blur - commit the value
+  const handleBlur = () => {
+    commitValue();
+  };
+
+  // Handle Enter key - commit the value
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      commitValue();
+    } else if (e.key === 'Escape') {
+      // Clear current input on escape
+      setValues((prev) => ({ ...prev, single: '', min: '', max: '' }));
+      setIsUserTyping(false);
+    }
   };
 
   if (needsNoValues) {
@@ -198,7 +216,8 @@ export function NumberFilterInput<TData = unknown>({
               type="number"
               value={values.min}
               onChange={handleMinChange}
-              onKeyDown={keyboardNavigation.onKeyDown}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
               placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Min value' })}
               min={numberConfig.min}
               max={numberConfig.max}
@@ -209,7 +228,6 @@ export function NumberFilterInput<TData = unknown>({
                   values.min &&
                   'border-destructive focus-visible:ring-destructive'
               )}
-              {...keyboardNavigation.ariaAttributes}
             />
           </div>
           <div className="space-y-1">
@@ -218,7 +236,8 @@ export function NumberFilterInput<TData = unknown>({
               type="number"
               value={values.max}
               onChange={handleMaxChange}
-              onKeyDown={keyboardNavigation.onKeyDown}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
               placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Max value' })}
               min={numberConfig.min}
               max={numberConfig.max}
@@ -229,7 +248,6 @@ export function NumberFilterInput<TData = unknown>({
                   values.max &&
                   'border-destructive focus-visible:ring-destructive'
               )}
-              {...keyboardNavigation.ariaAttributes}
             />
           </div>
         </div>
@@ -247,7 +265,8 @@ export function NumberFilterInput<TData = unknown>({
         type="number"
         value={values.single}
         onChange={handleSingleChange}
-        onKeyDown={keyboardNavigation.onKeyDown}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         placeholder={getFormattedPlaceholder(numberConfig)}
         min={numberConfig.min}
         max={numberConfig.max}
@@ -258,7 +277,6 @@ export function NumberFilterInput<TData = unknown>({
             values.single &&
             'border-destructive focus-visible:ring-destructive'
         )}
-        {...keyboardNavigation.ariaAttributes}
       />
       {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (
         <p className="text-sm text-destructive">{finalValidation.error}</p>

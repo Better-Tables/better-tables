@@ -1,3 +1,5 @@
+'use client';
+
 import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
 import { getColumnStyle } from '@better-tables/core';
 import type React from 'react';

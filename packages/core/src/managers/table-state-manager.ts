@@ -8,7 +8,7 @@
  * @module managers/table-state-manager
  */
 
-import type { ColumnDefinition } from '../types/column';
+import type { ColumnDefinition, ColumnVisibility } from '../types/column';
 import type { FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
 import type { SortingState } from '../types/sorting';
@@ -76,6 +76,8 @@ export interface TableState {
   sorting: SortingState;
   /** Currently selected row IDs */
   selectedRows: Set<string>;
+  /** Column visibility state */
+  columnVisibility: ColumnVisibility;
 }
 
 /**
@@ -112,7 +114,8 @@ export type TableStateEvent =
   | { type: 'filters_changed'; filters: FilterState[] }
   | { type: 'pagination_changed'; pagination: PaginationState }
   | { type: 'sorting_changed'; sorting: SortingState }
-  | { type: 'selection_changed'; selectedRows: Set<string> };
+  | { type: 'selection_changed'; selectedRows: Set<string> }
+  | { type: 'visibility_changed'; columnVisibility: ColumnVisibility };
 
 /**
  * Table state manager subscriber function type.
@@ -185,6 +188,7 @@ export class TableStateManager<TData = unknown> {
   private paginationManager: PaginationManager;
   private sorting: SortingState = [];
   private selectedRows: Set<string> = new Set();
+  private columnVisibility: ColumnVisibility = {};
   private subscribers: TableStateSubscriber[] = [];
   private columns: ColumnDefinition<TData>[];
 
@@ -193,6 +197,7 @@ export class TableStateManager<TData = unknown> {
   private cachedPagination: PaginationState | null = null;
   private cachedSorting: SortingState | null = null;
   private cachedSelectedRows: Set<string> | null = null;
+  private cachedColumnVisibility: ColumnVisibility | null = null;
   private lastNotifiedState: TableState | null = null;
 
   constructor(
@@ -212,6 +217,14 @@ export class TableStateManager<TData = unknown> {
     // Initialize state
     this.sorting = initialState.sorting || [];
     this.selectedRows = initialState.selectedRows || new Set();
+    this.columnVisibility = initialState.columnVisibility || {};
+
+    // Initialize all columns as visible by default
+    columns.forEach((column) => {
+      if (this.columnVisibility[column.id] === undefined) {
+        this.columnVisibility[column.id] = true;
+      }
+    });
 
     // Subscribe to sub-manager changes
     this.filterManager.subscribe(() => {
@@ -242,6 +255,7 @@ export class TableStateManager<TData = unknown> {
       pagination: this.getPagination(),
       sorting: this.getSorting(),
       selectedRows: this.getSelectedRows(),
+      columnVisibility: this.getColumnVisibility(),
     };
   }
 
@@ -420,6 +434,48 @@ export class TableStateManager<TData = unknown> {
   }
 
   // ============================================================================
+  // Column Visibility Operations
+  // ============================================================================
+
+  getColumnVisibility(): ColumnVisibility {
+    // Return cached reference if visibility hasn't changed
+    if (
+      this.cachedColumnVisibility &&
+      deepEqual(this.cachedColumnVisibility, this.columnVisibility)
+    ) {
+      return this.cachedColumnVisibility;
+    }
+
+    this.cachedColumnVisibility = { ...this.columnVisibility };
+    return this.cachedColumnVisibility;
+  }
+
+  setColumnVisibility(visibility: ColumnVisibility): void {
+    this.columnVisibility = { ...visibility };
+    // Invalidate cache to force new reference
+    this.cachedColumnVisibility = null;
+    this.notifySubscribers({ type: 'visibility_changed', columnVisibility: this.columnVisibility });
+    this.notifyStateChanged();
+  }
+
+  toggleColumnVisibility(columnId: string): void {
+    const newVisibility = { ...this.columnVisibility };
+    // Treat undefined as visible (true) before toggling
+    const currentValue = newVisibility[columnId] ?? true;
+    newVisibility[columnId] = !currentValue;
+    this.setColumnVisibility(newVisibility);
+  }
+
+  resetColumnVisibility(): void {
+    // Reset all columns to visible
+    const newVisibility: ColumnVisibility = {};
+    this.columns.forEach((column) => {
+      newVisibility[column.id] = true;
+    });
+    this.setColumnVisibility(newVisibility);
+  }
+
+  // ============================================================================
   // Bulk Operations
   // ============================================================================
 
@@ -452,6 +508,15 @@ export class TableStateManager<TData = unknown> {
       this.notifySubscribers({ type: 'selection_changed', selectedRows: this.selectedRows });
     }
 
+    if (updates.columnVisibility !== undefined) {
+      this.columnVisibility = { ...updates.columnVisibility };
+      this.cachedColumnVisibility = null;
+      this.notifySubscribers({
+        type: 'visibility_changed',
+        columnVisibility: this.columnVisibility,
+      });
+    }
+
     this.notifyStateChanged();
   }
 
@@ -463,6 +528,13 @@ export class TableStateManager<TData = unknown> {
     this.paginationManager.reset();
     this.sorting = [];
     this.selectedRows = new Set();
+    // Reset column visibility to all visible
+    const allVisible: ColumnVisibility = {};
+    this.columns.forEach((column) => {
+      allVisible[column.id] = true;
+    });
+    this.columnVisibility = allVisible;
+    this.cachedColumnVisibility = null;
     this.notifyStateChanged();
   }
 

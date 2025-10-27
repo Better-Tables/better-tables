@@ -3,18 +3,12 @@
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { X } from 'lucide-react';
 import * as React from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useFilterValidation } from '@/hooks/use-filter-validation';
-import { cn } from '@/lib/utils';
+import { useFilterValidation } from '../../../hooks/use-filter-validation';
+import { cn } from '../../../lib/utils';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { Label } from '../../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 
 export interface OptionFilterInputProps<TData = unknown> {
   /** Filter state */
@@ -29,7 +23,7 @@ export interface OptionFilterInputProps<TData = unknown> {
 
 /**
  * Option filter input component
- * 
+ *
  * Pattern: Controlled component (no local state needed for simple selects)
  * - Values come directly from filter.values
  * - Updates sent immediately to parent via onChange

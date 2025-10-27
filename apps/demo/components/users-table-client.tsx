@@ -40,6 +40,7 @@ export function UsersTableClient({
       filters: true,
       pagination: true,
       sorting: true,
+      columnVisibility: true,
     },
     urlAdapter
   );
@@ -59,6 +60,17 @@ export function UsersTableClient({
         sorting: true,
         pagination: true,
         rowSelection: true,
+        headerContextMenu: {
+          enabled: true,
+          showSortToggle: true,
+          allowSortReorder: true,
+          showColumnVisibility: true,
+        },
+      }}
+      sorting={{
+        enabled: true,
+        multiSort: true,
+        maxSortColumns: 3,
       }}
       emptyMessage="No users found. Try adjusting your filters."
     />

@@ -4,18 +4,8 @@ import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { getNumberFormat, getOperatorDefinition } from '@better-tables/core';
 import { Lock, X } from 'lucide-react';
 import * as React from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
-import { formatDateRange, formatDateWithConfig } from '@/lib/date-utils';
-import { getFilterValueAsDate, getFilterValueAsNumber } from '@/lib/filter-value-utils';
+import { formatDateRange, formatDateWithConfig } from '../../lib/date-utils';
+import { getFilterValueAsDate, getFilterValueAsNumber } from '../../lib/filter-value-utils';
 import {
   formatCurrency,
   formatEmail,
@@ -25,8 +15,12 @@ import {
   formatUrl,
   getFormatterForType,
   truncateText,
-} from '@/lib/format-utils';
-import { cn } from '@/lib/utils';
+} from '../../lib/format-utils';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Separator } from '../ui/separator';
 import { FilterOperatorSelect } from './filter-operator-select';
 import { FilterValueInput } from './filter-value-input';
 

@@ -411,6 +411,75 @@ export class SortingManager<TData = unknown> {
   }
 
   /**
+   * Reorder the current sorts while preserving column IDs and directions.
+   *
+   * Validates that the new order contains the same column IDs as the current state,
+   * then replaces the sorting state with the new order. Preserves the existing
+   * direction for each column, ensuring that reordering cannot accidentally flip
+   * a column from desc to asc. Useful for drag-and-drop reordering of multi-column sorts.
+   *
+   * @param newOrder - Array of sorting parameters in the desired order
+   * @throws {Error} If the new order doesn't match current sorts exactly
+   *
+   * @example
+   * ```typescript
+   * // Current: [{ columnId: 'name', direction: 'asc' }, { columnId: 'age', direction: 'desc' }]
+   * // Reorder to: [{ columnId: 'age', direction: 'desc' }, { columnId: 'name', direction: 'asc' }]
+   * sortingManager.reorderSorts([
+   *   { columnId: 'age', direction: 'desc' },  // Direction will be preserved from current state
+   *   { columnId: 'name', direction: 'asc' }    // Direction will be preserved from current state
+   * ]);
+   * ```
+   */
+  reorderSorts(newOrder: SortingState): void {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    // Validate that new order contains exactly the same column IDs (in any order)
+    const currentIds = new Set(this.sortingState.map((s) => s.columnId));
+    const newIds = new Set(newOrder.map((s) => s.columnId));
+
+    // Check that sizes match (prevents duplicate columns)
+    if (currentIds.size !== newIds.size || currentIds.size !== newOrder.length) {
+      throw new Error('New sort order must contain exactly the same column IDs as current sorts');
+    }
+
+    // Check that all IDs match
+    if (![...currentIds].every((id) => newIds.has(id))) {
+      throw new Error('New sort order must contain exactly the same column IDs as current sorts');
+    }
+
+    // Create a map of current column IDs to their sort params (to preserve directions)
+    const currentSortMap = new Map(this.sortingState.map((sort) => [sort.columnId, sort]));
+
+    // Build the reordered list, preserving the existing direction for each column
+    const reorderedSorts: SortingState = [];
+    for (const sort of newOrder) {
+      const existingSort = currentSortMap.get(sort.columnId);
+      if (existingSort) {
+        // Preserve the existing direction, only use the new order
+        const validation = this.validateSort(existingSort);
+        if (validation.valid) {
+          reorderedSorts.push(existingSort);
+        } else {
+          console.warn(`Invalid sort for column ${sort.columnId}: ${validation.error}`);
+        }
+      }
+    }
+
+    // If no valid sorts, clear sorting
+    if (reorderedSorts.length === 0) {
+      this.clearSorting();
+      return;
+    }
+
+    // Apply the new order with preserved directions
+    this.sortingState = reorderedSorts;
+    this.notifySubscribers({ type: 'sorts_replaced', sorts: reorderedSorts });
+  }
+
+  /**
    * Get sorting for a specific column
    */
   getSort(columnId: string): SortingParams | undefined {

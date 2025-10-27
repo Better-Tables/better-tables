@@ -49,6 +49,9 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown> {
   /** Whether column is resizable */
   resizable?: boolean;
 
+  /** Whether column can be hidden via context menu */
+  hideable?: boolean;
+
   /** Default column width */
   width?: number;
 

@@ -4,8 +4,8 @@ import type { ColumnDefinition, FilterOperator } from '@better-tables/core';
 import { getOperatorsForType } from '@better-tables/core';
 import * as React from 'react';
 import { useId } from 'react';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '../ui/label';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 export interface FilterOperatorSelectProps<TData = unknown> {
   /** Column definition */
