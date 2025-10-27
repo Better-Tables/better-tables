@@ -26,6 +26,7 @@ function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxP
             viewBox="0 0 9 9"
             fill="currentcolor"
             xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
           >
             <title>Indeterminate</title>
             <path
@@ -41,6 +42,7 @@ function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxP
             viewBox="0 0 9 9"
             fill="currentcolor"
             xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
           >
             <title>Checked</title>
             <path

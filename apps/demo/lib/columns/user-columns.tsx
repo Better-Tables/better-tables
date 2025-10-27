@@ -95,7 +95,7 @@ export const userColumns = [
     .id('createdAt')
     .displayName('Joined')
     .accessor((user) => user.createdAt)
-    .filterable(false) // Disable filtering - timestamp format needs custom handling
+    .filterable(true) // Enable filtering for date testing
     .sortable()
     .build(),
 

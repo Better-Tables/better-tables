@@ -98,6 +98,11 @@ export function DateFilterInput<TData = unknown>({
     return undefined;
   });
 
+  // Auto-open popover when there's no date value
+  const [isOpen, setIsOpen] = React.useState(() => {
+    return needsNoValues ? false : needsDateRange ? !dateRange?.from : !singleDate;
+  });
+
   // Keyboard navigation
   const keyboardNavigation = useKeyboardNavigation({
     onEscape: () => {
@@ -119,11 +124,21 @@ export function DateFilterInput<TData = unknown>({
   }, [singleDate, dateRange, needsDateRange, needsNoValues]);
 
   // Validate the current values
+  // For date ranges, only validate when both dates are selected (prevents error while user is selecting)
+  const shouldValidate = React.useMemo(() => {
+    if (needsNoValues) return true;
+    if (needsDateRange) {
+      // Only validate if we have both dates
+      return validationValues.length === 2;
+    }
+    return validationValues.length > 0;
+  }, [needsDateRange, needsNoValues, validationValues.length]);
+
   const validation = useFilterValidation({
     filter,
     column,
     values: validationValues,
-    immediate: validationValues.length > 0 || needsNoValues,
+    immediate: shouldValidate,
   });
 
   // Sync TO parent when dates change
@@ -131,15 +146,21 @@ export function DateFilterInput<TData = unknown>({
     if (needsNoValues) {
       onChangeRef.current([]);
     } else if (needsDateRange) {
+      // For date range, only send values when BOTH dates are selected
       if (dateRange?.from && dateRange?.to) {
         onChangeRef.current([dateRange.from, dateRange.to]);
-      } else if (dateRange?.from) {
-        onChangeRef.current([dateRange.from]);
+        // Close popover when both dates are selected
+        setIsOpen(false);
       } else {
+        // Don't send partial ranges - will show validation error
         onChangeRef.current([]);
       }
     } else {
       onChangeRef.current(singleDate ? [singleDate] : []);
+      // Close popover when date is selected
+      if (singleDate) {
+        setIsOpen(false);
+      }
     }
   }, [singleDate, dateRange, needsDateRange, needsNoValues]);
 
@@ -231,7 +252,7 @@ export function DateFilterInput<TData = unknown>({
     return (
       <div className="space-y-2">
         <Label className="text-sm font-medium">Date Range</Label>
-        <Popover>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -278,7 +299,7 @@ export function DateFilterInput<TData = unknown>({
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">Date</Label>
-      <Popover>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"

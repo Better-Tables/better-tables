@@ -130,6 +130,11 @@ export function createTableStore(initialState: TableStoreInitialState) {
           ...state,
           columnVisibility: event.columnVisibility,
         }));
+      } else if (event.type === 'columns_changed') {
+        set((state) => ({
+          ...state,
+          columns: event.columns,
+        }));
       }
     });
 

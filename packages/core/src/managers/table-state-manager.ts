@@ -12,6 +12,7 @@ import type { ColumnDefinition, ColumnVisibility } from '../types/column';
 import type { FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
 import type { SortingState } from '../types/sorting';
+import { mergeColumnVisibility } from '../utils/column-visibility';
 import { deepEqual, shallowEqualArrays } from '../utils/equality';
 import { FilterManager } from './filter-manager';
 import { PaginationManager } from './pagination-manager';
@@ -115,7 +116,8 @@ export type TableStateEvent =
   | { type: 'pagination_changed'; pagination: PaginationState }
   | { type: 'sorting_changed'; sorting: SortingState }
   | { type: 'selection_changed'; selectedRows: Set<string> }
-  | { type: 'visibility_changed'; columnVisibility: ColumnVisibility };
+  | { type: 'visibility_changed'; columnVisibility: ColumnVisibility }
+  | { type: 'columns_changed'; columns: ColumnDefinition[] };
 
 /**
  * Table state manager subscriber function type.
@@ -217,16 +219,8 @@ export class TableStateManager<TData = unknown> {
     // Initialize state
     this.sorting = initialState.sorting || [];
     this.selectedRows = initialState.selectedRows || new Set();
-    this.columnVisibility = initialState.columnVisibility || {};
-
-    // Initialize columns based on defaultVisible property
-    columns.forEach((column) => {
-      if (this.columnVisibility[column.id] === undefined) {
-        // Use defaultVisible if specified, otherwise default to true
-        this.columnVisibility[column.id] =
-          column.defaultVisible !== undefined ? column.defaultVisible : true;
-      }
-    });
+    // Merge initial visibility with column defaults
+    this.columnVisibility = mergeColumnVisibility(columns, initialState.columnVisibility || {});
 
     // Subscribe to sub-manager changes
     this.filterManager.subscribe(() => {
@@ -531,12 +525,7 @@ export class TableStateManager<TData = unknown> {
     this.sorting = [];
     this.selectedRows = new Set();
     // Reset column visibility to defaults
-    const defaultVisibility: ColumnVisibility = {};
-    this.columns.forEach((column) => {
-      defaultVisibility[column.id] =
-        column.defaultVisible !== undefined ? column.defaultVisible : true;
-    });
-    this.columnVisibility = defaultVisibility;
+    this.columnVisibility = mergeColumnVisibility(this.columns, {});
     this.cachedColumnVisibility = null;
     this.notifyStateChanged();
   }
@@ -614,5 +603,9 @@ export class TableStateManager<TData = unknown> {
       this.notifySubscribers({ type: 'filters_changed', filters });
       this.notifyStateChanged();
     });
+
+    // Notify subscribers that columns have changed
+    // Cast to match the event type which expects ColumnDefinition[]
+    this.notifySubscribers({ type: 'columns_changed', columns: columns as ColumnDefinition[] });
   }
 }

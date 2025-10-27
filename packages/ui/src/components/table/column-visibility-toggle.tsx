@@ -54,7 +54,13 @@ export function ColumnVisibilityToggle<TData = unknown>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" disabled={disabled} className="h-8 px-2 lg:px-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={disabled}
+          className="h-8 px-2 lg:px-3"
+          aria-label="Toggle column visibility"
+        >
           <Columns2 className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

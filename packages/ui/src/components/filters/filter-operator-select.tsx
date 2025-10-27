@@ -6,6 +6,7 @@ import * as React from 'react';
 import { useId } from 'react';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { ScrollArea } from '../ui/scroll-area';
 
 export interface FilterOperatorSelectProps<TData = unknown> {
   /** Column definition */
@@ -49,42 +50,48 @@ export function FilterOperatorSelect<TData = unknown>({
   return (
     <div className="space-y-3">
       <Label className="text-sm font-medium">Operator</Label>
-      <RadioGroup
-        value={value}
-        onValueChange={handleValueChange}
-        disabled={disabled}
-        className="gap-4"
+      <ScrollArea
+        className="h-60"
+        maskHeight={40}
+        maskClassName="before:from-popover after:from-popover"
       >
-        {operators.map((operator) => (
-          <div key={operator.key} className="flex items-start gap-2">
-            <RadioGroupItem
-              value={operator.key}
-              id={`${id}-${operator.key}`}
-              aria-describedby={
-                operator.description ? `${id}-${operator.key}-description` : undefined
-              }
-              disabled={disabled}
-              className="cursor-pointer mt-1"
-            />
-            <div className="grid grow gap-0.5">
-              <Label
-                htmlFor={`${id}-${operator.key}`}
-                className="text-sm font-medium cursor-pointer"
-              >
-                {operator.label}
-              </Label>
-              {operator.description && (
-                <p
-                  id={`${id}-${operator.key}-description`}
-                  className="text-xs text-muted-foreground"
+        <RadioGroup
+          value={value}
+          onValueChange={handleValueChange}
+          disabled={disabled}
+          className="gap-4 pr-4"
+        >
+          {operators.map((operator) => (
+            <div key={operator.key} className="flex items-start gap-2">
+              <RadioGroupItem
+                value={operator.key}
+                id={`${id}-${operator.key}`}
+                aria-describedby={
+                  operator.description ? `${id}-${operator.key}-description` : undefined
+                }
+                disabled={disabled}
+                className="cursor-pointer mt-1"
+              />
+              <div className="grid grow gap-0.5">
+                <Label
+                  htmlFor={`${id}-${operator.key}`}
+                  className="text-sm font-medium cursor-pointer"
                 >
-                  {operator.description}
-                </p>
-              )}
+                  {operator.label}
+                </Label>
+                {operator.description && (
+                  <p
+                    id={`${id}-${operator.key}-description`}
+                    className="text-xs text-muted-foreground"
+                  >
+                    {operator.description}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </RadioGroup>
+          ))}
+        </RadioGroup>
+      </ScrollArea>
     </div>
   );
 }

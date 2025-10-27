@@ -92,7 +92,8 @@ export function getColumnVisibilityModifications<TData = unknown>(
  * Merge column visibility modifications with default states.
  *
  * Takes modifications (typically from URL) and merges them with the default
- * visibility states defined in the column definitions.
+ * visibility states defined in the column definitions. Ignores modifications that
+ * attempt to hide columns where `hideable === false`.
  *
  * @param columns - Array of column definitions
  * @param modifications - Visibility modifications to apply
@@ -102,12 +103,14 @@ export function getColumnVisibilityModifications<TData = unknown>(
  * ```typescript
  * const columns = [
  *   { id: 'name', defaultVisible: true },
- *   { id: 'email', defaultVisible: false }
+ *   { id: 'email', defaultVisible: false },
+ *   { id: 'id', hideable: false } // Non-hideable column
  * ];
  *
- * const modifications = { name: false }; // User hid the name column
+ * const modifications = { name: false, id: false }; // User tried to hide both
  * const visibility = mergeColumnVisibility(columns, modifications);
- * // Returns: { name: false, email: false }
+ * // Returns: { name: false, email: false, id: true }
+ * // Note: 'id' remains true because hideable === false
  * ```
  */
 export function mergeColumnVisibility<TData = unknown>(
@@ -117,8 +120,19 @@ export function mergeColumnVisibility<TData = unknown>(
   const defaults = getDefaultColumnVisibility(columns);
   const visibility: ColumnVisibility = { ...defaults };
 
+  // Create a map of columns for quick lookup
+  const columnMap = new Map(columns.map((col) => [col.id, col]));
+
   // Override with any modifications
   Object.entries(modifications).forEach(([columnId, value]) => {
+    const column = columnMap.get(columnId);
+
+    // Skip modifications for non-hideable columns when trying to hide them
+    // This prevents persisted state from hiding columns that shouldn't be hideable
+    if (column?.hideable === false && value === false) {
+      return;
+    }
+
     visibility[columnId] = value;
   });
 
