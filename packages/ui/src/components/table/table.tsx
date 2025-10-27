@@ -432,7 +432,17 @@ export function BetterTable<TData = unknown>({
                         isSortable && 'cursor-pointer hover:bg-muted/50'
                       )}
                       onClick={isSortable ? () => handleSortingChange(column.id) : undefined}
-                      tabIndex={0}
+                      onKeyDown={
+                        isSortable
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleSortingChange(column.id);
+                              }
+                            }
+                          : undefined
+                      }
+                      tabIndex={isSortable ? 0 : undefined}
                       role="columnheader"
                       aria-sort={
                         currentSort?.direction === 'asc'
@@ -454,6 +464,17 @@ export function BetterTable<TData = unknown>({
                       isSortable && 'cursor-pointer hover:bg-muted/50'
                     )}
                     onClick={isSortable ? () => handleSortingChange(column.id) : undefined}
+                    onKeyDown={
+                      isSortable
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSortingChange(column.id);
+                            }
+                          }
+                        : undefined
+                    }
+                    tabIndex={isSortable ? 0 : undefined}
                   >
                     {headerContent}
                   </TableHead>

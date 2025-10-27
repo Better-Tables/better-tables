@@ -117,9 +117,15 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
 
       {/* Direction icon */}
       {sort.direction === 'asc' ? (
-        <ArrowUp className="h-3 w-3 text-muted-foreground" />
+        <div className="flex items-center">
+          <ArrowUp className="h-3 w-3 text-muted-foreground" aria-label="Ascending" />
+          <span className="sr-only">Ascending</span>
+        </div>
       ) : (
-        <ArrowDown className="h-3 w-3 text-muted-foreground" />
+        <div className="flex items-center">
+          <ArrowDown className="h-3 w-3 text-muted-foreground" aria-label="Descending" />
+          <span className="sr-only">Descending</span>
+        </div>
       )}
 
       {/* Remove button */}

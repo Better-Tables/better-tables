@@ -10,6 +10,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, EyeOff, X } from 'lucide-react';
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -117,33 +118,27 @@ export function TableHeaderContextMenu<TData = unknown>({
               Sort Direction
             </div>
             <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={onSetSortAsc}
-              className="flex items-center gap-2"
-              aria-checked={currentSort?.direction === 'asc'}
+            <ContextMenuCheckboxItem
+              checked={currentSort?.direction === 'asc'}
+              onCheckedChange={(checked) => {
+                if (checked) onSetSortAsc();
+              }}
+              className="flex items-center gap-2 pl-8"
             >
-              <ArrowUp className="h-4 w-4" />
+              <ArrowUp className="h-4 w-4 ml-[-4px]" />
               Sort Ascending
-              {currentSort?.direction === 'asc' && <CheckIcon />}
-              {currentSort?.direction === 'asc' && (
-                <span className="sr-only">Currently sorting by this column in ascending order</span>
-              )}
-            </ContextMenuItem>
+            </ContextMenuCheckboxItem>
 
-            <ContextMenuItem
-              onClick={onSetSortDesc}
-              className="flex items-center gap-2"
-              aria-checked={currentSort?.direction === 'desc'}
+            <ContextMenuCheckboxItem
+              checked={currentSort?.direction === 'desc'}
+              onCheckedChange={(checked) => {
+                if (checked) onSetSortDesc();
+              }}
+              className="flex items-center gap-2 pl-8"
             >
-              <ArrowDown className="h-4 w-4" />
+              <ArrowDown className="h-4 w-4 ml-[-4px]" />
               Sort Descending
-              {currentSort?.direction === 'desc' && <CheckIcon />}
-              {currentSort?.direction === 'desc' && (
-                <span className="sr-only">
-                  Currently sorting by this column in descending order
-                </span>
-              )}
-            </ContextMenuItem>
+            </ContextMenuCheckboxItem>
 
             {currentSort && (
               <>
@@ -209,21 +204,5 @@ export function TableHeaderContextMenu<TData = unknown>({
         )}
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      className="ml-auto h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <title>Checked</title>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
   );
 }

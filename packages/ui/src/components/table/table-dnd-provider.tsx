@@ -3,6 +3,7 @@
 import {
   closestCenter,
   DndContext,
+  type DragCancelEvent,
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
@@ -73,6 +74,10 @@ export function TableDndProvider({
     });
   };
 
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -80,6 +85,7 @@ export function TableDndProvider({
       modifiers={[restrictToVerticalAxis]}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       {children}
       <DragOverlay>
