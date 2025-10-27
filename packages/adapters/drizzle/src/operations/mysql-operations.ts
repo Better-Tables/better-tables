@@ -3,10 +3,10 @@
  * @module @better-tables/drizzle-adapter/operations/mysql
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import type { DatabaseOperations, TableWithId } from '../types';
+import type { AnyTableType, DatabaseOperations, TableWithId } from '../types';
 import { QueryError } from '../types';
 
 /**
@@ -86,5 +86,16 @@ export class MySQLOperations<TRecord> implements DatabaseOperations<TRecord> {
     const records = await this.db.select().from(mysqlTable).where(inArray(table.id, ids));
     await this.db.delete(mysqlTable).where(inArray(table.id, ids));
     return records as TRecord[];
+  }
+
+  /**
+   * Build count query for MySQL
+   * @param primaryTable - The primary table schema
+   * @returns Promise with the count result
+   */
+  async buildCountQuery(primaryTable: AnyTableType): Promise<{ count: number }[]> {
+    const mysqlTable = primaryTable as MySqlTable;
+    const result = await this.db.select({ count: count() }).from(mysqlTable);
+    return result as { count: number }[];
   }
 }

@@ -321,6 +321,13 @@ export interface DatabaseOperations<TRecord> {
    * @returns Promise with array of deleted records
    */
   bulkDelete(table: TableWithId, ids: string[]): Promise<TRecord[]>;
+
+  /**
+   * Build count query for the specific database driver
+   * @param primaryTable - The primary table schema
+   * @returns Promise with the count result
+   */
+  buildCountQuery(primaryTable: AnyTableType): Promise<{ count: number }[]>;
 }
 
 /**

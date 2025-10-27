@@ -3,10 +3,10 @@
  * @module @better-tables/drizzle-adapter/operations/sqlite
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import type { DatabaseOperations, TableWithId } from '../types';
+import type { AnyTableType, DatabaseOperations, TableWithId } from '../types';
 import { QueryError } from '../types';
 
 /**
@@ -62,5 +62,16 @@ export class SQLiteOperations<TRecord> implements DatabaseOperations<TRecord> {
     const sqliteTable = table as SQLiteTable;
     const result = await this.db.delete(sqliteTable).where(inArray(table.id, ids)).returning();
     return result as TRecord[];
+  }
+
+  /**
+   * Build count query for SQLite
+   * @param primaryTable - The primary table schema
+   * @returns Promise with the count result
+   */
+  async buildCountQuery(primaryTable: AnyTableType): Promise<{ count: number }[]> {
+    const sqliteTable = primaryTable as SQLiteTable;
+    const result = await this.db.select({ count: count() }).from(sqliteTable);
+    return result as { count: number }[];
   }
 }

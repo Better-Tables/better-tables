@@ -3,10 +3,10 @@
  * @module @better-tables/drizzle-adapter/operations/postgres
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type { DatabaseOperations, TableWithId } from '../types';
+import type { AnyTableType, DatabaseOperations, TableWithId } from '../types';
 import { QueryError } from '../types';
 
 /**
@@ -62,5 +62,16 @@ export class PostgresOperations<TRecord> implements DatabaseOperations<TRecord> 
     const pgTable = table as PgTable;
     const result = await this.db.delete(pgTable).where(inArray(table.id, ids)).returning();
     return result as TRecord[];
+  }
+
+  /**
+   * Build count query for PostgreSQL
+   * @param primaryTable - The primary table schema
+   * @returns Promise with the count result
+   */
+  async buildCountQuery(primaryTable: AnyTableType): Promise<{ count: number }[]> {
+    const pgTable = primaryTable as PgTable;
+    const result = await this.db.select({ count: count() }).from(pgTable);
+    return result as { count: number }[];
   }
 }
