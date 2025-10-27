@@ -3,7 +3,6 @@
 import {
   closestCenter,
   DndContext,
-  type DragCancelEvent,
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,

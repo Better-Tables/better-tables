@@ -15,6 +15,7 @@ export * from './components/filters/inputs/number-filter-input';
 export * from './components/filters/inputs/option-filter-input';
 // Export filter inputs
 export * from './components/filters/inputs/text-filter-input';
+export * from './components/table/column-visibility-toggle';
 export * from './components/table/empty-state';
 export * from './components/table/error-state';
 export * from './components/table/sort-order-list';
@@ -32,8 +33,10 @@ export * from './components/ui/checkbox';
 export * from './components/ui/command';
 export * from './components/ui/context-menu';
 export * from './components/ui/dialog';
+export * from './components/ui/dropdown-menu';
 export * from './components/ui/input';
 export * from './components/ui/popover';
+export * from './components/ui/scroll-area';
 export * from './components/ui/select';
 export * from './components/ui/separator';
 export * from './components/ui/skeleton';

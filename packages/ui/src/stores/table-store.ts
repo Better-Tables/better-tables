@@ -19,6 +19,7 @@ export interface TableState {
   manager: TableStateManager;
 
   // State (synced from manager)
+  columns: ColumnDefinition[];
   filters: FilterState[];
   pagination: PaginationState;
   sorting: SortingState;
@@ -137,6 +138,7 @@ export function createTableStore(initialState: TableStoreInitialState) {
       manager,
 
       // Initial state from manager
+      columns: initialState.columns,
       filters: managerState.filters,
       pagination: managerState.pagination,
       sorting: managerState.sorting,

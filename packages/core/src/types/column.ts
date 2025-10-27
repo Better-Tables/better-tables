@@ -52,6 +52,9 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown> {
   /** Whether column can be hidden via context menu */
   hideable?: boolean;
 
+  /** Whether column is visible by default */
+  defaultVisible?: boolean;
+
   /** Default column width */
   width?: number;
 

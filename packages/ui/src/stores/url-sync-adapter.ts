@@ -1,5 +1,6 @@
 'use client';
 
+import { getColumnVisibilityModifications, mergeColumnVisibility } from '@better-tables/core';
 import { useEffect, useRef } from 'react';
 import { getTableStore } from './table-registry';
 
@@ -130,7 +131,10 @@ export function useTableUrlSync(
       const visibilityParam = adapter.getParam('columnVisibility');
       if (visibilityParam) {
         try {
-          updates.columnVisibility = JSON.parse(visibilityParam);
+          const modifications = JSON.parse(visibilityParam);
+          const { columns } = store.getState();
+          // Merge modifications with defaults
+          updates.columnVisibility = mergeColumnVisibility(columns, modifications);
         } catch {
           // Silently ignore parse errors
         }
@@ -176,13 +180,14 @@ export function useTableUrlSync(
         }
 
         if (config.columnVisibility) {
-          const visibilityKeys = Object.keys(event.state.columnVisibility);
-          const hasHiddenColumns = visibilityKeys.some(
-            (key) => event.state.columnVisibility[key] === false
+          const { columns } = store.getState();
+          // Get only modifications from defaults
+          const modifications = getColumnVisibilityModifications(
+            columns,
+            event.state.columnVisibility
           );
-          updates.columnVisibility = hasHiddenColumns
-            ? JSON.stringify(event.state.columnVisibility)
-            : null;
+          updates.columnVisibility =
+            Object.keys(modifications).length > 0 ? JSON.stringify(modifications) : null;
         }
 
         adapter.setParams(updates);

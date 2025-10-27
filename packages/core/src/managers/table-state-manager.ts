@@ -219,10 +219,12 @@ export class TableStateManager<TData = unknown> {
     this.selectedRows = initialState.selectedRows || new Set();
     this.columnVisibility = initialState.columnVisibility || {};
 
-    // Initialize all columns as visible by default
+    // Initialize columns based on defaultVisible property
     columns.forEach((column) => {
       if (this.columnVisibility[column.id] === undefined) {
-        this.columnVisibility[column.id] = true;
+        // Use defaultVisible if specified, otherwise default to true
+        this.columnVisibility[column.id] =
+          column.defaultVisible !== undefined ? column.defaultVisible : true;
       }
     });
 
@@ -528,12 +530,13 @@ export class TableStateManager<TData = unknown> {
     this.paginationManager.reset();
     this.sorting = [];
     this.selectedRows = new Set();
-    // Reset column visibility to all visible
-    const allVisible: ColumnVisibility = {};
+    // Reset column visibility to defaults
+    const defaultVisibility: ColumnVisibility = {};
     this.columns.forEach((column) => {
-      allVisible[column.id] = true;
+      defaultVisibility[column.id] =
+        column.defaultVisible !== undefined ? column.defaultVisible : true;
     });
-    this.columnVisibility = allVisible;
+    this.columnVisibility = defaultVisibility;
     this.cachedColumnVisibility = null;
     this.notifyStateChanged();
   }

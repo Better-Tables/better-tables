@@ -314,7 +314,14 @@ export function BetterTable<TData = unknown>({
     return (
       <div className={cn('space-y-4', className)}>
         {filtering && (
-          <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
+          <FilterBar
+            columns={columns}
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            showColumnVisibility={features.columnVisibility !== false}
+            columnVisibility={columnVisibility}
+            onToggleColumnVisibility={toggleColumnVisibility}
+          />
         )}
         <EmptyState
           message={emptyMessage || emptyState?.description || 'No data available'}
@@ -341,7 +348,14 @@ export function BetterTable<TData = unknown>({
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props}>
       {filtering && (
-        <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
+        <FilterBar
+          columns={columns}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          showColumnVisibility={features.columnVisibility !== false}
+          columnVisibility={columnVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+        />
       )}
 
       <div className="border rounded-md">

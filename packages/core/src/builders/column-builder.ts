@@ -190,6 +190,22 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
+   * Set whether column can be hidden via context menu
+   */
+  hideable(hideable = true): this {
+    this.config.hideable = hideable;
+    return this;
+  }
+
+  /**
+   * Set whether column is visible by default
+   */
+  defaultVisible(visible: boolean): this {
+    this.config.defaultVisible = visible;
+    return this;
+  }
+
+  /**
    * Set column width properties
    */
   width(width: number, minWidth?: number, maxWidth?: number): this {
