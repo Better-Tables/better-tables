@@ -22,25 +22,42 @@ export class MySQLOperations<TRecord> implements DatabaseOperations<TRecord> {
     const mysqlTable = table as MySqlTable;
     const result = await this.db.insert(mysqlTable).values(data);
 
-    // MySQL returns [ResultSetHeader, FieldPacket[]], extract insertId
-    const insertId = Array.isArray(result)
-      ? (result[0] as { insertId: number }).insertId
-      : (result as { insertId: number }).insertId;
+    // For MySQL, we need to handle both auto-increment and non-auto-increment primary keys
+    // Check if the primary key was provided in the data (UUID/string keys)
+    const primaryKeyValue = (data as Record<string, unknown>)[table.id.name];
 
-    if (!insertId) {
-      throw new QueryError('Insert operation failed: no insertId returned', { table, data });
-    }
+    if (primaryKeyValue) {
+      // Primary key was provided (UUID/string), fetch using that value
+      const records = await this.db
+        .select()
+        .from(mysqlTable)
+        .where(eq(table.id, String(primaryKeyValue)));
+      const [record] = records as [TRecord];
+      if (!record) {
+        throw new QueryError('Failed to fetch inserted record', { table, primaryKeyValue });
+      }
+      return record;
+    } else {
+      // Auto-increment primary key, extract insertId
+      const insertId = Array.isArray(result)
+        ? (result[0] as { insertId: number }).insertId
+        : (result as { insertId: number }).insertId;
 
-    // Fetch the inserted record
-    const records = await this.db
-      .select()
-      .from(mysqlTable)
-      .where(eq(table.id, String(insertId)));
-    const [record] = records as [TRecord];
-    if (!record) {
-      throw new QueryError('Failed to fetch inserted record', { table, insertId });
+      if (!insertId) {
+        throw new QueryError('Insert operation failed: no insertId returned', { table, data });
+      }
+
+      // Fetch the inserted record using insertId
+      const records = await this.db
+        .select()
+        .from(mysqlTable)
+        .where(eq(table.id, String(insertId)));
+      const [record] = records as [TRecord];
+      if (!record) {
+        throw new QueryError('Failed to fetch inserted record', { table, insertId });
+      }
+      return record;
     }
-    return record;
   }
 
   async update(table: TableWithId, id: string, data: Partial<TRecord>): Promise<TRecord> {
