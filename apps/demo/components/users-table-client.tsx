@@ -2,15 +2,14 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
-import { useMemo } from 'react';
-import { defaultVisibleColumns, userColumns } from '@/lib/columns/user-columns';
+import { userColumns } from '@/lib/columns/user-columns';
+import type { UserWithRelations } from '@/lib/db/schema';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'users-table';
 
 interface UsersTableClientProps {
-  // biome-ignore lint/suspicious/noExplicitAny: Data type is generic
-  data: any[];
+  data: UserWithRelations[];
   totalCount: number;
   initialPagination: PaginationState;
   initialSorting: SortingState;
@@ -24,13 +23,6 @@ export function UsersTableClient({
   initialSorting,
   initialFilters,
 }: UsersTableClientProps) {
-  // Filter columns to only show visible ones
-  // biome-ignore lint/suspicious/noExplicitAny: Column types are complex and vary
-  const visibleColumns: any[] = useMemo(
-    () => userColumns.filter((col) => defaultVisibleColumns.includes(col.id)),
-    []
-  );
-
   // Set up URL sync with Next.js adapter
   const urlAdapter = useNextjsUrlAdapter();
 
@@ -46,10 +38,11 @@ export function UsersTableClient({
   );
 
   return (
-    <BetterTable
+    <BetterTable<UserWithRelations>
       id={TABLE_ID}
       name="Users"
-      columns={visibleColumns}
+      // biome-ignore lint/suspicious/noExplicitAny: Column types need to match BetterTable expectations
+      columns={userColumns as any}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}

@@ -12,6 +12,7 @@ import type { ColumnDefinition, ColumnVisibility } from '../types/column';
 import type { FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
 import type { SortingState } from '../types/sorting';
+import { mergeColumnVisibility } from '../utils/column-visibility';
 import { deepEqual, shallowEqualArrays } from '../utils/equality';
 import { FilterManager } from './filter-manager';
 import { PaginationManager } from './pagination-manager';
@@ -115,7 +116,8 @@ export type TableStateEvent =
   | { type: 'pagination_changed'; pagination: PaginationState }
   | { type: 'sorting_changed'; sorting: SortingState }
   | { type: 'selection_changed'; selectedRows: Set<string> }
-  | { type: 'visibility_changed'; columnVisibility: ColumnVisibility };
+  | { type: 'visibility_changed'; columnVisibility: ColumnVisibility }
+  | { type: 'columns_changed'; columns: ColumnDefinition[] };
 
 /**
  * Table state manager subscriber function type.
@@ -217,14 +219,8 @@ export class TableStateManager<TData = unknown> {
     // Initialize state
     this.sorting = initialState.sorting || [];
     this.selectedRows = initialState.selectedRows || new Set();
-    this.columnVisibility = initialState.columnVisibility || {};
-
-    // Initialize all columns as visible by default
-    columns.forEach((column) => {
-      if (this.columnVisibility[column.id] === undefined) {
-        this.columnVisibility[column.id] = true;
-      }
-    });
+    // Merge initial visibility with column defaults
+    this.columnVisibility = mergeColumnVisibility(columns, initialState.columnVisibility || {});
 
     // Subscribe to sub-manager changes
     this.filterManager.subscribe(() => {
@@ -528,12 +524,8 @@ export class TableStateManager<TData = unknown> {
     this.paginationManager.reset();
     this.sorting = [];
     this.selectedRows = new Set();
-    // Reset column visibility to all visible
-    const allVisible: ColumnVisibility = {};
-    this.columns.forEach((column) => {
-      allVisible[column.id] = true;
-    });
-    this.columnVisibility = allVisible;
+    // Reset column visibility to defaults
+    this.columnVisibility = mergeColumnVisibility(this.columns, {});
     this.cachedColumnVisibility = null;
     this.notifyStateChanged();
   }
@@ -611,5 +603,9 @@ export class TableStateManager<TData = unknown> {
       this.notifySubscribers({ type: 'filters_changed', filters });
       this.notifyStateChanged();
     });
+
+    // Notify subscribers that columns have changed
+    // Cast to match the event type which expects ColumnDefinition[]
+    this.notifySubscribers({ type: 'columns_changed', columns: columns as ColumnDefinition[] });
   }
 }

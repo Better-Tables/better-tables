@@ -18,11 +18,12 @@ import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
-import { TableDndProvider } from './table-dnd-provider';
 import { TableHeaderContextMenu } from './table-header-context-menu';
 import { TablePagination } from './table-pagination';
+import { TableProviders } from './table-providers';
 
 /**
  * UI-specific props for the BetterTable component
@@ -240,6 +241,12 @@ export function BetterTable<TData = unknown>({
     clearFilters();
   }, [clearFilters]);
 
+  // Reset all table state handler
+  const handleReset = useCallback(() => {
+    const state = store.getState();
+    state.reset();
+  }, [store]);
+
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;
 
@@ -314,7 +321,15 @@ export function BetterTable<TData = unknown>({
     return (
       <div className={cn('space-y-4', className)}>
         {filtering && (
-          <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
+          <FilterBar
+            columns={columns}
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            showColumnVisibility={features.columnVisibility !== false}
+            columnVisibility={columnVisibility}
+            onToggleColumnVisibility={toggleColumnVisibility}
+            onReset={handleReset}
+          />
         )}
         <EmptyState
           message={emptyMessage || emptyState?.description || 'No data available'}
@@ -341,7 +356,15 @@ export function BetterTable<TData = unknown>({
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props}>
       {filtering && (
-        <FilterBar columns={columns} filters={filters} onFiltersChange={handleFiltersChange} />
+        <FilterBar
+          columns={columns}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          showColumnVisibility={features.columnVisibility !== false}
+          columnVisibility={columnVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onReset={handleReset}
+        />
       )}
 
       <div className="border rounded-md">
@@ -518,16 +541,49 @@ export function BetterTable<TData = unknown>({
                           column.align === 'right' && 'text-right'
                         )}
                       >
-                        {column.cellRenderer ? (
-                          column.cellRenderer({
-                            value,
-                            row,
-                            column,
-                            rowIndex: index,
-                          })
-                        ) : (
-                          <span>{getFormatterForType(column.type, value, column.meta)}</span>
-                        )}
+                        {column.cellRenderer
+                          ? column.cellRenderer({
+                              value,
+                              row,
+                              column,
+                              rowIndex: index,
+                            })
+                          : (() => {
+                              const formatted = getFormatterForType(
+                                column.type,
+                                value,
+                                column.meta
+                              );
+                              const truncateConfig = column.meta?.truncate as
+                                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                                | undefined;
+
+                              // Show tooltip for truncated text if showTooltip is enabled
+                              if (truncateConfig?.showTooltip && value != null) {
+                                const originalValue = String(value);
+                                const maxLen = truncateConfig.maxLength || 50;
+                                const isTruncated = originalValue.length > maxLen;
+
+                                if (isTruncated) {
+                                  return (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-help truncate max-w-full inline-block">
+                                          {formatted}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-xs" showArrow>
+                                        <div className="break-words whitespace-pre-wrap text-pretty">
+                                          {originalValue}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  );
+                                }
+                              }
+
+                              return <span>{formatted}</span>;
+                            })()}
                       </TableCell>
                     );
                   })}
@@ -622,11 +678,14 @@ export function BetterTable<TData = unknown>({
     );
   };
 
-  return shouldShowContextMenu ? (
-    <TableDndProvider onDragEnd={handleDragEnd} renderDragOverlay={renderDragOverlay}>
+  return (
+    <TableProviders
+      enableTooltip={true}
+      enableDnd={shouldShowContextMenu}
+      onDragEnd={handleDragEnd}
+      renderDragOverlay={renderDragOverlay}
+    >
       {tableContent}
-    </TableDndProvider>
-  ) : (
-    tableContent
+    </TableProviders>
   );
 }

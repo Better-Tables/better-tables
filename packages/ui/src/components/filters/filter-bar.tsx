@@ -1,10 +1,16 @@
 'use client';
 
-import type { ColumnDefinition, FilterGroup, FilterState } from '@better-tables/core';
+import type {
+  ColumnDefinition,
+  ColumnVisibility,
+  FilterGroup,
+  FilterState,
+} from '@better-tables/core';
 import { getDefaultOperatorsForType } from '@better-tables/core';
 import { Search, X } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
+import { ColumnVisibilityToggle } from '../table/column-visibility-toggle';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ActiveFilters } from './active-filters';
@@ -67,6 +73,14 @@ export interface FilterBarProps<TData = unknown> {
   addFilterLabel?: string;
   /** Callback to check if a filter is protected (can't be removed) */
   isFilterProtected?: (filter: FilterState) => boolean;
+  /** Whether to show the column visibility toggle */
+  showColumnVisibility?: boolean;
+  /** Current column visibility state */
+  columnVisibility?: ColumnVisibility;
+  /** Handler to toggle column visibility */
+  onToggleColumnVisibility?: (columnId: string) => void;
+  /** Handler to reset all table state (filters, sorting, selection, etc.) */
+  onReset?: () => void;
 }
 
 export function FilterBar<TData = unknown>({
@@ -86,6 +100,10 @@ export function FilterBar<TData = unknown>({
   customFilters = [],
   addFilterLabel = 'Add filter',
   isFilterProtected,
+  showColumnVisibility = true,
+  columnVisibility,
+  onToggleColumnVisibility,
+  onReset,
 }: FilterBarProps<TData>) {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -148,10 +166,15 @@ export function FilterBar<TData = unknown>({
   );
 
   const handleClearAll = React.useCallback(() => {
-    // Only clear non-protected filters
+    // If onReset is provided, reset all table state
+    if (onReset) {
+      onReset();
+      return;
+    }
+    // Otherwise, only clear non-protected filters (legacy behavior)
     const protectedFilters = isFilterProtected ? filters.filter(isFilterProtected) : [];
     onFiltersChange(protectedFilters);
-  }, [filters, isFilterProtected, onFiltersChange]);
+  }, [onReset, filters, isFilterProtected, onFiltersChange]);
 
   const hasFilters = React.useMemo(() => filters.length > 0, [filters.length]);
 
@@ -256,6 +279,16 @@ export function FilterBar<TData = unknown>({
             <X className="mr-1 h-4 w-4" />
             Clear all
           </Button>
+        )}
+
+        {/* Column Visibility Toggle */}
+        {showColumnVisibility && columnVisibility && onToggleColumnVisibility && (
+          <ColumnVisibilityToggle
+            columns={columns}
+            columnVisibility={columnVisibility}
+            onToggleVisibility={onToggleColumnVisibility}
+            disabled={disabled}
+          />
         )}
       </div>
     </div>
