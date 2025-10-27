@@ -114,10 +114,10 @@ export function TableHeaderContextMenu<TData = unknown>({
         {/* Sorting controls */}
         {isSortable && contextMenuConfig.showSortToggle && (
           <>
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+            {/* <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
               Sort Direction
             </div>
-            <ContextMenuSeparator />
+            <ContextMenuSeparator /> */}
             <ContextMenuCheckboxItem
               checked={currentSort?.direction === 'asc'}
               onCheckedChange={(checked) => {
