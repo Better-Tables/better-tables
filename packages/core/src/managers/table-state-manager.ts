@@ -8,10 +8,11 @@
  * @module managers/table-state-manager
  */
 
-import type { ColumnDefinition, ColumnVisibility } from '../types/column';
+import type { ColumnDefinition, ColumnOrder, ColumnVisibility } from '../types/column';
 import type { FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
 import type { SortingState } from '../types/sorting';
+import { getDefaultColumnOrder, mergeColumnOrder } from '../utils/column-order';
 import { mergeColumnVisibility } from '../utils/column-visibility';
 import { deepEqual, shallowEqualArrays } from '../utils/equality';
 import { FilterManager } from './filter-manager';
@@ -79,6 +80,8 @@ export interface TableState {
   selectedRows: Set<string>;
   /** Column visibility state */
   columnVisibility: ColumnVisibility;
+  /** Column order state */
+  columnOrder: ColumnOrder;
 }
 
 /**
@@ -117,6 +120,7 @@ export type TableStateEvent =
   | { type: 'sorting_changed'; sorting: SortingState }
   | { type: 'selection_changed'; selectedRows: Set<string> }
   | { type: 'visibility_changed'; columnVisibility: ColumnVisibility }
+  | { type: 'order_changed'; columnOrder: ColumnOrder }
   | { type: 'columns_changed'; columns: ColumnDefinition[] };
 
 /**
@@ -191,6 +195,7 @@ export class TableStateManager<TData = unknown> {
   private sorting: SortingState = [];
   private selectedRows: Set<string> = new Set();
   private columnVisibility: ColumnVisibility = {};
+  private columnOrder: ColumnOrder = [];
   private subscribers: TableStateSubscriber[] = [];
   private columns: ColumnDefinition<TData>[];
 
@@ -200,6 +205,7 @@ export class TableStateManager<TData = unknown> {
   private cachedSorting: SortingState | null = null;
   private cachedSelectedRows: Set<string> | null = null;
   private cachedColumnVisibility: ColumnVisibility | null = null;
+  private cachedColumnOrder: ColumnOrder | null = null;
   private lastNotifiedState: TableState | null = null;
 
   constructor(
@@ -221,6 +227,8 @@ export class TableStateManager<TData = unknown> {
     this.selectedRows = initialState.selectedRows || new Set();
     // Merge initial visibility with column defaults
     this.columnVisibility = mergeColumnVisibility(columns, initialState.columnVisibility || {});
+    // Merge initial order with column defaults
+    this.columnOrder = mergeColumnOrder(columns, initialState.columnOrder || []);
 
     // Subscribe to sub-manager changes
     this.filterManager.subscribe(() => {
@@ -252,6 +260,7 @@ export class TableStateManager<TData = unknown> {
       sorting: this.getSorting(),
       selectedRows: this.getSelectedRows(),
       columnVisibility: this.getColumnVisibility(),
+      columnOrder: this.getColumnOrder(),
     };
   }
 
@@ -472,6 +481,36 @@ export class TableStateManager<TData = unknown> {
   }
 
   // ============================================================================
+  // Column Order Operations
+  // ============================================================================
+
+  getColumnOrder(): ColumnOrder {
+    // Return cached reference if order array hasn't changed
+    if (this.cachedColumnOrder && shallowEqualArrays(this.cachedColumnOrder, this.columnOrder)) {
+      return this.cachedColumnOrder;
+    }
+
+    this.cachedColumnOrder = [...this.columnOrder];
+    return this.cachedColumnOrder;
+  }
+
+  setColumnOrder(order: ColumnOrder): void {
+    this.columnOrder = [...order];
+    // Invalidate cache to force new reference
+    this.cachedColumnOrder = null;
+    this.notifySubscribers({ type: 'order_changed', columnOrder: this.columnOrder });
+    this.notifyStateChanged();
+  }
+
+  resetColumnOrder(): void {
+    // Reset to default order based on column definitions
+    this.columnOrder = getDefaultColumnOrder(this.columns);
+    this.cachedColumnOrder = null;
+    this.notifySubscribers({ type: 'order_changed', columnOrder: this.columnOrder });
+    this.notifyStateChanged();
+  }
+
+  // ============================================================================
   // Bulk Operations
   // ============================================================================
 
@@ -513,6 +552,15 @@ export class TableStateManager<TData = unknown> {
       });
     }
 
+    if (updates.columnOrder !== undefined) {
+      this.columnOrder = [...updates.columnOrder];
+      this.cachedColumnOrder = null;
+      this.notifySubscribers({
+        type: 'order_changed',
+        columnOrder: this.columnOrder,
+      });
+    }
+
     this.notifyStateChanged();
   }
 
@@ -527,6 +575,9 @@ export class TableStateManager<TData = unknown> {
     // Reset column visibility to defaults
     this.columnVisibility = mergeColumnVisibility(this.columns, {});
     this.cachedColumnVisibility = null;
+    // Reset column order to defaults
+    this.columnOrder = getDefaultColumnOrder(this.columns);
+    this.cachedColumnOrder = null;
     this.notifyStateChanged();
   }
 

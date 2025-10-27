@@ -33,12 +33,13 @@ export function UsersTableClient({
       pagination: true,
       sorting: true,
       columnVisibility: true,
+      columnOrder: true,
     },
     urlAdapter
   );
 
   return (
-    <BetterTable<UserWithRelations>
+    <BetterTable
       id={TABLE_ID}
       name="Users"
       // biome-ignore lint/suspicious/noExplicitAny: Column types need to match BetterTable expectations
@@ -53,6 +54,7 @@ export function UsersTableClient({
         sorting: true,
         pagination: true,
         rowSelection: true,
+        columnReordering: true,
         headerContextMenu: {
           enabled: true,
           showSortToggle: true,

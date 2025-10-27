@@ -5,6 +5,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
+  useTableColumnOrder,
   useTableColumnVisibility,
   useTableFilters,
   useTablePagination,
@@ -13,7 +14,11 @@ import {
 } from '../../hooks/use-table-store';
 import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
-import { destroyTableStore, getOrCreateTableStore } from '../../stores/table-registry';
+import {
+  destroyTableStore,
+  getOrCreateTableStore,
+  getTableStore,
+} from '../../stores/table-registry';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
@@ -131,6 +136,7 @@ export function BetterTable<TData = unknown>({
     pagination: paginationEnabled = true,
     rowSelection = false,
     headerContextMenu,
+    columnReordering = false,
   } = features;
 
   // Initialize store synchronously during render
@@ -153,6 +159,7 @@ export function BetterTable<TData = unknown>({
   const { sorting: sortingState, toggleSort, setSorting } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
   const { columnVisibility, toggleColumnVisibility } = useTableColumnVisibility(id);
+  const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
 
   // Cleanup store on unmount to prevent memory leaks
   useEffect(() => {
@@ -250,10 +257,29 @@ export function BetterTable<TData = unknown>({
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;
 
-  // Filter columns by visibility (must be before any early returns)
+  // Filter columns by visibility and apply column order (must be before any early returns)
   const visibleColumns = useMemo(() => {
-    return columns.filter((col) => columnVisibility[col.id] !== false);
-  }, [columns, columnVisibility]);
+    const visible = columns.filter((col) => columnVisibility[col.id] !== false);
+
+    // If we have a custom column order, apply it
+    if (columnOrder.length > 0) {
+      // Create a map of column IDs to columns for quick lookup
+      const columnMap = new Map(visible.map((col) => [col.id, col]));
+
+      // Apply the order from columnOrder, filtering to only include visible columns
+      const ordered = columnOrder
+        .map((id) => columnMap.get(id))
+        .filter((col): col is (typeof columns)[0] => col !== undefined);
+
+      // Add any columns that are visible but not in columnOrder (shouldn't happen, but defensive)
+      const unorderedIds = new Set(ordered.map((col) => col.id));
+      const remaining = visible.filter((col) => !unorderedIds.has(col.id));
+
+      return [...ordered, ...remaining];
+    }
+
+    return visible;
+  }, [columns, columnVisibility, columnOrder]);
 
   // Render loading state
   if (loading) {
@@ -328,6 +354,12 @@ export function BetterTable<TData = unknown>({
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}
+            columnOrder={columnOrder}
+            onResetColumnOrder={() => {
+              const store = getTableStore(id);
+              if (store) store.getState().resetColumnOrder();
+            }}
+            enableColumnReordering={columnReordering}
             onReset={handleReset}
           />
         )}
@@ -363,6 +395,12 @@ export function BetterTable<TData = unknown>({
           showColumnVisibility={features.columnVisibility !== false}
           columnVisibility={columnVisibility}
           onToggleColumnVisibility={toggleColumnVisibility}
+          columnOrder={columnOrder}
+          onResetColumnOrder={() => {
+            const store = getTableStore(id);
+            if (store) store.getState().resetColumnOrder();
+          }}
+          enableColumnReordering={true}
           onReset={handleReset}
         />
       )}
@@ -612,9 +650,43 @@ export function BetterTable<TData = unknown>({
     if (!event.over) return;
 
     const overId = event.over.id;
+    const activeId = event.active.id;
 
-    // Find indices by columnId matching
-    const oldIndex = sortingState.findIndex((s) => s.columnId === event.active.id);
+    // Handle column reordering (check for column-drop-* zones or column IDs in columnOrder)
+    const columnOrderIndex = columnOrder.indexOf(activeId);
+    const columnOrderTargetIndex = columnOrder.indexOf(overId);
+
+    if (columnOrderIndex >= 0 || columnOrderTargetIndex >= 0 || overId.startsWith('column-drop-')) {
+      let newOrder: string[];
+
+      if (overId.startsWith('column-drop-')) {
+        // Dropped on a column drop zone
+        const dropMatch = overId.match(/column-drop-(before|after)-(\d+)/);
+        if (dropMatch) {
+          const position = dropMatch[1];
+          const targetIndex = parseInt(dropMatch[2], 10);
+
+          newOrder = [...columnOrder];
+          const [removed] = newOrder.splice(columnOrderIndex, 1);
+
+          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+          newOrder.splice(insertIndex, 0, removed);
+          setColumnOrder(newOrder);
+        }
+      } else if (
+        columnOrderIndex >= 0 &&
+        columnOrderTargetIndex >= 0 &&
+        columnOrderIndex !== columnOrderTargetIndex
+      ) {
+        // Normal column reordering between items
+        newOrder = arrayMove(columnOrder, columnOrderIndex, columnOrderTargetIndex);
+        setColumnOrder(newOrder);
+      }
+      return;
+    }
+
+    // Handle sort reordering (original logic)
+    const oldIndex = sortingState.findIndex((s) => s.columnId === activeId);
     const newIndex = sortingState.findIndex((s) => s.columnId === overId);
 
     // Handle drop zones (they have IDs like "sort-drop-before-0")

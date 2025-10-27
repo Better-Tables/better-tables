@@ -1,6 +1,11 @@
 'use client';
 
-import { getColumnVisibilityModifications, mergeColumnVisibility } from '@better-tables/core';
+import {
+  getColumnOrderModifications,
+  getColumnVisibilityModifications,
+  mergeColumnOrder,
+  mergeColumnVisibility,
+} from '@better-tables/core';
 import { useEffect, useRef } from 'react';
 import { getTableStore } from './table-registry';
 
@@ -35,6 +40,8 @@ export interface UrlSyncConfig {
   sorting?: boolean;
   /** Sync column visibility to URL */
   columnVisibility?: boolean;
+  /** Sync column order to URL */
+  columnOrder?: boolean;
 }
 
 /**
@@ -141,6 +148,20 @@ export function useTableUrlSync(
       }
     }
 
+    if (config.columnOrder) {
+      const orderParam = adapter.getParam('columnOrder');
+      if (orderParam) {
+        try {
+          const modifications = JSON.parse(orderParam);
+          const { columns } = store.getState();
+          // Merge modifications with defaults
+          updates.columnOrder = mergeColumnOrder(columns, modifications);
+        } catch {
+          // Silently ignore parse errors
+        }
+      }
+    }
+
     // Apply updates if we have any
     if (Object.keys(updates).length > 0) {
       manager.updateState(updates);
@@ -188,6 +209,13 @@ export function useTableUrlSync(
           );
           updates.columnVisibility =
             Object.keys(modifications).length > 0 ? JSON.stringify(modifications) : null;
+        }
+
+        if (config.columnOrder) {
+          const { columns } = store.getState();
+          // Get only modifications from defaults
+          const modifications = getColumnOrderModifications(columns, event.state.columnOrder);
+          updates.columnOrder = modifications.length > 0 ? JSON.stringify(modifications) : null;
         }
 
         adapter.setParams(updates);
