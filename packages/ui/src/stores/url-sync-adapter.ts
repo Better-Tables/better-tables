@@ -153,9 +153,12 @@ export function useTableUrlSync(
       if (orderParam) {
         try {
           const modifications = JSON.parse(orderParam);
-          const { columns } = store.getState();
-          // Merge modifications with defaults
-          updates.columnOrder = mergeColumnOrder(columns, modifications);
+          // Guard against malformed URLs: ensure modifications is an array
+          if (Array.isArray(modifications)) {
+            const { columns } = store.getState();
+            // Merge modifications with defaults
+            updates.columnOrder = mergeColumnOrder(columns, modifications);
+          }
         } catch {
           // Silently ignore parse errors
         }

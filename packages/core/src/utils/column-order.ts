@@ -129,8 +129,12 @@ export function mergeColumnOrder<TData = unknown>(
     return defaultOrder;
   }
 
+  // Ensure modifications has unique column IDs (no duplicates)
+  const uniqueModifications = new Set(modifications);
+  if (uniqueModifications.size !== modifications.length) {
+    // Duplicates detected, return default order
+    return defaultOrder;
+  }
+
   return modifications;
 }
-
-// Note: Use arrayMove from @dnd-kit/sortable instead of this utility
-// This was created but is not used anywhere in the codebase

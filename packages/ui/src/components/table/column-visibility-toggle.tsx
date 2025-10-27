@@ -107,7 +107,7 @@ export function ColumnVisibilityToggle<TData = unknown>({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={onResetColumnOrder}
+              onSelect={onResetColumnOrder}
               disabled={disabled}
               className="flex items-center gap-2 cursor-pointer"
             >

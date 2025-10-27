@@ -495,7 +495,8 @@ export class TableStateManager<TData = unknown> {
   }
 
   setColumnOrder(order: ColumnOrder): void {
-    this.columnOrder = [...order];
+    // Normalize and validate the incoming order to ensure it's valid
+    this.columnOrder = mergeColumnOrder(this.columns, order);
     // Invalidate cache to force new reference
     this.cachedColumnOrder = null;
     this.notifySubscribers({ type: 'order_changed', columnOrder: this.columnOrder });
@@ -553,7 +554,8 @@ export class TableStateManager<TData = unknown> {
     }
 
     if (updates.columnOrder !== undefined) {
-      this.columnOrder = [...updates.columnOrder];
+      // Normalize and validate the incoming order to ensure it's valid
+      this.columnOrder = mergeColumnOrder(this.columns, updates.columnOrder);
       this.cachedColumnOrder = null;
       this.notifySubscribers({
         type: 'order_changed',

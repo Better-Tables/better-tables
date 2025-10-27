@@ -400,7 +400,7 @@ export function BetterTable<TData = unknown>({
             const store = getTableStore(id);
             if (store) store.getState().resetColumnOrder();
           }}
-          enableColumnReordering={true}
+          enableColumnReordering={columnReordering}
           onReset={handleReset}
         />
       )}
