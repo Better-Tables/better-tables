@@ -381,14 +381,23 @@ export interface QueryBuilderWithJoins {
  *
  * @description Configuration object for creating a DrizzleAdapter instance.
  * The driver type parameter is required and must be explicitly specified to ensure
- * proper type safety for all database operations.
+ * proper type safety for all database operations. The `db` property will automatically
+ * be typed based on the `driver` value.
  *
  * @example
  * ```typescript
+ * // For PostgreSQL - db will be typed as PostgresJsDatabase
  * const config: DrizzleAdapterConfig<typeof schema, 'postgres'> = {
- *   db: postgresDb,
+ *   db: postgresDb, // TypeScript knows this should be PostgresJsDatabase
  *   schema: { users, profiles },
  *   driver: 'postgres'
+ * };
+ *
+ * // For SQLite - db will be typed as BetterSQLite3Database
+ * const config: DrizzleAdapterConfig<typeof schema, 'sqlite'> = {
+ *   db: sqliteDb, // TypeScript knows this should be BetterSQLite3Database
+ *   schema: { users, profiles },
+ *   driver: 'sqlite'
  * };
  * ```
  */
@@ -396,13 +405,13 @@ export interface DrizzleAdapterConfig<
   TSchema extends Record<string, AnyTableType>,
   TDriver extends DatabaseDriver,
 > {
-  /** Drizzle database instance - must match the driver type */
+  /** Drizzle database instance - automatically typed based on driver */
   db: DrizzleDatabase<TDriver>;
 
   /** Schema containing tables and relations */
   schema: TSchema;
 
-  /** Database driver type - must be explicitly specified */
+  /** Database driver type - determines the type of the `db` property */
   driver: TDriver;
 
   /** Auto-detect relationships from schema */
