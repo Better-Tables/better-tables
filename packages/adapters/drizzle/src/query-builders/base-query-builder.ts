@@ -20,19 +20,17 @@ import type {
   AnyTableType,
   ColumnPath,
   DatabaseDriver,
+  MySQLQueryBuilderWithJoins,
+  PostgresQueryBuilderWithJoins,
   QueryBuilderWithJoins,
   QueryContext,
   RelationshipPath,
+  SQLiteQueryBuilderWithJoins,
 } from '../types';
 import { QueryError } from '../types';
 import { getColumnNames } from '../utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from '../utils/levenshtein';
 import { getPrimaryKeyMap } from '../utils/schema-introspection';
-
-/**
- * Type for accessing table columns by name.
- */
-type TableWithColumns = Record<string, AnyColumnType>;
 
 /**
  * Abstract base class for query builders.
@@ -58,6 +56,36 @@ export abstract class BaseQueryBuilder {
     this.relationshipManager = relationshipManager;
     this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType);
     this.primaryKeyMap = getPrimaryKeyMap(schema, primaryKeyMap);
+  }
+
+  /**
+   * Type-safe helper to cast Drizzle's complex query builder types to our QueryBuilderWithJoins interface.
+   * This is safe because Drizzle's query builders implement all methods in our interface,
+   * but TypeScript cannot statically verify this due to Drizzle's complex generic types.
+   */
+  protected asQueryBuilder<T>(query: T): QueryBuilderWithJoins {
+    return query as QueryBuilderWithJoins;
+  }
+
+  /**
+   * Type-safe helper to cast Drizzle's PostgreSQL query builder types to our PostgresQueryBuilderWithJoins interface.
+   */
+  protected asPostgresQueryBuilder<T>(query: T): PostgresQueryBuilderWithJoins {
+    return query as PostgresQueryBuilderWithJoins;
+  }
+
+  /**
+   * Type-safe helper to cast Drizzle's MySQL query builder types to our MySQLQueryBuilderWithJoins interface.
+   */
+  protected asMySQLQueryBuilder<T>(query: T): MySQLQueryBuilderWithJoins {
+    return query as MySQLQueryBuilderWithJoins;
+  }
+
+  /**
+   * Type-safe helper to cast Drizzle's SQLite query builder types to our SQLiteQueryBuilderWithJoins interface.
+   */
+  protected asSQLiteQueryBuilder<T>(query: T): SQLiteQueryBuilderWithJoins {
+    return query as SQLiteQueryBuilderWithJoins;
   }
 
   /**
@@ -176,6 +204,18 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
+   * Type helper to access columns from a table.
+   * Tables in Drizzle have columns as properties, but the base type doesn't expose an index signature.
+   * We use a type assertion through the table's actual structure to safely access columns.
+   */
+  private getTableColumn(table: AnyTableType, columnName: string): AnyColumnType | undefined {
+    // TypeScript doesn't recognize that Drizzle tables have column index signatures,
+    // so we assert to access them safely. This is type-safe at runtime.
+    type TableWithIndex = typeof table & Record<string, AnyColumnType>;
+    return (table as TableWithIndex)[columnName];
+  }
+
+  /**
    * Build join condition with proper type safety
    */
   protected buildJoinCondition(relationship: RelationshipPath): SQL | SQLWrapper {
@@ -189,12 +229,8 @@ export abstract class BaseQueryBuilder {
       );
     }
 
-    const sourceColumn = (sourceTable as unknown as Record<string, AnyColumnType>)[
-      relationship.localKey
-    ];
-    const targetColumn = (targetTable as unknown as Record<string, AnyColumnType>)[
-      relationship.foreignKey
-    ];
+    const sourceColumn = this.getTableColumn(sourceTable, relationship.localKey);
+    const targetColumn = this.getTableColumn(targetTable, relationship.foreignKey);
 
     if (!sourceColumn || !targetColumn) {
       throw new QueryError(
@@ -220,7 +256,7 @@ export abstract class BaseQueryBuilder {
       const primaryTableColumnNames = getColumnNames(primaryTableSchema);
 
       for (const colName of primaryTableColumnNames) {
-        const col = (primaryTableSchema as unknown as TableWithColumns)[colName];
+        const col = this.getTableColumn(primaryTableSchema, colName);
         if (col) {
           selections[colName] = col;
         }
@@ -253,7 +289,7 @@ export abstract class BaseQueryBuilder {
         const primaryTableColumnNames = getColumnNames(primaryTableSchema);
 
         for (const colName of primaryTableColumnNames) {
-          const col = (primaryTableSchema as unknown as TableWithColumns)[colName];
+          const col = this.getTableColumn(primaryTableSchema, colName);
           if (col && !selections[colName]) {
             selections[colName] = col;
           }
@@ -279,7 +315,7 @@ export abstract class BaseQueryBuilder {
             const columnNames = getColumnNames(relatedTable);
 
             for (const colName of columnNames) {
-              const col = (relatedTable as unknown as TableWithColumns)[colName];
+              const col = this.getTableColumn(relatedTable, colName);
               if (col) {
                 const aliasedKey = `${realTableName}_${colName}`;
                 selections[aliasedKey] = col;
@@ -338,7 +374,7 @@ export abstract class BaseQueryBuilder {
       return null;
     }
 
-    return (table as unknown as Record<string, AnyColumnType>)[columnPath.field] || null;
+    return this.getTableColumn(table, columnPath.field) || null;
   }
 
   /**
@@ -385,15 +421,23 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
+   * Type guard to check if an object has a specific property.
+   */
+  protected hasProperty<K extends PropertyKey>(obj: object, prop: K): obj is Record<K, unknown> {
+    return prop in obj;
+  }
+
+  /**
    * Get query execution plan
    */
   getQueryPlan(query: QueryBuilderWithJoins): string {
     try {
-      const queryObj = query as unknown as Record<string, unknown>;
-      const explainResult = queryObj.explain;
-      if (typeof explainResult === 'function') {
-        const result = explainResult();
-        return typeof result === 'string' ? result : 'Query plan not available';
+      if (this.hasProperty(query, 'explain')) {
+        const explainResult = query.explain;
+        if (typeof explainResult === 'function') {
+          const result = explainResult();
+          return typeof result === 'string' ? result : 'Query plan not available';
+        }
       }
       return 'Query plan not available';
     } catch {
@@ -409,7 +453,7 @@ export abstract class BaseQueryBuilder {
       if (!query || query === null || query === undefined) {
         return false;
       }
-      return typeof (query as unknown as Record<string, unknown>).execute === 'function';
+      return this.hasProperty(query, 'execute') && typeof query.execute === 'function';
     } catch {
       return false;
     }

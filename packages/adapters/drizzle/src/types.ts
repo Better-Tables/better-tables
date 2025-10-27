@@ -387,18 +387,65 @@ export interface QueryBuilder {
 }
 
 /**
- * Query builder with joins interface
+ * Base query builder with joins interface
+ * This interface defines the common methods that all database query builders must implement
  */
 export interface QueryBuilderWithJoins {
   leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): QueryBuilderWithJoins;
   innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): QueryBuilderWithJoins;
-  select(selections: Record<string, AnyColumnType | SQL | SQLWrapper>): QueryBuilderWithJoins;
+  select(selections?: Record<string, AnyColumnType | SQL | SQLWrapper>): QueryBuilderWithJoins;
   where(condition: SQL | SQLWrapper): QueryBuilderWithJoins;
   orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): QueryBuilderWithJoins;
   limit(count: number): QueryBuilderWithJoins;
   offset(count: number): QueryBuilderWithJoins;
   groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): QueryBuilderWithJoins;
   execute(): Promise<Record<string, unknown>[]>;
+}
+
+/**
+ * PostgreSQL-specific query builder with joins interface
+ */
+export interface PostgresQueryBuilderWithJoins extends QueryBuilderWithJoins {
+  leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins;
+  innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins;
+  select(
+    selections?: Record<string, AnyColumnType | SQL | SQLWrapper>
+  ): PostgresQueryBuilderWithJoins;
+  where(condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins;
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): PostgresQueryBuilderWithJoins;
+  limit(count: number): PostgresQueryBuilderWithJoins;
+  offset(count: number): PostgresQueryBuilderWithJoins;
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): PostgresQueryBuilderWithJoins;
+}
+
+/**
+ * MySQL-specific query builder with joins interface
+ */
+export interface MySQLQueryBuilderWithJoins extends QueryBuilderWithJoins {
+  leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): MySQLQueryBuilderWithJoins;
+  innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): MySQLQueryBuilderWithJoins;
+  select(selections?: Record<string, AnyColumnType | SQL | SQLWrapper>): MySQLQueryBuilderWithJoins;
+  where(condition: SQL | SQLWrapper): MySQLQueryBuilderWithJoins;
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): MySQLQueryBuilderWithJoins;
+  limit(count: number): MySQLQueryBuilderWithJoins;
+  offset(count: number): MySQLQueryBuilderWithJoins;
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): MySQLQueryBuilderWithJoins;
+}
+
+/**
+ * SQLite-specific query builder with joins interface
+ */
+export interface SQLiteQueryBuilderWithJoins extends QueryBuilderWithJoins {
+  leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): SQLiteQueryBuilderWithJoins;
+  innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): SQLiteQueryBuilderWithJoins;
+  select(
+    selections?: Record<string, AnyColumnType | SQL | SQLWrapper>
+  ): SQLiteQueryBuilderWithJoins;
+  where(condition: SQL | SQLWrapper): SQLiteQueryBuilderWithJoins;
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): SQLiteQueryBuilderWithJoins;
+  limit(count: number): SQLiteQueryBuilderWithJoins;
+  offset(count: number): SQLiteQueryBuilderWithJoins;
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): SQLiteQueryBuilderWithJoins;
 }
 
 /**
