@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, GripVertical, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { SortOrderDropIndicator } from './sort-order-drop-indicator';
-import { DndSortableContext } from './table-dnd-provider';
+import { DndSortableContext } from './table-providers';
 
 interface SortOrderListProps {
   /** Current sort state */

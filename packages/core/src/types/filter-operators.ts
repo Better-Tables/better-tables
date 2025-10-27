@@ -8,7 +8,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'contains',
     label: 'Contains',
-    description: 'Contains the specified text',
+    description: 'Includes this text',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'string',
@@ -16,7 +16,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'equals',
     label: 'Equals',
-    description: 'Exactly matches the value',
+    description: 'Exact match',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,
@@ -24,7 +24,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'startsWith',
     label: 'Starts with',
-    description: 'Starts with the specified text',
+    description: 'Begins with this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'string',
@@ -32,7 +32,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'endsWith',
     label: 'Ends with',
-    description: 'Ends with the specified text',
+    description: 'Finishes with this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'string',
@@ -40,7 +40,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isEmpty',
     label: 'Is empty',
-    description: 'Is empty or null',
+    description: 'Blank or null',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -48,7 +48,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotEmpty',
     label: 'Is not empty',
-    description: 'Is not empty and not null',
+    description: 'Has content',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -62,7 +62,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'equals',
     label: 'Equals',
-    description: 'Exactly matches the value',
+    description: 'Exact match',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,
@@ -70,7 +70,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'notEquals',
     label: 'Not equals',
-    description: 'Does not equal the specified value',
+    description: "Doesn't match",
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'number',
@@ -78,7 +78,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'greaterThan',
     label: 'Greater than',
-    description: 'Greater than the specified value',
+    description: 'More than this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'number',
@@ -86,7 +86,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'greaterThanOrEqual',
     label: 'Greater than or equal',
-    description: 'Greater than or equal to the specified value',
+    description: 'At least this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'number',
@@ -94,7 +94,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'lessThan',
     label: 'Less than',
-    description: 'Less than the specified value',
+    description: 'Under this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'number',
@@ -102,7 +102,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'lessThanOrEqual',
     label: 'Less than or equal',
-    description: 'Less than or equal to the specified value',
+    description: 'At most this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'number',
@@ -122,7 +122,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'notBetween',
     label: 'Not between',
-    description: 'Not between two values',
+    description: 'Outside this range',
     valueCount: 2,
     supportsNull: false,
     validate: (values) => {
@@ -134,7 +134,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNull',
     label: 'Is null',
-    description: 'Is null or undefined',
+    description: 'No value set',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -142,7 +142,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotNull',
     label: 'Is not null',
-    description: 'Is not null and not undefined',
+    description: 'Has a value',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -156,7 +156,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'is',
     label: 'Is',
-    description: 'Is the specified date',
+    description: 'Exact date match',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] instanceof Date,
@@ -164,7 +164,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNot',
     label: 'Is not',
-    description: 'Is not the specified date',
+    description: 'Any except this',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] instanceof Date,
@@ -172,7 +172,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'before',
     label: 'Before',
-    description: 'Before the specified date',
+    description: 'Earlier than',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] instanceof Date,
@@ -180,7 +180,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'after',
     label: 'After',
-    description: 'After the specified date',
+    description: 'Later than',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] instanceof Date,
@@ -188,7 +188,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'between',
     label: 'Between',
-    description: 'Between two dates (inclusive)',
+    description: 'Between dates (inclusive)',
     valueCount: 2,
     supportsNull: false,
     validate: (values) => {
@@ -200,7 +200,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'notBetween',
     label: 'Not between',
-    description: 'Not between two dates',
+    description: 'Outside date range',
     valueCount: 2,
     supportsNull: false,
     validate: (values) => {
@@ -212,7 +212,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isToday',
     label: 'Is today',
-    description: 'Is today',
+    description: 'Current day',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -220,7 +220,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isYesterday',
     label: 'Is yesterday',
-    description: 'Is yesterday',
+    description: 'Previous day',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -228,7 +228,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isThisWeek',
     label: 'Is this week',
-    description: 'Is this week',
+    description: 'Current week',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -236,7 +236,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isThisMonth',
     label: 'Is this month',
-    description: 'Is this month',
+    description: 'Current month',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -244,7 +244,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isThisYear',
     label: 'Is this year',
-    description: 'Is this year',
+    description: 'Current year',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -252,7 +252,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNull',
     label: 'Is null',
-    description: 'Is null or undefined',
+    description: 'No date set',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -260,7 +260,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotNull',
     label: 'Is not null',
-    description: 'Is not null and not undefined',
+    description: 'Date exists',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -274,7 +274,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'is',
     label: 'Is',
-    description: 'Is the specified option',
+    description: 'Matches option',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null && values[0] !== '',
@@ -282,7 +282,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNot',
     label: 'Is not',
-    description: 'Is not the specified option',
+    description: 'Excludes option',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null && values[0] !== '',
@@ -290,7 +290,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isAnyOf',
     label: 'Is any of',
-    description: 'Is any of the specified options',
+    description: 'Matches any selected',
     valueCount: 'variable',
     supportsNull: false,
     validate: (values) => values.length >= 1 && values.every((v) => v != null),
@@ -298,7 +298,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNoneOf',
     label: 'Is none of',
-    description: 'Is none of the specified options',
+    description: 'Excludes all selected',
     valueCount: 'variable',
     supportsNull: false,
     validate: (values) => values.length >= 1 && values.every((v) => v != null),
@@ -306,7 +306,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNull',
     label: 'Is null',
-    description: 'Is null or undefined',
+    description: 'No option set',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -314,7 +314,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotNull',
     label: 'Is not null',
-    description: 'Is not null and not undefined',
+    description: 'Option selected',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -328,7 +328,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'includes',
     label: 'Includes',
-    description: 'Includes the specified value',
+    description: 'Contains value',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,
@@ -336,7 +336,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'excludes',
     label: 'Excludes',
-    description: 'Excludes the specified value',
+    description: 'Missing value',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,
@@ -344,7 +344,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'includesAny',
     label: 'Includes any',
-    description: 'Includes any of the specified values',
+    description: 'Contains any selected',
     valueCount: 'variable',
     supportsNull: false,
     validate: (values) => values.length >= 1 && values.every((v) => v != null),
@@ -352,7 +352,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'includesAll',
     label: 'Includes all',
-    description: 'Includes all of the specified values',
+    description: 'Contains all selected',
     valueCount: 'variable',
     supportsNull: false,
     validate: (values) => values.length >= 1 && values.every((v) => v != null),
@@ -360,7 +360,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'excludesAny',
     label: 'Excludes any',
-    description: 'Excludes any of the specified values',
+    description: 'Missing any selected',
     valueCount: 'variable',
     supportsNull: false,
     validate: (values) => values.length >= 1 && values.every((v) => v != null),
@@ -368,7 +368,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'excludesAll',
     label: 'Excludes all',
-    description: 'Excludes all of the specified values',
+    description: 'Missing all selected',
     valueCount: 'variable',
     supportsNull: false,
     validate: (values) => values.length >= 1 && values.every((v) => v != null),
@@ -376,7 +376,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNull',
     label: 'Is null',
-    description: 'Is null or undefined',
+    description: 'No values set',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -384,7 +384,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotNull',
     label: 'Is not null',
-    description: 'Is not null and not undefined',
+    description: 'Has values',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -398,7 +398,7 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isTrue',
     label: 'Is true',
-    description: 'Is true',
+    description: 'Checked/enabled',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -406,7 +406,7 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isFalse',
     label: 'Is false',
-    description: 'Is false',
+    description: 'Unchecked/disabled',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -414,7 +414,7 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNull',
     label: 'Is null',
-    description: 'Is null or undefined',
+    description: 'No value set',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -422,7 +422,7 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotNull',
     label: 'Is not null',
-    description: 'Is not null and not undefined',
+    description: 'Has value',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -436,7 +436,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'contains',
     label: 'Contains',
-    description: 'JSON contains the specified text',
+    description: 'Includes text',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && typeof values[0] === 'string',
@@ -444,7 +444,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'equals',
     label: 'Equals',
-    description: 'JSON exactly matches the specified value',
+    description: 'Exact match',
     valueCount: 1,
     supportsNull: false,
     validate: (values) => values.length === 1 && values[0] != null,
@@ -452,7 +452,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isEmpty',
     label: 'Is empty',
-    description: 'JSON is empty or null',
+    description: 'Empty object/array',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -460,7 +460,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotEmpty',
     label: 'Is not empty',
-    description: 'JSON is not empty and not null',
+    description: 'Has data',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,
@@ -468,7 +468,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNull',
     label: 'Is null',
-    description: 'Is null or undefined',
+    description: 'No value set',
     valueCount: 0,
     supportsNull: true,
     validate: (values) => values.length === 0,
@@ -476,7 +476,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
   {
     key: 'isNotNull',
     label: 'Is not null',
-    description: 'Is not null and not undefined',
+    description: 'Has value',
     valueCount: 0,
     supportsNull: false,
     validate: (values) => values.length === 0,

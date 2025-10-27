@@ -79,6 +79,8 @@ export interface FilterBarProps<TData = unknown> {
   columnVisibility?: ColumnVisibility;
   /** Handler to toggle column visibility */
   onToggleColumnVisibility?: (columnId: string) => void;
+  /** Handler to reset all table state (filters, sorting, selection, etc.) */
+  onReset?: () => void;
 }
 
 export function FilterBar<TData = unknown>({
@@ -101,6 +103,7 @@ export function FilterBar<TData = unknown>({
   showColumnVisibility = true,
   columnVisibility,
   onToggleColumnVisibility,
+  onReset,
 }: FilterBarProps<TData>) {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -163,10 +166,15 @@ export function FilterBar<TData = unknown>({
   );
 
   const handleClearAll = React.useCallback(() => {
-    // Only clear non-protected filters
+    // If onReset is provided, reset all table state
+    if (onReset) {
+      onReset();
+      return;
+    }
+    // Otherwise, only clear non-protected filters (legacy behavior)
     const protectedFilters = isFilterProtected ? filters.filter(isFilterProtected) : [];
     onFiltersChange(protectedFilters);
-  }, [filters, isFilterProtected, onFiltersChange]);
+  }, [onReset, filters, isFilterProtected, onFiltersChange]);
 
   const hasFilters = React.useMemo(() => filters.length > 0, [filters.length]);
 

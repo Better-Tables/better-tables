@@ -105,6 +105,7 @@ export const userColumns = [
     .id('profile.bio')
     .displayName('Bio')
     .nullableAccessor((user) => user.profile?.bio)
+    .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
     .filterable()
     .build(),
 

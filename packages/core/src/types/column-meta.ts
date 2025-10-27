@@ -170,6 +170,8 @@ export interface TextFormatMeta {
     maxLength: number;
     /** Ellipsis string to append when truncated */
     ellipsis?: string;
+    /** Show tooltip with full text when truncated */
+    showTooltip?: boolean;
   };
   /** Text case transformation */
   textTransform?: 'uppercase' | 'lowercase' | 'capitalize';

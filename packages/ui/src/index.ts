@@ -21,9 +21,9 @@ export * from './components/table/error-state';
 export * from './components/table/sort-order-list';
 // Export table components
 export * from './components/table/table';
-export * from './components/table/table-dnd-provider';
 export * from './components/table/table-header-context-menu';
 export * from './components/table/table-pagination';
+export * from './components/table/table-providers';
 export * from './components/table/virtualized-table';
 export * from './components/ui/badge';
 // Export base UI components from shadcn/ui
@@ -41,6 +41,7 @@ export * from './components/ui/select';
 export * from './components/ui/separator';
 export * from './components/ui/skeleton';
 export * from './components/ui/switch';
+export * from './components/ui/tooltip';
 // Export hooks
 export * from './hooks';
 export * from './lib/filter-value-utils';
