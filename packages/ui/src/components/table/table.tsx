@@ -1,6 +1,12 @@
 'use client';
 
-import type { FilterState, PaginationState, SortingState, TableConfig } from '@better-tables/core';
+import type {
+  ColumnDefinition,
+  FilterState,
+  PaginationState,
+  SortingState,
+  TableConfig,
+} from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
@@ -25,6 +31,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { ActionsToolbar } from './actions-toolbar';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { TableHeaderContextMenu } from './table-header-context-menu';
@@ -36,7 +43,17 @@ import { TableProviders } from './table-providers';
  * Data fetching is handled by parent component
  * State is now managed internally with Zustand
  */
-export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TData>, 'adapter'> {
+// Type for columns with mixed value types (e.g., string, number, Date, boolean)
+// TypeScript cannot express a heterogeneous generic array, so we use 'any' here
+
+// biome-ignore lint/suspicious/noExplicitAny: Need to accept columns with mixed value types
+type MixedColumnDefinition<TData> = ColumnDefinition<TData, any>;
+
+export interface BetterTableProps<TData = unknown>
+  extends Omit<TableConfig<TData>, 'adapter' | 'columns'> {
+  /** Column definitions - may have mixed value types (string, number, Date, etc.) */
+  columns: MixedColumnDefinition<TData>[];
+
   /** Table data */
   data: TData[];
 
@@ -140,6 +157,12 @@ export function BetterTable<TData = unknown>({
     columnReordering = false,
   } = features;
 
+  // Get actions from props
+  const actions = props.actions || [];
+
+  // Enable row selection automatically if actions are provided
+  const shouldShowRowSelection = actions.length > 0 || rowSelection;
+
   // Initialize store synchronously during render
   // The store creation is idempotent - it only creates once per ID
   // All state management is delegated to the TableStateManager
@@ -204,7 +227,26 @@ export function BetterTable<TData = unknown>({
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
-    return rowConfig?.getId || ((_row: TData, index: number) => `row-${index}`);
+    return (
+      rowConfig?.getId ||
+      ((row: TData, _index: number) => {
+        // Try to find an id field using common patterns
+        if (typeof row === 'object' && row !== null) {
+          const obj = row as Record<string, unknown>;
+          if ('id' in obj && obj.id != null) {
+            return String(obj.id);
+          }
+          if ('_id' in obj && obj._id != null) {
+            return String(obj._id);
+          }
+          if ('uuid' in obj && obj.uuid != null) {
+            return String(obj.uuid);
+          }
+        }
+        // Fallback to index only if no ID field found
+        return `row-${_index}`;
+      })
+    );
   }, [rowConfig?.getId]);
 
   // Handle filter changes - just update store
@@ -313,7 +355,7 @@ export function BetterTable<TData = unknown>({
           <Table>
             <TableHeader>
               <TableRow>
-                {rowSelection && (
+                {shouldShowRowSelection && (
                   <TableHead className="w-[50px]">
                     <Skeleton className="h-4 w-4" />
                   </TableHead>
@@ -331,7 +373,7 @@ export function BetterTable<TData = unknown>({
                 const rowKey = `skeleton-row-${rowIdx}`;
                 return (
                   <TableRow key={rowKey}>
-                    {rowSelection && (
+                    {shouldShowRowSelection && (
                       <TableCell>
                         <Skeleton className="h-4 w-4" />
                       </TableCell>
@@ -412,6 +454,20 @@ export function BetterTable<TData = unknown>({
         </div>
       )}
 
+      {/* Actions Toolbar - render independently of filtering */}
+      {actions.length > 0 && (
+        <ActionsToolbar
+          actions={actions}
+          selectedIds={Array.from(selectedRows)}
+          selectedData={data.filter((row, index) => selectedRows.has(getRowId(row, index)))}
+          onActionMake={() => {
+            // Action executed - could trigger data refresh
+            // This callback can be used by parent to refetch data
+          }}
+        />
+      )}
+
+      {/* Filter Bar - only show when filtering is enabled */}
       {filtering && (
         <FilterBar
           columns={columns}
@@ -434,7 +490,7 @@ export function BetterTable<TData = unknown>({
         <Table>
           <TableHeader>
             <TableRow>
-              {rowSelection && (
+              {shouldShowRowSelection && (
                 <TableHead
                   className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
                   style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
@@ -600,7 +656,7 @@ export function BetterTable<TData = unknown>({
                       : undefined
                   }
                 >
-                  {rowSelection && (
+                  {shouldShowRowSelection && (
                     <TableCell
                       className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
                       style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
