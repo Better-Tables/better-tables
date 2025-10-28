@@ -125,11 +125,20 @@ export class MySQLOperations<TRecord> implements DatabaseOperations<TRecord> {
     const mysqlTable = table as MySqlTable;
     await this.db.update(mysqlTable).set(data).where(eq(table.id, id));
 
+    // Determine the correct identifier to fetch the updated record
+    // If the update changed the primary key, use the new value; otherwise use the original id
+    const dataAsRecord = data as Record<string, unknown>;
+    const newPrimaryKeyValue = dataAsRecord[table.id.name];
+    const identifierToFetch = newPrimaryKeyValue !== undefined ? String(newPrimaryKeyValue) : id;
+
     // Fetch the updated record
-    const records = await this.db.select().from(mysqlTable).where(eq(table.id, id));
+    const records = await this.db.select().from(mysqlTable).where(eq(table.id, identifierToFetch));
     const [record] = records as [TRecord];
     if (!record) {
-      throw new QueryError(`Record not found with id: ${id}`, { table, id });
+      throw new QueryError(`Record not found with id: ${identifierToFetch}`, {
+        table,
+        id: identifierToFetch,
+      });
     }
     return record;
   }

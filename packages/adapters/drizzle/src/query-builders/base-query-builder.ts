@@ -11,7 +11,7 @@
 
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
-import { and, asc, avg, count, desc, max, min, sum } from 'drizzle-orm';
+import { and, asc, avg, count, countDistinct, desc, eq, max, min, sum } from 'drizzle-orm';
 import { FilterHandler } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
@@ -239,7 +239,6 @@ export abstract class BaseQueryBuilder {
       );
     }
 
-    const { eq } = require('drizzle-orm');
     return eq(sourceColumn, targetColumn);
   }
 
@@ -353,7 +352,7 @@ export abstract class BaseQueryBuilder {
       case 'max':
         return max(column);
       case 'distinct':
-        return count(column);
+        return countDistinct(column);
       default:
         return count();
     }

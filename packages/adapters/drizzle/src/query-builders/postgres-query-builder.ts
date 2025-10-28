@@ -8,7 +8,7 @@
  * @since 1.0.0
  */
 
-import { count, isNotNull, max, min, type SQL } from 'drizzle-orm';
+import { count, countDistinct, isNotNull, max, min, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { RelationshipManager } from '../relationship-manager';
@@ -157,9 +157,20 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     }
 
     const pgTable = this.asPgTable(primaryTableSchema);
-    const baseQuery = this.db.select({ count: count() }).from(pgTable);
-
     const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+
+    // If there are joins, count distinct primary keys to avoid inflated counts
+    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
+    const hasJoins = joinOrder.length > 0;
+
+    const baseQuery =
+      hasJoins && primaryKeyInfo
+        ? (() => {
+            // Use count distinct on primary key to avoid counting duplicate rows from joins
+            const pgPkColumn = this.asPgColumn(primaryKeyInfo.column);
+            return this.db.select({ count: countDistinct(pgPkColumn) }).from(pgTable);
+          })()
+        : this.db.select({ count: count() }).from(pgTable);
 
     // Build query by chaining operations - use proper typing
     let query:
