@@ -41,6 +41,7 @@
 
 import type { RelationshipManager } from './relationship-manager';
 import type { AggregateColumn, AnyTableType, ColumnPath } from './types';
+import { generateAlias } from './utils/alias-generator';
 import {
   getColumnNames,
   getForeignKeyColumns,
@@ -246,29 +247,29 @@ export class DataTransformer {
     const relationshipPath = columnPath.relationshipPath;
     if (!relationshipPath || relationshipPath.length === 0) return;
 
-    const relationship = relationshipPath[0];
+    const relationship = relationshipPath[relationshipPath.length - 1];
     if (!relationship) return;
 
     const realTableName = relationship.to;
     const alias = columnPath.table; // Use the alias from columnPath (e.g., 'profile')
 
     // Find the first record with data for this relationship
+    // Use generateAlias utility to construct the correct alias based on relationship path
+    const testKey = generateAlias(relationshipPath, columnPath.field);
     const relatedRecord = records.find(
-      (record) =>
-        record[`${realTableName}_${columnPath.field}`] !== null &&
-        record[`${realTableName}_${columnPath.field}`] !== undefined
+      (record) => record[testKey] !== null && record[testKey] !== undefined
     );
 
     if (relatedRecord) {
       // Build nested object for the related table
       const relatedData: Record<string, unknown> = {};
 
-      // Extract all columns from the related table using Drizzle schema utilities
+      // Extract all columns from the related table using the new alias format
       const relatedTableSchema = this.schema[realTableName];
       const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
 
       for (const col of relatedColumns) {
-        const flatKey = `${realTableName}_${col}`;
+        const flatKey = generateAlias(relationshipPath, col);
         if (relatedRecord[flatKey] !== undefined) {
           relatedData[col] = relatedRecord[flatKey];
         }
@@ -291,7 +292,7 @@ export class DataTransformer {
     const relationshipPath = columnPath.relationshipPath;
     if (!relationshipPath || relationshipPath.length === 0) return;
 
-    const relationship = relationshipPath[0];
+    const relationship = relationshipPath[relationshipPath.length - 1];
     if (!relationship) return;
 
     const realTableName = relationship.to;
@@ -305,7 +306,8 @@ export class DataTransformer {
       const relatedTableSchema = this.schema[realTableName];
       if (!relatedTableSchema) continue;
       const primaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
-      const relatedKey = String(record[`${realTableName}_${primaryKeyName}`] || '');
+      // Use generateAlias utility for the primary key
+      const relatedKey = String(record[generateAlias(relationshipPath, primaryKeyName)] || '');
 
       if (relatedKey && relatedKey !== 'undefined' && relatedKey !== 'null') {
         if (!relatedRecords.has(relatedKey)) {
@@ -315,10 +317,10 @@ export class DataTransformer {
         const relatedData = relatedRecords.get(relatedKey);
         if (!relatedData) continue;
 
-        // Extract all columns from the related table using Drizzle schema utilities
+        // Extract all columns from the related table using the new alias format
         const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
         for (const col of relatedColumns) {
-          const flatKey = `${realTableName}_${col}`;
+          const flatKey = generateAlias(relationshipPath, col);
           if (record[flatKey] !== undefined) {
             relatedData[col] = record[flatKey];
           }

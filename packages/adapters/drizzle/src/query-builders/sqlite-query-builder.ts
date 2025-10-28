@@ -1,0 +1,361 @@
+/**
+ * @fileoverview SQLite-specific query builder
+ * @module @better-tables/drizzle-adapter/query-builders/sqlite
+ *
+ * @description
+ * SQLite query builder implementation with driver-specific optimizations.
+ *
+ * @since 1.0.0
+ */
+
+import { count, isNotNull, max, min, type SQL } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
+import type { RelationshipManager } from '../relationship-manager';
+import type {
+  AggregateFunction,
+  AnyColumnType,
+  AnyTableType,
+  QueryContext,
+  SQLiteQueryBuilderWithJoins,
+} from '../types';
+import { QueryError } from '../types';
+import { generateAlias } from '../utils/alias-generator';
+import { BaseQueryBuilder } from './base-query-builder';
+
+/**
+ * SQLite query builder implementation.
+ *
+ * @class SQLiteQueryBuilder
+ * @extends {BaseQueryBuilder}
+ * @since 1.0.0
+ */
+export class SQLiteQueryBuilder extends BaseQueryBuilder {
+  private db: BetterSQLite3Database;
+
+  constructor(
+    db: BetterSQLite3Database,
+    schema: Record<string, AnyTableType>,
+    relationshipManager: RelationshipManager
+  ) {
+    super(schema, relationshipManager, 'sqlite');
+    this.db = db;
+  }
+
+  /**
+   * Type-safe helper to cast AnyTableType to SQLiteTable.
+   * At runtime, this query builder only receives SQLite tables via the factory pattern.
+   */
+  private asSQLiteTable(table: AnyTableType): SQLiteTable {
+    return table as SQLiteTable;
+  }
+
+  /**
+   * Type-safe helper to cast AnyColumnType to SQLiteColumn.
+   * At runtime, this query builder only receives SQLite columns via the factory pattern.
+   */
+  private asSQLiteColumn(column: AnyColumnType): SQLiteColumn {
+    return column as SQLiteColumn;
+  }
+
+  /**
+   * Build SELECT query with joins
+   */
+  buildSelectQuery(
+    context: QueryContext,
+    primaryTable: string,
+    columns?: string[]
+  ): {
+    query: SQLiteQueryBuilderWithJoins;
+    columnMetadata: {
+      selections: Record<string, AnyColumnType>;
+      columnMapping: Record<string, string>;
+    };
+  } {
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const selections: Record<string, AnyColumnType> = {};
+    const columnMapping: Record<string, string> = {};
+
+    if (columns && columns.length > 0) {
+      Object.assign(selections, this.buildColumnSelections(columns, primaryTable));
+      for (const columnId of columns) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+        if (columnPath.isNested && columnPath.relationshipPath) {
+          const aliasedKey = generateAlias(columnPath.relationshipPath, columnPath.field);
+          columnMapping[aliasedKey] = columnId;
+        } else {
+          columnMapping[columnId] = columnId;
+        }
+      }
+    } else if (context.joinPaths.size > 0) {
+      Object.assign(selections, this.buildFlatSelectionsForRelationships(primaryTable));
+      for (const key of Object.keys(selections)) {
+        columnMapping[key] = key;
+      }
+    }
+
+    // Cast selections to Record<string, SQLiteColumn> for type-safe select
+    const sqliteSelections = selections as Record<string, SQLiteColumn>;
+    const sqliteTable = this.asSQLiteTable(primaryTableSchema);
+
+    const baseQuery =
+      Object.keys(selections).length > 0
+        ? this.db.select(sqliteSelections).from(sqliteTable)
+        : this.db.select().from(sqliteTable);
+
+    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+
+    let query:
+      | ReturnType<typeof baseQuery.leftJoin>
+      | ReturnType<typeof baseQuery.innerJoin>
+      | typeof baseQuery = baseQuery;
+    for (const relationship of joinOrder) {
+      const targetTable = this.schema[relationship.to];
+      if (!targetTable) {
+        throw new QueryError(`Target table not found: ${relationship.to}`, {
+          targetTable: relationship.to,
+        });
+      }
+
+      const joinCondition = this.buildJoinCondition(relationship) as SQL;
+      const sqliteTargetTable = this.asSQLiteTable(targetTable);
+
+      if (relationship.joinType === 'left') {
+        query = query.leftJoin(sqliteTargetTable, joinCondition);
+      } else {
+        query = query.innerJoin(sqliteTargetTable, joinCondition);
+      }
+    }
+
+    return {
+      query: this.asSQLiteQueryBuilder(query),
+      columnMetadata: {
+        selections,
+        columnMapping,
+      },
+    };
+  }
+
+  /**
+   * Build COUNT query for pagination
+   */
+  buildCountQuery(context: QueryContext, primaryTable: string): SQLiteQueryBuilderWithJoins {
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const sqliteTable = this.asSQLiteTable(primaryTableSchema);
+    const baseQuery = this.db.select({ count: count() }).from(sqliteTable);
+    let query:
+      | ReturnType<typeof baseQuery.leftJoin>
+      | ReturnType<typeof baseQuery.innerJoin>
+      | typeof baseQuery = baseQuery;
+
+    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+
+    for (const relationship of joinOrder) {
+      const targetTable = this.schema[relationship.to];
+      if (!targetTable) {
+        throw new QueryError(`Target table not found: ${relationship.to}`, {
+          targetTable: relationship.to,
+        });
+      }
+
+      const joinCondition = this.buildJoinCondition(relationship) as SQL;
+      const sqliteTargetTable = this.asSQLiteTable(targetTable);
+
+      if (relationship.joinType === 'left') {
+        query = query.leftJoin(sqliteTargetTable, joinCondition);
+      } else {
+        query = query.innerJoin(sqliteTargetTable, joinCondition);
+      }
+    }
+
+    return this.asSQLiteQueryBuilder(query);
+  }
+
+  /**
+   * Build aggregate query for faceted values
+   */
+  buildAggregateQuery<TColumnId extends string>(
+    columnId: TColumnId,
+    aggregateFunction: AggregateFunction = 'count',
+    primaryTable: string
+  ): SQLiteQueryBuilderWithJoins {
+    this.validateColumnId(columnId, primaryTable);
+    this.validateAggregateFunction(aggregateFunction);
+
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
+
+    this.validateAggregateColumnCompatibility(columnReference.column, aggregateFunction);
+
+    const mainTableSchema = this.schema[primaryTable];
+    if (!mainTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const sqliteTable = this.asSQLiteTable(mainTableSchema);
+    const sqliteColumn = this.asSQLiteColumn(columnReference.column);
+    const aggregateFn = this.getAggregateFunction(columnReference.column, aggregateFunction) as SQL;
+
+    const baseQuery = this.db
+      .select({
+        value: sqliteColumn,
+        count: aggregateFn,
+      })
+      .from(sqliteTable);
+    let query:
+      | ReturnType<typeof baseQuery.leftJoin>
+      | ReturnType<typeof baseQuery.innerJoin>
+      | typeof baseQuery = baseQuery;
+
+    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
+      columnPath,
+      primaryTable
+    );
+
+    for (const joinConfig of requiredJoins) {
+      const sqliteJoinTable = this.asSQLiteTable(joinConfig.table);
+      const joinCondition = joinConfig.condition as SQL;
+
+      if (joinConfig.type === 'left') {
+        query = query.leftJoin(sqliteJoinTable, joinCondition);
+      } else {
+        query = query.innerJoin(sqliteJoinTable, joinCondition);
+      }
+    }
+
+    return this.asSQLiteQueryBuilder(
+      query.where(isNotNull(sqliteColumn)).groupBy(sqliteColumn).orderBy(sqliteColumn)
+    );
+  }
+
+  /**
+   * Build filter options query
+   */
+  buildFilterOptionsQuery(columnId: string, primaryTable: string): SQLiteQueryBuilderWithJoins {
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const column = this.getColumn(columnPath);
+
+    if (!column) {
+      throw new QueryError(`Column not found: ${columnId}`, { columnId });
+    }
+
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const sqliteTable = this.asSQLiteTable(primaryTableSchema);
+    const sqliteColumn = this.asSQLiteColumn(column);
+
+    const baseQuery = this.db
+      .select({
+        value: sqliteColumn,
+        count: count(),
+      })
+      .from(sqliteTable);
+    let query:
+      | ReturnType<typeof baseQuery.leftJoin>
+      | ReturnType<typeof baseQuery.innerJoin>
+      | typeof baseQuery = baseQuery;
+
+    if (columnPath.isNested && columnPath.relationshipPath) {
+      const joinOrder = this.relationshipManager.optimizeJoinOrder(
+        new Map([[columnPath.table, columnPath.relationshipPath || []]]),
+        primaryTable
+      );
+
+      for (const relationship of joinOrder) {
+        const targetTable = this.schema[relationship.to];
+        if (!targetTable) {
+          throw new QueryError(`Target table not found: ${relationship.to}`, {
+            targetTable: relationship.to,
+          });
+        }
+
+        const joinCondition = this.buildJoinCondition(relationship) as SQL;
+        const sqliteTargetTable = this.asSQLiteTable(targetTable);
+
+        if (relationship.joinType === 'left') {
+          query = query.leftJoin(sqliteTargetTable, joinCondition);
+        } else {
+          query = query.innerJoin(sqliteTargetTable, joinCondition);
+        }
+      }
+    }
+
+    return this.asSQLiteQueryBuilder(
+      query.where(isNotNull(sqliteColumn)).groupBy(sqliteColumn).orderBy(sqliteColumn)
+    );
+  }
+
+  /**
+   * Build min/max values query
+   */
+  buildMinMaxQuery<TColumnId extends string>(
+    columnId: TColumnId,
+    primaryTable: string
+  ): SQLiteQueryBuilderWithJoins {
+    this.validateColumnId(columnId, primaryTable);
+
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
+
+    this.validateMinMaxColumnCompatibility(columnReference.column);
+
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const sqliteTable = this.asSQLiteTable(primaryTableSchema);
+    const sqliteColumn = this.asSQLiteColumn(columnReference.column);
+
+    const baseQuery = this.db
+      .select({
+        min: min(sqliteColumn),
+        max: max(sqliteColumn),
+      })
+      .from(sqliteTable);
+    let query:
+      | ReturnType<typeof baseQuery.leftJoin>
+      | ReturnType<typeof baseQuery.innerJoin>
+      | typeof baseQuery = baseQuery;
+
+    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
+      columnPath,
+      primaryTable
+    );
+
+    for (const joinConfig of requiredJoins) {
+      const sqliteJoinTable = this.asSQLiteTable(joinConfig.table);
+      const joinCondition = joinConfig.condition as SQL;
+
+      if (joinConfig.type === 'left') {
+        query = query.leftJoin(sqliteJoinTable, joinCondition);
+      } else {
+        query = query.innerJoin(sqliteJoinTable, joinCondition);
+      }
+    }
+
+    return this.asSQLiteQueryBuilder(query.where(isNotNull(sqliteColumn)));
+  }
+}

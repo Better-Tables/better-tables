@@ -454,38 +454,39 @@ export function BetterTable<TData = unknown>({
         </div>
       )}
 
-      {/* Actions Toolbar - render independently of filtering */}
-      {actions.length > 0 && (
-        <ActionsToolbar
-          actions={actions}
-          selectedIds={Array.from(selectedRows)}
-          selectedData={data.filter((row, index) => selectedRows.has(getRowId(row, index)))}
-          onActionMake={() => {
-            // Action executed - could trigger data refresh
-            // This callback can be used by parent to refetch data
-          }}
-        />
-      )}
+      <div className="flex items-center gap-2">
+        {/* Actions Toolbar - render independently of filtering */}
+        {actions.length > 0 && (
+          <ActionsToolbar
+            actions={actions}
+            selectedIds={Array.from(selectedRows)}
+            selectedData={data.filter((row, index) => selectedRows.has(getRowId(row, index)))}
+            onActionMake={() => {
+              // Action executed - could trigger data refresh
+              // This callback can be used by parent to refetch data
+            }}
+          />
+        )}
 
-      {/* Filter Bar - only show when filtering is enabled */}
-      {filtering && (
-        <FilterBar
-          columns={columns}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          showColumnVisibility={features.columnVisibility !== false}
-          columnVisibility={columnVisibility}
-          onToggleColumnVisibility={toggleColumnVisibility}
-          columnOrder={columnOrder}
-          onResetColumnOrder={() => {
-            const store = getTableStore(id);
-            if (store) store.getState().resetColumnOrder();
-          }}
-          enableColumnReordering={columnReordering}
-          onReset={handleReset}
-        />
-      )}
-
+        {/* Filter Bar - only show when filtering is enabled */}
+        {filtering && (
+          <FilterBar
+            columns={columns}
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            showColumnVisibility={features.columnVisibility !== false}
+            columnVisibility={columnVisibility}
+            onToggleColumnVisibility={toggleColumnVisibility}
+            columnOrder={columnOrder}
+            onResetColumnOrder={() => {
+              const store = getTableStore(id);
+              if (store) store.getState().resetColumnOrder();
+            }}
+            enableColumnReordering={columnReordering}
+            onReset={handleReset}
+          />
+        )}
+      </div>
       <div className="border rounded-md">
         <Table>
           <TableHeader>

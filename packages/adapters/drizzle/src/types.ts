@@ -17,14 +17,34 @@
 
 import type { AdapterMeta } from '@better-tables/core';
 import type { AnyColumn, InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import type { BaseQueryBuilder } from './query-builders';
+import type { RelationshipManager } from './relationship-manager';
+
+/**
+ * Mapping of database drivers to their corresponding Drizzle database types.
+ * This is the single source of truth for supported database drivers.
+ *
+ * @description This type ensures that every database driver has a corresponding
+ * database type. When you add a new driver, add it here and TypeScript will
+ * ensure type safety throughout the codebase.
+ */
+type DatabaseTypeMap = {
+  postgres: PostgresJsDatabase;
+  mysql: MySql2Database;
+  sqlite: BetterSQLite3Database;
+};
 
 /**
  * Database driver types supported by the Drizzle adapter.
  *
  * @description Identifies which database driver is being used
+ * Supported drivers are: postgres, mysql, sqlite.
  *
  * @example
  * ```typescript
@@ -33,7 +53,7 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
  *
  * @since 1.0.0
  */
-export type DatabaseDriver = 'postgres' | 'mysql' | 'sqlite';
+export type DatabaseDriver = keyof DatabaseTypeMap;
 
 /**
  * Generic table type that works across all database drivers.
@@ -230,26 +250,133 @@ export type TableWithId = AnyTableType & {
 /**
  * Database instance type for Drizzle ORM
  *
- * Drizzle supports multiple database drivers (SQLite, PostgreSQL, MySQL), each with
- * slightly different method signatures. TypeScript cannot reconcile union types with
- * different method signatures, which causes type errors when calling methods like
- * select(), insert(), update(), delete().
+ * @description Represents the actual Drizzle database instance returned by drizzle().
+ * It provides full type safety and access to all Drizzle methods like .select(), .insert(), etc.
  *
- * Following Drizzle's own adapter pattern and common ORM practices, we use `any` here
- * to support all three database types. The actual type safety is maintained through:
- * 1. The driver parameter which specifies which database is being used
- * 2. Runtime behavior that correctly handles each database type
- * 3. The schema type parameter which provides type safety for table operations
+ * @template TDriver - The specific database driver type
  *
- * This is the same approach used in Drizzle's documentation examples and other
- * multi-database ORMs.
+ * @example
+ * ```typescript
+ * // Specific driver - fully typed
+ * const db: DrizzleDatabase<'postgres'> = drizzle(connection);
  *
- *
+ * // Generic - requires runtime handling
+ * const db: DrizzleDatabase<DatabaseDriver> = drizzle(connection);
+ * ```
  */
+export type DrizzleDatabase<TDriver extends DatabaseDriver> = DatabaseTypeMap[TDriver];
 
-// TODO: should this have a proper type? ideally yes but we need to support all three database types
-// biome-ignore lint/suspicious/noExplicitAny: we need to support all three database types
-export type DrizzleDatabase = any;
+/**
+ * Common interface for database operations across all drivers.
+ * This follows the Strategy Pattern and ensures consistent behavior.
+ *
+ * @template TRecord - The record type for the table
+ * @description Defines the contract that all database operation implementations must follow
+ *
+ * @example
+ * ```typescript
+ * const operations: DatabaseOperations<User> = new PostgresOperations(db);
+ * const user = await operations.insert(usersTable, { name: 'John' });
+ * ```
+ *
+ * @since 1.0.0
+ */
+export interface DatabaseOperations<TRecord> {
+  /**
+   * Insert a new record into the table
+   * @param table - The table to insert into
+   * @param data - The data to insert
+   * @returns Promise with the inserted record
+   */
+  insert(table: TableWithId, data: Partial<TRecord>): Promise<TRecord>;
+
+  /**
+   * Update an existing record by ID
+   * @param table - The table to update
+   * @param id - The ID of the record to update
+   * @param data - The data to update
+   * @returns Promise with the updated record
+   */
+  update(table: TableWithId, id: string, data: Partial<TRecord>): Promise<TRecord>;
+
+  /**
+   * Delete a record by ID
+   * @param table - The table to delete from
+   * @param id - The ID of the record to delete
+   * @returns Promise with the deleted record
+   */
+  delete(table: TableWithId, id: string): Promise<TRecord>;
+
+  /**
+   * Bulk update multiple records
+   * @param table - The table to update
+   * @param ids - Array of IDs to update
+   * @param data - The data to update
+   * @returns Promise with array of updated records
+   */
+  bulkUpdate(table: TableWithId, ids: string[], data: Partial<TRecord>): Promise<TRecord[]>;
+
+  /**
+   * Bulk delete multiple records
+   * @param table - The table to delete from
+   * @param ids - Array of IDs to delete
+   * @returns Promise with array of deleted records
+   */
+  bulkDelete(table: TableWithId, ids: string[]): Promise<TRecord[]>;
+
+  /**
+   * Build count query for the specific database driver
+   * @param primaryTable - The primary table schema
+   * @returns Promise with the count result
+   */
+  buildCountQuery(primaryTable: AnyTableType): Promise<{ count: number }[]>;
+}
+
+/**
+ * Factory function type for creating database operations.
+ * This follows the Factory Pattern for operations instantiation.
+ *
+ * @template TRecord - The record type for the table
+ * @template TDriver - The database driver type
+ * @param db - The Drizzle database instance
+ * @returns The appropriate database operations implementation
+ *
+ * @example
+ * ```typescript
+ * const createOperations = getOperationsFactory<'postgres'>();
+ * const operations = createOperations<User>(postgresDb);
+ * ```
+ *
+ * @since 1.0.0
+ */
+export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
+  db: DrizzleDatabase<TDriver>
+) => DatabaseOperations<TRecord>;
+
+/**
+ * Factory function type for creating database query builders.
+ * This follows the Factory Pattern for query builder instantiation.
+ * Primary keys are auto-detected from the schema - no manual configuration needed.
+ *
+ * @template TDriver - The database driver type
+ * @param db - The Drizzle database instance
+ * @param schema - The schema containing all tables
+ * @param relationshipManager - The relationship manager instance
+ * @returns The appropriate query builder implementation
+ *
+ * @example
+ * ```typescript
+ * const createQueryBuilder = getQueryBuilderFactory<'postgres'>();
+ * const queryBuilder = createQueryBuilder(postgresDb, schema, relationshipManager);
+ * ```
+ *
+ * @since 1.0.0
+ */
+export type QueryBuilderFactory<TDriver extends DatabaseDriver> = (
+  db: DrizzleDatabase<TDriver>,
+  schema: Record<string, AnyTableType>,
+  relationshipManager: RelationshipManager
+) => BaseQueryBuilder;
 
 /**
  * Query builder interface for type safety
@@ -259,12 +386,13 @@ export interface QueryBuilder {
 }
 
 /**
- * Query builder with joins interface
+ * Base query builder with joins interface
+ * This interface defines the common methods that all database query builders must implement
  */
 export interface QueryBuilderWithJoins {
   leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): QueryBuilderWithJoins;
   innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): QueryBuilderWithJoins;
-  select(selections: Record<string, AnyColumnType | SQL | SQLWrapper>): QueryBuilderWithJoins;
+  select(selections?: Record<string, AnyColumnType | SQL | SQLWrapper>): QueryBuilderWithJoins;
   where(condition: SQL | SQLWrapper): QueryBuilderWithJoins;
   orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): QueryBuilderWithJoins;
   limit(count: number): QueryBuilderWithJoins;
@@ -274,17 +402,91 @@ export interface QueryBuilderWithJoins {
 }
 
 /**
- * Configuration for the Drizzle adapter
+ * PostgreSQL-specific query builder with joins interface
  */
-export interface DrizzleAdapterConfig<TSchema extends Record<string, AnyTableType>> {
-  /** Drizzle database instance */
-  db: DrizzleDatabase;
+export interface PostgresQueryBuilderWithJoins extends QueryBuilderWithJoins {
+  leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins;
+  innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins;
+  select(
+    selections?: Record<string, AnyColumnType | SQL | SQLWrapper>
+  ): PostgresQueryBuilderWithJoins;
+  where(condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins;
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): PostgresQueryBuilderWithJoins;
+  limit(count: number): PostgresQueryBuilderWithJoins;
+  offset(count: number): PostgresQueryBuilderWithJoins;
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): PostgresQueryBuilderWithJoins;
+}
+
+/**
+ * MySQL-specific query builder with joins interface
+ */
+export interface MySQLQueryBuilderWithJoins extends QueryBuilderWithJoins {
+  leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): MySQLQueryBuilderWithJoins;
+  innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): MySQLQueryBuilderWithJoins;
+  select(selections?: Record<string, AnyColumnType | SQL | SQLWrapper>): MySQLQueryBuilderWithJoins;
+  where(condition: SQL | SQLWrapper): MySQLQueryBuilderWithJoins;
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): MySQLQueryBuilderWithJoins;
+  limit(count: number): MySQLQueryBuilderWithJoins;
+  offset(count: number): MySQLQueryBuilderWithJoins;
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): MySQLQueryBuilderWithJoins;
+}
+
+/**
+ * SQLite-specific query builder with joins interface
+ */
+export interface SQLiteQueryBuilderWithJoins extends QueryBuilderWithJoins {
+  leftJoin(table: AnyTableType, condition: SQL | SQLWrapper): SQLiteQueryBuilderWithJoins;
+  innerJoin(table: AnyTableType, condition: SQL | SQLWrapper): SQLiteQueryBuilderWithJoins;
+  select(
+    selections?: Record<string, AnyColumnType | SQL | SQLWrapper>
+  ): SQLiteQueryBuilderWithJoins;
+  where(condition: SQL | SQLWrapper): SQLiteQueryBuilderWithJoins;
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): SQLiteQueryBuilderWithJoins;
+  limit(count: number): SQLiteQueryBuilderWithJoins;
+  offset(count: number): SQLiteQueryBuilderWithJoins;
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): SQLiteQueryBuilderWithJoins;
+}
+
+/**
+ * Configuration for the Drizzle adapter
+ *
+ * @template TSchema - The schema containing all tables
+ * @template TDriver - The specific database driver type (REQUIRED - must be specified)
+ *
+ * @description Configuration object for creating a DrizzleAdapter instance.
+ * The driver type parameter is required and must be explicitly specified to ensure
+ * proper type safety for all database operations. The `db` property will automatically
+ * be typed based on the `driver` value.
+ *
+ * @example
+ * ```typescript
+ * // For PostgreSQL - db will be typed as PostgresJsDatabase
+ * const config: DrizzleAdapterConfig<typeof schema, 'postgres'> = {
+ *   db: postgresDb, // TypeScript knows this should be PostgresJsDatabase
+ *   schema: { users, profiles },
+ *   driver: 'postgres'
+ * };
+ *
+ * // For SQLite - db will be typed as BetterSQLite3Database
+ * const config: DrizzleAdapterConfig<typeof schema, 'sqlite'> = {
+ *   db: sqliteDb, // TypeScript knows this should be BetterSQLite3Database
+ *   schema: { users, profiles },
+ *   driver: 'sqlite'
+ * };
+ * ```
+ */
+export interface DrizzleAdapterConfig<
+  TSchema extends Record<string, AnyTableType>,
+  TDriver extends DatabaseDriver,
+> {
+  /** Drizzle database instance - automatically typed based on driver */
+  db: DrizzleDatabase<TDriver>;
 
   /** Schema containing tables and relations */
   schema: TSchema;
 
-  /** Database driver type */
-  driver: DatabaseDriver;
+  /** Database driver type - determines the type of the `db` property */
+  driver: TDriver;
 
   /** Auto-detect relationships from schema */
   autoDetectRelationships?: boolean;
@@ -357,15 +559,6 @@ export interface DrizzleAdapterOptions {
 
     /** Batch size for large queries */
     batchSize?: number;
-  };
-
-  /** Primary key configuration */
-  primaryKey?: {
-    /** Custom primary key column name for the main table (defaults to 'id') */
-    mainTableKey?: string;
-
-    /** Map of table names to their primary key column names */
-    tableKeys?: Record<string, string>;
   };
 
   /** Logging configuration */

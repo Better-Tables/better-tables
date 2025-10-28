@@ -140,7 +140,7 @@ export const schema = {
   comments,
   categories,
   postCategories,
-} as const;
+};
 
 export const relationsSchema = {
   users: usersRelations,
@@ -149,7 +149,7 @@ export const relationsSchema = {
   comments: commentsRelations,
   categories: categoriesRelations,
   postCategories: postCategoriesRelations,
-} as const;
+};
 
 // Type exports
 export type User = typeof users.$inferSelect;

@@ -65,13 +65,15 @@ import type {
 } from '@better-tables/core';
 import type { InferSelectModel, Relations } from 'drizzle-orm';
 
-import { eq, inArray } from 'drizzle-orm';
 import { DataTransformer } from './data-transformer';
-import { DrizzleQueryBuilder } from './query-builder';
+import { getOperationsFactory } from './operations';
+import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
 import type {
   AnyTableType,
+  DatabaseDriver,
+  DatabaseOperations,
   DrizzleAdapterConfig,
   DrizzleDatabase,
   RelationshipMap,
@@ -89,10 +91,12 @@ import { QueryError, SchemaError } from './types';
  * @class DrizzleAdapter
  * @implements {TableAdapter}
  * @template TSchema - The schema type containing all tables
+ * @template TDriver - The database driver type (REQUIRED - must be explicitly specified)
  * @description Main adapter class for Drizzle ORM integration with Better Tables
  *
- * @property {DrizzleDatabase} db - The Drizzle database instance
+ * @property {DrizzleDatabase<TDriver>} db - The Drizzle database instance
  * @property {TSchema} schema - The schema containing all tables
+ * @property {TDriver} driver - The database driver type
  * @property {RelationshipMap} relationships - Map of all relationships
  * @property {RelationshipDetector} relationshipDetector - Detects relationships from schema
  * @property {RelationshipManager} relationshipManager - Manages relationship paths
@@ -105,8 +109,9 @@ import { QueryError, SchemaError } from './types';
  *
  * @example
  * ```typescript
- * const adapter = new DrizzleAdapter({
- *   db: drizzleDb,
+ * // REQUIRED: Specify the driver type explicitly for proper type safety
+ * const adapter = new DrizzleAdapter<typeof schema, 'postgres'>({
+ *   db: postgresDb,
  *   schema: { users, profiles, posts },
  *   relations: { usersRelations },
  *   driver: 'postgres',
@@ -117,15 +122,18 @@ import { QueryError, SchemaError } from './types';
  * @see {@link TableAdapter} for the interface contract
  * @since 1.0.0
  */
-export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
-  implements TableAdapter<InferSelectModel<TSchema[keyof TSchema]>>
+export class DrizzleAdapter<
+  TSchema extends Record<string, AnyTableType>,
+  TDriver extends DatabaseDriver,
+> implements TableAdapter<InferSelectModel<TSchema[keyof TSchema]>>
 {
-  private db: DrizzleDatabase;
+  private db: DrizzleDatabase<TDriver>;
   private schema: TSchema;
+  private operations: DatabaseOperations<InferSelectModel<TSchema[keyof TSchema]>>;
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
-  private queryBuilder: DrizzleQueryBuilder;
+  private queryBuilder: BaseQueryBuilder;
   private dataTransformer: DataTransformer;
   private cache: Map<
     string,
@@ -137,7 +145,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
   > = new Map();
   private subscribers: Array<(event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>) => void> =
     [];
-  private options: DrizzleAdapterConfig<TSchema>['options'];
+  private options: DrizzleAdapterConfig<TSchema, TDriver>['options'];
 
   public readonly meta: AdapterMeta;
 
@@ -148,10 +156,10 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    * relationship manager, query builder, and data transformer. Optionally
    * auto-detects relationships from the provided schema or uses manual mappings.
    *
-   * @param {DrizzleAdapterConfig<TSchema>} config - Configuration object for the adapter
-   * @param {DrizzleDatabase} config.db - The Drizzle database instance
+   * @param {DrizzleAdapterConfig<TSchema, TDriver>} config - Configuration object for the adapter
+   * @param {DrizzleDatabase<TDriver>} config.db - The Drizzle database instance
    * @param {TSchema} config.schema - The schema containing all Drizzle table definitions
-   * @param {DatabaseDriver} config.driver - The database driver being used ('postgres', 'mysql', 'sqlite')
+   * @param {TDriver} config.driver - The database driver being used (REQUIRED: 'postgres', 'mysql', or 'sqlite')
    * @param {boolean} [config.autoDetectRelationships=true] - Whether to automatically detect relationships from schema
    * @param {Record<string, unknown>} [config.relations] - Raw Drizzle relations for auto-detection
    * @param {RelationshipMap} [config.relationships] - Manual relationship mappings (overrides auto-detection)
@@ -162,8 +170,9 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    *
    * @example
    * ```typescript
-   * const adapter = new DrizzleAdapter({
-   *   db: drizzle(connectionString),
+   * // REQUIRED: Specify the driver type explicitly for proper type safety
+   * const adapter = new DrizzleAdapter<typeof schema, 'postgres'>({
+   *   db: postgresDb,
    *   schema: { users, profiles },
    *   driver: 'postgres',
    *   relations: { usersRelations },
@@ -175,10 +184,13 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
    *
    * @since 1.0.0
    */
-  constructor(config: DrizzleAdapterConfig<TSchema>) {
+  constructor(config: DrizzleAdapterConfig<TSchema, TDriver>) {
     this.db = config.db;
     this.schema = config.schema;
     this.options = config.options || {};
+
+    // Initialize database operations strategy based on driver
+    this.operations = this.createOperationsStrategy(config.driver);
 
     // Initialize relationship detection
     this.relationshipDetector = new RelationshipDetector();
@@ -200,17 +212,104 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
     // Initialize managers - they will be configured per query
     this.relationshipManager = new RelationshipManager(this.schema, this.relationships);
 
-    this.queryBuilder = new DrizzleQueryBuilder(
-      this.db,
-      this.schema,
-      this.relationshipManager,
-      config.driver,
-      config.options?.primaryKey?.tableKeys
-    );
+    // Initialize query builder using factory pattern based on driver
+    // Primary keys are auto-detected from schema
+    this.queryBuilder = this.createQueryBuilderStrategy(config.driver);
     this.dataTransformer = new DataTransformer(this.schema, this.relationshipManager);
 
     // Initialize metadata
     this.meta = this.buildAdapterMeta(config.meta);
+  }
+
+  /**
+   * Create the appropriate database operations strategy based on the driver.
+   * This uses the Factory Pattern to create the correct operations implementation.
+   *
+   * @private
+   * @param driver - The database driver type
+   * @returns The database operations implementation for the driver
+   */
+  private createOperationsStrategy(
+    driver: TDriver
+  ): DatabaseOperations<InferSelectModel<TSchema[keyof TSchema]>> {
+    const createOperations = getOperationsFactory(driver);
+    return createOperations<InferSelectModel<TSchema[keyof TSchema]>>(this.db);
+  }
+
+  /**
+   * Create the appropriate query builder strategy based on the driver.
+   * This uses the Factory Pattern to create the correct query builder implementation.
+   * Primary keys are auto-detected from the schema.
+   *
+   * @private
+   * @param driver - The database driver type
+   * @returns The query builder implementation for the driver
+   */
+  private createQueryBuilderStrategy(driver: TDriver): BaseQueryBuilder {
+    const createQueryBuilder = getQueryBuilderFactory(driver);
+    return createQueryBuilder(this.db, this.schema, this.relationshipManager);
+  }
+
+  /**
+   * Execute insert operation - Strategy Pattern dispatcher.
+   * Delegates to the appropriate driver-specific implementation.
+   *
+   * @private
+   * @param table - The table to insert into
+   * @param data - The data to insert
+   * @returns Promise with the inserted record
+   */
+  private async executeInsert(
+    table: TableWithId,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    return this.operations.insert(table, data);
+  }
+
+  /**
+   * Execute update operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeUpdate(
+    table: TableWithId,
+    id: string,
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    return this.operations.update(table, id, data);
+  }
+
+  /**
+   * Execute delete operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeDelete(
+    table: TableWithId,
+    id: string
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    return this.operations.delete(table, id);
+  }
+
+  /**
+   * Execute bulk update operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeBulkUpdate(
+    table: TableWithId,
+    ids: string[],
+    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    return this.operations.bulkUpdate(table, ids, data);
+  }
+
+  /**
+   * Execute bulk delete operation - Strategy Pattern dispatcher.
+   * @private
+   */
+  private async executeBulkDelete(
+    table: TableWithId,
+    ids: string[]
+  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    return this.operations.bulkDelete(table, ids);
   }
 
   /**
@@ -585,8 +684,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const insertResult = await this.db.insert(mainTableSchema).values(data).returning();
-      const [result] = insertResult as [InferSelectModel<TSchema[keyof TSchema]>];
+      const result = await this.executeInsert(mainTableSchema, data);
 
       this.emit({ type: 'insert', data: result });
       this.invalidateCache();
@@ -616,16 +714,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const updateResult = await this.db
-        .update(mainTableSchema)
-        .set(data)
-        .where(eq(mainTableSchema.id, id))
-        .returning();
-      const [result] = updateResult as [InferSelectModel<TSchema[keyof TSchema]>];
-
-      if (!result) {
-        throw new QueryError(`Record not found with id: ${id}`, { id });
-      }
+      const result = await this.executeUpdate(mainTableSchema, id, data);
 
       this.emit({ type: 'update', data: result });
       this.invalidateCache();
@@ -652,15 +741,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const deleteResult = await this.db
-        .delete(mainTableSchema)
-        .where(eq(mainTableSchema.id, id))
-        .returning();
-      const [result] = deleteResult as [InferSelectModel<TSchema[keyof TSchema]>];
-
-      if (!result) {
-        throw new QueryError(`Record not found with id: ${id}`, { id });
-      }
+      const result = await this.executeDelete(mainTableSchema, id);
 
       this.emit({ type: 'delete', data: result });
       this.invalidateCache();
@@ -688,12 +769,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const bulkUpdateResult = await this.db
-        .update(mainTableSchema)
-        .set(data)
-        .where(inArray(mainTableSchema.id, ids))
-        .returning();
-      const results = bulkUpdateResult as InferSelectModel<TSchema[keyof TSchema]>[];
+      const results = await this.executeBulkUpdate(mainTableSchema, ids, data);
 
       this.emit({ type: 'update', data: results });
       this.invalidateCache();
@@ -720,11 +796,7 @@ export class DrizzleAdapter<TSchema extends Record<string, AnyTableType>>
         });
       }
 
-      const bulkDeleteResult = await this.db
-        .delete(mainTableSchema)
-        .where(inArray(mainTableSchema.id, ids))
-        .returning();
-      const results = bulkDeleteResult as InferSelectModel<TSchema[keyof TSchema]>[];
+      const results = await this.executeBulkDelete(mainTableSchema, ids);
 
       this.emit({ type: 'delete', data: results });
       this.invalidateCache();
