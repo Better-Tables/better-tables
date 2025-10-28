@@ -118,7 +118,7 @@ export function drizzleAdapter<TDB>(
     const detected = detectDriver(db);
 
     if (!isValidDriver(detected)) {
-      throw new SchemaError(getDriverDetectionError(), { db });
+      throw new SchemaError(getDriverDetectionError());
     }
 
     driver = detected as ExtractDriverFromDB<TDB>;

@@ -20,6 +20,8 @@
  * ```
  */
 
+import type { TableAdapter } from './types/adapter';
+import type { ColumnDefinition } from './types/column';
 import type { BetterTablesConfig, BetterTablesInstance } from './types/factory';
 
 /**
@@ -83,14 +85,22 @@ export function betterTables<TRecord = unknown>(
 
   // Return the instance with methods
   return {
-    // Use getters to always reflect current configuration
-    get adapter() {
+    // Use getter/setter to always reflect current adapter and allow writes
+    get adapter(): TableAdapter<TRecord> {
       return currentConfig.database;
     },
 
-    // Use getter to always reflect current columns
-    get columns() {
+    set adapter(value: TableAdapter<TRecord>) {
+      currentConfig.database = value;
+    },
+
+    // Use getter/setter to always reflect current columns and allow writes
+    get columns(): ColumnDefinition<TRecord>[] {
       return currentConfig.columns ?? [];
+    },
+
+    set columns(value: ColumnDefinition<TRecord>[]) {
+      currentConfig.columns = value ?? [];
     },
 
     getConfig() {

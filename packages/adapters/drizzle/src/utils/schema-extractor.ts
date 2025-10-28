@@ -99,7 +99,12 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
 
       // Check if it has columns (table) or config (relation)
       if ('columns' in meta) {
-        result.tables[key] = value as AnyTableType;
+        // Check if there's a schema property to create a qualified key
+        const tableName = meta.name as string | undefined;
+        const schemaName = meta.schema as string | undefined;
+        const qualifiedKey = schemaName && tableName ? `${schemaName}.${tableName}` : key;
+
+        result.tables[qualifiedKey] = value as AnyTableType;
       }
     }
     // Check if this is a relation wrapper with a 'table' property
@@ -111,14 +116,19 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
       // Get the table name (e.g., 'users') from the table object itself.
       const tableName = tableObject._.name;
 
-      // Use the actual table name as the key.
-      if (tableName) {
-        // Store the table object, keyed by its name.
-        result.tables[tableName] = tableObject;
+      // Check if there's a schema property to create a qualified key
+      const schemaName = tableObject._.schema;
+      const qualifiedKey =
+        schemaName && typeof schemaName === 'string' ? `${schemaName}.${tableName}` : tableName;
 
-        // Store the relation object, also keyed by the table name it corresponds to.
+      // Use the qualified key to avoid collisions between tables with the same name in different schemas.
+      if (qualifiedKey) {
+        // Store the table object, keyed by its qualified name.
+        result.tables[qualifiedKey] = tableObject;
+
+        // Store the relation object, also keyed by the qualified table name.
         // This ensures the relationship detector can find it later.
-        result.relations[tableName] = relationObject;
+        result.relations[qualifiedKey] = relationObject;
       }
     }
     // If no _ property, treat as table (handles flattened schema structures)
