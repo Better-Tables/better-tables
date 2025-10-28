@@ -579,6 +579,42 @@ export interface DrizzleAdapterOptions {
 }
 
 /**
+ * Options for the drizzleAdapter factory function.
+ *
+ * @description
+ * Configuration options for creating a Drizzle adapter instance via the factory function.
+ * Allows overriding auto-detected values and providing additional configuration.
+ *
+ * @template TSchema - The schema type (optional, auto-inferred from db)
+ * @template TDriver - The driver type (optional, auto-inferred from db)
+ */
+export interface DrizzleAdapterFactoryOptions<
+  TSchema extends Record<string, AnyTableType> = Record<string, AnyTableType>,
+  TDriver extends DatabaseDriver = DatabaseDriver,
+> {
+  /** Override auto-detected schema */
+  schema?: TSchema;
+
+  /** Override auto-detected driver */
+  driver?: TDriver;
+
+  /** Override or provide relations */
+  relations?: Record<string, unknown>;
+
+  /** Manual relationship mappings */
+  relationships?: RelationshipMap;
+
+  /** Whether to auto-detect relationships (default: true) */
+  autoDetectRelationships?: boolean;
+
+  /** Adapter options */
+  options?: DrizzleAdapterOptions;
+
+  /** Adapter metadata */
+  meta?: Partial<AdapterMeta>;
+}
+
+/**
  * Query context for tracking required joins and tables
  */
 export interface QueryContext {
@@ -682,6 +718,75 @@ export interface QueryMetadata {
   /** Query SQL (if logging enabled) */
   sql?: string;
 }
+
+/**
+ * Extract schema type from Drizzle database instance.
+ *
+ * @description
+ * Attempts to extract the schema type parameter from a Drizzle database instance.
+ * This enables automatic type inference when using the factory function.
+ *
+ * @template TDB - The Drizzle database instance type
+ * @returns The schema type if available, otherwise a generic record
+ *
+ * @example
+ * ```typescript
+ * type MySchema = ExtractSchemaFromDB<typeof db>;
+ * // Returns the schema type passed to drizzle(connection, { schema })
+ * ```
+ */
+export type ExtractSchemaFromDB<TDB> = TDB extends PostgresJsDatabase<infer S>
+  ? S extends Record<string, AnyTableType>
+    ? S
+    : Record<string, AnyTableType>
+  : TDB extends MySql2Database<infer S>
+    ? S extends Record<string, AnyTableType>
+      ? S
+      : Record<string, AnyTableType>
+    : TDB extends BetterSQLite3Database<infer S>
+      ? S extends Record<string, AnyTableType>
+        ? S
+        : Record<string, AnyTableType>
+      : Record<string, AnyTableType>;
+
+/**
+ * Extract driver type from Drizzle database instance.
+ *
+ * @description
+ * Automatically determines the database driver type from the Drizzle instance type.
+ * This enables compile-time driver detection for type safety.
+ *
+ * @template TDB - The Drizzle database instance type
+ * @returns The driver type ('postgres' | 'mysql' | 'sqlite')
+ *
+ * @example
+ * ```typescript
+ * type MyDriver = ExtractDriverFromDB<PostgresJsDatabase>;
+ * // Returns 'postgres'
+ * ```
+ */
+export type ExtractDriverFromDB<TDB> = TDB extends PostgresJsDatabase<Record<string, never>>
+  ? 'postgres'
+  : TDB extends MySql2Database<Record<string, never>>
+    ? 'mysql'
+    : TDB extends BetterSQLite3Database<Record<string, never>>
+      ? 'sqlite'
+      : DatabaseDriver;
+
+/**
+ * Infer adapter type from Drizzle database instance.
+ *
+ * @description
+ * Combines schema and driver extraction to infer the complete adapter type
+ * from a Drizzle database instance. This is used by the factory function.
+ *
+ * @template TDB - The Drizzle database instance type
+ * @returns The DrizzleAdapter type with inferred generics
+ */
+export type InferAdapterFromDB<TDB> = import('./drizzle-adapter').DrizzleAdapter<
+  ExtractSchemaFromDB<TDB>,
+  ExtractDriverFromDB<TDB>
+>;
 
 /**
  * Error types for the adapter

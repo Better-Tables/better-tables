@@ -98,6 +98,8 @@
 
 // Builders
 export * from './builders';
+// Factory
+export * from './factory';
 // Managers
 export * from './managers';
 // Types

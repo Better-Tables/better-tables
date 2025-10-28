@@ -42,6 +42,7 @@
 
 export { DataTransformer } from './data-transformer';
 export { DrizzleAdapter } from './drizzle-adapter';
+export { createDrizzleAdapter, drizzleAdapter } from './factory';
 export { FilterHandler } from './filter-handler';
 export {
   BaseQueryBuilder,
@@ -83,6 +84,10 @@ export type {
   ColumnPath,
   DatabaseDriver,
   DrizzleAdapterConfig,
+  DrizzleAdapterFactoryOptions,
+  ExtractDriverFromDB,
+  ExtractSchemaFromDB,
+  InferAdapterFromDB,
   JoinConfig,
   QueryBuilderFactory,
   QueryContext,
