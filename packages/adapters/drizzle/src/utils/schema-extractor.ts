@@ -101,7 +101,10 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
       if ('columns' in meta) {
         // Check if there's a schema property to create a qualified key
         const tableName = meta.name as string | undefined;
-        const schemaName = meta.schema as string | undefined;
+        const schemaNameValue = meta.schema;
+
+        // Only use schemaName if it's actually a string (not a schema object like pgSchema())
+        const schemaName = typeof schemaNameValue === 'string' ? schemaNameValue : undefined;
 
         // Use schema-qualified name if schema exists, otherwise use original key
         // This preserves the original behavior for SQLite while adding schema support for PostgreSQL
