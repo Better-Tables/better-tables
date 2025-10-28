@@ -102,6 +102,9 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
         // Check if there's a schema property to create a qualified key
         const tableName = meta.name as string | undefined;
         const schemaName = meta.schema as string | undefined;
+
+        // Use schema-qualified name if schema exists, otherwise use original key
+        // This preserves the original behavior for SQLite while adding schema support for PostgreSQL
         const qualifiedKey = schemaName && tableName ? `${schemaName}.${tableName}` : key;
 
         result.tables[qualifiedKey] = value as AnyTableType;
@@ -110,26 +113,44 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
     // Check if this is a relation wrapper with a 'table' property
     else if ('table' in potentialTable && potentialTable.table) {
       // This is a relation object, like `usersRelations`.
-      const relationObject = value as Relations;
-      const tableObject = relationObject.table as AnyTableType;
+      try {
+        const relationObject = value as Relations;
+        const tableObject = relationObject.table as AnyTableType;
 
-      // Get the table name (e.g., 'users') from the table object itself.
-      const tableName = tableObject._.name;
+        // Check if tableObject exists and has a _ property before accessing it
+        if (!tableObject || typeof tableObject !== 'object') {
+          continue;
+        }
 
-      // Check if there's a schema property to create a qualified key
-      const schemaName = tableObject._.schema;
-      const qualifiedKey =
-        schemaName && typeof schemaName === 'string' ? `${schemaName}.${tableName}` : tableName;
+        // Use Drizzle symbols to get table metadata
+        const tableSymbol = Symbol.for('drizzle:Name');
+        const schemaSymbol = Symbol.for('drizzle:Schema');
+        const tableObjectWithSymbols = tableObject as unknown as Record<symbol, unknown>;
 
-      // Use the qualified key to avoid collisions between tables with the same name in different schemas.
-      if (qualifiedKey) {
-        // Store the table object, keyed by its qualified name.
-        result.tables[qualifiedKey] = tableObject;
+        // Get the table name from the Drizzle symbol
+        const tableName = tableObjectWithSymbols[tableSymbol];
 
-        // Store the relation object, also keyed by the qualified table name.
-        // This ensures the relationship detector can find it later.
-        result.relations[qualifiedKey] = relationObject;
-      }
+        // Get the schema name from the Drizzle symbol (if available)
+        const schemaName = tableObjectWithSymbols[schemaSymbol];
+
+        // Ensure tableName is a string, skip if not
+        if (typeof tableName !== 'string' || tableName.length === 0) {
+          continue;
+        }
+
+        const qualifiedKey =
+          typeof schemaName === 'string' ? `${schemaName}.${tableName}` : tableName;
+
+        // Use the qualified key to avoid collisions between tables with the same name in different schemas.
+        if (qualifiedKey) {
+          // Store the table object, keyed by its qualified name.
+          result.tables[qualifiedKey] = tableObject as AnyTableType;
+
+          // Store the relation object, also keyed by the qualified table name.
+          // This ensures the relationship detector can find it later.
+          result.relations[qualifiedKey] = relationObject;
+        }
+      } catch {}
     }
     // If no _ property, treat as table (handles flattened schema structures)
     else {
