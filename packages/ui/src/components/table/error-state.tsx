@@ -29,6 +29,9 @@ export function ErrorState({
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}
     >
       <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mb-4">

@@ -211,8 +211,11 @@ export function NumberFilterInput<TData = unknown>({
         <Label className="text-sm font-medium">Range</Label>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Min</Label>
+            <Label htmlFor={`min-${filter.columnId}`} className="text-xs text-muted-foreground">
+              Minimum {column.displayName}
+            </Label>
             <Input
+              id={`min-${filter.columnId}`}
               type="number"
               value={values.min}
               onChange={handleMinChange}
@@ -231,8 +234,11 @@ export function NumberFilterInput<TData = unknown>({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Max</Label>
+            <Label htmlFor={`max-${filter.columnId}`} className="text-xs text-muted-foreground">
+              Maximum {column.displayName}
+            </Label>
             <Input
+              id={`max-${filter.columnId}`}
               type="number"
               value={values.max}
               onChange={handleMaxChange}
