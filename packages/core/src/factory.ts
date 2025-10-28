@@ -83,8 +83,15 @@ export function betterTables<TRecord = unknown>(
 
   // Return the instance with methods
   return {
-    adapter: config.database,
-    columns: initialColumns,
+    // Use getters to always reflect current configuration
+    get adapter() {
+      return currentConfig.database;
+    },
+
+    // Use getter to always reflect current columns
+    get columns() {
+      return currentConfig.columns ?? [];
+    },
 
     getConfig() {
       return { ...currentConfig };

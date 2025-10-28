@@ -40,7 +40,8 @@ export interface ExtractedSchema {
  * ```typescript
  * const db = drizzle(connection, { schema: { users, usersRelations } });
  * const extracted = extractSchemaFromDB(db);
- * // { tables: { users }, relations: { usersRelations }, hasSchema: true }
+ * // { tables: { users }, relations: { users }, hasSchema: true }
+ * // Note: Relations are keyed by table name, not the relation property name
  * ```
  */
 export function extractSchemaFromDB(db: unknown): ExtractedSchema {
@@ -103,12 +104,21 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
     }
     // Check if this is a relation wrapper with a 'table' property
     else if ('table' in potentialTable && potentialTable.table) {
-      // This is a relation - extract the actual table
-      const actualTable = potentialTable.table as AnyTableType;
-      result.tables[key] = actualTable;
-      // Also store as relation
-      if ('config' in potentialTable) {
-        result.relations[key] = value as Relations;
+      // This is a relation object, like `usersRelations`.
+      const relationObject = value as Relations;
+      const tableObject = relationObject.table as AnyTableType;
+
+      // Get the table name (e.g., 'users') from the table object itself.
+      const tableName = tableObject._.name;
+
+      // Use the actual table name as the key.
+      if (tableName) {
+        // Store the table object, keyed by its name.
+        result.tables[tableName] = tableObject;
+
+        // Store the relation object, also keyed by the table name it corresponds to.
+        // This ensures the relationship detector can find it later.
+        result.relations[tableName] = relationObject;
       }
     }
     // If no _ property, treat as table (handles flattened schema structures)
