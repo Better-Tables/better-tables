@@ -118,7 +118,7 @@ export function ActionsToolbar<TData = unknown>({
             return (
               <DropdownMenuItem
                 key={action.id}
-                onClick={() => handleActionClick(action)}
+                onSelect={() => handleActionClick(action)}
                 disabled={!isEnabled || isAnyExecuting}
                 className={
                   action.variant === 'destructive' ? 'text-destructive focus:text-destructive' : ''

@@ -24,11 +24,15 @@ export type ActionVariant = 'default' | 'destructive' | 'secondary';
  * Determines whether an action should be visible based on the currently
  * selected rows and their data.
  *
+ * @template TData - The type of row data
  * @param selectedIds - Array of selected row IDs
  * @param selectedData - Array of selected row data (optional)
  * @returns Whether the action should be visible
  */
-export type ActionVisibility = (selectedIds: string[], selectedData?: unknown[]) => boolean;
+export type ActionVisibility<TData = unknown> = (
+  selectedIds: string[],
+  selectedData?: TData[]
+) => boolean;
 
 /**
  * Function type for checking if action is enabled.
@@ -36,11 +40,15 @@ export type ActionVisibility = (selectedIds: string[], selectedData?: unknown[])
  * Determines whether an action button should be enabled or disabled
  * based on the current selection.
  *
+ * @template TData - The type of row data
  * @param selectedIds - Array of selected row IDs
  * @param selectedData - Array of selected row data (optional)
  * @returns Whether the action should be enabled
  */
-export type ActionEnabled = (selectedIds: string[], selectedData?: unknown[]) => boolean;
+export type ActionEnabled<TData = unknown> = (
+  selectedIds: string[],
+  selectedData?: TData[]
+) => boolean;
 
 /**
  * Action handler function type.
@@ -108,8 +116,8 @@ export interface ActionConfirmationConfig {
  *     cancelLabel: 'Cancel',
  *     destructive: true
  *   },
- *   isVisible: (selectedIds) => selectedIds.length > 0,
- *   isEnabled: (selectedIds) => selectedIds.length > 0
+ *   isVisible: (selectedIds, selectedData) => selectedIds.length > 0,
+ *   isEnabled: (selectedIds, selectedData) => selectedIds.length > 0 && selectedData?.every(u => !u.isAdmin)
  * };
  * ```
  */
@@ -133,10 +141,10 @@ export interface TableAction<TData = unknown> {
   confirmationDialog?: ActionConfirmationConfig;
 
   /** Function to determine if action is visible */
-  isVisible?: ActionVisibility;
+  isVisible?: ActionVisibility<TData>;
 
   /** Function to determine if action is enabled */
-  isEnabled?: ActionEnabled;
+  isEnabled?: ActionEnabled<TData>;
 
   /** Additional metadata for the action */
   meta?: Record<string, unknown>;
