@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: Multiple drizzle versions and readonly schema cause type conflicts */
 import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
 import { getDatabase } from './db';
 import { relationsSchema as relations, schema } from './db/schema';
@@ -6,9 +7,9 @@ export async function getAdapter() {
   const { db } = await getDatabase();
 
   return new DrizzleAdapter({
-    db,
-    schema,
-    relations,
+    db: db as any,
+    schema: schema as any,
+    relations: relations as any,
     driver: 'sqlite',
     autoDetectRelationships: true,
     options: {
@@ -23,14 +24,6 @@ export async function getAdapter() {
         maxJoins: 10, // Maximum number of joins per query
         enableBatching: true, // Enable query result batching for large datasets
         batchSize: 1000, // Batch size for large queries
-      },
-      // Primary key configuration
-      primaryKey: {
-        mainTableKey: 'id', // Custom primary key for main table (defaults to 'id')
-        tableKeys: {
-          // Map specific table names to their primary key column names
-          // Example: 'users': 'userId', 'profiles': 'profileId'
-        },
       },
       // Logging configuration
       logging: {

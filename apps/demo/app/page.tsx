@@ -2,6 +2,7 @@ import type { FilterState, SortingState } from '@better-tables/core';
 import { UsersTableClient } from '@/components/users-table-client';
 import { getAdapter } from '@/lib/adapter';
 import { defaultVisibleColumns } from '@/lib/columns/user-columns';
+import type { UserWithRelations } from '@/lib/db/schema';
 
 interface PageProps {
   searchParams: Promise<{
@@ -101,7 +102,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
         {/* Table */}
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <UsersTableClient
-            data={result.data}
+            data={result.data as UserWithRelations[]}
             totalCount={result.total}
             initialPagination={
               result.pagination || {

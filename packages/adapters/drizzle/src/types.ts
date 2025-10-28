@@ -356,12 +356,13 @@ export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
 /**
  * Factory function type for creating database query builders.
  * This follows the Factory Pattern for query builder instantiation.
+ * Primary keys are auto-detected from the schema - no manual configuration needed.
  *
  * @template TDriver - The database driver type
  * @param db - The Drizzle database instance
  * @param schema - The schema containing all tables
  * @param relationshipManager - The relationship manager instance
- * @param primaryKeyMap - Optional primary key mapping
+ * @param primaryKeyMap - Optional primary key mapping (deprecated - kept for backward compatibility, auto-detected if not provided)
  * @returns The appropriate query builder implementation
  *
  * @example
@@ -560,15 +561,6 @@ export interface DrizzleAdapterOptions {
 
     /** Batch size for large queries */
     batchSize?: number;
-  };
-
-  /** Primary key configuration */
-  primaryKey?: {
-    /** Custom primary key column name for the main table (defaults to 'id') */
-    mainTableKey?: string;
-
-    /** Map of table names to their primary key column names */
-    tableKeys?: Record<string, string>;
   };
 
   /** Logging configuration */

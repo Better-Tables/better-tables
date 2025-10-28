@@ -67,7 +67,7 @@ import type { InferSelectModel, Relations } from 'drizzle-orm';
 
 import { DataTransformer } from './data-transformer';
 import { getOperationsFactory } from './operations';
-import { getQueryBuilderFactory, type BaseQueryBuilder } from './query-builders';
+import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
 import type {
@@ -213,10 +213,8 @@ export class DrizzleAdapter<
     this.relationshipManager = new RelationshipManager(this.schema, this.relationships);
 
     // Initialize query builder using factory pattern based on driver
-    this.queryBuilder = this.createQueryBuilderStrategy(
-      config.driver,
-      config.options?.primaryKey?.tableKeys
-    );
+    // Primary keys are auto-detected from schema
+    this.queryBuilder = this.createQueryBuilderStrategy(config.driver);
     this.dataTransformer = new DataTransformer(this.schema, this.relationshipManager);
 
     // Initialize metadata
@@ -241,18 +239,15 @@ export class DrizzleAdapter<
   /**
    * Create the appropriate query builder strategy based on the driver.
    * This uses the Factory Pattern to create the correct query builder implementation.
+   * Primary keys are auto-detected from the schema.
    *
    * @private
    * @param driver - The database driver type
-   * @param primaryKeyMap - Optional primary key mapping
    * @returns The query builder implementation for the driver
    */
-  private createQueryBuilderStrategy(
-    driver: TDriver,
-    primaryKeyMap?: Record<string, string>
-  ): BaseQueryBuilder {
+  private createQueryBuilderStrategy(driver: TDriver): BaseQueryBuilder {
     const createQueryBuilder = getQueryBuilderFactory(driver);
-    return createQueryBuilder(this.db, this.schema, this.relationshipManager, primaryKeyMap);
+    return createQueryBuilder(this.db, this.schema, this.relationshipManager);
   }
 
   /**

@@ -18,6 +18,7 @@ import { SQLiteQueryBuilder } from './sqlite-query-builder';
 /**
  * Factory function to create query builders based on driver type.
  * This follows the Factory Pattern and provides type-safe query builder creation.
+ * Primary keys are auto-detected from the schema.
  *
  * @template TDriver - The database driver type
  * @param driver - The database driver identifier
@@ -29,8 +30,7 @@ import { SQLiteQueryBuilder } from './sqlite-query-builder';
  * const queryBuilder = createQueryBuilder(
  *   postgresDb,
  *   schema,
- *   relationshipManager,
- *   primaryKeyMap
+ *   relationshipManager
  * );
  * ```
  *
@@ -45,15 +45,15 @@ export function getQueryBuilderFactory<TDriver extends DatabaseDriver>(
     db: DrizzleDatabase<TDriver>,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    primaryKeyMap?: Record<string, string>
+    _primaryKeyMap?: Record<string, string> // Deprecated - auto-detected, kept for backward compatibility
   ): BaseQueryBuilder => {
     switch (driver) {
       case 'postgres':
-        return new PostgresQueryBuilder(db as never, schema, relationshipManager, primaryKeyMap);
+        return new PostgresQueryBuilder(db as never, schema, relationshipManager);
       case 'mysql':
-        return new MySQLQueryBuilder(db as never, schema, relationshipManager, primaryKeyMap);
+        return new MySQLQueryBuilder(db as never, schema, relationshipManager);
       case 'sqlite':
-        return new SQLiteQueryBuilder(db as never, schema, relationshipManager, primaryKeyMap);
+        return new SQLiteQueryBuilder(db as never, schema, relationshipManager);
       default:
         throw new Error(`Unsupported database driver: ${driver as string}`);
     }
