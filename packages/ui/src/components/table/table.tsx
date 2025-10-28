@@ -3,6 +3,7 @@
 import type { FilterState, PaginationState, SortingState, TableConfig } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
+import * as React from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
   useTableColumnOrder,
@@ -257,6 +258,17 @@ export function BetterTable<TData = unknown>({
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;
 
+  // Screen reader announcement for sort changes
+  const sortAnnouncement = React.useMemo(() => {
+    if (sortingState.length === 0) return '';
+    return sortingState
+      .map((sort) => {
+        const column = columns.find((c) => c.id === sort.columnId);
+        return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
+      })
+      .join(', ');
+  }, [sortingState, columns]);
+
   // Filter columns by visibility and apply column order (must be before any early returns)
   const visibleColumns = useMemo(() => {
     const visible = columns.filter((col) => columnVisibility[col.id] !== false);
@@ -284,7 +296,13 @@ export function BetterTable<TData = unknown>({
   // Render loading state
   if (loading) {
     return (
-      <div className={cn('space-y-4', className)}>
+      // biome-ignore lint/a11y/useSemanticElements: Fine for live regions
+      <div
+        className={cn('space-y-4', className)}
+        role="status"
+        aria-live="polite"
+        aria-label="Loading table data"
+      >
         {filtering && (
           <div className="flex items-center justify-between">
             <Skeleton className="h-10 w-[200px]" />
@@ -387,6 +405,13 @@ export function BetterTable<TData = unknown>({
 
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props}>
+      {/* Screen reader announcement for sort changes */}
+      {sortAnnouncement && (
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {sortAnnouncement}
+        </div>
+      )}
+
       {filtering && (
         <FilterBar
           columns={columns}
@@ -488,6 +513,7 @@ export function BetterTable<TData = unknown>({
                   >
                     <TableHead
                       className={cn(
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                         column.align === 'center' && 'text-center',
                         column.align === 'right' && 'text-right',
                         isSortable && 'cursor-pointer hover:bg-muted/50'
@@ -520,6 +546,7 @@ export function BetterTable<TData = unknown>({
                   <TableHead
                     key={column.id}
                     className={cn(
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
                       isSortable && 'cursor-pointer hover:bg-muted/50'
@@ -556,6 +583,22 @@ export function BetterTable<TData = unknown>({
                     onRowClick?.(row);
                     rowConfig?.onClick?.(row);
                   }}
+                  onKeyDown={(e) => {
+                    if (onRowClick || rowConfig?.onClick) {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onRowClick?.(row);
+                        rowConfig?.onClick?.(row);
+                      }
+                    }
+                  }}
+                  tabIndex={onRowClick || rowConfig?.onClick ? 0 : undefined}
+                  role={onRowClick || rowConfig?.onClick ? 'button' : undefined}
+                  aria-label={
+                    onRowClick || rowConfig?.onClick
+                      ? `Row ${index + 1}: Click to view details`
+                      : undefined
+                  }
                 >
                   {rowSelection && (
                     <TableCell
@@ -652,6 +695,40 @@ export function BetterTable<TData = unknown>({
     const overId = event.over.id;
     const activeId = event.active.id;
 
+    // Handle sort reordering first (check if this is a sort drag)
+    const oldIndex = sortingState.findIndex((s) => s.columnId === activeId);
+    const newIndex = sortingState.findIndex((s) => s.columnId === overId);
+
+    // Handle drop zones (they have IDs like "sort-drop-before-0")
+    if (oldIndex >= 0 && newIndex < 0) {
+      // Dropped on a drop zone - check if it's a valid sort zone
+      if (overId.startsWith('sort-drop-')) {
+        // Extract target index from drop zone ID
+        const dropMatch = overId.match(/sort-drop-(before|after)-(\d+)/);
+        if (dropMatch) {
+          const position = dropMatch[1];
+          const targetIndex = parseInt(dropMatch[2], 10);
+
+          const newSorts = [...sortingState];
+          const [removed] = newSorts.splice(oldIndex, 1);
+
+          // Insert before or after the target index
+          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+          newSorts.splice(insertIndex, 0, removed);
+
+          setSorting(newSorts);
+          return;
+        }
+      }
+    }
+
+    // Normal sort reordering between items
+    if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+      const newSorts = arrayMove(sortingState, oldIndex, newIndex);
+      setSorting(newSorts);
+      return;
+    }
+
     // Handle column reordering (check for column-drop-* zones or column IDs in columnOrder)
     const columnOrderIndex = columnOrder.indexOf(activeId);
     const columnOrderTargetIndex = columnOrder.indexOf(overId);
@@ -683,40 +760,6 @@ export function BetterTable<TData = unknown>({
         setColumnOrder(newOrder);
       }
       return;
-    }
-
-    // Handle sort reordering (original logic)
-    const oldIndex = sortingState.findIndex((s) => s.columnId === activeId);
-    const newIndex = sortingState.findIndex((s) => s.columnId === overId);
-
-    // Handle drop zones (they have IDs like "sort-drop-before-0")
-    if (oldIndex >= 0 && newIndex < 0) {
-      // Dropped on a drop zone - check if it's a valid zone
-      if (overId.startsWith('sort-drop-')) {
-        // Extract target index from drop zone ID
-        const dropMatch = overId.match(/sort-drop-(before|after)-(\d+)/);
-        if (dropMatch) {
-          const position = dropMatch[1];
-          const targetIndex = parseInt(dropMatch[2], 10);
-
-          const newSorts = [...sortingState];
-          const [removed] = newSorts.splice(oldIndex, 1);
-
-          // Insert before or after the target index
-          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
-          newSorts.splice(insertIndex, 0, removed);
-
-          setSorting(newSorts);
-          return;
-        }
-      }
-      return;
-    }
-
-    // Normal reordering between items
-    if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
-      const newSorts = arrayMove(sortingState, oldIndex, newIndex);
-      setSorting(newSorts);
     }
   };
 
