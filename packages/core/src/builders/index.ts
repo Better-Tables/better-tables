@@ -1,11 +1,19 @@
 /**
- * @fileoverview Barrel export for column builders and factory utilities.
+ * @fileoverview Barrel export for column builders, action builders and factory utilities.
  *
- * This module provides a centralized export point for all column builder classes
+ * This module provides a centralized export point for all builder classes
  * and factory utilities, enabling convenient imports and maintaining a clean API.
  *
  * @module builders
  */
+
+// Action builders and factories
+export { ActionBuilder } from './action-builder';
+export {
+  createActionBuilder,
+  createActionBuilders,
+  deleteAction,
+} from './action-factory';
 
 // Column builders
 export { BooleanColumnBuilder } from './boolean-column-builder';

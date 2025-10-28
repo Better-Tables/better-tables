@@ -1,13 +1,14 @@
-import type { ColumnVisibility } from '@better-tables/core';
-import {
-  type ColumnDefinition,
-  type FilterState,
-  type PaginationState,
-  type SortingState,
-  type TableStateConfig,
-  type TableStateEvent,
-  TableStateManager,
+import type {
+  ColumnDefinition,
+  ColumnOrder,
+  ColumnVisibility,
+  FilterState,
+  PaginationState,
+  SortingState,
+  TableStateConfig,
+  TableStateEvent,
 } from '@better-tables/core';
+import { TableStateManager } from '@better-tables/core';
 import { createStore } from 'zustand/vanilla';
 
 /**
@@ -25,6 +26,7 @@ export interface TableState {
   sorting: SortingState;
   selectedRows: Set<string>;
   columnVisibility: ColumnVisibility;
+  columnOrder: ColumnOrder;
 
   // Filter actions
   setFilters: (filters: FilterState[]) => void;
@@ -55,6 +57,10 @@ export interface TableState {
   toggleColumnVisibility: (columnId: string) => void;
   setColumnVisibility: (visibility: ColumnVisibility) => void;
 
+  // Column order actions
+  setColumnOrder: (order: ColumnOrder) => void;
+  resetColumnOrder: () => void;
+
   // Bulk operations
   updateState: (state: Partial<Omit<TableState, 'manager'>>) => void;
   reset: () => void;
@@ -69,6 +75,7 @@ export interface TableStoreInitialState {
   sorting?: SortingState;
   selectedRows?: Set<string>;
   columnVisibility?: ColumnVisibility;
+  columnOrder?: ColumnOrder;
   // biome-ignore lint/suspicious/noExplicitAny: Needs to work with any column type
   columns: ColumnDefinition<any>[];
   config?: TableStateConfig;
@@ -89,6 +96,7 @@ export function createTableStore(initialState: TableStoreInitialState) {
       sorting: initialState.sorting,
       selectedRows: initialState.selectedRows,
       columnVisibility: initialState.columnVisibility,
+      columnOrder: initialState.columnOrder,
     },
     initialState.config
   );
@@ -108,7 +116,8 @@ export function createTableStore(initialState: TableStoreInitialState) {
             state.pagination !== event.state.pagination ||
             state.sorting !== event.state.sorting ||
             state.selectedRows !== event.state.selectedRows ||
-            state.columnVisibility !== event.state.columnVisibility;
+            state.columnVisibility !== event.state.columnVisibility ||
+            state.columnOrder !== event.state.columnOrder;
 
           // If nothing changed, return same state object to prevent re-renders
           if (!hasChanged) {
@@ -123,12 +132,18 @@ export function createTableStore(initialState: TableStoreInitialState) {
             sorting: event.state.sorting,
             selectedRows: event.state.selectedRows,
             columnVisibility: event.state.columnVisibility,
+            columnOrder: event.state.columnOrder,
           };
         });
       } else if (event.type === 'visibility_changed') {
         set((state) => ({
           ...state,
           columnVisibility: event.columnVisibility,
+        }));
+      } else if (event.type === 'order_changed') {
+        set((state) => ({
+          ...state,
+          columnOrder: event.columnOrder,
         }));
       } else if (event.type === 'columns_changed') {
         set((state) => ({
@@ -149,6 +164,7 @@ export function createTableStore(initialState: TableStoreInitialState) {
       sorting: managerState.sorting,
       selectedRows: managerState.selectedRows,
       columnVisibility: managerState.columnVisibility,
+      columnOrder: managerState.columnOrder,
 
       // Filter actions - delegate to manager
       setFilters: (filters) => {
@@ -235,6 +251,15 @@ export function createTableStore(initialState: TableStoreInitialState) {
 
       setColumnVisibility: (visibility) => {
         get().manager.setColumnVisibility(visibility);
+      },
+
+      // Column order actions - delegate to manager
+      setColumnOrder: (order) => {
+        get().manager.setColumnOrder(order);
+      },
+
+      resetColumnOrder: () => {
+        get().manager.resetColumnOrder();
       },
 
       // Bulk operations

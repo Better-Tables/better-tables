@@ -79,6 +79,12 @@ export interface FilterBarProps<TData = unknown> {
   columnVisibility?: ColumnVisibility;
   /** Handler to toggle column visibility */
   onToggleColumnVisibility?: (columnId: string) => void;
+  /** Current column order state */
+  columnOrder?: string[];
+  /** Handler to reset column order */
+  onResetColumnOrder?: () => void;
+  /** Whether column reordering is enabled */
+  enableColumnReordering?: boolean;
   /** Handler to reset all table state (filters, sorting, selection, etc.) */
   onReset?: () => void;
 }
@@ -103,6 +109,9 @@ export function FilterBar<TData = unknown>({
   showColumnVisibility = true,
   columnVisibility,
   onToggleColumnVisibility,
+  columnOrder,
+  onResetColumnOrder,
+  enableColumnReordering = false,
   onReset,
 }: FilterBarProps<TData>) {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
@@ -189,7 +198,14 @@ export function FilterBar<TData = unknown>({
   );
 
   return (
-    <div className={cn('w-full space-y-2', theme?.container, className)}>
+    <div className={cn('w-full', theme?.container, className)}>
+      {/* Screen reader announcement for filter changes */}
+      <div aria-live="polite" aria-atomic="false" className="sr-only">
+        {filters.length > 0
+          ? `${filters.length} filter${filters.length !== 1 ? 's' : ''} active`
+          : 'No filters active'}
+      </div>
+
       {/* Search Input for large column sets */}
       {searchable && availableColumns.length > 10 && (
         <div className="relative">
@@ -198,7 +214,9 @@ export function FilterBar<TData = unknown>({
             placeholder={searchPlaceholder}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
+            className="pl-8 focus-visible:ring-2"
+            aria-label="Search columns"
+            type="search"
           />
         </div>
       )}
@@ -287,6 +305,9 @@ export function FilterBar<TData = unknown>({
             columns={columns}
             columnVisibility={columnVisibility}
             onToggleVisibility={onToggleColumnVisibility}
+            columnOrder={columnOrder}
+            onResetColumnOrder={onResetColumnOrder}
+            enableReordering={enableColumnReordering}
             disabled={disabled}
           />
         )}

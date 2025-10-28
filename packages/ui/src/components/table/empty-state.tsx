@@ -27,7 +27,11 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Fine for live regions 
     <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}
     >
       <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted/20 mb-4">

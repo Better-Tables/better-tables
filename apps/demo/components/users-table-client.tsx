@@ -2,6 +2,7 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { userActions } from '@/lib/actions/user-actions';
 import { userColumns } from '@/lib/columns/user-columns';
 import type { UserWithRelations } from '@/lib/db/schema';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
@@ -33,16 +34,17 @@ export function UsersTableClient({
       pagination: true,
       sorting: true,
       columnVisibility: true,
+      columnOrder: true,
     },
     urlAdapter
   );
 
   return (
-    <BetterTable<UserWithRelations>
+    <BetterTable
       id={TABLE_ID}
       name="Users"
-      // biome-ignore lint/suspicious/noExplicitAny: Column types need to match BetterTable expectations
-      columns={userColumns as any}
+      columns={userColumns}
+      actions={userActions}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}
@@ -53,6 +55,7 @@ export function UsersTableClient({
         sorting: true,
         pagination: true,
         rowSelection: true,
+        columnReordering: true,
         headerContextMenu: {
           enabled: true,
           showSortToggle: true,

@@ -180,3 +180,32 @@ export function useTableColumnVisibility(tableId: string) {
     }))
   );
 }
+
+/**
+ * Hook to access column order state and actions
+ * More performant than useTableStore as it only subscribes to column order changes
+ *
+ * @param tableId - Unique table identifier
+ * @returns Column order state and actions
+ *
+ * @example
+ * ```tsx
+ * const { columnOrder, setColumnOrder, resetColumnOrder } = useTableColumnOrder('my-table');
+ * ```
+ */
+export function useTableColumnOrder(tableId: string) {
+  const store = getTableStore(tableId);
+  if (!store) {
+    throw new Error(
+      `Table store "${tableId}" not found. Make sure BetterTable is rendered before accessing the store.`
+    );
+  }
+  return useStore(
+    store,
+    useShallow((state) => ({
+      columnOrder: state.columnOrder,
+      setColumnOrder: state.setColumnOrder,
+      resetColumnOrder: state.resetColumnOrder,
+    }))
+  );
+}

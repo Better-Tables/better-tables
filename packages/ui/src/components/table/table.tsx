@@ -1,10 +1,18 @@
 'use client';
 
-import type { FilterState, PaginationState, SortingState, TableConfig } from '@better-tables/core';
+import type {
+  ColumnDefinition,
+  FilterState,
+  PaginationState,
+  SortingState,
+  TableConfig,
+} from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
+import * as React from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
+  useTableColumnOrder,
   useTableColumnVisibility,
   useTableFilters,
   useTablePagination,
@@ -13,12 +21,17 @@ import {
 } from '../../hooks/use-table-store';
 import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
-import { destroyTableStore, getOrCreateTableStore } from '../../stores/table-registry';
+import {
+  destroyTableStore,
+  getOrCreateTableStore,
+  getTableStore,
+} from '../../stores/table-registry';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { ActionsToolbar } from './actions-toolbar';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { TableHeaderContextMenu } from './table-header-context-menu';
@@ -30,7 +43,17 @@ import { TableProviders } from './table-providers';
  * Data fetching is handled by parent component
  * State is now managed internally with Zustand
  */
-export interface BetterTableProps<TData = unknown> extends Omit<TableConfig<TData>, 'adapter'> {
+// Type for columns with mixed value types (e.g., string, number, Date, boolean)
+// TypeScript cannot express a heterogeneous generic array, so we use 'any' here
+
+// biome-ignore lint/suspicious/noExplicitAny: Need to accept columns with mixed value types
+type MixedColumnDefinition<TData> = ColumnDefinition<TData, any>;
+
+export interface BetterTableProps<TData = unknown>
+  extends Omit<TableConfig<TData>, 'adapter' | 'columns'> {
+  /** Column definitions - may have mixed value types (string, number, Date, etc.) */
+  columns: MixedColumnDefinition<TData>[];
+
   /** Table data */
   data: TData[];
 
@@ -131,7 +154,14 @@ export function BetterTable<TData = unknown>({
     pagination: paginationEnabled = true,
     rowSelection = false,
     headerContextMenu,
+    columnReordering = false,
   } = features;
+
+  // Get actions from props
+  const actions = props.actions || [];
+
+  // Enable row selection automatically if actions are provided
+  const shouldShowRowSelection = actions.length > 0 || rowSelection;
 
   // Initialize store synchronously during render
   // The store creation is idempotent - it only creates once per ID
@@ -153,6 +183,7 @@ export function BetterTable<TData = unknown>({
   const { sorting: sortingState, toggleSort, setSorting } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
   const { columnVisibility, toggleColumnVisibility } = useTableColumnVisibility(id);
+  const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
 
   // Cleanup store on unmount to prevent memory leaks
   useEffect(() => {
@@ -196,7 +227,26 @@ export function BetterTable<TData = unknown>({
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
-    return rowConfig?.getId || ((_row: TData, index: number) => `row-${index}`);
+    return (
+      rowConfig?.getId ||
+      ((row: TData, _index: number) => {
+        // Try to find an id field using common patterns
+        if (typeof row === 'object' && row !== null) {
+          const obj = row as Record<string, unknown>;
+          if ('id' in obj && obj.id != null) {
+            return String(obj.id);
+          }
+          if ('_id' in obj && obj._id != null) {
+            return String(obj._id);
+          }
+          if ('uuid' in obj && obj.uuid != null) {
+            return String(obj.uuid);
+          }
+        }
+        // Fallback to index only if no ID field found
+        return `row-${_index}`;
+      })
+    );
   }, [rowConfig?.getId]);
 
   // Handle filter changes - just update store
@@ -250,15 +300,51 @@ export function BetterTable<TData = unknown>({
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;
 
-  // Filter columns by visibility (must be before any early returns)
+  // Screen reader announcement for sort changes
+  const sortAnnouncement = React.useMemo(() => {
+    if (sortingState.length === 0) return '';
+    return sortingState
+      .map((sort) => {
+        const column = columns.find((c) => c.id === sort.columnId);
+        return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
+      })
+      .join(', ');
+  }, [sortingState, columns]);
+
+  // Filter columns by visibility and apply column order (must be before any early returns)
   const visibleColumns = useMemo(() => {
-    return columns.filter((col) => columnVisibility[col.id] !== false);
-  }, [columns, columnVisibility]);
+    const visible = columns.filter((col) => columnVisibility[col.id] !== false);
+
+    // If we have a custom column order, apply it
+    if (columnOrder.length > 0) {
+      // Create a map of column IDs to columns for quick lookup
+      const columnMap = new Map(visible.map((col) => [col.id, col]));
+
+      // Apply the order from columnOrder, filtering to only include visible columns
+      const ordered = columnOrder
+        .map((id) => columnMap.get(id))
+        .filter((col): col is (typeof columns)[0] => col !== undefined);
+
+      // Add any columns that are visible but not in columnOrder (shouldn't happen, but defensive)
+      const unorderedIds = new Set(ordered.map((col) => col.id));
+      const remaining = visible.filter((col) => !unorderedIds.has(col.id));
+
+      return [...ordered, ...remaining];
+    }
+
+    return visible;
+  }, [columns, columnVisibility, columnOrder]);
 
   // Render loading state
   if (loading) {
     return (
-      <div className={cn('space-y-4', className)}>
+      // biome-ignore lint/a11y/useSemanticElements: Fine for live regions
+      <div
+        className={cn('space-y-4', className)}
+        role="status"
+        aria-live="polite"
+        aria-label="Loading table data"
+      >
         {filtering && (
           <div className="flex items-center justify-between">
             <Skeleton className="h-10 w-[200px]" />
@@ -269,7 +355,7 @@ export function BetterTable<TData = unknown>({
           <Table>
             <TableHeader>
               <TableRow>
-                {rowSelection && (
+                {shouldShowRowSelection && (
                   <TableHead className="w-[50px]">
                     <Skeleton className="h-4 w-4" />
                   </TableHead>
@@ -287,7 +373,7 @@ export function BetterTable<TData = unknown>({
                 const rowKey = `skeleton-row-${rowIdx}`;
                 return (
                   <TableRow key={rowKey}>
-                    {rowSelection && (
+                    {shouldShowRowSelection && (
                       <TableCell>
                         <Skeleton className="h-4 w-4" />
                       </TableCell>
@@ -328,6 +414,12 @@ export function BetterTable<TData = unknown>({
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}
+            columnOrder={columnOrder}
+            onResetColumnOrder={() => {
+              const store = getTableStore(id);
+              if (store) store.getState().resetColumnOrder();
+            }}
+            enableColumnReordering={columnReordering}
             onReset={handleReset}
           />
         )}
@@ -355,6 +447,27 @@ export function BetterTable<TData = unknown>({
 
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props}>
+      {/* Screen reader announcement for sort changes */}
+      {sortAnnouncement && (
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {sortAnnouncement}
+        </div>
+      )}
+
+      {/* Actions Toolbar - render independently of filtering */}
+      {actions.length > 0 && (
+        <ActionsToolbar
+          actions={actions}
+          selectedIds={Array.from(selectedRows)}
+          selectedData={data.filter((row, index) => selectedRows.has(getRowId(row, index)))}
+          onActionMake={() => {
+            // Action executed - could trigger data refresh
+            // This callback can be used by parent to refetch data
+          }}
+        />
+      )}
+
+      {/* Filter Bar - only show when filtering is enabled */}
       {filtering && (
         <FilterBar
           columns={columns}
@@ -363,6 +476,12 @@ export function BetterTable<TData = unknown>({
           showColumnVisibility={features.columnVisibility !== false}
           columnVisibility={columnVisibility}
           onToggleColumnVisibility={toggleColumnVisibility}
+          columnOrder={columnOrder}
+          onResetColumnOrder={() => {
+            const store = getTableStore(id);
+            if (store) store.getState().resetColumnOrder();
+          }}
+          enableColumnReordering={columnReordering}
           onReset={handleReset}
         />
       )}
@@ -371,7 +490,7 @@ export function BetterTable<TData = unknown>({
         <Table>
           <TableHeader>
             <TableRow>
-              {rowSelection && (
+              {shouldShowRowSelection && (
                 <TableHead
                   className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
                   style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
@@ -450,6 +569,7 @@ export function BetterTable<TData = unknown>({
                   >
                     <TableHead
                       className={cn(
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                         column.align === 'center' && 'text-center',
                         column.align === 'right' && 'text-right',
                         isSortable && 'cursor-pointer hover:bg-muted/50'
@@ -482,6 +602,7 @@ export function BetterTable<TData = unknown>({
                   <TableHead
                     key={column.id}
                     className={cn(
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
                       isSortable && 'cursor-pointer hover:bg-muted/50'
@@ -518,8 +639,24 @@ export function BetterTable<TData = unknown>({
                     onRowClick?.(row);
                     rowConfig?.onClick?.(row);
                   }}
+                  onKeyDown={(e) => {
+                    if (onRowClick || rowConfig?.onClick) {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onRowClick?.(row);
+                        rowConfig?.onClick?.(row);
+                      }
+                    }
+                  }}
+                  tabIndex={onRowClick || rowConfig?.onClick ? 0 : undefined}
+                  role={onRowClick || rowConfig?.onClick ? 'button' : undefined}
+                  aria-label={
+                    onRowClick || rowConfig?.onClick
+                      ? `Row ${index + 1}: Click to view details`
+                      : undefined
+                  }
                 >
-                  {rowSelection && (
+                  {shouldShowRowSelection && (
                     <TableCell
                       className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
                       style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
@@ -612,14 +749,15 @@ export function BetterTable<TData = unknown>({
     if (!event.over) return;
 
     const overId = event.over.id;
+    const activeId = event.active.id;
 
-    // Find indices by columnId matching
-    const oldIndex = sortingState.findIndex((s) => s.columnId === event.active.id);
+    // Handle sort reordering first (check if this is a sort drag)
+    const oldIndex = sortingState.findIndex((s) => s.columnId === activeId);
     const newIndex = sortingState.findIndex((s) => s.columnId === overId);
 
     // Handle drop zones (they have IDs like "sort-drop-before-0")
     if (oldIndex >= 0 && newIndex < 0) {
-      // Dropped on a drop zone - check if it's a valid zone
+      // Dropped on a drop zone - check if it's a valid sort zone
       if (overId.startsWith('sort-drop-')) {
         // Extract target index from drop zone ID
         const dropMatch = overId.match(/sort-drop-(before|after)-(\d+)/);
@@ -638,13 +776,46 @@ export function BetterTable<TData = unknown>({
           return;
         }
       }
-      return;
     }
 
-    // Normal reordering between items
+    // Normal sort reordering between items
     if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
       const newSorts = arrayMove(sortingState, oldIndex, newIndex);
       setSorting(newSorts);
+      return;
+    }
+
+    // Handle column reordering (check for column-drop-* zones or column IDs in columnOrder)
+    const columnOrderIndex = columnOrder.indexOf(activeId);
+    const columnOrderTargetIndex = columnOrder.indexOf(overId);
+
+    if (columnOrderIndex >= 0 || columnOrderTargetIndex >= 0 || overId.startsWith('column-drop-')) {
+      let newOrder: string[];
+
+      if (overId.startsWith('column-drop-')) {
+        // Dropped on a column drop zone
+        const dropMatch = overId.match(/column-drop-(before|after)-(\d+)/);
+        if (dropMatch) {
+          const position = dropMatch[1];
+          const targetIndex = parseInt(dropMatch[2], 10);
+
+          newOrder = [...columnOrder];
+          const [removed] = newOrder.splice(columnOrderIndex, 1);
+
+          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+          newOrder.splice(insertIndex, 0, removed);
+          setColumnOrder(newOrder);
+        }
+      } else if (
+        columnOrderIndex >= 0 &&
+        columnOrderTargetIndex >= 0 &&
+        columnOrderIndex !== columnOrderTargetIndex
+      ) {
+        // Normal column reordering between items
+        newOrder = arrayMove(columnOrder, columnOrderIndex, columnOrderTargetIndex);
+        setColumnOrder(newOrder);
+      }
+      return;
     }
   };
 

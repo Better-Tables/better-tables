@@ -8,6 +8,7 @@
  */
 
 import type { ComponentType } from 'react';
+import type { ActionsConfig, TableAction } from './action';
 import type { TableAdapter } from './adapter';
 import type { ColumnDefinition } from './column';
 import type { EventHandler, IconComponent, TableTheme } from './common';
@@ -63,7 +64,13 @@ export interface TableConfig<TData = unknown> {
   /** Sorting configuration and options */
   sorting?: SortingConfig;
 
-  /** Bulk actions available for selected rows */
+  /** Actions available for selected rows */
+  actions?: TableAction<TData>[];
+
+  /** Actions configuration and options */
+  actionsConfig?: ActionsConfig;
+
+  /** Bulk actions available for selected rows (deprecated, use actions instead) */
   bulkActions?: BulkActionDefinition<TData>[];
 
   /** Export configuration and options */
