@@ -198,7 +198,7 @@ export function FilterBar<TData = unknown>({
   );
 
   return (
-    <div className={cn('w-full space-y-2', theme?.container, className)}>
+    <div className={cn('w-full', theme?.container, className)}>
       {/* Screen reader announcement for filter changes */}
       <div aria-live="polite" aria-atomic="false" className="sr-only">
         {filters.length > 0
