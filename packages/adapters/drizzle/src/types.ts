@@ -362,7 +362,6 @@ export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
  * @param db - The Drizzle database instance
  * @param schema - The schema containing all tables
  * @param relationshipManager - The relationship manager instance
- * @param primaryKeyMap - Optional primary key mapping (deprecated - kept for backward compatibility, auto-detected if not provided)
  * @returns The appropriate query builder implementation
  *
  * @example
@@ -376,8 +375,7 @@ export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
 export type QueryBuilderFactory<TDriver extends DatabaseDriver> = (
   db: DrizzleDatabase<TDriver>,
   schema: Record<string, AnyTableType>,
-  relationshipManager: RelationshipManager,
-  primaryKeyMap?: Record<string, string>
+  relationshipManager: RelationshipManager
 ) => BaseQueryBuilder;
 
 /**

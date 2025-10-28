@@ -28,6 +28,7 @@ import type {
   SQLiteQueryBuilderWithJoins,
 } from '../types';
 import { QueryError } from '../types';
+import { generateAlias, generatePathKey } from '../utils/alias-generator';
 import { getColumnNames } from '../utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from '../utils/levenshtein';
 import { getPrimaryKeyMap } from '../utils/schema-introspection';
@@ -49,13 +50,13 @@ export abstract class BaseQueryBuilder {
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    databaseType: DatabaseDriver,
-    primaryKeyMap?: Record<string, string>
+    databaseType: DatabaseDriver
   ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
     this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType);
-    this.primaryKeyMap = getPrimaryKeyMap(schema, primaryKeyMap);
+    // Primary keys are auto-detected from the schema
+    this.primaryKeyMap = getPrimaryKeyMap(schema);
   }
 
   /**
@@ -301,9 +302,7 @@ export abstract class BaseQueryBuilder {
       const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
 
       if (columnPath.isNested && columnPath.relationshipPath) {
-        const relationshipPathKey = columnPath.relationshipPath
-          .map((r) => `${r.from}.${r.to}`)
-          .join('->');
+        const relationshipPathKey = generatePathKey(columnPath.relationshipPath);
 
         if (!relationshipPathsIncluded.has(relationshipPathKey)) {
           const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
@@ -316,7 +315,7 @@ export abstract class BaseQueryBuilder {
             for (const colName of columnNames) {
               const col = this.getTableColumn(relatedTable, colName);
               if (col) {
-                const aliasedKey = `${realTableName}_${colName}`;
+                const aliasedKey = generateAlias(columnPath.relationshipPath, colName);
                 selections[aliasedKey] = col;
               }
             }
@@ -434,7 +433,9 @@ export abstract class BaseQueryBuilder {
       if (this.hasProperty(query, 'explain')) {
         const explainResult = query.explain;
         if (typeof explainResult === 'function') {
-          const result = explainResult();
+          // Bind the explain method to the query instance to preserve 'this' context
+          const boundExplain = explainResult.bind(query);
+          const result = boundExplain();
           return typeof result === 'string' ? result : 'Query plan not available';
         }
       }

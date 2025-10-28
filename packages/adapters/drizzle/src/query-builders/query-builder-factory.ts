@@ -4,9 +4,13 @@
  *
  * @description
  * This factory follows the Factory Pattern to create the appropriate
- * query builder implementation based on the driver type.
- * It centralizes the creation logic and ensures type safety.
+ * query builder implementation based on the driver type,
+ * ensuring type safety through proper database type narrowing.
  */
+
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type { RelationshipManager } from '../relationship-manager';
 import type { AnyTableType, DatabaseDriver, DrizzleDatabase, QueryBuilderFactory } from '../types';
@@ -44,16 +48,21 @@ export function getQueryBuilderFactory<TDriver extends DatabaseDriver>(
   return (
     db: DrizzleDatabase<TDriver>,
     schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager,
-    _primaryKeyMap?: Record<string, string> // Deprecated - auto-detected, kept for backward compatibility
+    relationshipManager: RelationshipManager
   ): BaseQueryBuilder => {
     switch (driver) {
       case 'postgres':
-        return new PostgresQueryBuilder(db as never, schema, relationshipManager);
+        // TypeScript's control flow analysis doesn't narrow generic types in switch statements.
+        // However, this is safe because the DrizzleDatabase<TDriver> type is guaranteed to match
+        // the specific driver's database type when TDriver is narrowed by the switch case.
+        // When TDriver = 'postgres', DrizzleDatabase<'postgres'> = PostgresJsDatabase
+        return new PostgresQueryBuilder(db as PostgresJsDatabase, schema, relationshipManager);
       case 'mysql':
-        return new MySQLQueryBuilder(db as never, schema, relationshipManager);
+        // Same reasoning: DrizzleDatabase<'mysql'> = MySql2Database
+        return new MySQLQueryBuilder(db as MySql2Database, schema, relationshipManager);
       case 'sqlite':
-        return new SQLiteQueryBuilder(db as never, schema, relationshipManager);
+        // Same reasoning: DrizzleDatabase<'sqlite'> = BetterSQLite3Database
+        return new SQLiteQueryBuilder(db as BetterSQLite3Database, schema, relationshipManager);
       default:
         throw new Error(`Unsupported database driver: ${driver as string}`);
     }

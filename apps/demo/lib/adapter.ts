@@ -3,10 +3,18 @@ import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
 import { getDatabase } from './db';
 import { relationsSchema as relations, schema } from './db/schema';
 
+// Module-level cache for the adapter instance
+let adapterInstance: any = null;
+
 export async function getAdapter() {
+  // Return cached instance if it exists
+  if (adapterInstance) {
+    return adapterInstance;
+  }
+
   const { db } = await getDatabase();
 
-  return new DrizzleAdapter({
+  adapterInstance = new DrizzleAdapter({
     db: db as any,
     schema: schema as any,
     relations: relations as any,
@@ -38,4 +46,6 @@ export async function getAdapter() {
       },
     },
   });
+
+  return adapterInstance;
 }

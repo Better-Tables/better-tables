@@ -20,6 +20,7 @@ import type {
   QueryContext,
 } from '../types';
 import { QueryError } from '../types';
+import { generateAlias } from '../utils/alias-generator';
 import { BaseQueryBuilder } from './base-query-builder';
 
 /**
@@ -35,10 +36,9 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
   constructor(
     db: MySql2Database,
     schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager,
-    primaryKeyMap?: Record<string, string>
+    relationshipManager: RelationshipManager
   ) {
-    super(schema, relationshipManager, 'mysql', primaryKeyMap);
+    super(schema, relationshipManager, 'mysql');
     this.db = db;
   }
 
@@ -88,9 +88,7 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
         const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
 
         if (columnPath.isNested && columnPath.relationshipPath) {
-          const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
-          const realTableName = relationship?.to || columnPath.table;
-          const aliasedKey = `${realTableName}_${columnPath.field}`;
+          const aliasedKey = generateAlias(columnPath.relationshipPath, columnPath.field);
           columnMapping[aliasedKey] = columnId;
         } else {
           columnMapping[columnId] = columnId;
