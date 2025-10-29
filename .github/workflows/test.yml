@@ -91,6 +91,36 @@ jobs:
     defaults:
       run:
         working-directory: packages/adapters/drizzle
+    
+    services:
+      mysql:
+        image: mysql:8.0-alpine
+        env:
+          MYSQL_ROOT_PASSWORD: testpassword
+          MYSQL_DATABASE: drizzle_test
+          MYSQL_USER: testuser
+          MYSQL_PASSWORD: testpassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+      
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: drizzle_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U testuser"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout code
@@ -119,6 +149,33 @@ jobs:
           echo "Workspace packages:"
           pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
 
+      - name: Install build dependencies
+        run: |
+          echo "Installing build dependencies for native modules..."
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 make g++
+          echo "✓ Build dependencies installed"
+      
+      - name: Rebuild native dependencies
+        run: |
+          echo "Rebuilding native dependencies (better-sqlite3)..."
+          cd ../../..
+          # better-sqlite3 requires native compilation for the target platform
+          # Rebuild from workspace root to ensure it finds all dependencies
+          echo "Current Node.js version: $(node --version)"
+          echo "Current npm version: $(npm --version)"
+          echo ""
+          echo "Rebuilding better-sqlite3..."
+          pnpm rebuild better-sqlite3 --verbose || {
+            echo "⚠️  Rebuild failed, trying alternative approach..."
+            cd packages/adapters/drizzle
+            pnpm rebuild better-sqlite3 --verbose
+          }
+          echo ""
+          echo "Verifying better-sqlite3 installation..."
+          node -e "require('better-sqlite3'); console.log('✓ better-sqlite3 loaded successfully')" || echo "⚠️  Warning: better-sqlite3 may not be fully ready"
+          echo "✓ Native dependencies rebuilt"
+
       - name: Build Core Package (dependency)
         run: |
           echo "Building @better-tables/core package as dependency..."
@@ -132,6 +189,10 @@ jobs:
           echo "✓ Core package built successfully"
 
       - name: Run Adapter Tests
+        env:
+          # Set connection strings for MySQL and Postgres services
+          MYSQL_TEST_URL: mysql://testuser:testpassword@localhost:3306/drizzle_test
+          POSTGRES_TEST_URL: postgresql://testuser:testpassword@localhost:5432/drizzle_test
         run: |
           echo "========================================="
           echo "🧪 Running Adapter Package Tests"
@@ -140,6 +201,13 @@ jobs:
           echo "Working directory: $(pwd)"
           echo "Node version: $(node --version)"
           echo "pnpm version: $(pnpm --version)"
+          echo ""
+          echo "Database services available:"
+          echo "  MySQL: $MYSQL_TEST_URL"
+          echo "  Postgres: $POSTGRES_TEST_URL"
+          echo ""
+          echo "Waiting for database services to be ready..."
+          sleep 5
           echo ""
           echo "Starting test execution..."
           echo ""
