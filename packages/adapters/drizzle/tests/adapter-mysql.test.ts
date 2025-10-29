@@ -22,7 +22,7 @@ import type { User } from './helpers/test-schema';
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
+describe.skip('DrizzleAdapter - MySQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createMySQLAdapter>;
   let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
 

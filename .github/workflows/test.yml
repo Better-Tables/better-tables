@@ -77,9 +77,9 @@ jobs:
           echo ""
           echo "Starting test execution..."
           echo ""
-          echo "Running: pnpm test --run --reporter=verbose"
+          echo "Running: pnpm test -- --run --reporter=verbose"
           echo ""
-          pnpm test --run --reporter=verbose
+          pnpm test -- --run --reporter=verbose
           echo ""
           echo "========================================="
           echo "✅ Core tests completed successfully"
@@ -194,7 +194,7 @@ jobs:
           echo "Excluding: adapter-sqlite.test.ts and query-builder.test.ts"
           echo ""
           # Exclude SQLite tests due to native binding compilation issues
-          pnpm test --run --reporter=verbose \
+          pnpm test -- --run --reporter=verbose \
             --exclude="**/adapter-sqlite.test.ts" \
             --exclude="**/query-builder.test.ts"
           echo ""

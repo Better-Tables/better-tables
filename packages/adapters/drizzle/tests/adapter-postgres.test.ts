@@ -22,7 +22,7 @@ import type { User } from './helpers/test-schema';
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
+describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createPostgresAdapter>;
   let client: Awaited<ReturnType<typeof createPostgresDatabase>>['client'];
 
@@ -181,12 +181,12 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       const result = await adapter.fetchData({
         filters: [{ columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] }],
       });
-      // Note: notEquals may return all results if not properly implemented
-      // Just verify it returns data and doesn't crash
+      // Verify that 'John Doe' is excluded from results
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
       const names = result.data.map((r) => (r as UserWithRelations).name);
       expect(names.length).toBeGreaterThan(0);
+      expect(names).not.toContain('John Doe');
     });
 
     it('should filter by text isNull', async () => {
@@ -647,20 +647,19 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
     });
 
     it('should handle invalid filter operators', async () => {
-      // Adapter handles invalid operators gracefully (returns all data)
-      const result = await adapter.fetchData({
-        filters: [
-          {
-            columnId: 'name',
-            type: 'text',
-            operator: 'invalidOp' as FilterOperator,
-            values: ['test'],
-          },
-        ],
-      });
-      // Should return data without crashing
-      expect(result.data).toBeDefined();
-      expect(Array.isArray(result.data)).toBe(true);
+      // adapter.fetchData throws a QueryError for unsupported operators
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'invalidOp' as FilterOperator,
+              values: ['test'],
+            },
+          ],
+        })
+      ).rejects.toThrow();
     });
 
     it('should handle invalid relationship paths', async () => {

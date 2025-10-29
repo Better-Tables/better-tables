@@ -284,6 +284,61 @@ describe('Column Visibility Utilities', () => {
       });
     });
 
+    it('should not mutate the modifications object', () => {
+      const columns = [createMockColumn('name', true), createMockColumn('email', false)];
+
+      const modifications = {
+        name: false,
+        email: true,
+      };
+
+      const originalModifications = { ...modifications };
+      mergeColumnVisibility(columns, modifications);
+
+      // Verify modifications object was not mutated
+      expect(modifications).toEqual(originalModifications);
+    });
+
+    it('should handle modifications with multiple non-existent columns', () => {
+      const columns = [createMockColumn('id', true)];
+
+      const modifications = {
+        id: false,
+        nonExistent1: true,
+        nonExistent2: false,
+        nonExistent3: true,
+      };
+
+      const visibility = mergeColumnVisibility(columns, modifications);
+
+      expect(visibility).toEqual({
+        id: false,
+        // All non-existent columns should be ignored
+      });
+    });
+
+    it('should handle columns map lookup correctly for large column arrays', () => {
+      const columns = Array.from({ length: 100 }, (_, i) =>
+        createMockColumn(`col${i}`, i % 2 === 0)
+      );
+
+      const modifications = {
+        col0: false,
+        col50: true,
+        col99: false,
+        invalid: true,
+      };
+
+      const visibility = mergeColumnVisibility(columns, modifications);
+
+      expect(visibility.col0).toBe(false);
+      expect(visibility.col50).toBe(true);
+      expect(visibility.col99).toBe(false);
+      expect(visibility.invalid).toBeUndefined();
+      // Check that defaults are preserved
+      expect(visibility.col1).toBe(false); // defaultVisible from column
+    });
+
     it('should handle single column', () => {
       const columns = [createMockColumn('id', false)];
       const modifications = { id: true };

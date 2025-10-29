@@ -353,4 +353,60 @@ describe('TextColumnBuilder Enhancements', () => {
       expect(column.type).toBe('url'); // Last one wins
     });
   });
+
+  describe('truncate method', () => {
+    it('should set truncate options with default showTooltip = true', () => {
+      const builder = new TextColumnBuilder<TestUser>();
+      const column = builder
+        .id('description')
+        .displayName('Description')
+        .accessor((user) => user.description)
+        .truncate({ maxLength: 50 })
+        .build();
+
+      expect(column.meta?.truncate?.maxLength).toBe(50);
+      expect(column.meta?.truncate?.suffix).toBe('...');
+      expect(column.meta?.truncate?.showTooltip).toBe(true);
+    });
+
+    it('should set truncate with all default values when no options provided', () => {
+      const builder = new TextColumnBuilder<TestUser>();
+      const column = builder
+        .id('description')
+        .displayName('Description')
+        .accessor((user) => user.description)
+        .truncate()
+        .build();
+
+      expect(column.meta?.truncate?.maxLength).toBe(100);
+      expect(column.meta?.truncate?.suffix).toBe('...');
+      expect(column.meta?.truncate?.showTooltip).toBe(true);
+    });
+
+    it('should allow overriding showTooltip to false', () => {
+      const builder = new TextColumnBuilder<TestUser>();
+      const column = builder
+        .id('description')
+        .displayName('Description')
+        .accessor((user) => user.description)
+        .truncate({ maxLength: 50, showTooltip: false })
+        .build();
+
+      expect(column.meta?.truncate?.maxLength).toBe(50);
+      expect(column.meta?.truncate?.showTooltip).toBe(false);
+    });
+
+    it('should allow explicit showTooltip = true', () => {
+      const builder = new TextColumnBuilder<TestUser>();
+      const column = builder
+        .id('description')
+        .displayName('Description')
+        .accessor((user) => user.description)
+        .truncate({ maxLength: 50, showTooltip: true })
+        .build();
+
+      expect(column.meta?.truncate?.maxLength).toBe(50);
+      expect(column.meta?.truncate?.showTooltip).toBe(true);
+    });
+  });
 });

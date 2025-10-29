@@ -429,5 +429,139 @@ describe('Meta Accessors', () => {
 
       expect(meta.numberFormat?.locale).toBe('en-US'); // Original unchanged
     });
+
+    it('should clone numberFormat without mutating original', () => {
+      const meta: ColumnMeta = {
+        numberFormat: {
+          locale: 'en-US',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+          useGrouping: true,
+        },
+      };
+
+      const format = getNumberFormat(meta);
+      format.locale = 'en-GB';
+      format.minimumFractionDigits = 3;
+      format.useGrouping = false;
+
+      expect(meta.numberFormat?.locale).toBe('en-US');
+      expect(meta.numberFormat?.minimumFractionDigits).toBe(2);
+      expect(meta.numberFormat?.useGrouping).toBe(true);
+    });
+
+    it('should clone currencyFormat without mutating original numberFormat or currencyFormat', () => {
+      const meta: ColumnMeta = {
+        numberFormat: {
+          locale: 'en-US',
+          useGrouping: true,
+        },
+        currencyFormat: {
+          currency: 'USD',
+          currencyDisplay: 'symbol',
+        },
+      };
+
+      const format = getCurrencyFormat(meta);
+      format.locale = 'en-GB';
+      format.currency = 'EUR';
+      format.useGrouping = false;
+
+      expect(meta.numberFormat?.locale).toBe('en-US');
+      expect(meta.numberFormat?.useGrouping).toBe(true);
+      expect(meta.currencyFormat?.currency).toBe('USD');
+      expect(meta.currencyFormat?.currencyDisplay).toBe('symbol');
+    });
+
+    it('should clone dateFormat without mutating original', () => {
+      const meta: ColumnMeta = {
+        dateFormat: {
+          format: 'MMM dd, yyyy',
+          locale: 'en-US',
+          showTime: true,
+        },
+      };
+
+      const format = getDateFormat(meta);
+      format.format = 'yyyy-MM-dd';
+      format.locale = 'en-GB';
+      format.showTime = false;
+
+      expect(meta.dateFormat?.format).toBe('MMM dd, yyyy');
+      expect(meta.dateFormat?.locale).toBe('en-US');
+      expect(meta.dateFormat?.showTime).toBe(true);
+    });
+
+    it('should clone dateFormat relativeOptions without mutating original', () => {
+      const meta: ColumnMeta = {
+        dateFormat: {
+          format: 'MMM dd, yyyy',
+          locale: 'en-US',
+          showTime: true,
+          relativeOptions: {
+            maxDays: 7,
+            short: true,
+            numeric: 'auto' as const,
+          },
+        },
+      };
+
+      const format = getDateFormat(meta);
+      if (format.relativeOptions) {
+        format.relativeOptions.maxDays = 30;
+        format.relativeOptions.short = false;
+        format.relativeOptions.numeric = 'always';
+      }
+
+      expect(meta.dateFormat?.relativeOptions?.maxDays).toBe(7);
+      expect(meta.dateFormat?.relativeOptions?.short).toBe(true);
+      expect(meta.dateFormat?.relativeOptions?.numeric).toBe('auto');
+    });
+
+    it('should clone textFormat without mutating original', () => {
+      const meta: ColumnMeta = {
+        textFormat: {
+          truncate: {
+            maxLength: 50,
+            suffix: '...',
+            showTooltip: true,
+          },
+          textTransform: 'capitalize',
+          trim: true,
+        },
+      };
+
+      const format = getTextFormat(meta);
+      if (format.truncate) {
+        format.truncate.maxLength = 100;
+        format.truncate.showTooltip = false;
+      }
+      format.textTransform = 'uppercase';
+      format.trim = false;
+
+      expect(meta.textFormat?.truncate?.maxLength).toBe(50);
+      expect(meta.textFormat?.truncate?.showTooltip).toBe(true);
+      expect(meta.textFormat?.textTransform).toBe('capitalize');
+      expect(meta.textFormat?.trim).toBe(true);
+    });
+
+    it('should clone optionColors without mutating original', () => {
+      const meta: ColumnMeta = {
+        optionColors: {
+          active: '#10b981',
+          inactive: '#6b7280',
+          pending: '#f59e0b',
+        },
+      };
+
+      const colors = getOptionColors(meta);
+      colors.active = '#ff0000';
+      colors.newOption = '#0000ff';
+
+      expect(meta.optionColors?.active).toBe('#10b981');
+      expect(meta.optionColors?.inactive).toBe('#6b7280');
+      expect(meta.optionColors?.pending).toBe('#f59e0b');
+      expect(meta.optionColors?.newOption).toBeUndefined();
+    });
   });
 });

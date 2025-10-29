@@ -96,7 +96,18 @@ export function getCurrencyFormat(meta?: ColumnMeta): CurrencyFormatMeta {
  * ```
  */
 export function getDateFormat(meta?: ColumnMeta): DateFormatMeta {
-  return meta?.dateFormat ? { ...meta.dateFormat } : {};
+  if (!meta?.dateFormat) {
+    return {};
+  }
+
+  const dateFormat = { ...meta.dateFormat };
+
+  // Deep clone the relativeOptions object if it exists
+  if (dateFormat.relativeOptions) {
+    dateFormat.relativeOptions = { ...dateFormat.relativeOptions };
+  }
+
+  return dateFormat;
 }
 
 /**
@@ -124,7 +135,18 @@ export function getDateFormat(meta?: ColumnMeta): DateFormatMeta {
  * ```
  */
 export function getTextFormat(meta?: ColumnMeta): TextFormatMeta {
-  return meta?.textFormat ? { ...meta.textFormat } : {};
+  if (!meta?.textFormat) {
+    return {};
+  }
+
+  const textFormat = { ...meta.textFormat };
+
+  // Deep clone the truncate object if it exists
+  if (textFormat.truncate) {
+    textFormat.truncate = { ...textFormat.truncate };
+  }
+
+  return textFormat;
 }
 
 /**
