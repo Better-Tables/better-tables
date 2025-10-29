@@ -119,6 +119,18 @@ jobs:
           echo "Workspace packages:"
           pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
 
+      - name: Build Core Package (dependency)
+        run: |
+          echo "Building @better-tables/core package as dependency..."
+          cd ../../..
+          echo "Building core package..."
+          cd packages/core
+          pnpm build
+          echo ""
+          echo "Verifying core package was built..."
+          ls -la dist/ || echo "Warning: dist directory not found"
+          echo "✓ Core package built successfully"
+
       - name: Run Adapter Tests
         run: |
           echo "========================================="
