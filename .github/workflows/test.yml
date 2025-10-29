@@ -1,0 +1,181 @@
+name: Test Suite
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'packages/core/**'
+      - 'packages/adapters/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.github/workflows/test.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'packages/core/**'
+      - 'packages/adapters/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.github/workflows/test.yml'
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10.19.0'
+
+jobs:
+  test-core:
+    name: Test Core Package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/core
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies from workspace root..."
+          cd ../..
+          pnpm install --frozen-lockfile
+          echo ""
+          echo "✓ Dependencies installed successfully"
+          echo "Workspace packages:"
+          pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
+
+      - name: Run Core Tests
+        run: |
+          echo "========================================="
+          echo "🧪 Running Core Package Tests"
+          echo "========================================="
+          echo ""
+          echo "Working directory: $(pwd)"
+          echo "Node version: $(node --version)"
+          echo "pnpm version: $(pnpm --version)"
+          echo ""
+          echo "Starting test execution..."
+          echo ""
+          echo "Running: pnpm test --run --reporter=verbose"
+          echo ""
+          pnpm test --run --reporter=verbose
+          echo ""
+          echo "========================================="
+          echo "✅ Core tests completed successfully"
+          echo "========================================="
+
+  test-adapters:
+    name: Test Adapter Packages
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/adapters/drizzle
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies from workspace root..."
+          cd ../../..
+          pnpm install --frozen-lockfile
+          echo ""
+          echo "✓ Dependencies installed successfully"
+          echo "Workspace packages:"
+          pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
+
+      - name: Run Adapter Tests
+        run: |
+          echo "========================================="
+          echo "🧪 Running Adapter Package Tests"
+          echo "========================================="
+          echo ""
+          echo "Working directory: $(pwd)"
+          echo "Node version: $(node --version)"
+          echo "pnpm version: $(pnpm --version)"
+          echo ""
+          echo "Starting test execution..."
+          echo ""
+          echo "Running: pnpm test --run --reporter=verbose"
+          echo ""
+          pnpm test --run --reporter=verbose
+          echo ""
+          echo "========================================="
+          echo "✅ Adapter tests completed successfully"
+          echo "========================================="
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [test-core, test-adapters]
+    if: always()
+
+    steps:
+      - name: Test Results Summary
+        run: |
+          echo "========================================="
+          echo "📊 Test Execution Summary"
+          echo "========================================="
+          echo ""
+          
+          CORE_RESULT="${{ needs.test-core.result }}"
+          ADAPTER_RESULT="${{ needs.test-adapters.result }}"
+          
+          if [ "$CORE_RESULT" = "success" ]; then
+            echo "Core Package Tests: ✅ PASSED"
+          else
+            echo "Core Package Tests: ❌ FAILED"
+          fi
+          
+          if [ "$ADAPTER_RESULT" = "success" ]; then
+            echo "Adapter Package Tests: ✅ PASSED"
+          else
+            echo "Adapter Package Tests: ❌ FAILED"
+          fi
+          
+          echo ""
+          echo "========================================="
+          
+          if [ "$CORE_RESULT" != "success" ] || [ "$ADAPTER_RESULT" != "success" ]; then
+            echo "❌ Some tests failed. Please check the logs above for details."
+            exit 1
+          else
+            echo "✅ All tests passed successfully!"
+          fi
+          echo "========================================="
+
