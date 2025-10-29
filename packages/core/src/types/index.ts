@@ -3,6 +3,7 @@ export * from './adapter';
 export * from './column';
 export * from './column-meta';
 export * from './common';
+export * from './factory';
 export * from './filter';
 export * from './filter-operators';
 export * from './pagination';

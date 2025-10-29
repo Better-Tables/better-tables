@@ -1,17 +1,18 @@
 'use client';
 
 import type { ActionConfirmationConfig } from '@better-tables/core';
-import { AlertTriangle } from 'lucide-react';
+import { CircleAlertIcon } from 'lucide-react';
 import { useId } from 'react';
-import { Button } from '../ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 export interface ActionConfirmationDialogProps {
   open: boolean;
@@ -52,44 +53,38 @@ export function ActionConfirmationDialog({
   const description = config.description.replace('{count}', selectedCount.toString());
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-[425px]"
-        showCloseButton={false}
-        aria-describedby={descriptionId}
-      >
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            {config.destructive && (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              </div>
-            )}
-            <DialogTitle className="text-left">{config.title}</DialogTitle>
-          </div>
-          <DialogDescription id={descriptionId} className="text-left">
-            {description}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            className="w-full sm:w-auto"
-          >
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="sm:max-w-[425px]" aria-describedby={descriptionId}>
+        <div className="flex flex-col gap-2 max-sm:items-center sm:flex-row sm:gap-4">
+          {config.destructive && (
+            <div
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-destructive/10"
+              aria-hidden="true"
+            >
+              <CircleAlertIcon className="opacity-80 text-destructive" size={16} />
+            </div>
+          )}
+          <AlertDialogHeader>
+            <AlertDialogTitle>{config.title}</AlertDialogTitle>
+            <AlertDialogDescription id={descriptionId}>{description}</AlertDialogDescription>
+          </AlertDialogHeader>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleCancel}>
             {config.cancelLabel || 'Cancel'}
-          </Button>
-          <Button
-            type="button"
-            variant={config.destructive ? 'destructive' : 'default'}
+          </AlertDialogCancel>
+          <AlertDialogAction
             onClick={handleConfirm}
-            className="w-full sm:w-auto"
+            className={
+              config.destructive
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                : ''
+            }
           >
             {config.confirmLabel || 'Confirm'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
