@@ -4,10 +4,10 @@ import { relations, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DrizzleQueryBuilder } from '../src/query-builder';
+import { SQLiteQueryBuilder } from '../src/query-builders/sqlite-query-builder';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
-import type { QueryBuilderWithJoins } from '../src/types';
+import type { SQLiteQueryBuilderWithJoins } from '../src/types';
 
 // Test schema
 const users = sqliteTable('users', {
@@ -64,32 +64,32 @@ const relationsSchema = {
   posts: postsRelations,
 };
 
-describe('DrizzleQueryBuilder', () => {
-  let db: unknown;
-  let queryBuilder: DrizzleQueryBuilder;
+describe('SQLiteQueryBuilder', () => {
+  let db: any;
+  let queryBuilder: SQLiteQueryBuilder;
   let relationshipManager: RelationshipManager;
   let sqlite: Database.Database;
 
   beforeEach(async () => {
     sqlite = new Database(':memory:');
-    db = drizzle(sqlite) as unknown;
+    db = drizzle(sqlite);
 
     // Create tables
-    await (db as any).run(sql`CREATE TABLE users (
+    await db.run(sql`CREATE TABLE users (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT NOT NULL,
       age INTEGER
     )`);
 
-    await (db as any).run(sql`CREATE TABLE profiles (
+    await db.run(sql`CREATE TABLE profiles (
       id INTEGER PRIMARY KEY,
       user_id INTEGER NOT NULL,
       bio TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
 
-    await (db as any).run(sql`CREATE TABLE posts (
+    await db.run(sql`CREATE TABLE posts (
       id INTEGER PRIMARY KEY,
       user_id INTEGER NOT NULL,
       title TEXT NOT NULL,
@@ -98,16 +98,16 @@ describe('DrizzleQueryBuilder', () => {
     )`);
 
     // Insert test data
-    await (db as any).run(sql`INSERT INTO users (id, name, email, age) VALUES 
+    await db.run(sql`INSERT INTO users (id, name, email, age) VALUES 
       (1, 'John Doe', 'john@example.com', 30),
       (2, 'Jane Smith', 'jane@example.com', 25),
       (3, 'Bob Johnson', 'bob@example.com', 35)`);
 
-    await (db as any).run(sql`INSERT INTO profiles (id, user_id, bio) VALUES 
+    await db.run(sql`INSERT INTO profiles (id, user_id, bio) VALUES 
       (1, 1, 'Software developer'),
       (2, 2, 'Designer')`);
 
-    await (db as any).run(sql`INSERT INTO posts (id, user_id, title, published) VALUES 
+    await db.run(sql`INSERT INTO posts (id, user_id, title, published) VALUES 
       (1, 1, 'First Post', 1),
       (2, 1, 'Second Post', 0),
       (3, 2, 'Design Tips', 1)`);
@@ -118,7 +118,7 @@ describe('DrizzleQueryBuilder', () => {
     relationshipManager = new RelationshipManager(schema, relationships);
 
     // Initialize query builder
-    queryBuilder = new DrizzleQueryBuilder(db, schema, relationshipManager, 'sqlite');
+    queryBuilder = new SQLiteQueryBuilder(db, schema, relationshipManager);
   });
 
   afterEach(() => {
@@ -136,7 +136,7 @@ describe('DrizzleQueryBuilder', () => {
         'users'
       );
 
-      const query = queryBuilder.buildSelectQuery(context, 'users', ['name', 'email']);
+      const { query } = queryBuilder.buildSelectQuery(context, 'users', ['name', 'email']);
       expect(query).toBeDefined();
     });
 
@@ -148,7 +148,7 @@ describe('DrizzleQueryBuilder', () => {
         'users'
       );
 
-      const query = queryBuilder.buildSelectQuery(context, 'users', ['name', 'profile.bio']);
+      const { query } = queryBuilder.buildSelectQuery(context, 'users', ['name', 'profile.bio']);
       expect(query).toBeDefined();
     });
 
@@ -398,9 +398,13 @@ describe('DrizzleQueryBuilder', () => {
     });
 
     it('should handle invalid queries', () => {
-      expect(queryBuilder.validateQuery(null as unknown as QueryBuilderWithJoins)).toBe(false);
-      expect(queryBuilder.validateQuery(undefined as unknown as QueryBuilderWithJoins)).toBe(false);
-      expect(queryBuilder.validateQuery({} as unknown as QueryBuilderWithJoins)).toBe(false);
+      expect(queryBuilder.validateQuery(null as unknown as SQLiteQueryBuilderWithJoins)).toBe(
+        false
+      );
+      expect(queryBuilder.validateQuery(undefined as unknown as SQLiteQueryBuilderWithJoins)).toBe(
+        false
+      );
+      expect(queryBuilder.validateQuery({} as unknown as SQLiteQueryBuilderWithJoins)).toBe(false);
     });
   });
 
