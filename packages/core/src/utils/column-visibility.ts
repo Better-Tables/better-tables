@@ -123,13 +123,18 @@ export function mergeColumnVisibility<TData = unknown>(
   // Create a map of columns for quick lookup
   const columnMap = new Map(columns.map((col) => [col.id, col]));
 
-  // Override with any modifications
+  // Override with any modifications, but only for existing columns
   Object.entries(modifications).forEach(([columnId, value]) => {
     const column = columnMap.get(columnId);
 
+    // Skip modifications for non-existent columns
+    if (!column) {
+      return;
+    }
+
     // Skip modifications for non-hideable columns when trying to hide them
     // This prevents persisted state from hiding columns that shouldn't be hideable
-    if (column?.hideable === false && value === false) {
+    if (column.hideable === false && value === false) {
       return;
     }
 

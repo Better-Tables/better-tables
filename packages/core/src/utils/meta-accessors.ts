@@ -40,7 +40,7 @@ import type {
  * ```
  */
 export function getNumberFormat(meta?: ColumnMeta): NumberFormatMeta {
-  return meta?.numberFormat || {};
+  return meta?.numberFormat ? { ...meta.numberFormat } : {};
 }
 
 /**
@@ -96,7 +96,18 @@ export function getCurrencyFormat(meta?: ColumnMeta): CurrencyFormatMeta {
  * ```
  */
 export function getDateFormat(meta?: ColumnMeta): DateFormatMeta {
-  return meta?.dateFormat || {};
+  if (!meta?.dateFormat) {
+    return {};
+  }
+
+  const dateFormat = { ...meta.dateFormat };
+
+  // Deep clone the relativeOptions object if it exists
+  if (dateFormat.relativeOptions) {
+    dateFormat.relativeOptions = { ...dateFormat.relativeOptions };
+  }
+
+  return dateFormat;
 }
 
 /**
@@ -124,7 +135,18 @@ export function getDateFormat(meta?: ColumnMeta): DateFormatMeta {
  * ```
  */
 export function getTextFormat(meta?: ColumnMeta): TextFormatMeta {
-  return meta?.textFormat || {};
+  if (!meta?.textFormat) {
+    return {};
+  }
+
+  const textFormat = { ...meta.textFormat };
+
+  // Deep clone the truncate object if it exists
+  if (textFormat.truncate) {
+    textFormat.truncate = { ...textFormat.truncate };
+  }
+
+  return textFormat;
 }
 
 /**
@@ -186,5 +208,5 @@ export function getColumnStyle(meta?: ColumnMeta) {
  * ```
  */
 export function getOptionColors(meta?: ColumnMeta): Record<string, string> {
-  return meta?.optionColors || {};
+  return meta?.optionColors ? { ...meta.optionColors } : {};
 }
