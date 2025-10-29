@@ -97,17 +97,18 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: testpassword
-          MYSQL_DATABASE: drizzle_test
+          MYSQL_DATABASE: better_tables_test
           MYSQL_USER: testuser
           MYSQL_PASSWORD: testpassword
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="mysqladmin ping -h localhost -u root -ptestpassword"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
           --health-start-period=30s
+          --default-authentication-plugin=mysql_native_password
       
       postgres:
         image: postgres:16-alpine
@@ -192,7 +193,8 @@ jobs:
       - name: Run Adapter Tests
         env:
           # Set connection strings for MySQL and Postgres services
-          MYSQL_TEST_URL: mysql://testuser:testpassword@localhost:3306/drizzle_test
+          # Using root for MySQL since tests need to create databases
+          MYSQL_TEST_URL: mysql://root:testpassword@localhost:3306
           POSTGRES_TEST_URL: postgresql://testuser:testpassword@localhost:5432/drizzle_test
         run: |
           echo "========================================="
