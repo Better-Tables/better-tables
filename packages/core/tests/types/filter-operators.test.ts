@@ -386,6 +386,29 @@ describe('Filter Operators', () => {
         'Invalid values for this operator'
       );
     });
+
+    it('should correctly distinguish between date and option operators for "is" and "isNot"', () => {
+      // For option columns, 'is' and 'isNot' should accept strings
+      expect(validateOperatorValues('is', ['active'], 'option')).toBe(true);
+      expect(validateOperatorValues('isNot', ['inactive'], 'option')).toBe(true);
+      expect(validateOperatorValues('is', [''], 'option')).toBe('Invalid values for this operator'); // Empty string is NOT valid for option is/isNot
+      expect(validateOperatorValues('is', [null], 'option')).toBe(
+        'Invalid values for this operator'
+      );
+
+      // For date columns, 'is' and 'isNot' should accept Date objects
+      expect(validateOperatorValues('is', [new Date()], 'date')).toBe(true);
+      expect(validateOperatorValues('isNot', [new Date()], 'date')).toBe(true);
+      expect(validateOperatorValues('is', ['2023-01-01'], 'date')).toBe(
+        'Invalid values for this operator'
+      );
+
+      // Without column type, should fall back to first match (date operators)
+      expect(validateOperatorValues('is', ['active'])).toBe('Invalid values for this operator');
+      expect(validateOperatorValues('isNot', ['inactive'])).toBe(
+        'Invalid values for this operator'
+      );
+    });
   });
 
   describe('createOperatorRegistry', () => {

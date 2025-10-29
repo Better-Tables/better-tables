@@ -293,11 +293,14 @@ export function DateFilterInput<TData = unknown>({
               onKeyDown={keyboardNavigation.onKeyDown}
               {...keyboardNavigation.ariaAttributes}
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
               {dateRange?.from ? (
-                <span>{formatDateRange(dateRange.from, dateRange.to, dateFormat)}</span>
+                <span className="truncate">
+                  {formatDateRange(dateRange.from, dateRange.to, dateFormat)}
+                </span>
               ) : (
-                <span>Pick a date range{dateFormat.showTime ? ' and time' : ''}</span>
+                <span className="truncate">
+                  Pick a date range{dateFormat.showTime ? ' and time' : ''}
+                </span>
               )}
             </Button>
           </PopoverTrigger>

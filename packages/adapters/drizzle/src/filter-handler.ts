@@ -569,7 +569,7 @@ export class FilterHandler {
     for (const filter of filters) {
       try {
         // Validate filter values before processing
-        if (!this.validateFilterValues(filter.operator, filter.values)) {
+        if (!this.validateFilterValues(filter.operator, filter.values, filter.type)) {
           // Skip invalid filters silently
           continue;
         }
@@ -669,8 +669,12 @@ export class FilterHandler {
   /**
    * Validate filter values
    */
-  validateFilterValues(operator: FilterOperator, values: unknown[]): boolean {
-    const result = validateOperatorValues(operator, values);
+  validateFilterValues(
+    operator: FilterOperator,
+    values: unknown[],
+    columnType?: ColumnType
+  ): boolean {
+    const result = validateOperatorValues(operator, values, columnType);
     return result === true;
   }
 
