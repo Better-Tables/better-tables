@@ -524,8 +524,17 @@ export function getOperatorsForType(type: ColumnType): FilterOperatorDefinition[
  * Get a specific operator definition by key
  */
 export function getOperatorDefinition(
-  operator: FilterOperator
+  operator: FilterOperator,
+  columnType?: ColumnType
 ): FilterOperatorDefinition | undefined {
+  // If column type is provided, search in the relevant operator array first
+  if (columnType && FILTER_OPERATORS[columnType]) {
+    const found = FILTER_OPERATORS[columnType].find((op) => op.key === operator);
+    // Only return early if we found a match; otherwise fall through to global search
+    if (found) return found;
+  }
+
+  // Search all operator arrays for fallback (handles custom columns and cross-type operators)
   for (const operators of Object.values(FILTER_OPERATORS)) {
     const found = operators.find((op) => op.key === operator);
     if (found) return found;
@@ -596,9 +605,10 @@ export function getDefaultOperatorsForType(type: ColumnType): FilterOperator[] {
  */
 export function validateOperatorValues(
   operator: FilterOperator,
-  values: unknown[]
+  values: unknown[],
+  columnType?: ColumnType
 ): boolean | string {
-  const definition = getOperatorDefinition(operator);
+  const definition = getOperatorDefinition(operator, columnType);
   if (!definition) {
     return 'Unknown operator';
   }

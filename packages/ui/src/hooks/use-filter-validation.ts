@@ -51,7 +51,7 @@ export function useFilterValidation<TData = unknown>({
     }
 
     // Validate against operator requirements
-    const operatorValidation = validateOperatorValues(filter.operator, values);
+    const operatorValidation = validateOperatorValues(filter.operator, values, column.type);
     if (operatorValidation !== true) {
       return {
         isValid: false,
