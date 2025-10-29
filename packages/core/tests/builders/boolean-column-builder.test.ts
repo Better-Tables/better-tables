@@ -415,10 +415,12 @@ describe('BooleanColumnBuilder', () => {
       const column = builder
         .id('isVerified')
         .displayName('Is Verified')
-        .accessor((user) => user.isVerified) // Can be boolean | null
+        .accessor((user) => user.isVerified ?? false) // Handle null case
+        .nullable(true)
         .booleanFilter({ includeNull: true })
         .build();
 
+      expect(column.nullable).toBe(true);
       expect(column.filter?.includeNull).toBe(true);
       expect(column.filter?.operators).toContain('isNull');
       expect(column.filter?.operators).toContain('isNotNull');
