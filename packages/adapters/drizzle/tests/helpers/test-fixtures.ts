@@ -132,7 +132,11 @@ export function createPostgresDatabase(connectionString: string): {
   db: PostgresJsDatabase<typeof schema>;
   client: ReturnType<typeof postgres>;
 } {
-  const client = postgres(connectionString, { max: 1 });
+  const client = postgres(connectionString, {
+    max: 1,
+    // Suppress NOTICE messages (e.g., "table does not exist, skipping" during DROP TABLE IF EXISTS)
+    onnotice: () => {},
+  });
   const db = drizzlePostgres(client) as PostgresJsDatabase<typeof schema>;
   return { db, client };
 }

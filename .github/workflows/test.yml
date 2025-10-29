@@ -162,20 +162,22 @@ jobs:
           echo "Rebuilding native dependencies (better-sqlite3)..."
           cd ../../..
           # better-sqlite3 requires native compilation for the target platform
-          # Rebuild from workspace root to ensure it finds all dependencies
           echo "Current Node.js version: $(node --version)"
-          echo "Current npm version: $(npm --version)"
+          echo "Current pnpm version: $(pnpm --version)"
           echo ""
-          echo "Rebuilding better-sqlite3..."
-          pnpm rebuild better-sqlite3 --verbose || {
-            echo "⚠️  Rebuild failed, trying alternative approach..."
-            cd packages/adapters/drizzle
-            pnpm rebuild better-sqlite3 --verbose
+          # Rebuild all native dependencies in the workspace
+          echo "Rebuilding all native dependencies with pnpm..."
+          pnpm rebuild
+          echo ""
+          echo "Verifying better-sqlite3 installation from adapter package..."
+          cd packages/adapters/drizzle
+          node -e "const sqlite = require('better-sqlite3'); const db = new sqlite(':memory:'); console.log('✓ better-sqlite3 bindings work correctly'); db.close();" || {
+            echo "⚠️  Warning: better-sqlite3 verification failed"
+            echo "Attempting alternative rebuild method..."
+            cd ../../..
+            pnpm --filter @better-tables/adapters-drizzle rebuild better-sqlite3
           }
-          echo ""
-          echo "Verifying better-sqlite3 installation..."
-          node -e "require('better-sqlite3'); console.log('✓ better-sqlite3 loaded successfully')" || echo "⚠️  Warning: better-sqlite3 may not be fully ready"
-          echo "✓ Native dependencies rebuilt"
+          echo "✓ Native dependencies rebuild completed"
 
       - name: Build Core Package (dependency)
         run: |
