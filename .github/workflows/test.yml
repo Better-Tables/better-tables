@@ -94,7 +94,7 @@ jobs:
     
     services:
       mysql:
-        image: mysql:8.0-alpine
+        image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: testpassword
           MYSQL_DATABASE: drizzle_test
@@ -103,10 +103,11 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h localhost"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=3
+          --health-retries=5
+          --health-start-period=30s
       
       postgres:
         image: postgres:16-alpine
