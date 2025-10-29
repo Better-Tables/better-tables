@@ -131,7 +131,8 @@ export function drizzleAdapter<TDB>(
     db,
     schema,
     driver,
-    autoDetectRelationships: factoryOptions?.autoDetectRelationships ?? true,
+    autoDetectRelationships:
+      factoryOptions?.autoDetectRelationships ?? !factoryOptions?.relationships,
     options: factoryOptions?.options,
     meta: factoryOptions?.meta,
   };
@@ -188,7 +189,8 @@ export function createDrizzleAdapter<
     db,
     schema: factoryOptions.schema,
     driver: factoryOptions.driver,
-    autoDetectRelationships: factoryOptions.autoDetectRelationships ?? true,
+    autoDetectRelationships:
+      factoryOptions.autoDetectRelationships ?? !factoryOptions.relationships,
     options: factoryOptions.options,
     meta: factoryOptions.meta,
   };

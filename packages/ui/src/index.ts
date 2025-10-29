@@ -27,6 +27,7 @@ export * from './components/table/table-header-context-menu';
 export * from './components/table/table-pagination';
 export * from './components/table/table-providers';
 export * from './components/table/virtualized-table';
+export * from './components/ui/alert-dialog';
 export * from './components/ui/badge';
 // Export base UI components from shadcn/ui
 export * from './components/ui/button';

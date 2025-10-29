@@ -23,7 +23,6 @@ import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import type { DrizzleAdapter } from './drizzle-adapter';
 import type { BaseQueryBuilder } from './query-builders';
 import type { RelationshipManager } from './relationship-manager';
 
@@ -803,21 +802,6 @@ export type ExtractDriverFromDB<TDB> = TDB extends PostgresJsDatabase<infer _>
     : TDB extends BetterSQLite3Database<infer _>
       ? 'sqlite'
       : DatabaseDriver;
-
-/**
- * Infer adapter type from Drizzle database instance.
- *
- * @description
- * Combines schema and driver extraction to infer the complete adapter type
- * from a Drizzle database instance. This is used by the factory function.
- *
- * @template TDB - The Drizzle database instance type
- * @returns The DrizzleAdapter type with inferred generics
- */
-export type InferAdapterFromDB<TDB> = DrizzleAdapter<
-  ExtractSchemaFromDB<TDB>,
-  ExtractDriverFromDB<TDB>
->;
 
 /**
  * Error types for the adapter
