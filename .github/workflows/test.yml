@@ -150,8 +150,6 @@ jobs:
           echo "Workspace packages:"
           pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
 
-      # SQLite tests are excluded from CI, so no need to rebuild better-sqlite3 native bindings
-
       - name: Build Core Package (dependency)
         run: |
           echo "Building @better-tables/core package as dependency..."
@@ -166,6 +164,9 @@ jobs:
 
       - name: Run Adapter Tests
         env:
+          # Disable SQLite tests in CI (better-sqlite3 requires native bindings)
+          CI: 'true'
+          DISABLE_SQLITE: 'true'
           # Set connection strings for MySQL and Postgres services
           # Using root for MySQL since tests need to create databases
           MYSQL_TEST_URL: mysql://root:testpassword@localhost:3306
@@ -183,7 +184,7 @@ jobs:
           echo "  MySQL: $MYSQL_TEST_URL"
           echo "  Postgres: $POSTGRES_TEST_URL"
           echo ""
-          echo "Note: SQLite tests are excluded from CI due to native binding issues"
+          echo "Note: SQLite tests are excluded from CI (DISABLE_SQLITE=true)"
           echo ""
           echo "Waiting for database services to be ready..."
           sleep 5
@@ -191,12 +192,8 @@ jobs:
           echo "Starting test execution..."
           echo ""
           echo "Running: pnpm test --run --reporter=verbose"
-          echo "Excluding: adapter-sqlite.test.ts and query-builder.test.ts"
           echo ""
-          # Exclude SQLite tests due to native binding compilation issues
-          pnpm test -- --run --reporter=verbose \
-            --exclude="**/adapter-sqlite.test.ts" \
-            --exclude="**/query-builder.test.ts"
+          pnpm test -- --run --reporter=verbose
           echo ""
           echo "========================================="
           echo "✅ Adapter tests completed successfully"
