@@ -104,7 +104,10 @@ export function betterTables<TRecord = unknown>(
     },
 
     getConfig() {
-      return { ...currentConfig };
+      return {
+        ...currentConfig,
+        columns: currentConfig.columns ? [...currentConfig.columns] : [],
+      };
     },
 
     updateConfig(updates: Partial<BetterTablesConfig<TRecord>>) {

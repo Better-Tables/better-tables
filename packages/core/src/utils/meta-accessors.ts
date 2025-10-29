@@ -40,7 +40,7 @@ import type {
  * ```
  */
 export function getNumberFormat(meta?: ColumnMeta): NumberFormatMeta {
-  return meta?.numberFormat || {};
+  return meta?.numberFormat ? { ...meta.numberFormat } : {};
 }
 
 /**
@@ -96,7 +96,7 @@ export function getCurrencyFormat(meta?: ColumnMeta): CurrencyFormatMeta {
  * ```
  */
 export function getDateFormat(meta?: ColumnMeta): DateFormatMeta {
-  return meta?.dateFormat || {};
+  return meta?.dateFormat ? { ...meta.dateFormat } : {};
 }
 
 /**
@@ -124,7 +124,7 @@ export function getDateFormat(meta?: ColumnMeta): DateFormatMeta {
  * ```
  */
 export function getTextFormat(meta?: ColumnMeta): TextFormatMeta {
-  return meta?.textFormat || {};
+  return meta?.textFormat ? { ...meta.textFormat } : {};
 }
 
 /**
@@ -186,5 +186,5 @@ export function getColumnStyle(meta?: ColumnMeta) {
  * ```
  */
 export function getOptionColors(meta?: ColumnMeta): Record<string, string> {
-  return meta?.optionColors || {};
+  return meta?.optionColors ? { ...meta.optionColors } : {};
 }
