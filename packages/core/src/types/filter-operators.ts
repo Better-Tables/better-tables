@@ -527,12 +527,14 @@ export function getOperatorDefinition(
   operator: FilterOperator,
   columnType?: ColumnType
 ): FilterOperatorDefinition | undefined {
-  // If column type is provided, search only in the relevant operator array
+  // If column type is provided, search in the relevant operator array first
   if (columnType && FILTER_OPERATORS[columnType]) {
-    return FILTER_OPERATORS[columnType].find((op) => op.key === operator);
+    const found = FILTER_OPERATORS[columnType].find((op) => op.key === operator);
+    // Only return early if we found a match; otherwise fall through to global search
+    if (found) return found;
   }
 
-  // Otherwise, search all operator arrays
+  // Search all operator arrays for fallback (handles custom columns and cross-type operators)
   for (const operators of Object.values(FILTER_OPERATORS)) {
     const found = operators.find((op) => op.key === operator);
     if (found) return found;
