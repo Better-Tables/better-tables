@@ -2,107 +2,147 @@
  * Shared test fixtures for database setup and teardown across all database types
  */
 
+import { Database } from 'bun:sqlite';
 import { sql } from 'drizzle-orm';
-import { type BetterSQLite3Database, drizzle as drizzleSQLite } from 'drizzle-orm/better-sqlite3';
+import { drizzle as drizzleSQLite } from 'drizzle-orm/bun-sqlite';
+
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { drizzle as drizzleMysql } from 'drizzle-orm/mysql2';
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
+
 import mysql from 'mysql2/promise';
 import postgres from 'postgres';
+
 import type { DrizzleAdapter } from '../../src/drizzle-adapter';
 import { DrizzleAdapter as DrizzleAdapterClass } from '../../src/drizzle-adapter';
+
 import type { DrizzleAdapterConfig, DrizzleDatabase } from '../../src/types';
-import BunSQLiteCompat, { type Database } from './bun-sqlite-compat';
 import { relationsSchema, schema } from './test-schema';
 
 /**
- * ============================================================================
- * SQLite Test Fixtures
- * ============================================================================
+ * Bun SQLite Drizzle type
  */
+export type BunSQLiteDatabase = ReturnType<typeof drizzleSQLite<typeof schema>>;
 
 /**
- * Create an in-memory SQLite database for testing
+ * =============================================================================
+ * SQLite Test Fixtures
+ * =============================================================================
  */
+
 export function createSQLiteDatabase(): {
-  db: BetterSQLite3Database<typeof schema>;
+  db: BunSQLiteDatabase;
   sqlite: Database;
 } {
-  const sqlite = new BunSQLiteCompat(':memory:');
-  // Type assertion needed because Drizzle expects better-sqlite3 Database,
-  // but at runtime Bun's SQLite should work similarly
-  // @ts-expect-error - Drizzle expects better-sqlite3 Database, but Bun's SQLite is compatible at runtime
-  const db = drizzleSQLite(sqlite) as unknown as BetterSQLite3Database<typeof schema>;
+  const sqlite = new Database(':memory:');
+
+  // Key: explicitly use generic — no casting needed!
+  const db = drizzleSQLite<typeof schema>(sqlite, { schema });
+
   return { db, sqlite };
 }
 
-/**
- * Setup SQLite test database with tables and initial data
- */
-export async function setupSQLiteDatabase(db: BetterSQLite3Database<typeof schema>): Promise<void> {
-  // Create tables
-  await db.run(sql`CREATE TABLE users (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    age INTEGER,
-    created_at INTEGER
-  )`);
+export async function setupSQLiteDatabase(db: BunSQLiteDatabase): Promise<void> {
+  await db.run(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      age INTEGER,
+      created_at INTEGER
+    );
+  `);
 
-  await db.run(sql`CREATE TABLE profiles (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    bio TEXT,
-    avatar TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
+  await db.run(`
+    CREATE TABLE profiles (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      bio TEXT,
+      avatar TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `);
 
-  await db.run(sql`CREATE TABLE posts (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT,
-    published INTEGER DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
+  await db.run(`
+    CREATE TABLE posts (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      published INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `);
 
-  await db.run(sql`CREATE TABLE comments (
-    id INTEGER PRIMARY KEY,
-    post_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    content TEXT NOT NULL,
-    FOREIGN KEY (post_id) REFERENCES posts(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
+  await db.run(`
+    CREATE TABLE comments (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      FOREIGN KEY (post_id) REFERENCES posts(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `);
 
-  // Insert test data
-  await db.run(sql`INSERT INTO users (id, name, email, age, created_at) VALUES 
-    (1, 'John Doe', 'john@example.com', 30, ${Date.now()}),
-    (2, 'Jane Smith', 'jane@example.com', 25, ${Date.now()}),
-    (3, 'Bob Johnson', 'bob@example.com', 35, ${Date.now()})`);
+  const now = Date.now();
 
-  await db.run(sql`INSERT INTO profiles (id, user_id, bio, avatar) VALUES 
-    (1, 1, 'Software developer', 'avatar1.jpg'),
-    (2, 2, 'Designer', 'avatar2.jpg')`);
+  await db.run(`
+    INSERT INTO users (id, name, email, age, created_at) VALUES
+      (1, 'John Doe', 'john@example.com', 30, ${now}),
+      (2, 'Jane Smith', 'jane@example.com', 25, ${now}),
+      (3, 'Bob Johnson', 'bob@example.com', 35, ${now});
+  `);
 
-  await db.run(sql`INSERT INTO posts (id, user_id, title, content, published) VALUES 
-    (1, 1, 'First Post', 'Content 1', 1),
-    (2, 1, 'Second Post', 'Content 2', 0),
-    (3, 2, 'Design Tips', 'Content 3', 1)`);
+  await db.run(`
+    INSERT INTO profiles (id, user_id, bio, avatar) VALUES
+      (1, 1, 'Software developer', 'avatar1.jpg'),
+      (2, 2, 'Designer', 'avatar2.jpg');
+  `);
 
-  await db.run(sql`INSERT INTO comments (id, post_id, user_id, content) VALUES 
-    (1, 1, 2, 'Great post!'),
-    (2, 1, 3, 'I agree'),
-    (3, 3, 1, 'Nice design tips')`);
+  await db.run(`
+    INSERT INTO posts (id, user_id, title, content, published) VALUES
+      (1, 1, 'First Post', 'Content 1', 1),
+      (2, 1, 'Second Post', 'Content 2', 0),
+      (3, 2, 'Design Tips', 'Content 3', 1);
+  `);
+
+  await db.run(`
+    INSERT INTO comments (id, post_id, user_id, content) VALUES
+      (1, 1, 2, 'Great post!'),
+      (2, 1, 3, 'I agree'),
+      (3, 3, 1, 'Nice design tips');
+  `);
 }
 
-/**
- * Create a Drizzle adapter configured for SQLite testing
- */
 export function createSQLiteAdapter(
-  db: BetterSQLite3Database<typeof schema>
+  db: BunSQLiteDatabase
 ): DrizzleAdapter<typeof schema, 'sqlite'> {
+  /**
+   * ⚠️ NOTE ABOUT THIS CAST
+   * ---------------------------------------------------------------
+   * The Drizzle adapter typing currently assumes that the "sqlite"
+   * driver always uses BetterSQLite3 (drizzle-orm/better-sqlite3).
+   *
+   * However, in the test suite we use Bun's SQLite implementation
+   * (`bun:sqlite` + `drizzle-orm/bun-sqlite`), which produces a different
+   * database instance type.
+   *
+   * To keep the adapter typing compatible — without modifying the
+   * adapter's public API — we cast the Bun SQLite database to the
+   * BetterSQLite3-based `DrizzleDatabase<'sqlite'>` type.
+   *
+   * This is safe **only** because:
+   *  - the tests exercise high-level Drizzle operations
+   *  - Drizzle provides the same query API for both drivers
+   *  - no driver-specific methods are used
+   *
+   * If in the future we add first-class support for Bun SQLite to the
+   * adapter, this cast should be removed and replaced with a dedicated
+   * `bun_sqlite` driver type in DatabaseTypeMap.
+   */
   const config: DrizzleAdapterConfig<typeof schema, 'sqlite'> = {
     db: db as unknown as DrizzleDatabase<'sqlite'>,
     schema,
@@ -114,14 +154,11 @@ export function createSQLiteAdapter(
   return new DrizzleAdapterClass(config);
 }
 
-/**
- * Close SQLite database connection
- */
+
 export function closeSQLiteDatabase(sqlite: Database): void {
-  if (sqlite) {
-    sqlite.close();
-  }
+  sqlite.close();
 }
+
 
 /**
  * ============================================================================

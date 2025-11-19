@@ -76,7 +76,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       });
 
       expect(result.data).toHaveLength(2);
-      const names = result.data.map((r: UserWithRelations) => r.name).sort();
+      const names = (result.data as UserWithRelations[]).map((r) => r.name).sort();
       expect(names).toContain('John Doe');
       expect(names).toContain('Bob Johnson');
     });
@@ -94,7 +94,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       });
 
       expect(result.data.length).toBeGreaterThan(0);
-      expect(result.data.every((u: UserWithRelations) => (u.age ?? 0) > 25)).toBe(true);
+      expect((result.data as UserWithRelations[]).every((u) => (u.age ?? 0) > 25)).toBe(true);
     });
 
     it('should filter by text equals', async () => {
@@ -178,20 +178,19 @@ describe('DrizzleAdapter - SQLite Integration', () => {
     });
 
     it('should handle invalid filter operators gracefully', async () => {
-      // The adapter may handle invalid operators gracefully or ignore them
-      const result = await adapter.fetchData({
-        filters: [
-          {
-            columnId: 'name',
-            type: 'text',
-            operator: 'invalidOperator' as FilterOperator,
-            values: ['test'],
-          },
-        ],
-      });
-      // Should return results without crashing
-      expect(result.data).toBeDefined();
-      expect(Array.isArray(result.data)).toBe(true);
+      // Adapter should throw an error for invalid operators
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'invalidOperator' as FilterOperator,
+              values: ['test'],
+            },
+          ],
+        })
+      ).rejects.toThrow();
     });
   });
 });
