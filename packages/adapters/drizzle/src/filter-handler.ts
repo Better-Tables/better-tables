@@ -244,8 +244,10 @@ export class FilterHandler {
             // For PostgreSQL, use SQL template with proper date casting
             conditions.push(sql`${column} = ${dateValue}::timestamp`);
           } else if (this.databaseType === 'mysql' && typeof dateValue === 'string') {
-            // For MySQL, use CAST function
-            conditions.push(sql`${column} = CAST(${dateValue} AS DATETIME)`);
+            // For MySQL, use CAST function - need to escape the string value properly
+            conditions.push(
+              sql`${column} = CAST(${sql.raw(`'${dateValue.replace(/'/g, "''")}'`)} AS DATETIME)`
+            );
           } else {
             conditions.push(eq(column, dateValue));
           }

@@ -46,9 +46,10 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
   });
 
   beforeEach(async () => {
-    // Connect to the existing database (no creation, tables already exist)
+    // Connect to the existing database and reset tables with seed data for each test
     const { db, connection: mysqlConnection } = await createMySQLDatabase(connectionString);
     connection = mysqlConnection;
+    await setupMySQLDatabase(connection); // Reset tables and seed data for test isolation
     adapter = createMySQLAdapter(db);
   });
 
@@ -129,7 +130,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       await adapter.deleteRecord('99');
       const result = await adapter.fetchData({});
       expect(result.data).toHaveLength(3); // Original 3 users remain
-      expect(result.data.find((u: UserWithRelations) => u.id === 99)).toBeUndefined();
+      expect((result.data as UserWithRelations[]).find((u) => u.id === 99)).toBeUndefined();
     });
 
     it('should bulk update records', async () => {
@@ -163,7 +164,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['John'] }],
       });
       expect(result.data).toHaveLength(2); // 'John Doe' and 'Bob Johnson' both contain 'John'
-      const names = result.data.map((r: UserWithRelations) => r.name).sort();
+      const names = (result.data as UserWithRelations[]).map((r) => r.name).sort();
       expect(names).toContain('John Doe');
       expect(names).toContain('Bob Johnson');
     });
@@ -215,7 +216,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       // Just verify it returns data and doesn't crash
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
-      const names = result.data.map((r: UserWithRelations) => r.name);
+      const names = (result.data as UserWithRelations[]).map((r) => r.name);
       expect(names.length).toBeGreaterThan(0);
     });
 
@@ -248,7 +249,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'age', type: 'number', operator: 'notEquals', values: [30] }],
       });
       expect(result.data).toHaveLength(2);
-      const ages = result.data.map((r: UserWithRelations) => r.age);
+      const ages = (result.data as UserWithRelations[]).map((r) => r.age);
       expect(ages).not.toContain(30);
     });
 
@@ -475,7 +476,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
+      const johnUser = (result.data as UserWithRelations[]).find((u) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).profile).toBeDefined();
       expect((johnUser as UserWithRelations).profile?.bio).toBe('Software developer');
     });
@@ -486,7 +487,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
+      const johnUser = (result.data as UserWithRelations[]).find((u) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).posts).toBeDefined();
       expect((johnUser as UserWithRelations).posts).toHaveLength(2);
     });
@@ -514,7 +515,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const bobUser = result.data.find((u: UserWithRelations) => u.name === 'Bob Johnson');
+      const bobUser = (result.data as UserWithRelations[]).find((u) => u.name === 'Bob Johnson');
       expect((bobUser as UserWithRelations).profile).toBeNull();
     });
   });
@@ -605,7 +606,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      result.data.forEach((user: UserWithRelations) => {
+      (result.data as UserWithRelations[]).forEach((user) => {
         expect(user.name).toBeDefined();
       });
     });
@@ -677,20 +678,19 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
     });
 
     it('should handle invalid filter operators', async () => {
-      // Adapter handles invalid operators gracefully (returns all data)
-      const result = await adapter.fetchData({
-        filters: [
-          {
-            columnId: 'name',
-            type: 'text',
-            operator: 'invalidOp' as FilterOperator,
-            values: ['test'],
-          },
-        ],
-      });
-      // Should return data without crashing
-      expect(result.data).toBeDefined();
-      expect(Array.isArray(result.data)).toBe(true);
+      // Adapter should throw an error for invalid operators
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'invalidOp' as FilterOperator,
+              values: ['test'],
+            },
+          ],
+        })
+      ).rejects.toThrow();
     });
 
     it('should handle invalid relationship paths', async () => {
