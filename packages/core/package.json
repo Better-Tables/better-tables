@@ -18,9 +18,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest",
-    "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
     "lint": "biome check .",
     "lint:fix": "biome check --apply .",
     "format": "biome format --write .",
@@ -35,18 +35,12 @@
     "react-dom": "^18.0.0"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "catalog:",
-    "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
-    "jsdom": "catalog:",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsup": "^8.5.0",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   },
   "publishConfig": {
     "access": "public"

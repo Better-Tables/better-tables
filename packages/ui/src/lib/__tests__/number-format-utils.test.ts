@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { getNumberInputConfig } from '../number-format-utils';
 
 describe('getNumberInputConfig', () => {
   describe('basic number type', () => {
     it('should return default config for number type', () => {
       const config = getNumberInputConfig('number');
-      
+
       expect(config.type).toBe('number');
       expect(config.locale).toBe('en-US');
       expect(config.allowNegative).toBe(true);
@@ -22,9 +22,9 @@ describe('getNumberInputConfig', () => {
         max: 1000,
         step: 0.1,
       };
-      
+
       const config = getNumberInputConfig('number', meta);
-      
+
       expect(config.decimals).toBe(3);
       expect(config.minDecimals).toBe(1);
       expect(config.maxDecimals).toBe(4);
@@ -37,7 +37,7 @@ describe('getNumberInputConfig', () => {
   describe('currency type', () => {
     it('should return currency config with defaults', () => {
       const config = getNumberInputConfig('currency');
-      
+
       expect(config.type).toBe('currency');
       expect(config.currency).toBe('USD');
       expect(config.decimals).toBe(2);
@@ -51,9 +51,9 @@ describe('getNumberInputConfig', () => {
         currency: 'EUR',
         decimals: 3,
       };
-      
+
       const config = getNumberInputConfig('currency', meta);
-      
+
       expect(config.currency).toBe('EUR');
       expect(config.decimals).toBe(3);
       expect(config.minDecimals).toBe(2);
@@ -64,9 +64,9 @@ describe('getNumberInputConfig', () => {
       const meta = {
         decimals: 1,
       };
-      
+
       const config = getNumberInputConfig('currency', meta);
-      
+
       expect(config.currency).toBe('USD');
       expect(config.decimals).toBe(1);
     });
@@ -75,7 +75,7 @@ describe('getNumberInputConfig', () => {
   describe('percentage type', () => {
     it('should return percentage config with defaults', () => {
       const config = getNumberInputConfig('percentage');
-      
+
       expect(config.type).toBe('percentage');
       expect(config.decimals).toBe(2);
       expect(config.minDecimals).toBe(0);
@@ -91,9 +91,9 @@ describe('getNumberInputConfig', () => {
         min: 10,
         max: 90,
       };
-      
+
       const config = getNumberInputConfig('percentage', meta);
-      
+
       expect(config.decimals).toBe(1);
       expect(config.min).toBe(10);
       expect(config.max).toBe(90);
@@ -103,7 +103,7 @@ describe('getNumberInputConfig', () => {
   describe('unknown type', () => {
     it('should return default config for unknown type', () => {
       const config = getNumberInputConfig('unknown');
-      
+
       expect(config.type).toBe('number');
       expect(config.locale).toBe('en-US');
       expect(config.allowNegative).toBe(true);
@@ -114,21 +114,21 @@ describe('getNumberInputConfig', () => {
   describe('edge cases', () => {
     it('should handle null meta', () => {
       const config = getNumberInputConfig('number', null as unknown as Record<string, unknown>);
-      
+
       expect(config.type).toBe('number');
       expect(config.locale).toBe('en-US');
     });
 
     it('should handle undefined meta', () => {
       const config = getNumberInputConfig('number', undefined);
-      
+
       expect(config.type).toBe('number');
       expect(config.locale).toBe('en-US');
     });
 
     it('should handle empty meta object', () => {
       const config = getNumberInputConfig('number', {});
-      
+
       expect(config.type).toBe('number');
       expect(config.locale).toBe('en-US');
     });
@@ -140,9 +140,9 @@ describe('getNumberInputConfig', () => {
         max: null,
         currency: 123,
       };
-      
+
       const config = getNumberInputConfig('currency', meta);
-      
+
       expect(config.currency).toBe('USD'); // Should fallback to default
       expect(config.decimals).toBe(2); // Should use default
       expect(config.min).toBeUndefined(); // Invalid values should be ignored
@@ -168,9 +168,9 @@ describe('getNumberInputConfig', () => {
         allowDecimal: false,
         placeholder: '金額を入力してください',
       };
-      
+
       const config = getNumberInputConfig('currency', meta);
-      
+
       expect(config.type).toBe('currency');
       expect(config.currency).toBe('JPY');
       expect(config.decimals).toBe(0);
@@ -192,9 +192,9 @@ describe('getNumberInputConfig', () => {
       const meta = {
         decimals: 1,
       };
-      
+
       const config = getNumberInputConfig('number', meta);
-      
+
       expect(config.type).toBe('number');
       expect(config.locale).toBe('en-US');
       expect(config.decimals).toBe(1);

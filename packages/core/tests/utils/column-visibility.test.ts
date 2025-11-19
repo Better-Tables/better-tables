@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { ColumnDefinition } from '../../src/types/column';
 import {
   getColumnVisibilityModifications,
@@ -297,8 +297,8 @@ describe('Column Visibility Utilities', () => {
       expect(visibility).toEqual({
         name: false,
       });
-      expect((visibility as any).unknownColumn).toBeUndefined();
-      expect((visibility as any).anotherUnknown).toBeUndefined();
+      expect((visibility).unknownColumn).toBeUndefined();
+      expect((visibility).anotherUnknown).toBeUndefined();
     });
 
     it('should not mutate the modifications object', () => {

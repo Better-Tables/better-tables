@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { ColumnDefinition } from '../../src/types/column';
 import {
   getColumnOrderModifications,

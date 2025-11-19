@@ -1,44 +1,42 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { DataEvent, FilterOperator } from '../../../core/src/types';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { DataEvent, FilterOperator } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
-  closeMySQLDatabase,
-  createMySQLAdapter,
-  createMySQLDatabase,
-  setupMySQLDatabase,
+  closePostgresDatabase,
+  createPostgresAdapter,
+  createPostgresDatabase,
+  setupPostgresDatabase,
 } from './helpers/test-fixtures';
 import type { User } from './helpers/test-schema';
 
 /**
- * MySQL Integration Tests
+ * PostgreSQL Integration Tests
  *
- * These tests are skipped by default because they require a running MySQL instance.
+ * These tests are skipped by default because they require a running PostgreSQL instance.
  *
  * To run these tests:
- * 1. Start a MySQL database
- * 2. Set MYSQL_TEST_URL environment variable (or use default: mysql://localhost:3306/drizzle_test)
- * 3. Or run: npm test -- mysql-setup.test.ts (requires test to be enabled)
+ * 1. Start a PostgreSQL database
+ * 2. Set POSTGRES_TEST_URL environment variable (or use default: postgresql://localhost:5432/drizzle_test)
+ * 3. Or run: npm test -- postgres-setup.test.ts (requires test to be enabled)
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
-  let adapter: ReturnType<typeof createMySQLAdapter>;
-  let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
+describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
+  let adapter: ReturnType<typeof createPostgresAdapter>;
+  let client: Awaited<ReturnType<typeof createPostgresDatabase>>['client'];
 
   beforeEach(async () => {
-    const connectionString = process.env.MYSQL_TEST_URL;
-    if (!connectionString) {
-      throw new Error('MYSQL_TEST_URL environment variable is required for MySQL tests');
-    }
+    const connectionString =
+      process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
 
-    const { db, connection: mysqlConnection } = await createMySQLDatabase(connectionString);
-    connection = mysqlConnection;
-    await setupMySQLDatabase(connection);
-    adapter = createMySQLAdapter(db);
+    const { db, client: pgClient } = createPostgresDatabase(connectionString);
+    client = pgClient;
+    await setupPostgresDatabase(db);
+    adapter = createPostgresAdapter(db);
   });
 
   afterEach(async () => {
-    await closeMySQLDatabase(connection);
+    await closePostgresDatabase(client);
   });
 
   describe('Basic CRUD Operations', () => {
@@ -67,7 +65,6 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
     });
 
     it('should create a new record', async () => {
-      // MySQL requires explicit ID since table doesn't have AUTO_INCREMENT in test fixtures
       const newUser = await adapter.createRecord({
         id: 4,
         name: 'Test User',
@@ -101,7 +98,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       await adapter.deleteRecord('99');
       const result = await adapter.fetchData({});
       expect(result.data).toHaveLength(3); // Original 3 users remain
-      expect(result.data.find((u) => (u as UserWithRelations).id === 99)).toBeUndefined();
+      expect(result.data.find((u: { id: number }) => u.id === 99)).toBeUndefined();
     });
 
     it('should bulk update records', async () => {
@@ -135,7 +132,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['John'] }],
       });
       expect(result.data).toHaveLength(2); // 'John Doe' and 'Bob Johnson' both contain 'John'
-      const names = result.data.map((r) => (r as UserWithRelations).name).sort();
+      const names = result.data.map((r: UserWithRelations) => r.name).sort();
       expect(names).toContain('John Doe');
       expect(names).toContain('Bob Johnson');
     });
@@ -183,12 +180,12 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       const result = await adapter.fetchData({
         filters: [{ columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] }],
       });
-      // Note: notEquals may return all results if not properly implemented
-      // Just verify it returns data and doesn't crash
+      // Verify that 'John Doe' is excluded from results
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
-      const names = result.data.map((r) => (r as UserWithRelations).name);
+      const names = result.data.map((r: UserWithRelations) => r.name);
       expect(names.length).toBeGreaterThan(0);
+      expect(names).not.toContain('John Doe');
     });
 
     it('should filter by text isNull', async () => {
@@ -220,7 +217,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'age', type: 'number', operator: 'notEquals', values: [30] }],
       });
       expect(result.data).toHaveLength(2);
-      const ages = result.data.map((r) => (r as UserWithRelations).age);
+      const ages = result.data.map((r: UserWithRelations) => r.age);
       expect(ages).not.toContain(30);
     });
 
@@ -397,10 +394,10 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         columns: ['name', 'email'],
         sorting: [{ columnId: 'profile.bio', direction: 'asc' }],
       });
-      // MySQL puts NULLs first by default when sorting ASC
-      expect((result.data[0] as UserWithRelations).name).toBe('Bob Johnson'); // No profile (NULL)
-      expect((result.data[1] as UserWithRelations).name).toBe('Jane Smith'); // Designer
-      expect((result.data[2] as UserWithRelations).name).toBe('John Doe'); // Software developer
+      // PostgreSQL puts NULLs last by default when sorting ASC
+      expect((result.data[0] as UserWithRelations).name).toBe('Jane Smith'); // Designer (alphabetically first)
+      expect((result.data[1] as UserWithRelations).name).toBe('John Doe'); // Software developer
+      expect((result.data[2] as UserWithRelations).name).toBe('Bob Johnson'); // No profile (NULL)
     });
 
     it('should handle multi-column sorting', async () => {
@@ -447,7 +444,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u) => (u as UserWithRelations).name === 'John Doe');
+      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).profile).toBeDefined();
       expect((johnUser as UserWithRelations).profile?.bio).toBe('Software developer');
     });
@@ -458,7 +455,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u) => (u as UserWithRelations).name === 'John Doe');
+      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).posts).toBeDefined();
       expect((johnUser as UserWithRelations).posts).toHaveLength(2);
     });
@@ -486,7 +483,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const bobUser = result.data.find((u) => (u as UserWithRelations).name === 'Bob Johnson');
+      const bobUser = result.data.find((u: UserWithRelations) => u.name === 'Bob Johnson');
       expect((bobUser as UserWithRelations).profile).toBeNull();
     });
   });
@@ -540,8 +537,8 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       } as Partial<User>);
 
       expect(events).toHaveLength(1);
-      expect(events[0].type).toBe('insert');
-      expect((events[0].data as UserWithRelations).name).toBe('Event Test User');
+      expect(events[0]?.type).toBe('insert');
+      expect((events[0]?.data as UserWithRelations).name).toBe('Event Test User');
 
       unsubscribe();
     });
@@ -569,26 +566,26 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
     });
   });
 
-  describe('MySQL-Specific Features', () => {
-    it('should handle MySQL-specific data types', async () => {
+  describe('PostgreSQL-Specific Features', () => {
+    it('should handle PostgreSQL-specific data types', async () => {
       // Test with basic columns (no timestamps in test schema)
       const result = await adapter.fetchData({
         columns: ['name', 'email'],
       });
 
       expect(result.data).toHaveLength(3);
-      result.data.forEach((user) => {
-        expect((user as UserWithRelations).name).toBeDefined();
+      result.data.forEach((user: UserWithRelations) => {
+        expect(user.name).toBeDefined();
       });
     });
 
-    it('should handle MySQL JSON operations (if implemented)', async () => {
+    it('should handle PostgreSQL JSON operations (if implemented)', async () => {
       // Placeholder for future JSON column support
       expect(true).toBe(true);
     });
 
-    it('should handle MySQL-specific collation and charset', async () => {
-      // Test case-insensitive search (MySQL default behavior)
+    it('should handle PostgreSQL-specific case-insensitive search', async () => {
+      // Test case-insensitive search with ILIKE (PostgreSQL default behavior)
       const result = await adapter.fetchData({
         filters: [
           {
@@ -604,7 +601,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       expect(result.data).toHaveLength(2);
     });
 
-    it('should handle MySQL-specific functions', async () => {
+    it('should handle PostgreSQL-specific functions', async () => {
       // Test basic query works (no date columns in test schema)
       const result = await adapter.fetchData({
         columns: ['name'],
@@ -649,20 +646,19 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
     });
 
     it('should handle invalid filter operators', async () => {
-      // Adapter handles invalid operators gracefully (returns all data)
-      const result = await adapter.fetchData({
-        filters: [
-          {
-            columnId: 'name',
-            type: 'text',
-            operator: 'invalidOp' as FilterOperator,
-            values: ['test'],
-          },
-        ],
-      });
-      // Should return data without crashing
-      expect(result.data).toBeDefined();
-      expect(Array.isArray(result.data)).toBe(true);
+      // adapter.fetchData throws a QueryError for unsupported operators
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'invalidOp' as FilterOperator,
+              values: ['test'],
+            },
+          ],
+        })
+      ).rejects.toThrow();
     });
 
     it('should handle invalid relationship paths', async () => {

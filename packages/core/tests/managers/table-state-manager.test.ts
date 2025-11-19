@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { TableStateManager } from '../../src/managers/table-state-manager';
 import type { ColumnDefinition } from '../../src/types/column';
 import type { FilterState } from '../../src/types/filter';
@@ -64,10 +64,10 @@ const mockColumns: ColumnDefinition<TestData>[] = [
 
 describe('TableStateManager', () => {
   let manager: TableStateManager<TestData>;
-  let mockSubscriber: ReturnType<typeof vi.fn>;
+  let mockSubscriber: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    mockSubscriber = vi.fn();
+    mockSubscriber = mock();
   });
 
   describe('initialization', () => {
@@ -618,7 +618,7 @@ describe('TableStateManager', () => {
     });
 
     it('should handle multiple subscribers', () => {
-      const subscriber2 = vi.fn();
+      const subscriber2 = mock();
       manager.subscribe(mockSubscriber);
       manager.subscribe(subscriber2);
 
@@ -647,7 +647,7 @@ describe('TableStateManager', () => {
     it('should update state with partial updates', () => {
       // Set total first so page 3 is valid
       manager.setTotal(100);
-      
+
       const updates = {
         filters: [
           {

@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'bun:test';
 import type {
   CellRendererProps,
   ColumnDefinition,
@@ -46,7 +46,7 @@ describe('Column Types', () => {
         const column: ColumnDefinition = {
           id: 'test',
           displayName: 'Test',
-          accessor: (row) => row.test,
+          accessor: (row) => (row as { test: string }).test,
           type,
         };
         expect(column.type).toBe(type);
@@ -98,10 +98,10 @@ describe('Column Types', () => {
         message: 'Must be at least 3 characters',
       };
 
-      const column: ColumnDefinition<any, string> = {
+      const column: ColumnDefinition<unknown, string> = {
         id: 'validated',
         displayName: 'Validated',
-        accessor: (row) => row.value,
+        accessor: (row) => (row as { value: string }).value,
         type: 'text',
         validation: [validationRule],
       };

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { FilterState } from '../../src/types/filter';
 import {
   assertFilterValueType,
@@ -22,151 +22,151 @@ describe('Type Guards', () => {
   describe('Filter State Type Guards', () => {
     describe('isTextFilterState', () => {
       it('should return true for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isTextFilterState(filter)).toBe(true);
       });
 
       it('should return true for email filter', () => {
-        const filter: FilterState = { type: 'email', values: ['test@example.com'] };
+        const filter = { type: 'email', values: ['test@example.com'] } as FilterState;
         expect(isTextFilterState(filter)).toBe(true);
       });
 
       it('should return true for url filter', () => {
-        const filter: FilterState = { type: 'url', values: ['https://example.com'] };
+        const filter = { type: 'url', values: ['https://example.com'] } as FilterState;
         expect(isTextFilterState(filter)).toBe(true);
       });
 
       it('should return true for phone filter', () => {
-        const filter: FilterState = { type: 'phone', values: ['1234567890'] };
+        const filter = { type: 'phone', values: ['1234567890'] } as FilterState;
         expect(isTextFilterState(filter)).toBe(true);
       });
 
       it('should return false for number filter', () => {
-        const filter: FilterState = { type: 'number', values: [1, 2] };
+        const filter = { type: 'number', values: [1, 2] } as FilterState;
         expect(isTextFilterState(filter)).toBe(false);
       });
 
       it('should return false for date filter', () => {
-        const filter: FilterState = { type: 'date', values: [new Date()] };
+        const filter = { type: 'date', values: [new Date()] } as FilterState;
         expect(isTextFilterState(filter)).toBe(false);
       });
     });
 
     describe('isNumberFilterState', () => {
       it('should return true for number filter', () => {
-        const filter: FilterState = { type: 'number', values: [1, 2] };
+        const filter = { type: 'number', values: [1, 2] } as FilterState;
         expect(isNumberFilterState(filter)).toBe(true);
       });
 
       it('should return true for currency filter', () => {
-        const filter: FilterState = { type: 'currency', values: [100.5] };
+        const filter = { type: 'currency', values: [100.5] } as FilterState;
         expect(isNumberFilterState(filter)).toBe(true);
       });
 
       it('should return true for percentage filter', () => {
-        const filter: FilterState = { type: 'percentage', values: [50] };
+        const filter = { type: 'percentage', values: [50] } as FilterState;
         expect(isNumberFilterState(filter)).toBe(true);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isNumberFilterState(filter)).toBe(false);
       });
 
       it('should return false for date filter', () => {
-        const filter: FilterState = { type: 'date', values: [new Date()] };
+        const filter = { type: 'date', values: [new Date()] } as FilterState;
         expect(isNumberFilterState(filter)).toBe(false);
       });
     });
 
     describe('isDateFilterState', () => {
       it('should return true for date filter', () => {
-        const filter: FilterState = { type: 'date', values: [new Date()] };
+        const filter = { type: 'date', values: [new Date()] } as FilterState;
         expect(isDateFilterState(filter)).toBe(true);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isDateFilterState(filter)).toBe(false);
       });
 
       it('should return false for number filter', () => {
-        const filter: FilterState = { type: 'number', values: [1] };
+        const filter = { type: 'number', values: [1] } as FilterState;
         expect(isDateFilterState(filter)).toBe(false);
       });
     });
 
     describe('isBooleanFilterState', () => {
       it('should return true for boolean filter', () => {
-        const filter: FilterState = { type: 'boolean', values: [true] };
+        const filter = { type: 'boolean', values: [true] } as FilterState;
         expect(isBooleanFilterState(filter)).toBe(true);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isBooleanFilterState(filter)).toBe(false);
       });
 
       it('should return false for number filter', () => {
-        const filter: FilterState = { type: 'number', values: [1] };
+        const filter = { type: 'number', values: [1] } as FilterState;
         expect(isBooleanFilterState(filter)).toBe(false);
       });
     });
 
     describe('isOptionFilterState', () => {
       it('should return true for option filter', () => {
-        const filter: FilterState = { type: 'option', values: ['active'] };
+        const filter = { type: 'option', values: ['active'] } as FilterState;
         expect(isOptionFilterState(filter)).toBe(true);
       });
 
       it('should return false for multiOption filter', () => {
-        const filter: FilterState = { type: 'multiOption', values: ['active'] };
+        const filter = { type: 'multiOption', values: ['active'] } as FilterState;
         expect(isOptionFilterState(filter)).toBe(false);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isOptionFilterState(filter)).toBe(false);
       });
     });
 
     describe('isMultiOptionFilterState', () => {
       it('should return true for multiOption filter', () => {
-        const filter: FilterState = { type: 'multiOption', values: ['active', 'pending'] };
+        const filter = { type: 'multiOption', values: ['active', 'pending'] } as FilterState;
         expect(isMultiOptionFilterState(filter)).toBe(true);
       });
 
       it('should return false for option filter', () => {
-        const filter: FilterState = { type: 'option', values: ['active'] };
+        const filter = { type: 'option', values: ['active'] } as FilterState;
         expect(isMultiOptionFilterState(filter)).toBe(false);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isMultiOptionFilterState(filter)).toBe(false);
       });
     });
 
     describe('isJsonFilterState', () => {
       it('should return true for json filter', () => {
-        const filter: FilterState = { type: 'json', values: [{ a: 1 }] };
+        const filter = { type: 'json', values: [{ a: 1 }] } as FilterState;
         expect(isJsonFilterState(filter)).toBe(true);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isJsonFilterState(filter)).toBe(false);
       });
     });
 
     describe('isCustomFilterState', () => {
       it('should return true for custom filter', () => {
-        const filter: FilterState = { type: 'custom', values: [1] };
+        const filter = { type: 'custom', values: [1] } as FilterState;
         expect(isCustomFilterState(filter)).toBe(true);
       });
 
       it('should return false for text filter', () => {
-        const filter: FilterState = { type: 'text', values: ['test'] };
+        const filter = { type: 'text', values: ['test'] } as FilterState;
         expect(isCustomFilterState(filter)).toBe(false);
       });
     });
@@ -175,49 +175,49 @@ describe('Type Guards', () => {
   describe('Filter Value Type Guards', () => {
     describe('isTextFilterValues', () => {
       it('should return true for filter with string values', () => {
-        const filter: FilterState = { type: 'text', values: ['a', 'b', 'c'] };
+        const filter = { type: 'text', values: ['a', 'b', 'c'] } as FilterState;
         expect(isTextFilterValues(filter)).toBe(true);
       });
 
       it('should return false for filter with number values', () => {
-        const filter: FilterState = { type: 'text', values: [1, 2, 3] };
+        const filter = { type: 'text', values: [1, 2, 3] } as unknown as FilterState;
         expect(isTextFilterValues(filter)).toBe(false);
       });
 
       it('should return false for filter with mixed types', () => {
-        const filter: FilterState = { type: 'text', values: ['a', 1] };
+        const filter = { type: 'text', values: ['a', 1] } as unknown as FilterState;
         expect(isTextFilterValues(filter)).toBe(false);
       });
 
       it('should return true for empty array', () => {
-        const filter: FilterState = { type: 'text', values: [] };
+        const filter = { type: 'text', values: [] } as unknown as FilterState;
         expect(isTextFilterValues(filter)).toBe(true);
       });
     });
 
     describe('isNumberFilterValues', () => {
       it('should return true for filter with number values', () => {
-        const filter: FilterState = { type: 'number', values: [1, 2, 3] };
+        const filter = { type: 'number', values: [1, 2, 3] } as FilterState;
         expect(isNumberFilterValues(filter)).toBe(true);
       });
 
       it('should return false for filter with string values', () => {
-        const filter: FilterState = { type: 'number', values: ['1', '2'] };
+        const filter = { type: 'number', values: ['1', '2'] } as unknown as FilterState;
         expect(isNumberFilterValues(filter)).toBe(false);
       });
 
       it('should return false for filter with mixed types', () => {
-        const filter: FilterState = { type: 'number', values: [1, '2'] };
+        const filter = { type: 'number', values: [1, '2'] } as unknown as FilterState;
         expect(isNumberFilterValues(filter)).toBe(false);
       });
 
       it('should handle NaN', () => {
-        const filter: FilterState = { type: 'number', values: [NaN] };
+        const filter = { type: 'number', values: [NaN] } as FilterState;
         expect(isNumberFilterValues(filter)).toBe(true); // NaN is still a number type
       });
 
       it('should handle Infinity', () => {
-        const filter: FilterState = { type: 'number', values: [Infinity] };
+        const filter = { type: 'number', values: [Infinity] } as FilterState;
         expect(isNumberFilterValues(filter)).toBe(true);
       });
     });
@@ -226,42 +226,45 @@ describe('Type Guards', () => {
       it('should return true for filter with Date values', () => {
         const date1 = new Date('2023-01-01');
         const date2 = new Date('2023-01-02');
-        const filter: FilterState = { type: 'date', values: [date1, date2] };
+        const filter = { type: 'date', values: [date1, date2] } as FilterState;
         expect(isDateFilterValues(filter)).toBe(true);
       });
 
       it('should return false for filter with invalid Date', () => {
         const invalidDate = new Date('invalid');
-        const filter: FilterState = { type: 'date', values: [invalidDate] };
+        const filter = { type: 'date', values: [invalidDate] } as FilterState;
         expect(isDateFilterValues(filter)).toBe(false);
       });
 
       it('should return false for filter with string values', () => {
-        const filter: FilterState = { type: 'date', values: ['2023-01-01'] };
+        const filter = { type: 'date', values: ['2023-01-01'] } as unknown as FilterState;
         expect(isDateFilterValues(filter)).toBe(false);
       });
 
       it('should return false for filter with mixed types', () => {
-        const filter: FilterState = { type: 'date', values: [new Date(), '2023-01-01'] };
+        const filter = {
+          type: 'date',
+          values: [new Date(), '2023-01-01'],
+        } as unknown as FilterState;
         expect(isDateFilterValues(filter)).toBe(false);
       });
     });
 
     describe('isFilterValuesOfType', () => {
       it('should validate all values match type checker', () => {
-        const filter: FilterState = { type: 'text', values: ['a', 'b', 'c'] };
+        const filter = { type: 'text', values: ['a', 'b', 'c'] } as FilterState;
         const checker = (value: unknown): value is string => typeof value === 'string';
         expect(isFilterValuesOfType(filter, checker)).toBe(true);
       });
 
       it('should return false when any value fails type checker', () => {
-        const filter: FilterState = { type: 'text', values: ['a', 1, 'c'] };
+        const filter = { type: 'text', values: ['a', 1, 'c'] } as unknown as FilterState;
         const checker = (value: unknown): value is string => typeof value === 'string';
         expect(isFilterValuesOfType(filter, checker)).toBe(false);
       });
 
       it('should return true for empty array', () => {
-        const filter: FilterState = { type: 'text', values: [] };
+        const filter = { type: 'text', values: [] } as unknown as FilterState;
         const checker = (value: unknown): value is string => typeof value === 'string';
         expect(isFilterValuesOfType(filter, checker)).toBe(true);
       });
@@ -269,19 +272,19 @@ describe('Type Guards', () => {
 
     describe('assertFilterValueType', () => {
       it('should return true when types match', () => {
-        const filter: FilterState = { type: 'text', values: ['a'] };
+        const filter = { type: 'text', values: ['a'] } as FilterState;
         expect(assertFilterValueType(filter, 'text')).toBe(true);
       });
 
       it('should throw error when types do not match', () => {
-        const filter: FilterState = { type: 'text', values: ['a'] };
+        const filter = { type: 'text', values: ['a'] } as FilterState;
         expect(() => assertFilterValueType(filter, 'number')).toThrow(
           'Expected filter type number, got text'
         );
       });
 
       it('should narrow type correctly', () => {
-        const filter: FilterState = { type: 'text', values: ['a'] };
+        const filter = { type: 'text', values: ['a'] } as FilterState;
         if (assertFilterValueType<string>(filter, 'text')) {
           expect(filter.values).toEqual(['a']);
         }

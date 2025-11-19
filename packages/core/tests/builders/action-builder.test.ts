@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { ActionBuilder } from '../../src/builders/action-builder';
 import type { ActionEnabled, ActionHandler, ActionVisibility } from '../../src/types/action';
 
@@ -116,7 +116,7 @@ describe('ActionBuilder', () => {
     });
 
     it('should allow handler to receive selectedIds and selectedData', async () => {
-      const handler = vi.fn<ActionHandler<TestUser>>();
+      const handler = mock<ActionHandler<TestUser>>();
       const builder = new ActionBuilder<TestUser>();
       builder.handler(handler);
 

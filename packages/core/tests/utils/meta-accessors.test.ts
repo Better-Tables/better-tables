@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { ColumnMeta } from '../../src/types/column-meta';
 import {
   getColumnStyle,
@@ -192,7 +192,7 @@ describe('Meta Accessors', () => {
         textFormat: {
           truncate: {
             maxLength: 50,
-            suffix: '...',
+            ellipsis: '...',
             showTooltip: true,
           },
           textTransform: 'capitalize',
@@ -205,7 +205,7 @@ describe('Meta Accessors', () => {
       expect(format).toEqual({
         truncate: {
           maxLength: 50,
-          suffix: '...',
+          ellipsis: '...',
           showTooltip: true,
         },
         textTransform: 'capitalize',
@@ -523,7 +523,7 @@ describe('Meta Accessors', () => {
         textFormat: {
           truncate: {
             maxLength: 50,
-            suffix: '...',
+            ellipsis: '...',
             showTooltip: true,
           },
           textTransform: 'capitalize',

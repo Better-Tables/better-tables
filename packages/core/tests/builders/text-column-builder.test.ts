@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { TextColumnBuilder } from '../../src/builders/text-column-builder';
 
 interface TestUser {
@@ -51,7 +51,10 @@ describe('TextColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.type).toBe('phone');
-      expect((column.meta?.truncate as any)?.maxLength).toBe(20);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(20);
     });
 
     it('should work with textOperators', () => {
@@ -222,7 +225,10 @@ describe('TextColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toEqual(['contains', 'equals']);
-      expect((column.meta?.truncate as any)?.maxLength).toBe(50);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(50);
       expect(column.meta?.textTransform).toBe('capitalize');
     });
 
@@ -266,7 +272,10 @@ describe('TextColumnBuilder Enhancements', () => {
 
       expect(column.type).toBe('phone');
       expect(column.filter?.operators).toEqual(['equals', 'contains']);
-      expect((column.meta?.truncate as any)?.maxLength).toBe(20);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(20);
     });
 
     it('should combine asUrl with textOperators and other methods', () => {
@@ -364,9 +373,18 @@ describe('TextColumnBuilder Enhancements', () => {
         .truncate({ maxLength: 50 })
         .build();
 
-      expect((column.meta?.truncate as any)?.maxLength).toBe(50);
-      expect((column.meta?.truncate as any)?.suffix).toBe('...');
-      expect((column.meta?.truncate as any)?.showTooltip).toBe(true);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(50);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.suffix
+      ).toBe('...');
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.showTooltip
+      ).toBe(true);
     });
 
     it('should set truncate with all default values when no options provided', () => {
@@ -378,9 +396,18 @@ describe('TextColumnBuilder Enhancements', () => {
         .truncate()
         .build();
 
-      expect((column.meta?.truncate as any)?.maxLength).toBe(100);
-      expect((column.meta?.truncate as any)?.suffix).toBe('...');
-      expect((column.meta?.truncate as any)?.showTooltip).toBe(true);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(100);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.suffix
+      ).toBe('...');
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.showTooltip
+      ).toBe(true);
     });
 
     it('should use correct defaults when options are empty', () => {
@@ -392,9 +419,18 @@ describe('TextColumnBuilder Enhancements', () => {
         .truncate({})
         .build();
 
-      expect((column.meta?.truncate as any)?.maxLength).toBe(100);
-      expect((column.meta?.truncate as any)?.suffix).toBe('...');
-      expect((column.meta?.truncate as any)?.showTooltip).toBe(true);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(100);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.suffix
+      ).toBe('...');
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.showTooltip
+      ).toBe(true);
     });
 
     it('should allow overriding showTooltip to false', () => {
@@ -406,8 +442,14 @@ describe('TextColumnBuilder Enhancements', () => {
         .truncate({ maxLength: 50, showTooltip: false })
         .build();
 
-      expect((column.meta?.truncate as any)?.maxLength).toBe(50);
-      expect((column.meta?.truncate as any)?.showTooltip).toBe(false);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(50);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.showTooltip
+      ).toBe(false);
     });
 
     it('should allow explicit showTooltip = true', () => {
@@ -419,8 +461,14 @@ describe('TextColumnBuilder Enhancements', () => {
         .truncate({ maxLength: 50, showTooltip: true })
         .build();
 
-      expect((column.meta?.truncate as any)?.maxLength).toBe(50);
-      expect((column.meta?.truncate as any)?.showTooltip).toBe(true);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(50);
+      expect(
+        (column.meta?.truncate as { maxLength: number; suffix?: string; showTooltip?: boolean })
+          ?.showTooltip
+      ).toBe(true);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'bun:test';
 import type { ColumnType } from '../../src/types/column';
 import type { FilterOperator } from '../../src/types/filter';
 import {

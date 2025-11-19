@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { FilterState } from '../../src/types/filter';
 import { FilterURLSerializer, filterURLUtils } from '../../src/utils/filter-serialization';
 
@@ -9,7 +9,7 @@ const mockLocation = {
 };
 
 const mockHistory = {
-  replaceState: vi.fn(),
+  replaceState: mock(),
 };
 
 Object.defineProperty(global, 'window', {
@@ -56,7 +56,7 @@ const mockFilterWithMeta: FilterState = {
 
 describe('FilterURLSerializer', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockHistory.replaceState.mockClear();
     mockLocation.search = '';
     mockLocation.href = 'https://example.com/table';
   });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { ActionBuilder } from '../../src/builders/action-builder';
 import {
   createActionBuilder,
@@ -33,9 +33,9 @@ describe('Action Factory', () => {
       const action = builder
         .id('test')
         .label('Test Action')
-        .handler(async (ids, _data) => {
+        .handler(async (_ids, _data) => {
           // data should be typed as TestUser[] | undefined
-          return ids.map((id) => id);
+          // Handler should not return a value
         })
         .build();
 
@@ -72,7 +72,7 @@ describe('Action Factory', () => {
 
   describe('deleteAction', () => {
     it('should create a delete action with default configuration', () => {
-      const handler: ActionHandler<TestUser> = async (ids) => ids;
+      const handler: ActionHandler<TestUser> = async () => {};
 
       const action = deleteAction({
         handler,
@@ -88,7 +88,7 @@ describe('Action Factory', () => {
     });
 
     it('should create a delete action with custom label', () => {
-      const handler: ActionHandler<TestUser> = async (ids) => ids;
+      const handler: ActionHandler<TestUser> = async () => {};
 
       const action = deleteAction({
         label: 'Remove Users',
@@ -102,7 +102,7 @@ describe('Action Factory', () => {
 
     it('should create a delete action with custom icon', () => {
       const MockIcon: IconComponent = () => null;
-      const handler: ActionHandler<TestUser> = async (ids) => ids;
+      const handler: ActionHandler<TestUser> = async () => {};
 
       const action = deleteAction({
         icon: MockIcon,
@@ -114,7 +114,7 @@ describe('Action Factory', () => {
     });
 
     it('should create a delete action with custom confirmation', () => {
-      const handler: ActionHandler<TestUser> = async (ids) => ids;
+      const handler: ActionHandler<TestUser> = async () => {};
 
       const action = deleteAction({
         handler,
@@ -133,7 +133,7 @@ describe('Action Factory', () => {
     });
 
     it('should create a delete action without custom confirmation', () => {
-      const handler: ActionHandler<TestUser> = async (ids) => ids;
+      const handler: ActionHandler<TestUser> = async () => {};
 
       const action = deleteAction({
         handler,
@@ -146,7 +146,7 @@ describe('Action Factory', () => {
     });
 
     it('should set handler function', async () => {
-      const mockHandler = vi.fn<ActionHandler<TestUser>>();
+      const mockHandler = mock<ActionHandler<TestUser>>();
 
       const action = deleteAction({
         handler: mockHandler,

@@ -1,20 +1,30 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { VirtualizationManager } from '../../src/managers/virtualization-manager';
 import type { ScrollInfo, VirtualizationConfig } from '../../src/types/virtualization';
 
 describe('VirtualizationManager', () => {
   let manager: VirtualizationManager;
-  let mockSubscriber: ReturnType<typeof vi.fn>;
+  let mockSubscriber: ReturnType<typeof mock>;
+  let resizeObserverConstructor: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    mockSubscriber = vi.fn();
+    mockSubscriber = mock();
 
     // Mock ResizeObserver
-    global.ResizeObserver = vi.fn().mockImplementation(() => ({
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    }));
+    const mockObserve = mock();
+    const mockUnobserve = mock();
+    const mockDisconnect = mock();
+    resizeObserverConstructor = mock();
+
+    global.ResizeObserver = class ResizeObserver {
+      observe = mockObserve;
+      unobserve = mockUnobserve;
+      disconnect = mockDisconnect;
+
+      constructor(callback: ResizeObserverCallback) {
+        resizeObserverConstructor(callback);
+      }
+    } as typeof ResizeObserver;
   });
 
   afterEach(() => {
@@ -311,20 +321,20 @@ describe('VirtualizationManager', () => {
     });
 
     it('should initialize resize observer for dynamic heights', () => {
-      expect(global.ResizeObserver).toHaveBeenCalled();
+      expect(resizeObserverConstructor).toHaveBeenCalled();
     });
 
     it('should observe elements when requested', () => {
       const mockElement = {
         dataset: {} as Record<string, string>,
       } as HTMLElement;
-      const mockObserve = vi.fn();
-      const mockDisconnect = vi.fn();
+      const mockObserve = mock();
+      const mockDisconnect = mock();
 
       // Mock the observe method
       (manager as unknown as { resizeObserver: ResizeObserver }).resizeObserver = {
         observe: mockObserve,
-        unobserve: vi.fn(),
+        unobserve: mock(),
         disconnect: mockDisconnect,
       } as ResizeObserver;
 

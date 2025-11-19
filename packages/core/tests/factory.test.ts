@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { betterTables } from '../src/factory';
 import type { TableAdapter } from '../src/types/adapter';
 import type { ColumnDefinition } from '../src/types/column';

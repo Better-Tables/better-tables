@@ -5,8 +5,8 @@
  * including CRUD operations, filtering, sorting, pagination, and relationship handling.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { FilterOperator } from '../../../core/src/types';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { FilterOperator } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closeDatabase,
@@ -76,7 +76,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       });
 
       expect(result.data).toHaveLength(2);
-      const names = result.data.map((r) => (r as UserWithRelations).name).sort();
+      const names = result.data.map((r: UserWithRelations) => r.name).sort();
       expect(names).toContain('John Doe');
       expect(names).toContain('Bob Johnson');
     });
@@ -94,7 +94,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       });
 
       expect(result.data.length).toBeGreaterThan(0);
-      expect(result.data.every((u) => ((u as UserWithRelations).age ?? 0) > 25)).toBe(true);
+      expect(result.data.every((u: UserWithRelations) => (u.age ?? 0) > 25)).toBe(true);
     });
 
     it('should filter by text equals', async () => {
