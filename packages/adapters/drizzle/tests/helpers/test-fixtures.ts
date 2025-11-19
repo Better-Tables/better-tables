@@ -2,7 +2,6 @@
  * Shared test fixtures for database setup and teardown across all database types
  */
 
-import Database from 'better-sqlite3';
 import { sql } from 'drizzle-orm';
 import { type BetterSQLite3Database, drizzle as drizzleSQLite } from 'drizzle-orm/better-sqlite3';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
@@ -14,6 +13,7 @@ import postgres from 'postgres';
 import type { DrizzleAdapter } from '../../src/drizzle-adapter';
 import { DrizzleAdapter as DrizzleAdapterClass } from '../../src/drizzle-adapter';
 import type { DrizzleAdapterConfig, DrizzleDatabase } from '../../src/types';
+import BunSQLiteCompat, { type Database } from './bun-sqlite-compat';
 import { relationsSchema, schema } from './test-schema';
 
 /**
@@ -27,9 +27,12 @@ import { relationsSchema, schema } from './test-schema';
  */
 export function createSQLiteDatabase(): {
   db: BetterSQLite3Database<typeof schema>;
-  sqlite: Database.Database;
+  sqlite: Database;
 } {
-  const sqlite = new Database(':memory:');
+  const sqlite = new BunSQLiteCompat(':memory:');
+  // Type assertion needed because Drizzle expects better-sqlite3 Database,
+  // but at runtime Bun's SQLite should work similarly
+  // @ts-expect-error - Drizzle expects better-sqlite3 Database, but Bun's SQLite is compatible at runtime
   const db = drizzleSQLite(sqlite) as unknown as BetterSQLite3Database<typeof schema>;
   return { db, sqlite };
 }
@@ -43,7 +46,8 @@ export async function setupSQLiteDatabase(db: BetterSQLite3Database<typeof schem
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
-    age INTEGER
+    age INTEGER,
+    created_at INTEGER
   )`);
 
   await db.run(sql`CREATE TABLE profiles (
@@ -73,10 +77,10 @@ export async function setupSQLiteDatabase(db: BetterSQLite3Database<typeof schem
   )`);
 
   // Insert test data
-  await db.run(sql`INSERT INTO users (id, name, email, age) VALUES 
-    (1, 'John Doe', 'john@example.com', 30),
-    (2, 'Jane Smith', 'jane@example.com', 25),
-    (3, 'Bob Johnson', 'bob@example.com', 35)`);
+  await db.run(sql`INSERT INTO users (id, name, email, age, created_at) VALUES 
+    (1, 'John Doe', 'john@example.com', 30, ${Date.now()}),
+    (2, 'Jane Smith', 'jane@example.com', 25, ${Date.now()}),
+    (3, 'Bob Johnson', 'bob@example.com', 35, ${Date.now()})`);
 
   await db.run(sql`INSERT INTO profiles (id, user_id, bio, avatar) VALUES 
     (1, 1, 'Software developer', 'avatar1.jpg'),
@@ -113,7 +117,7 @@ export function createSQLiteAdapter(
 /**
  * Close SQLite database connection
  */
-export function closeSQLiteDatabase(sqlite: Database.Database): void {
+export function closeSQLiteDatabase(sqlite: Database): void {
   if (sqlite) {
     sqlite.close();
   }
@@ -126,19 +130,82 @@ export function closeSQLiteDatabase(sqlite: Database.Database): void {
  */
 
 /**
+ * Parse PostgreSQL connection string to extract database name
+ */
+function parsePostgresConnectionString(connectionString: string): {
+  database: string;
+  baseUrl: string;
+} {
+  const url = new URL(connectionString);
+  const database = url.pathname.slice(1) || 'postgres';
+  url.pathname = '/postgres'; // Connect to default postgres database first
+  return { database, baseUrl: url.toString() };
+}
+
+/**
+ * Escape PostgreSQL identifier (database name, table name, etc.)
+ * Simple escaping for test purposes - wraps in double quotes
+ */
+function escapeIdentifier(identifier: string): string {
+  // Replace double quotes with escaped double quotes and wrap in quotes
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Ensure PostgreSQL database exists (drops if exists, then creates)
+ * Returns the database name
+ */
+export async function ensurePostgresDatabase(connectionString: string): Promise<string> {
+  const { database: databaseName, baseUrl } = parsePostgresConnectionString(connectionString);
+
+  // Connect to default postgres database to manage the test database
+  const adminClient = postgres(baseUrl, {
+    max: 1,
+    onnotice: () => {},
+  });
+
+  try {
+    // Terminate all connections to the database before dropping
+    await adminClient`
+      SELECT pg_terminate_backend(pg_stat_activity.pid)
+      FROM pg_stat_activity
+      WHERE pg_stat_activity.datname = ${databaseName}
+        AND pid <> pg_backend_pid()
+    `.catch(() => {
+      // Ignore errors if database doesn't exist or has no connections
+    });
+
+    // Drop database if it exists (clean slate)
+    await adminClient.unsafe(`DROP DATABASE IF EXISTS ${escapeIdentifier(databaseName)}`);
+
+    // Create the database
+    await adminClient.unsafe(`CREATE DATABASE ${escapeIdentifier(databaseName)}`);
+  } finally {
+    await adminClient.end();
+  }
+
+  return databaseName;
+}
+
+/**
  * Create a PostgreSQL database connection for testing
+ * Assumes the database already exists (use ensurePostgresDatabase first)
  */
 export function createPostgresDatabase(connectionString: string): {
   db: PostgresJsDatabase<typeof schema>;
   client: ReturnType<typeof postgres>;
+  databaseName: string;
 } {
+  const { database: databaseName } = parsePostgresConnectionString(connectionString);
+
+  // Connect to the test database
   const client = postgres(connectionString, {
     max: 1,
     // Suppress NOTICE messages (e.g., "table does not exist, skipping" during DROP TABLE IF EXISTS)
     onnotice: () => {},
   });
   const db = drizzlePostgres(client) as PostgresJsDatabase<typeof schema>;
-  return { db, client };
+  return { db, client, databaseName };
 }
 
 /**
@@ -156,7 +223,8 @@ export async function setupPostgresDatabase(db: PostgresJsDatabase<typeof schema
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
-    age INTEGER
+    age INTEGER,
+    created_at TIMESTAMP
   )`);
 
   await db.execute(sql`CREATE TABLE profiles (
@@ -182,10 +250,13 @@ export async function setupPostgresDatabase(db: PostgresJsDatabase<typeof schema
   )`);
 
   // Insert test data
-  await db.execute(sql`INSERT INTO users (id, name, email, age) VALUES 
-    (1, 'John Doe', 'john@example.com', 30),
-    (2, 'Jane Smith', 'jane@example.com', 25),
-    (3, 'Bob Johnson', 'bob@example.com', 35)`);
+  const now = new Date();
+  // Convert Date to ISO string for PostgreSQL compatibility
+  const nowTimestamp = now.toISOString();
+  await db.execute(sql`INSERT INTO users (id, name, email, age, created_at) VALUES 
+    (1, 'John Doe', 'john@example.com', 30, ${nowTimestamp}),
+    (2, 'Jane Smith', 'jane@example.com', 25, ${nowTimestamp}),
+    (3, 'Bob Johnson', 'bob@example.com', 35, ${nowTimestamp})`);
 
   await db.execute(sql`INSERT INTO profiles (id, user_id, bio, avatar) VALUES 
     (1, 1, 'Software developer', 'avatar1.jpg'),
@@ -229,28 +300,111 @@ export async function closePostgresDatabase(client: ReturnType<typeof postgres>)
 }
 
 /**
+ * Drop PostgreSQL test database (cleanup after all tests)
+ */
+export async function dropPostgresDatabase(
+  connectionString: string,
+  databaseName: string
+): Promise<void> {
+  const { baseUrl } = parsePostgresConnectionString(connectionString);
+  const adminClient = postgres(baseUrl, {
+    max: 1,
+    onnotice: () => {},
+  });
+
+  try {
+    // Terminate all connections to the database before dropping
+    await adminClient`
+      SELECT pg_terminate_backend(pg_stat_activity.pid)
+      FROM pg_stat_activity
+      WHERE pg_stat_activity.datname = ${databaseName}
+        AND pid <> pg_backend_pid()
+    `;
+
+    // Drop the database
+    // Note: DROP DATABASE cannot be parameterized, so we escape the identifier
+    await adminClient.unsafe(`DROP DATABASE IF EXISTS ${escapeIdentifier(databaseName)}`);
+  } finally {
+    await adminClient.end();
+  }
+}
+
+/**
  * ============================================================================
  * MySQL Test Fixtures
  * ============================================================================
  */
 
 /**
+ * Parse MySQL connection string to extract database name
+ */
+function parseMySQLConnectionString(connectionString: string): {
+  database: string;
+  baseUrl: string;
+} {
+  const url = new URL(connectionString);
+  const database = url.pathname.slice(1) || 'mysql';
+  // Create base URL without database name (connect to default mysql database)
+  url.pathname = '';
+  const baseUrl = url.toString().replace(/\/$/, '');
+  return { database, baseUrl };
+}
+
+/**
+ * Escape MySQL identifier (database name, table name, etc.)
+ * Simple escaping for test purposes - wraps in backticks
+ */
+function escapeMySQLIdentifier(identifier: string): string {
+  // Replace backticks with escaped backticks and wrap in backticks
+  return `\`${identifier.replace(/`/g, '``')}\``;
+}
+
+/**
+ * Ensure MySQL database exists (drops if exists, then creates)
+ * Returns the database name
+ */
+export async function ensureMySQLDatabase(connectionString: string): Promise<string> {
+  const { database: databaseName, baseUrl } = parseMySQLConnectionString(connectionString);
+
+  // Connect without specifying database to manage it
+  const adminConnection = await mysql.createConnection({
+    uri: baseUrl,
+  });
+
+  try {
+    // Drop database if it exists (clean slate)
+    await adminConnection.query(`DROP DATABASE IF EXISTS ${escapeMySQLIdentifier(databaseName)}`);
+
+    // Create the database
+    await adminConnection.query(`CREATE DATABASE ${escapeMySQLIdentifier(databaseName)}`);
+  } finally {
+    await adminConnection.end();
+  }
+
+  return databaseName;
+}
+
+/**
  * Create a MySQL database connection for testing
+ * Assumes the database already exists (use ensureMySQLDatabase first)
  */
 export async function createMySQLDatabase(connectionString: string): Promise<{
   db: MySql2Database<typeof schema>;
   connection: mysql.Connection;
+  databaseName: string;
 }> {
+  const { database: databaseName } = parseMySQLConnectionString(connectionString);
+
+  // Connect to the specific database
   const connection = await mysql.createConnection({
     uri: connectionString,
   });
 
-  // Create database if it doesn't exist - use query for DDL
-  await connection.query('CREATE DATABASE IF NOT EXISTS better_tables_test');
-  await connection.query('USE better_tables_test');
+  // Use the database
+  await connection.query(`USE ${escapeMySQLIdentifier(databaseName)}`);
 
   const db = drizzleMysql(connection) as MySql2Database<typeof schema>;
-  return { db, connection };
+  return { db, connection, databaseName };
 }
 
 /**
@@ -268,7 +422,8 @@ export async function setupMySQLDatabase(connection: mysql.Connection): Promise<
     id INT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
-    age INT
+    age INT,
+    created_at TIMESTAMP
   )`);
 
   await connection.query(`CREATE TABLE profiles (
@@ -298,10 +453,12 @@ export async function setupMySQLDatabase(connection: mysql.Connection): Promise<
   )`);
 
   // Insert test data
-  await connection.query(`INSERT INTO users (id, name, email, age) VALUES 
-    (1, 'John Doe', 'john@example.com', 30),
-    (2, 'Jane Smith', 'jane@example.com', 25),
-    (3, 'Bob Johnson', 'bob@example.com', 35)`);
+  const now = new Date();
+  const nowTimestamp = now.toISOString().slice(0, 19).replace('T', ' '); // MySQL datetime format
+  await connection.query(`INSERT INTO users (id, name, email, age, created_at) VALUES 
+    (1, 'John Doe', 'john@example.com', 30, '${nowTimestamp}'),
+    (2, 'Jane Smith', 'jane@example.com', 25, '${nowTimestamp}'),
+    (3, 'Bob Johnson', 'bob@example.com', 35, '${nowTimestamp}')`);
 
   await connection.query(`INSERT INTO profiles (id, user_id, bio, avatar) VALUES 
     (1, 1, 'Software developer', 'avatar1.jpg'),
@@ -341,6 +498,26 @@ export function createMySQLAdapter(
 export async function closeMySQLDatabase(connection: mysql.Connection): Promise<void> {
   if (connection) {
     await connection.end();
+  }
+}
+
+/**
+ * Drop MySQL test database (cleanup after all tests)
+ */
+export async function dropMySQLDatabase(
+  connectionString: string,
+  databaseName: string
+): Promise<void> {
+  const { baseUrl } = parseMySQLConnectionString(connectionString);
+  const adminConnection = await mysql.createConnection({
+    uri: baseUrl,
+  });
+
+  try {
+    // Drop the database
+    await adminConnection.query(`DROP DATABASE IF EXISTS ${escapeMySQLIdentifier(databaseName)}`);
+  } finally {
+    await adminConnection.end();
   }
 }
 

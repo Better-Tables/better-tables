@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   BooleanColumnBuilder,
   DateColumnBuilder,
@@ -124,7 +124,7 @@ describe('Edge Cases and Error Scenarios', () => {
           .range(0, Number.MAX_SAFE_INTEGER)
           .build();
 
-        expect(column.meta?.range?.max).toBe(Number.MAX_SAFE_INTEGER);
+        expect((column.meta?.range as { max?: number })?.max).toBe(Number.MAX_SAFE_INTEGER);
       });
 
       it('should handle Number.MIN_SAFE_INTEGER', () => {
@@ -136,7 +136,7 @@ describe('Edge Cases and Error Scenarios', () => {
           .range(Number.MIN_SAFE_INTEGER, 0)
           .build();
 
-        expect(column.meta?.range?.min).toBe(Number.MIN_SAFE_INTEGER);
+        expect((column.meta?.range as { min?: number })?.min).toBe(Number.MIN_SAFE_INTEGER);
       });
 
       it('should handle negative numbers in range', () => {
@@ -148,8 +148,8 @@ describe('Edge Cases and Error Scenarios', () => {
           .range(-1000, 1000)
           .build();
 
-        expect(column.filter?.min).toBe(-1000);
-        expect(column.filter?.max).toBe(1000);
+        expect((column.filter as { min?: number; max?: number })?.min).toBe(-1000);
+        expect((column.filter as { min?: number; max?: number })?.max).toBe(1000);
       });
 
       it('should handle zero as min/max value', () => {
@@ -213,7 +213,10 @@ describe('Edge Cases and Error Scenarios', () => {
           .truncate({ maxLength: 10000 })
           .build();
 
-        expect(column.meta?.truncate?.maxLength).toBe(10000);
+        expect(
+          (column.meta?.truncate as { maxLength?: number; suffix?: string; showTooltip?: boolean })
+            ?.maxLength
+        ).toBe(10000);
       });
 
       it('should handle truncation with zero length', () => {
@@ -225,7 +228,10 @@ describe('Edge Cases and Error Scenarios', () => {
           .truncate({ maxLength: 0 })
           .build();
 
-        expect(column.meta?.truncate?.maxLength).toBe(0);
+        expect(
+          (column.meta?.truncate as { maxLength?: number; suffix?: string; showTooltip?: boolean })
+            ?.maxLength
+        ).toBe(0);
       });
 
       it('should handle special characters in text', () => {
@@ -254,8 +260,12 @@ describe('Edge Cases and Error Scenarios', () => {
           .dateRange({ minDate, maxDate })
           .build();
 
-        expect(column.meta?.dateRange?.minDate).toEqual(minDate);
-        expect(column.meta?.dateRange?.maxDate).toEqual(maxDate);
+        expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toEqual(
+          minDate
+        );
+        expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toEqual(
+          maxDate
+        );
       });
 
       it('should handle very old dates', () => {
@@ -268,7 +278,7 @@ describe('Edge Cases and Error Scenarios', () => {
           .dateRange({ minDate: oldDate })
           .build();
 
-        expect(column.meta?.dateRange?.minDate).toEqual(oldDate);
+        expect((column.meta?.dateRange as { minDate?: Date })?.minDate).toEqual(oldDate);
       });
 
       it('should handle future dates', () => {
@@ -281,7 +291,7 @@ describe('Edge Cases and Error Scenarios', () => {
           .dateRange({ maxDate: futureDate })
           .build();
 
-        expect(column.meta?.dateRange?.maxDate).toEqual(futureDate);
+        expect((column.meta?.dateRange as { maxDate?: Date })?.maxDate).toEqual(futureDate);
       });
     });
 
@@ -295,7 +305,7 @@ describe('Edge Cases and Error Scenarios', () => {
           .options([], { maxSelections: 0 })
           .build();
 
-        expect(column.meta?.options?.maxSelections).toBe(0);
+        expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(0);
       });
 
       it('should handle very large maxSelections', () => {
@@ -307,7 +317,7 @@ describe('Edge Cases and Error Scenarios', () => {
           .options([], { maxSelections: 10000 })
           .build();
 
-        expect(column.meta?.options?.maxSelections).toBe(10000);
+        expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(10000);
       });
 
       it('should handle maxSelections equal to minSelections', () => {
@@ -319,8 +329,14 @@ describe('Edge Cases and Error Scenarios', () => {
           .options([], { minSelections: 5, maxSelections: 5 })
           .build();
 
-        expect(column.meta?.options?.minSelections).toBe(5);
-        expect(column.meta?.options?.maxSelections).toBe(5);
+        expect(
+          (column.meta?.options as { minSelections?: number; maxSelections?: number })
+            ?.minSelections
+        ).toBe(5);
+        expect(
+          (column.meta?.options as { minSelections?: number; maxSelections?: number })
+            ?.maxSelections
+        ).toBe(5);
       });
     });
   });
@@ -396,7 +412,7 @@ describe('Edge Cases and Error Scenarios', () => {
       const column = builder
         .id('name')
         .displayName('Name')
-        .accessor((d) => d.name || null)
+        .accessor((d) => d.name || '')
         .nullable(true)
         .build();
 
@@ -449,8 +465,12 @@ describe('Edge Cases and Error Scenarios', () => {
         .build();
 
       // Builder allows this configuration, validation happens at runtime
-      expect(column.meta?.dateRange?.minDate).toEqual(minDate);
-      expect(column.meta?.dateRange?.maxDate).toEqual(maxDate);
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toEqual(
+        minDate
+      );
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toEqual(
+        maxDate
+      );
     });
   });
 
@@ -485,7 +505,10 @@ describe('Edge Cases and Error Scenarios', () => {
         .truncate({ maxLength: 100, suffix: undefined, showTooltip: undefined })
         .build();
 
-      expect(column.meta?.truncate?.maxLength).toBe(100);
+      expect(
+        (column.meta?.truncate as { maxLength?: number; suffix?: string; showTooltip?: boolean })
+          ?.maxLength
+      ).toBe(100);
       // Should use defaults for undefined options
     });
   });
@@ -523,7 +546,7 @@ describe('Edge Cases and Error Scenarios', () => {
         .build();
 
       expect(column.filter?.options).toHaveLength(500);
-      expect(column.meta?.options?.maxSelections).toBe(500);
+      expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(500);
     });
   });
 
@@ -545,7 +568,14 @@ describe('Edge Cases and Error Scenarios', () => {
         .id('name')
         .displayName('Name')
         .accessor((d) => d.name)
-        .textOperators([...operators]) // Pass a copy to test immutability
+        .textOperators([...operators] as (
+          | 'contains'
+          | 'equals'
+          | 'startsWith'
+          | 'endsWith'
+          | 'isEmpty'
+          | 'isNotEmpty'
+        )[]) // Pass a copy to test immutability
         .build();
 
       // Mutating the original array should not affect the column

@@ -310,6 +310,20 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    */
   build(): ColumnDefinition<TData, TValue> {
     this.validateConfig();
+
+    // If nullable is true, wrap the accessor to convert empty strings to null
+    if (this.config.nullable && this.config.accessor) {
+      const originalAccessor = this.config.accessor;
+      this.config.accessor = (data: TData) => {
+        const value = originalAccessor(data);
+        // Convert empty strings to null for nullable columns
+        if (value === '' || value === undefined) {
+          return null as TValue;
+        }
+        return value;
+      };
+    }
+
     return this.config as ColumnDefinition<TData, TValue>;
   }
 

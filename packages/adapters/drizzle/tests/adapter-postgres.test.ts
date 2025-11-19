@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { DataEvent, FilterOperator } from '../../../core/src/types';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import type { DataEvent, FilterOperator } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closePostgresDatabase,
   createPostgresAdapter,
   createPostgresDatabase,
+  dropPostgresDatabase,
+  ensurePostgresDatabase,
   setupPostgresDatabase,
 } from './helpers/test-fixtures';
 import type { User } from './helpers/test-schema';
@@ -17,27 +19,49 @@ import type { User } from './helpers/test-schema';
  * To run these tests:
  * 1. Start a PostgreSQL database
  * 2. Set POSTGRES_TEST_URL environment variable (or use default: postgresql://localhost:5432/drizzle_test)
- * 3. Remove .skip from describe() to enable tests
- * 4. Or run: npm test -- postgres-setup.test.ts (requires test to be enabled)
+ * 3. Or run: npm test -- postgres-setup.test.ts (requires test to be enabled)
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
+describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createPostgresAdapter>;
-  let client: Awaited<ReturnType<typeof createPostgresDatabase>>['client'];
+  let client: ReturnType<typeof createPostgresDatabase>['client'];
+  let connectionString: string;
+  let databaseName: string;
+
+  beforeAll(async () => {
+    // Drop database if exists, create it, and set up tables with seed data once
+    connectionString = process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
+    databaseName = await ensurePostgresDatabase(connectionString);
+
+    // Connect and set up tables with seed data
+    const { db, client: setupClient } = createPostgresDatabase(connectionString);
+    await setupPostgresDatabase(db);
+    await closePostgresDatabase(setupClient);
+  });
 
   beforeEach(async () => {
-    const connectionString =
-      process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
-
+    // Connect to the existing database (no creation, tables already exist)
     const { db, client: pgClient } = createPostgresDatabase(connectionString);
     client = pgClient;
-    await setupPostgresDatabase(db);
     adapter = createPostgresAdapter(db);
   });
 
   afterEach(async () => {
+    // Close the connection after each test
     await closePostgresDatabase(client);
+  });
+
+  afterAll(async () => {
+    // Clean up: drop the test database after all tests complete
+    if (connectionString && databaseName) {
+      try {
+        await dropPostgresDatabase(connectionString, databaseName);
+      } catch (error) {
+        // Ignore errors during cleanup (database might already be dropped)
+        console.warn('Failed to drop test database:', error);
+      }
+    }
   });
 
   describe('Basic CRUD Operations', () => {
@@ -99,7 +123,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       await adapter.deleteRecord('99');
       const result = await adapter.fetchData({});
       expect(result.data).toHaveLength(3); // Original 3 users remain
-      expect(result.data.find((u) => (u as UserWithRelations).id === 99)).toBeUndefined();
+      expect(result.data.find((u: { id: number }) => u.id === 99)).toBeUndefined();
     });
 
     it('should bulk update records', async () => {
@@ -133,7 +157,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
         filters: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['John'] }],
       });
       expect(result.data).toHaveLength(2); // 'John Doe' and 'Bob Johnson' both contain 'John'
-      const names = result.data.map((r) => (r as UserWithRelations).name).sort();
+      const names = result.data.map((r: UserWithRelations) => r.name).sort();
       expect(names).toContain('John Doe');
       expect(names).toContain('Bob Johnson');
     });
@@ -184,7 +208,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       // Verify that 'John Doe' is excluded from results
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
-      const names = result.data.map((r) => (r as UserWithRelations).name);
+      const names = result.data.map((r: UserWithRelations) => r.name);
       expect(names.length).toBeGreaterThan(0);
       expect(names).not.toContain('John Doe');
     });
@@ -218,7 +242,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
         filters: [{ columnId: 'age', type: 'number', operator: 'notEquals', values: [30] }],
       });
       expect(result.data).toHaveLength(2);
-      const ages = result.data.map((r) => (r as UserWithRelations).age);
+      const ages = result.data.map((r: UserWithRelations) => r.age);
       expect(ages).not.toContain(30);
     });
 
@@ -284,7 +308,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
     });
   });
 
-  describe.skip('Date Filter Operators - Skipped (no timestamp columns in test schema)', () => {
+  describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
       // Get current timestamp for exact match
       const now = new Date();
@@ -445,7 +469,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u) => (u as UserWithRelations).name === 'John Doe');
+      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).profile).toBeDefined();
       expect((johnUser as UserWithRelations).profile?.bio).toBe('Software developer');
     });
@@ -456,7 +480,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u) => (u as UserWithRelations).name === 'John Doe');
+      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).posts).toBeDefined();
       expect((johnUser as UserWithRelations).posts).toHaveLength(2);
     });
@@ -484,7 +508,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const bobUser = result.data.find((u) => (u as UserWithRelations).name === 'Bob Johnson');
+      const bobUser = result.data.find((u: UserWithRelations) => u.name === 'Bob Johnson');
       expect((bobUser as UserWithRelations).profile).toBeNull();
     });
   });
@@ -538,8 +562,8 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       } as Partial<User>);
 
       expect(events).toHaveLength(1);
-      expect(events[0].type).toBe('insert');
-      expect((events[0].data as UserWithRelations).name).toBe('Event Test User');
+      expect(events[0]?.type).toBe('insert');
+      expect((events[0]?.data as UserWithRelations).name).toBe('Event Test User');
 
       unsubscribe();
     });
@@ -575,8 +599,8 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      result.data.forEach((user) => {
-        expect((user as UserWithRelations).name).toBeDefined();
+      result.data.forEach((user: UserWithRelations) => {
+        expect(user.name).toBeDefined();
       });
     });
 

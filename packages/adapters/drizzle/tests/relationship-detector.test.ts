@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
 import type { RelationshipMap } from '../src/types';
@@ -14,23 +14,23 @@ describe('RelationshipDetector', () => {
   it('should detect relationships from schema', () => {
     const relationships = detector.detectFromSchema(relationsSchema, schema);
 
-    expect(relationships).toHaveProperty('users.profile');
-    expect(relationships).toHaveProperty('users.posts');
-    expect(relationships).toHaveProperty('users.comments');
-    expect(relationships).toHaveProperty('profiles.user');
-    expect(relationships).toHaveProperty('posts.user');
-    expect(relationships).toHaveProperty('posts.comments');
-    expect(relationships).toHaveProperty('comments.post');
-    expect(relationships).toHaveProperty('comments.user');
+    expect(relationships['users.profile']).toBeDefined();
+    expect(relationships['users.posts']).toBeDefined();
+    expect(relationships['users.comments']).toBeDefined();
+    expect(relationships['profiles.user']).toBeDefined();
+    expect(relationships['posts.user']).toBeDefined();
+    expect(relationships['posts.comments']).toBeDefined();
+    expect(relationships['comments.post']).toBeDefined();
+    expect(relationships['comments.user']).toBeDefined();
   });
 
   it('should detect relationship cardinality', () => {
     const relationships = detector.detectFromSchema(relationsSchema, schema);
 
-    expect(relationships['users.profile'].cardinality).toBe('one');
-    expect(relationships['users.posts'].cardinality).toBe('many');
-    expect(relationships['profiles.user'].cardinality).toBe('one');
-    expect(relationships['posts.comments'].cardinality).toBe('many');
+    expect(relationships['users.profile']?.cardinality).toBe('one');
+    expect(relationships['users.posts']?.cardinality).toBe('many');
+    expect(relationships['profiles.user']?.cardinality).toBe('one');
+    expect(relationships['posts.comments']?.cardinality).toBe('many');
   });
 
   it('should find join path between directly related tables', () => {
@@ -38,8 +38,8 @@ describe('RelationshipDetector', () => {
 
     const path = detector.getJoinPath('users', 'profiles');
     expect(path).toHaveLength(1);
-    expect(path[0].from).toBe('users');
-    expect(path[0].to).toBe('profiles');
+    expect(path[0]?.from).toBe('users');
+    expect(path[0]?.to).toBe('profiles');
   });
 
   it('should find multi-level join paths', () => {
@@ -47,10 +47,10 @@ describe('RelationshipDetector', () => {
 
     const path = detector.getJoinPath('users', 'comments');
     expect(path).toHaveLength(2);
-    expect(path[0].from).toBe('users');
-    expect(path[0].to).toBe('posts');
-    expect(path[1].from).toBe('posts');
-    expect(path[1].to).toBe('comments');
+    expect(path[0]?.from).toBe('users');
+    expect(path[0]?.to).toBe('posts');
+    expect(path[1]?.from).toBe('posts');
+    expect(path[1]?.to).toBe('comments');
   });
 
   it('should detect circular references', () => {
@@ -158,8 +158,8 @@ describe('RelationshipManager', () => {
     const joinOrder = manager.optimizeJoinOrder(requiredJoins, 'users');
 
     expect(joinOrder).toHaveLength(2);
-    expect(joinOrder[0].to).toBe('posts');
-    expect(joinOrder[1].to).toBe('comments');
+    expect(joinOrder[0]?.to).toBe('posts');
+    expect(joinOrder[1]?.to).toBe('comments');
   });
 
   it('should validate column access', () => {

@@ -1,5 +1,5 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: Test file */
-/** biome-ignore-all lint/suspicious/noConsole: Test file */
+// TODO: Now we are type safe this can be updated to use the types from the schema
+// TODO: remove the any types
 import { createColumnBuilder } from '@better-tables/core';
 import type { RelationshipMap } from '@better-tables/drizzle';
 import Database from 'better-sqlite3';

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { FilterManager } from '../../src/managers/filter-manager';
 import type { ColumnDefinition } from '../../src/types/column';
 import type { FilterState } from '../../src/types/filter';
@@ -98,10 +98,10 @@ const mockColumns: ColumnDefinition<TestData>[] = [
 ];
 
 describe('FilterManager', () => {
-  let filterManager: FilterManager;
+  let filterManager: FilterManager<TestData>;
 
   beforeEach(() => {
-    filterManager = new FilterManager(mockColumns);
+    filterManager = new FilterManager<TestData>(mockColumns);
   });
 
   describe('initialization', () => {
@@ -351,12 +351,12 @@ describe('FilterManager', () => {
     });
 
     it('should reject filter with wrong type', () => {
-      const filter: FilterState = {
+      const filter = {
         columnId: 'name',
         type: 'number', // Wrong type
         operator: 'contains',
         values: ['John'],
-      };
+      } as unknown as FilterState;
 
       const result = filterManager.validateFilter(filter);
       expect(result.valid).toBe(false);
@@ -403,12 +403,12 @@ describe('FilterManager', () => {
     });
 
     it('should reject filter with values for no-value operator', () => {
-      const filter: FilterState = {
+      const filter = {
         columnId: 'age',
         type: 'number',
         operator: 'isNull',
         values: ['test'], // Should be no values
-      };
+      } as unknown as FilterState;
 
       const result = filterManager.validateFilter(filter);
       expect(result.valid).toBe(false);
@@ -463,7 +463,7 @@ describe('FilterManager', () => {
 
   describe('subscriptions', () => {
     it('should notify subscribers when filter is added', () => {
-      const callback = vi.fn();
+      const callback = mock();
       filterManager.subscribe(callback);
 
       const filter: FilterState = {
@@ -482,7 +482,7 @@ describe('FilterManager', () => {
     });
 
     it('should notify subscribers when filter is updated', () => {
-      const callback = vi.fn();
+      const callback = mock();
 
       const filter: FilterState = {
         columnId: 'name',
@@ -511,7 +511,7 @@ describe('FilterManager', () => {
     });
 
     it('should notify subscribers when filter is removed', () => {
-      const callback = vi.fn();
+      const callback = mock();
 
       const filter: FilterState = {
         columnId: 'name',
@@ -532,7 +532,7 @@ describe('FilterManager', () => {
     });
 
     it('should notify subscribers when filters are cleared', () => {
-      const callback = vi.fn();
+      const callback = mock();
 
       const filter: FilterState = {
         columnId: 'name',
@@ -552,7 +552,7 @@ describe('FilterManager', () => {
     });
 
     it('should unsubscribe properly', () => {
-      const callback = vi.fn();
+      const callback = mock();
       const unsubscribe = filterManager.subscribe(callback);
 
       const filter: FilterState = {
@@ -729,10 +729,12 @@ describe('FilterManager', () => {
     });
 
     it('should handle subscriber errors gracefully', () => {
-      const errorCallback = vi.fn(() => {
+      const errorCallback = mock(() => {
         throw new Error('Subscriber error');
       });
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const originalError = console.error;
+      const consoleSpy = mock();
+      console.error = consoleSpy as typeof console.error;
 
       filterManager.subscribe(errorCallback);
 
@@ -753,7 +755,7 @@ describe('FilterManager', () => {
         expect.any(Error)
       );
 
-      consoleSpy.mockRestore();
+      console.error = originalError;
     });
   });
 });

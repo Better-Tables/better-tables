@@ -13,6 +13,7 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   email: text('email').notNull(),
   age: integer('age'),
+  createdAt: integer('created_at', { mode: 'timestamp' }),
 });
 
 export const profiles = sqliteTable('profiles', {

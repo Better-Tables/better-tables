@@ -9,8 +9,7 @@ on:
       - 'packages/core/**'
       - 'packages/adapters/**'
       - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
+      - 'bun.lock'
       - 'turbo.json'
       - '.github/workflows/test.yml'
   push:
@@ -21,14 +20,12 @@ on:
       - 'packages/core/**'
       - 'packages/adapters/**'
       - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
+      - 'bun.lock'
       - 'turbo.json'
       - '.github/workflows/test.yml'
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '10.19.0'
 
 jobs:
   test-core:
@@ -44,26 +41,25 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: |
           echo "Installing dependencies from workspace root..."
           cd ../..
-          pnpm install --frozen-lockfile
+          bun install --frozen-lockfile
           echo ""
           echo "✓ Dependencies installed successfully"
           echo "Workspace packages:"
-          pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
+          bun pm ls 2>/dev/null | head -20 || echo "Package list command not available"
 
       - name: Run Core Tests
         run: |
@@ -73,13 +69,13 @@ jobs:
           echo ""
           echo "Working directory: $(pwd)"
           echo "Node version: $(node --version)"
-          echo "pnpm version: $(pnpm --version)"
+          echo "Bun version: $(bun --version)"
           echo ""
           echo "Starting test execution..."
           echo ""
-          echo "Running: pnpm test -- --run --reporter=verbose"
+          echo "Running: bun test"
           echo ""
-          pnpm test -- --run --reporter=verbose
+          bun test
           echo ""
           echo "========================================="
           echo "✅ Core tests completed successfully"
@@ -129,26 +125,25 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: |
           echo "Installing dependencies from workspace root..."
           cd ../../..
-          pnpm install --frozen-lockfile
+          bun install --frozen-lockfile
           echo ""
           echo "✓ Dependencies installed successfully"
           echo "Workspace packages:"
-          pnpm list --depth=0 2>/dev/null | head -20 || echo "Package list command not available"
+          bun pm ls 2>/dev/null | head -20 || echo "Package list command not available"
 
       - name: Build Core Package (dependency)
         run: |
@@ -156,7 +151,7 @@ jobs:
           cd ../../..
           echo "Building core package..."
           cd packages/core
-          pnpm build
+          bun run build
           echo ""
           echo "Verifying core package was built..."
           ls -la dist/ || echo "Warning: dist directory not found"
@@ -166,7 +161,7 @@ jobs:
         env:
           # Disable SQLite tests in CI (better-sqlite3 requires native bindings)
           CI: 'true'
-          DISABLE_SQLITE: 'true'
+          DISABLE_SQLITE: 'false'
           # Set connection strings for MySQL and Postgres services
           # Using root for MySQL since tests need to create databases
           MYSQL_TEST_URL: mysql://root:testpassword@localhost:3306
@@ -178,7 +173,7 @@ jobs:
           echo ""
           echo "Working directory: $(pwd)"
           echo "Node version: $(node --version)"
-          echo "pnpm version: $(pnpm --version)"
+          echo "Bun version: $(bun --version)"
           echo ""
           echo "Database services available:"
           echo "  MySQL: $MYSQL_TEST_URL"
@@ -191,9 +186,9 @@ jobs:
           echo ""
           echo "Starting test execution..."
           echo ""
-          echo "Running: pnpm test --run --reporter=verbose"
+          echo "Running: bun test"
           echo ""
-          pnpm test -- --run --reporter=verbose
+          bun test
           echo ""
           echo "========================================="
           echo "✅ Adapter tests completed successfully"

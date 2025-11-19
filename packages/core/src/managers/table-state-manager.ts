@@ -525,12 +525,22 @@ export class TableStateManager<TData = unknown> {
     }
 
     if (updates.pagination !== undefined) {
-      const { page, limit } = updates.pagination;
-      if (page !== undefined && page !== this.paginationManager.getCurrentPage()) {
-        this.paginationManager.goToPage(page);
+      const { page, limit, totalPages } = updates.pagination;
+
+      // If totalPages is provided, calculate and set total first
+      // This ensures validation works correctly when updating page
+      if (totalPages !== undefined) {
+        const currentLimit = limit ?? this.paginationManager.getPageSize();
+        const calculatedTotal = totalPages * currentLimit;
+        this.paginationManager.setTotal(calculatedTotal);
       }
+
       if (limit !== undefined && limit !== this.paginationManager.getPageSize()) {
         this.paginationManager.changePageSize(limit);
+      }
+
+      if (page !== undefined && page !== this.paginationManager.getCurrentPage()) {
+        this.paginationManager.goToPage(page);
       }
     }
 

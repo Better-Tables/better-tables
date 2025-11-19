@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { MultiOptionColumnBuilder } from '../../src/builders/multi-option-column-builder';
 import type { FilterOption } from '../../src/types/filter';
 
@@ -30,8 +30,12 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
 
       expect(column.filter?.options).toEqual(mockOptions);
       expect(column.meta?.categories).toBeDefined();
-      expect(column.meta?.categories?.showHierarchy).toBe(true);
-      expect(column.meta?.categories?.showIcons).toBe(true);
+      expect(
+        (column.meta?.categories as { showHierarchy?: boolean; showIcons?: boolean })?.showHierarchy
+      ).toBe(true);
+      expect(
+        (column.meta?.categories as { showHierarchy?: boolean; showIcons?: boolean })?.showIcons
+      ).toBe(true);
     });
 
     it('should configure categories with includeNull', () => {
@@ -55,7 +59,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .categories([], { searchable: false })
         .build();
 
-      expect(column.meta?.options?.searchable).toBe(false);
+      expect((column.meta?.options as { searchable?: boolean })?.searchable).toBe(false);
     });
 
     it('should configure categories with showHierarchy', () => {
@@ -67,7 +71,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .categories([], { showHierarchy: false })
         .build();
 
-      expect(column.meta?.categories?.showHierarchy).toBe(false);
+      expect((column.meta?.categories as { showHierarchy?: boolean })?.showHierarchy).toBe(false);
     });
 
     it('should configure categories with maxCategories', () => {
@@ -79,7 +83,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .categories([], { maxCategories: 5 })
         .build();
 
-      expect(column.meta?.options?.maxSelections).toBe(5);
+      expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(5);
     });
 
     it('should support method chaining with categories', () => {
@@ -93,8 +97,8 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.meta?.categories).toBeDefined();
-      expect(column.meta?.options?.maxSelections).toBe(3);
-      expect(column.meta?.display?.type).toBe('chips');
+      expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(3);
+      expect((column.meta?.display as { type?: string })?.type).toBe('chips');
     });
   });
 
@@ -116,8 +120,13 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
 
       expect(column.filter?.options).toEqual(roleOptions);
       expect(column.meta?.roles).toBeDefined();
-      expect(column.meta?.roles?.showDescriptions).toBe(true);
-      expect(column.meta?.roles?.showBadges).toBe(true);
+      expect(
+        (column.meta?.roles as { showDescriptions?: boolean; showBadges?: boolean })
+          ?.showDescriptions
+      ).toBe(true);
+      expect(
+        (column.meta?.roles as { showDescriptions?: boolean; showBadges?: boolean })?.showBadges
+      ).toBe(true);
     });
 
     it('should configure roles with includeNull', () => {
@@ -141,7 +150,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .roles([], { searchable: false })
         .build();
 
-      expect(column.meta?.options?.searchable).toBe(false);
+      expect((column.meta?.options as { searchable?: boolean })?.searchable).toBe(false);
     });
 
     it('should configure roles with showDescriptions', () => {
@@ -153,7 +162,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .roles([], { showDescriptions: false })
         .build();
 
-      expect(column.meta?.roles?.showDescriptions).toBe(false);
+      expect((column.meta?.roles as { showDescriptions?: boolean })?.showDescriptions).toBe(false);
     });
 
     it('should configure roles with maxRoles', () => {
@@ -165,7 +174,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .roles([], { maxRoles: 10 })
         .build();
 
-      expect(column.meta?.options?.maxSelections).toBe(10);
+      expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(10);
     });
 
     it('should support method chaining with roles', () => {
@@ -179,15 +188,17 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.meta?.roles).toBeDefined();
-      expect(column.meta?.options?.maxSelections).toBe(5);
-      expect(column.meta?.display?.type).toBe('chips');
-      expect(column.meta?.display?.removable).toBe(true);
+      expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(5);
+      expect((column.meta?.display as { type?: string; removable?: boolean })?.type).toBe('chips');
+      expect((column.meta?.display as { type?: string; removable?: boolean })?.removable).toBe(
+        true
+      );
     });
   });
 
   describe('asyncOptions method', () => {
     it('should configure async options loader', async () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -197,8 +208,14 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader)
         .build();
 
-      expect(column.meta?.options?.async).toBe(true);
-      expect(column.meta?.options?.optionsLoader).toBe(mockLoader);
+      expect(
+        (column.meta?.options as { async?: boolean; optionsLoader?: () => Promise<FilterOption[]> })
+          ?.async
+      ).toBe(true);
+      expect(
+        (column.meta?.options as { async?: boolean; optionsLoader?: () => Promise<FilterOption[]> })
+          ?.optionsLoader
+      ).toBe(mockLoader);
 
       // Verify loader works
       const result = await mockLoader();
@@ -207,7 +224,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
     });
 
     it('should configure async options with default loading placeholder', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -217,11 +234,13 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader)
         .build();
 
-      expect(column.meta?.options?.loadingPlaceholder).toBe('Loading options...');
+      expect((column.meta?.options as { loadingPlaceholder?: string })?.loadingPlaceholder).toBe(
+        'Loading options...'
+      );
     });
 
     it('should configure async options with custom loading placeholder', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -231,11 +250,13 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader, { loadingPlaceholder: 'Fetching tags...' })
         .build();
 
-      expect(column.meta?.options?.loadingPlaceholder).toBe('Fetching tags...');
+      expect((column.meta?.options as { loadingPlaceholder?: string })?.loadingPlaceholder).toBe(
+        'Fetching tags...'
+      );
     });
 
     it('should configure async options with includeNull', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -249,8 +270,8 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
     });
 
     it('should configure async options with validation', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
-      const validation = vi.fn<(value: string[]) => boolean>().mockReturnValue(true);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const validation = mock<(value: string[]) => boolean>().mockReturnValue(true);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -264,7 +285,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
     });
 
     it('should configure async options with maxSelections', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -274,11 +295,11 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader, { maxSelections: 5 })
         .build();
 
-      expect(column.meta?.options?.maxSelections).toBe(5);
+      expect((column.meta?.options as { maxSelections?: number })?.maxSelections).toBe(5);
     });
 
     it('should configure async options with minSelections', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -288,11 +309,11 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader, { minSelections: 1 })
         .build();
 
-      expect(column.meta?.options?.minSelections).toBe(1);
+      expect((column.meta?.options as { minSelections?: number })?.minSelections).toBe(1);
     });
 
     it('should set correct operators for async options', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -313,7 +334,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
     });
 
     it('should support method chaining with asyncOptions', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -324,8 +345,8 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .showBadges()
         .build();
 
-      expect(column.meta?.options?.async).toBe(true);
-      expect(column.meta?.display?.type).toBe('chips');
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
+      expect((column.meta?.display as { type?: string })?.type).toBe('chips');
     });
   });
 
@@ -340,7 +361,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .validate({ maxSelections: 5 })
         .build();
 
-      expect(column.meta?.validation?.maxSelections).toBe(5);
+      expect((column.meta?.validation as { maxSelections?: number })?.maxSelections).toBe(5);
     });
 
     it('should configure validation with minSelections', () => {
@@ -353,13 +374,11 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .validate({ minSelections: 1 })
         .build();
 
-      expect(column.meta?.validation?.minSelections).toBe(1);
+      expect((column.meta?.validation as { minSelections?: number })?.minSelections).toBe(1);
     });
 
     it('should configure validation with custom validation function', () => {
-      const customValidation = vi
-        .fn<(values: string[]) => boolean | string>()
-        .mockReturnValue(true);
+      const customValidation = mock<(values: string[]) => boolean | string>().mockReturnValue(true);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -370,13 +389,13 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .validate({ custom: customValidation })
         .build();
 
-      expect(column.meta?.validation?.custom).toBe(customValidation);
+      expect(
+        (column.meta?.validation as { custom?: (values: string[]) => boolean | string })?.custom
+      ).toBe(customValidation);
     });
 
     it('should configure validation with all options', () => {
-      const customValidation = vi
-        .fn<(values: string[]) => boolean | string>()
-        .mockReturnValue(true);
+      const customValidation = mock<(values: string[]) => boolean | string>().mockReturnValue(true);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -391,9 +410,17 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         })
         .build();
 
-      expect(column.meta?.validation?.maxSelections).toBe(10);
-      expect(column.meta?.validation?.minSelections).toBe(2);
-      expect(column.meta?.validation?.custom).toBe(customValidation);
+      expect(
+        (column.meta?.validation as { maxSelections?: number; minSelections?: number })
+          ?.maxSelections
+      ).toBe(10);
+      expect(
+        (column.meta?.validation as { maxSelections?: number; minSelections?: number })
+          ?.minSelections
+      ).toBe(2);
+      expect(
+        (column.meta?.validation as { custom?: (values: string[]) => boolean | string })?.custom
+      ).toBe(customValidation);
     });
 
     it('should support method chaining with validate', () => {
@@ -407,8 +434,8 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .showBadges()
         .build();
 
-      expect(column.meta?.validation?.maxSelections).toBe(5);
-      expect(column.meta?.display?.type).toBe('chips');
+      expect((column.meta?.validation as { maxSelections?: number })?.maxSelections).toBe(5);
+      expect((column.meta?.display as { type?: string })?.type).toBe('chips');
     });
 
     it('should allow updating validation options', () => {
@@ -422,8 +449,14 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .validate({ maxSelections: 10, minSelections: 1 })
         .build();
 
-      expect(column.meta?.validation?.maxSelections).toBe(10);
-      expect(column.meta?.validation?.minSelections).toBe(1);
+      expect(
+        (column.meta?.validation as { maxSelections?: number; minSelections?: number })
+          ?.maxSelections
+      ).toBe(10);
+      expect(
+        (column.meta?.validation as { maxSelections?: number; minSelections?: number })
+          ?.minSelections
+      ).toBe(1);
     });
   });
 
@@ -507,7 +540,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
     });
 
     it('should work with asyncOptions', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -519,7 +552,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toEqual(['includes', 'includesAny']);
-      expect(column.meta?.options?.async).toBe(true);
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
     });
 
     it('should work with validate method', () => {
@@ -534,7 +567,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toEqual(['includes']);
-      expect(column.meta?.validation?.maxSelections).toBe(5);
+      expect((column.meta?.validation as { maxSelections?: number })?.maxSelections).toBe(5);
     });
 
     it('should support method chaining with multiOptionOperators', () => {
@@ -549,7 +582,7 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toEqual(['includes', 'excludes']);
-      expect(column.meta?.display?.type).toBe('chips');
+      expect((column.meta?.display as { type?: string })?.type).toBe('chips');
     });
 
     it('should handle empty operators array', () => {
@@ -580,11 +613,11 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
 
       expect(column.meta?.categories).toBeDefined();
       expect(column.filter?.operators).toEqual(['includes', 'includesAny']);
-      expect(column.meta?.validation?.maxSelections).toBe(3);
+      expect((column.meta?.validation as { maxSelections?: number })?.maxSelections).toBe(3);
     });
 
     it('should combine roles with asyncOptions and validate', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -597,8 +630,8 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.meta?.roles).toBeDefined();
-      expect(column.meta?.options?.async).toBe(true);
-      expect(column.meta?.validation?.maxSelections).toBe(5);
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
+      expect((column.meta?.validation as { maxSelections?: number })?.maxSelections).toBe(5);
     });
 
     it('should combine all enhancement methods', () => {
@@ -614,9 +647,15 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toHaveLength(3);
-      expect(column.meta?.validation?.maxSelections).toBe(10);
-      expect(column.meta?.validation?.minSelections).toBe(1);
-      expect(column.meta?.display?.type).toBe('chips');
+      expect(
+        (column.meta?.validation as { maxSelections?: number; minSelections?: number })
+          ?.maxSelections
+      ).toBe(10);
+      expect(
+        (column.meta?.validation as { maxSelections?: number; minSelections?: number })
+          ?.minSelections
+      ).toBe(1);
+      expect((column.meta?.display as { type?: string })?.type).toBe('chips');
     });
   });
 
@@ -648,9 +687,9 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
     });
 
     it('should handle asyncOptions loader that throws', async () => {
-      const mockLoader = vi
-        .fn<() => Promise<FilterOption[]>>()
-        .mockRejectedValue(new Error('Failed'));
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockRejectedValue(
+        new Error('Failed')
+      );
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -660,12 +699,12 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader)
         .build();
 
-      expect(column.meta?.options?.async).toBe(true);
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
       await expect(mockLoader()).rejects.toThrow('Failed');
     });
 
     it('should handle validate with only custom validation', () => {
-      const customValidation = vi.fn<(values: string[]) => boolean>().mockReturnValue(true);
+      const customValidation = mock<(values: string[]) => boolean>().mockReturnValue(true);
 
       const builder = new MultiOptionColumnBuilder<TestArticle>();
       const column = builder
@@ -676,9 +715,33 @@ describe('MultiOptionColumnBuilder Enhancements', () => {
         .validate({ custom: customValidation })
         .build();
 
-      expect(column.meta?.validation?.custom).toBe(customValidation);
-      expect(column.meta?.validation?.maxSelections).toBeUndefined();
-      expect(column.meta?.validation?.minSelections).toBeUndefined();
+      expect(
+        (
+          column.meta?.validation as {
+            custom?: (values: string[]) => boolean;
+            maxSelections?: number;
+            minSelections?: number;
+          }
+        )?.custom
+      ).toBe(customValidation);
+      expect(
+        (
+          column.meta?.validation as {
+            custom?: (values: string[]) => boolean;
+            maxSelections?: number;
+            minSelections?: number;
+          }
+        )?.maxSelections
+      ).toBeUndefined();
+      expect(
+        (
+          column.meta?.validation as {
+            custom?: (values: string[]) => boolean;
+            maxSelections?: number;
+            minSelections?: number;
+          }
+        )?.minSelections
+      ).toBeUndefined();
     });
   });
 });

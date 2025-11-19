@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { OptionColumnBuilder } from '../../src/builders/option-column-builder';
 import type { FilterOption } from '../../src/types/filter';
 
@@ -28,8 +28,12 @@ describe('OptionColumnBuilder Enhancements', () => {
 
       expect(column.filter?.options).toBeDefined();
       expect(column.meta?.priority).toBeDefined();
-      expect(column.meta?.priority?.showBadge).toBe(true);
-      expect(column.meta?.priority?.sortByOrder).toBe(true);
+      expect(
+        (column.meta?.priority as { showBadge?: boolean; sortByOrder?: boolean })?.showBadge
+      ).toBe(true);
+      expect(
+        (column.meta?.priority as { showBadge?: boolean; sortByOrder?: boolean })?.sortByOrder
+      ).toBe(true);
     });
 
     it('should configure priority with custom priorities', () => {
@@ -83,7 +87,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .priority([], { defaultValue: 'medium' })
         .build();
 
-      expect(column.meta?.priority?.defaultValue).toBe('medium');
+      expect((column.meta?.priority as { defaultValue?: string })?.defaultValue).toBe('medium');
     });
 
     it('should configure priority with includeNull', () => {
@@ -128,7 +132,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.meta?.priority).toBeDefined();
-      expect(column.meta?.display?.type).toBe('badge');
+      expect((column.meta?.display as { type?: string })?.type).toBe('badge');
     });
   });
 
@@ -150,7 +154,7 @@ describe('OptionColumnBuilder Enhancements', () => {
 
       expect(column.filter?.options).toEqual(categories);
       expect(column.meta?.category).toBeDefined();
-      expect(column.meta?.category?.showIcons).toBe(true);
+      expect((column.meta?.category as { showIcons?: boolean })?.showIcons).toBe(true);
     });
 
     it('should configure category with includeNull', () => {
@@ -174,7 +178,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .category([], { searchable: false })
         .build();
 
-      expect(column.meta?.options?.searchable).toBe(false);
+      expect((column.meta?.options as { searchable?: boolean })?.searchable).toBe(false);
     });
 
     it('should configure category with showIcons', () => {
@@ -186,7 +190,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .category([], { showIcons: false })
         .build();
 
-      expect(column.meta?.category?.showIcons).toBe(false);
+      expect((column.meta?.category as { showIcons?: boolean })?.showIcons).toBe(false);
     });
 
     it('should support method chaining with category', () => {
@@ -200,13 +204,13 @@ describe('OptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.meta?.category).toBeDefined();
-      expect(column.meta?.display?.type).toBe('badge');
+      expect((column.meta?.display as { type?: string })?.type).toBe('badge');
     });
   });
 
   describe('asyncOptions method', () => {
     it('should configure async options loader', async () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -216,8 +220,14 @@ describe('OptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader)
         .build();
 
-      expect(column.meta?.options?.async).toBe(true);
-      expect(column.meta?.options?.optionsLoader).toBe(mockLoader);
+      expect(
+        (column.meta?.options as { async?: boolean; optionsLoader?: () => Promise<FilterOption[]> })
+          ?.async
+      ).toBe(true);
+      expect(
+        (column.meta?.options as { async?: boolean; optionsLoader?: () => Promise<FilterOption[]> })
+          ?.optionsLoader
+      ).toBe(mockLoader);
 
       // Verify loader works
       const result = await mockLoader();
@@ -226,7 +236,7 @@ describe('OptionColumnBuilder Enhancements', () => {
     });
 
     it('should configure async options with default loading placeholder', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -236,11 +246,13 @@ describe('OptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader)
         .build();
 
-      expect(column.meta?.options?.loadingPlaceholder).toBe('Loading options...');
+      expect((column.meta?.options as { loadingPlaceholder?: string })?.loadingPlaceholder).toBe(
+        'Loading options...'
+      );
     });
 
     it('should configure async options with custom loading placeholder', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -250,11 +262,13 @@ describe('OptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader, { loadingPlaceholder: 'Fetching...' })
         .build();
 
-      expect(column.meta?.options?.loadingPlaceholder).toBe('Fetching...');
+      expect((column.meta?.options as { loadingPlaceholder?: string })?.loadingPlaceholder).toBe(
+        'Fetching...'
+      );
     });
 
     it('should configure async options with includeNull', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -268,8 +282,8 @@ describe('OptionColumnBuilder Enhancements', () => {
     });
 
     it('should configure async options with validation', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
-      const validation = vi.fn<(value: string) => boolean>().mockReturnValue(true);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const validation = mock<(value: string) => boolean>().mockReturnValue(true);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -283,7 +297,7 @@ describe('OptionColumnBuilder Enhancements', () => {
     });
 
     it('should configure async options with searchable', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -293,11 +307,11 @@ describe('OptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader, { searchable: false })
         .build();
 
-      expect(column.meta?.options?.searchable).toBe(false);
+      expect((column.meta?.options as { searchable?: boolean })?.searchable).toBe(false);
     });
 
     it('should configure async options with placeholder', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -307,11 +321,13 @@ describe('OptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader, { placeholder: 'Select status...' })
         .build();
 
-      expect(column.meta?.options?.placeholder).toBe('Select status...');
+      expect((column.meta?.options as { placeholder?: string })?.placeholder).toBe(
+        'Select status...'
+      );
     });
 
     it('should set correct operators for async options', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -325,7 +341,7 @@ describe('OptionColumnBuilder Enhancements', () => {
     });
 
     it('should support method chaining with asyncOptions', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -336,8 +352,8 @@ describe('OptionColumnBuilder Enhancements', () => {
         .showBadges()
         .build();
 
-      expect(column.meta?.options?.async).toBe(true);
-      expect(column.meta?.display?.type).toBe('badge');
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
+      expect((column.meta?.display as { type?: string })?.type).toBe('badge');
     });
   });
 
@@ -414,7 +430,7 @@ describe('OptionColumnBuilder Enhancements', () => {
     });
 
     it('should work with asyncOptions', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -426,7 +442,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toEqual(['is', 'isAnyOf']);
-      expect(column.meta?.options?.async).toBe(true);
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
     });
 
     it('should support method chaining with optionOperators', () => {
@@ -441,7 +457,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .build();
 
       expect(column.filter?.operators).toEqual(['is', 'isNot']);
-      expect(column.meta?.display?.type).toBe('badge');
+      expect((column.meta?.display as { type?: string })?.type).toBe('badge');
     });
 
     it('should handle empty operators array', () => {
@@ -472,11 +488,11 @@ describe('OptionColumnBuilder Enhancements', () => {
 
       expect(column.meta?.priority).toBeDefined();
       expect(column.filter?.operators).toEqual(['is', 'isNot']);
-      expect(column.meta?.display?.type).toBe('badge');
+      expect((column.meta?.display as { type?: string })?.type).toBe('badge');
     });
 
     it('should combine category with asyncOptions', () => {
-      const mockLoader = vi.fn<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockResolvedValue(mockOptions);
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -488,7 +504,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .build();
 
       // asyncOptions should override category's options
-      expect(column.meta?.options?.async).toBe(true);
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
     });
   });
 
@@ -520,9 +536,9 @@ describe('OptionColumnBuilder Enhancements', () => {
     });
 
     it('should handle asyncOptions loader that throws', async () => {
-      const mockLoader = vi
-        .fn<() => Promise<FilterOption[]>>()
-        .mockRejectedValue(new Error('Failed'));
+      const mockLoader = mock<() => Promise<FilterOption[]>>().mockRejectedValue(
+        new Error('Failed')
+      );
 
       const builder = new OptionColumnBuilder<TestUser>();
       const column = builder
@@ -532,7 +548,7 @@ describe('OptionColumnBuilder Enhancements', () => {
         .asyncOptions(mockLoader)
         .build();
 
-      expect(column.meta?.options?.async).toBe(true);
+      expect((column.meta?.options as { async?: boolean })?.async).toBe(true);
       await expect(mockLoader()).rejects.toThrow('Failed');
     });
   });

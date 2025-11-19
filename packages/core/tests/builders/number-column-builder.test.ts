@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { NumberColumnBuilder } from '../../src/builders/number-column-builder';
 
 interface TestProduct {

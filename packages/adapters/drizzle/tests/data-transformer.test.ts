@@ -1,5 +1,4 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: Test file */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { DataTransformer } from '../src/data-transformer';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';

@@ -1,4 +1,4 @@
-import { describe, expectTypeOf, it } from 'vitest';
+import { describe, expectTypeOf, it } from 'bun:test';
 import type {
   AdapterConfig,
   AdapterFeatures,
@@ -69,15 +69,26 @@ describe('Adapter Types', () => {
     });
 
     it('should support optional methods', () => {
-      const adapter: TableAdapter = {
-        fetchData: async () => ({ data: [], total: 0, pagination: {} as any }),
+      const adapter: TableAdapter<{ id: string; name: string }> = {
+        fetchData: async () => ({
+          data: [],
+          total: 0,
+          pagination: {
+            page: 1,
+            limit: 20,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          },
+        }),
         getFilterOptions: async () => [],
         getFacetedValues: async () => new Map(),
         getMinMaxValues: async () => [0, 0],
-        createRecord: async (data) => ({ id: '1', ...data }),
-        updateRecord: async (_id, data) => ({ id: _id, ...data }),
+        createRecord: async (data) => ({ id: '1', name: data.name ?? 'Unknown', ...data }),
+        updateRecord: async (_id, data) => ({ id: _id, name: data.name ?? 'Unknown', ...data }),
         deleteRecord: async (_id) => {},
-        bulkUpdate: async (_ids, data) => _ids.map((id) => ({ id, ...data })),
+        bulkUpdate: async (_ids, data) =>
+          _ids.map((id) => ({ id, name: data.name ?? 'Unknown', ...data })),
         bulkDelete: async (_ids) => {},
         exportData: async (_params) => ({
           data: new Blob(),
@@ -93,11 +104,13 @@ describe('Adapter Types', () => {
         meta: {} as AdapterMeta,
       };
 
-      expectTypeOf(adapter.createRecord).toEqualTypeOf<
-        ((data: Partial<any>) => Promise<any>) | undefined
+      expectTypeOf(adapter.createRecord).toMatchTypeOf<
+        | ((data: Partial<{ id: string; name: string }>) => Promise<{ id: string; name: string }>)
+        | undefined
       >();
-      expectTypeOf(adapter.subscribe).toEqualTypeOf<
-        ((callback: (event: DataEvent<any>) => void) => () => void) | undefined
+      expectTypeOf(adapter.subscribe).toMatchTypeOf<
+        | ((callback: (event: DataEvent<{ id: string; name: string }>) => void) => () => void)
+        | undefined
       >();
     });
   });
@@ -286,13 +299,14 @@ describe('Adapter Types', () => {
         ],
       };
 
-      const _deleteEvent: DataEvent<User> = {
+      const deleteEvent: DataEvent<User> = {
         type: 'delete',
         data: { id: '1', name: 'John' },
       };
 
       expectTypeOf(insertEvent.type).toEqualTypeOf<'insert' | 'update' | 'delete'>();
       expectTypeOf(updateEvent.data).toMatchTypeOf<User | User[]>();
+      expectTypeOf(deleteEvent.type).toEqualTypeOf<'insert' | 'update' | 'delete'>();
     });
   });
 });

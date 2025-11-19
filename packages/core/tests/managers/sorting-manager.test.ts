@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { SortingManager } from '../../src/managers/sorting-manager';
 import type { ColumnDefinition } from '../../src/types/column';
 import type { SortingConfig } from '../../src/types/sorting';
@@ -6,7 +6,7 @@ import type { SortingConfig } from '../../src/types/sorting';
 describe('SortingManager', () => {
   let manager: SortingManager;
   let mockColumns: ColumnDefinition[];
-  let mockSubscriber: ReturnType<typeof vi.fn>;
+  let mockSubscriber: ReturnType<typeof mock>;
 
   beforeEach(() => {
     mockColumns = [
@@ -14,25 +14,25 @@ describe('SortingManager', () => {
         id: 'name',
         displayName: 'Name',
         type: 'text',
-        accessor: (row: any) => row.name,
+        accessor: (row: unknown) => (row as { name: string }).name,
         sortable: true,
       },
       {
         id: 'age',
         displayName: 'Age',
         type: 'number',
-        accessor: (row: any) => row.age,
+        accessor: (row: unknown) => (row as { age: number }).age,
         sortable: true,
       },
       {
         id: 'email',
         displayName: 'Email',
         type: 'text',
-        accessor: (row: any) => row.email,
+        accessor: (row: unknown) => (row as { email: string }).email,
         sortable: false,
       },
     ];
-    mockSubscriber = vi.fn();
+    mockSubscriber = mock();
   });
 
   describe('initialization', () => {
@@ -169,7 +169,7 @@ describe('SortingManager', () => {
         id: 'status',
         displayName: 'Status',
         type: 'text',
-        accessor: (row: any) => row.status,
+        accessor: (row: unknown) => (row as { status: string }).status,
         sortable: true,
       });
 
@@ -230,13 +230,15 @@ describe('SortingManager', () => {
     });
 
     it('should validate sort direction', () => {
-      expect(() => manager.addSort('name', 'invalid' as any)).toThrow(
+      expect(() => manager.addSort('name', 'invalid' as 'asc' | 'desc')).toThrow(
         'Invalid sort direction: invalid'
       );
     });
 
     it('should filter invalid sorts when setting', () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalWarn = console.warn;
+      const consoleWarn = mock();
+      console.warn = consoleWarn as typeof console.warn;
 
       manager.setSorting([
         { columnId: 'name', direction: 'asc' },
@@ -253,7 +255,7 @@ describe('SortingManager', () => {
         'Invalid sort for column email: Column email is not sortable'
       );
 
-      consoleWarn.mockRestore();
+      console.warn = originalWarn;
     });
   });
 
@@ -309,7 +311,7 @@ describe('SortingManager', () => {
     });
 
     it('should unsubscribe properly', () => {
-      const newSubscriber = vi.fn();
+      const newSubscriber = mock();
       const unsubscribe = manager.subscribe(newSubscriber);
       unsubscribe();
 

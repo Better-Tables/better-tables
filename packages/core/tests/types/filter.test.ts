@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'bun:test';
 import type {
   ColumnDefinition,
   ColumnType,
@@ -157,9 +157,9 @@ describe('Filter Types', () => {
         meta: { matchMode: 'any' },
       };
 
-      expectTypeOf(textFilter.type).toEqualTypeOf<ColumnType>();
-      expectTypeOf(numberFilter.values).toEqualTypeOf<any[]>();
-      expectTypeOf(multiOptionFilter.meta).toEqualTypeOf<Record<string, any> | undefined>();
+      expectTypeOf(textFilter.type).toMatchTypeOf<ColumnType>();
+      expectTypeOf(numberFilter.values).toMatchTypeOf<unknown[]>();
+      expectTypeOf(multiOptionFilter.meta).toMatchTypeOf<Record<string, unknown> | undefined>();
     });
   });
 
@@ -180,23 +180,25 @@ describe('Filter Types', () => {
 
   describe('FilterComponentProps', () => {
     it('should provide props for custom filter components', () => {
-      const column: ColumnDefinition<any, string> = {
+      const column: ColumnDefinition<unknown, string> = {
         id: 'custom',
         displayName: 'Custom',
-        accessor: (row) => row.custom,
+        accessor: (row) => (row as { custom: string }).custom,
         type: 'text',
       };
 
       const props: FilterComponentProps<string> = {
         value: ['test'],
-        onChange: (newValue) => console.log(newValue),
+        onChange: (_newValue) => {
+          // onChange handler
+        },
         operator: 'contains',
         column,
       };
 
       expectTypeOf(props.value).toEqualTypeOf<string[]>();
       expectTypeOf(props.onChange).toBeFunction();
-      expectTypeOf(props.column).toEqualTypeOf<ColumnDefinition<any, string>>();
+      expectTypeOf(props.column).toMatchTypeOf<ColumnDefinition<unknown, string>>();
     });
   });
 
@@ -208,12 +210,19 @@ describe('Filter Types', () => {
         description: 'Value is between two numbers',
         valueCount: 2,
         supportsNull: false,
-        validate: (values) => values.length === 2 && values[0] < values[1],
+        validate: (values) => {
+          if (values.length === 2) {
+            const first = values[0] as number;
+            const second = values[1] as number;
+            return first < second;
+          }
+          return false;
+        },
       };
 
       expectTypeOf(operatorDef.valueCount).toEqualTypeOf<number | 'variable'>();
-      expectTypeOf(operatorDef.validate).toEqualTypeOf<
-        ((values: any[]) => boolean | string) | undefined
+      expectTypeOf(operatorDef.validate).toMatchTypeOf<
+        ((values: unknown[]) => boolean | string) | undefined
       >();
     });
 

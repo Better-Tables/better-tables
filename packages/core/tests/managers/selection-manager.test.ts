@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { SelectionManager } from '../../src/managers/selection-manager';
 import type { SelectionConfig } from '../../src/types/selection';
 
@@ -11,11 +11,11 @@ interface TestData {
 
 describe('SelectionManager', () => {
   let manager: SelectionManager<TestData>;
-  let mockSubscriber: ReturnType<typeof vi.fn>;
+  let mockSubscriber: ReturnType<typeof mock>;
   let testData: TestData[];
 
   beforeEach(() => {
-    mockSubscriber = vi.fn();
+    mockSubscriber = mock();
     testData = [
       { id: '1', name: 'Alice', age: 25 },
       { id: '2', name: 'Bob', age: 30 },
@@ -41,11 +41,11 @@ describe('SelectionManager', () => {
         maxSelections: 2,
         preserveSelection: true,
         showSelectAll: false,
-        getRowId: (row: TestData) => row.id,
-        isSelectable: (row: TestData) => !row.disabled,
+        getRowId: (row: unknown) => (row as TestData).id,
+        isSelectable: (row: unknown) => !(row as TestData).disabled,
       };
 
-      manager = new SelectionManager(config, testData);
+      manager = new SelectionManager<TestData>(config, testData);
 
       expect(manager.getSelectionMode()).toBe('single');
       expect(manager.getConfig().maxSelections).toBe(2);
@@ -162,9 +162,9 @@ describe('SelectionManager', () => {
 
   describe('selectable rows', () => {
     beforeEach(() => {
-      manager = new SelectionManager(
+      manager = new SelectionManager<TestData>(
         {
-          isSelectable: (row: TestData) => !row.disabled,
+          isSelectable: (row: unknown) => !(row as TestData).disabled,
         },
         testData
       );
@@ -466,10 +466,12 @@ describe('SelectionManager', () => {
     });
 
     it('should handle subscriber errors gracefully', () => {
-      const errorCallback = vi.fn(() => {
+      const errorCallback = mock(() => {
         throw new Error('Subscriber error');
       });
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const originalError = console.error;
+      const consoleSpy = mock();
+      console.error = consoleSpy as typeof console.error;
 
       manager.subscribe(errorCallback);
 
@@ -483,7 +485,7 @@ describe('SelectionManager', () => {
         expect.any(Error)
       );
 
-      consoleSpy.mockRestore();
+      console.error = originalError;
     });
   });
 });

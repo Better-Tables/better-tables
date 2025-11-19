@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { TableStateManager } from '../../src/managers/table-state-manager';
 import type { ColumnDefinition } from '../../src/types/column';
 import type { FilterState } from '../../src/types/filter';
@@ -64,10 +64,10 @@ const mockColumns: ColumnDefinition<TestData>[] = [
 
 describe('TableStateManager', () => {
   let manager: TableStateManager<TestData>;
-  let mockSubscriber: ReturnType<typeof vi.fn>;
+  let mockSubscriber: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    mockSubscriber = vi.fn();
+    mockSubscriber = mock();
   });
 
   describe('initialization', () => {
@@ -618,7 +618,7 @@ describe('TableStateManager', () => {
     });
 
     it('should handle multiple subscribers', () => {
-      const subscriber2 = vi.fn();
+      const subscriber2 = mock();
       manager.subscribe(mockSubscriber);
       manager.subscribe(subscriber2);
 
@@ -634,7 +634,7 @@ describe('TableStateManager', () => {
       // The pagination manager emits events even when staying on the same page
       const calls = mockSubscriber.mock.calls;
       const stateChangedEvents = calls.filter((call) => call[0].type === 'state_changed');
-      // Pagination manager might emit events even without state change
+      // Pagination manager emits events even when page doesn't actually change
       expect(stateChangedEvents.length).toBeGreaterThanOrEqual(0);
     });
   });
@@ -645,6 +645,9 @@ describe('TableStateManager', () => {
     });
 
     it('should update state with partial updates', () => {
+      // Set total first so page 3 is valid
+      manager.setTotal(100);
+
       const updates = {
         filters: [
           {
@@ -665,8 +668,7 @@ describe('TableStateManager', () => {
 
       const state = manager.getState();
       expect(state.filters).toHaveLength(1);
-      // updateState might not update page if already on that page
-      expect(state.pagination.page).toBe(1); // Was not changed by updateState
+      expect(state.pagination.page).toBe(3);
       expect(state.sorting).toHaveLength(1);
       expect(state.selectedRows.size).toBe(2);
       expect(state.columnVisibility.id).toBe(false);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { betterTables } from '../src/factory';
 import type { TableAdapter } from '../src/types/adapter';
 import type { ColumnDefinition } from '../src/types/column';
@@ -221,6 +221,21 @@ describe('betterTables Factory', () => {
       expect(config.database).toBe(adapter);
       expect(config.columns).toEqual(columns);
       expect(config.pagination).toEqual(pagination);
+    });
+
+    it('should ensure returned config is immutable regarding internal state', () => {
+      const adapter = createMockAdapter();
+      const columns = [createMockColumn('name')];
+      const instance = betterTables({ database: adapter, columns });
+
+      const config = instance.getConfig();
+      if (config.columns) {
+        config.columns.push(createMockColumn('hacked'));
+      }
+
+      // Internal state should not be affected
+      expect(instance.columns).toHaveLength(1);
+      expect(instance.getConfig().columns).toHaveLength(1);
     });
   });
 

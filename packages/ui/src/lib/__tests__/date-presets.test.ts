@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { DatePreset } from '../date-presets';
 import {
   createCustomPreset,
@@ -108,7 +108,11 @@ describe('date-presets', () => {
 
       expect(grouped.relative).toHaveLength(3); // 2 explicit + 1 default
       expect(grouped.absolute).toHaveLength(1);
-      expect(grouped.relative?.map((p: DatePreset) => p.id)).toEqual(['preset1', 'preset2', 'preset4']);
+      expect(grouped.relative?.map((p: DatePreset) => p.id)).toEqual([
+        'preset1',
+        'preset2',
+        'preset4',
+      ]);
     });
   });
 
@@ -190,41 +194,37 @@ describe('date-presets', () => {
     });
 
     it('should generate ID from label when not provided', () => {
-      const preset = createCustomPreset(
-        'custom-my-custom-range',
-        'My Custom Range',
-        () => ({ from: new Date(), to: new Date() })
-      );
+      const preset = createCustomPreset('custom-my-custom-range', 'My Custom Range', () => ({
+        from: new Date(),
+        to: new Date(),
+      }));
 
       expect(preset.id).toBe('custom-my-custom-range');
     });
 
     it('should use provided ID when given', () => {
-      const preset = createCustomPreset(
-        'my-custom-id',
-        'Custom Range',
-        () => ({ from: new Date(), to: new Date() })
-      );
+      const preset = createCustomPreset('my-custom-id', 'Custom Range', () => ({
+        from: new Date(),
+        to: new Date(),
+      }));
 
       expect(preset.id).toBe('my-custom-id');
     });
 
     it('should handle special characters in label for ID generation', () => {
-      const preset = createCustomPreset(
-        'custom-q1-2023-jan-mar',
-        'Q1 2023 (Jan-Mar)',
-        () => ({ from: new Date(), to: new Date() })
-      );
+      const preset = createCustomPreset('custom-q1-2023-jan-mar', 'Q1 2023 (Jan-Mar)', () => ({
+        from: new Date(),
+        to: new Date(),
+      }));
 
       expect(preset.id).toBe('custom-q1-2023-jan-mar');
     });
 
     it('should set default values for optional properties', () => {
-      const preset = createCustomPreset(
-        'test',
-        'Test',
-        () => ({ from: new Date(), to: new Date() })
-      );
+      const preset = createCustomPreset('test', 'Test', () => ({
+        from: new Date(),
+        to: new Date(),
+      }));
 
       expect(preset.description).toBeUndefined();
       expect(preset.icon).toBeUndefined();
@@ -276,15 +276,14 @@ describe('date-presets', () => {
       const todayPreset = getPresetById('today');
 
       expect(todayPreset).toBeDefined();
-      expect(grouped.relative).toContain(todayPreset);
+      expect(grouped.relative).toContain(todayPreset as DatePreset);
     });
 
     it('should handle custom presets in grouping', () => {
-      const customPreset = createCustomPreset(
-        'test-range',
-        'Test Range',
-        () => ({ from: new Date('2023-01-01'), to: new Date('2023-01-31') })
-      );
+      const customPreset = createCustomPreset('test-range', 'Test Range', () => ({
+        from: new Date('2023-01-01'),
+        to: new Date('2023-01-31'),
+      }));
 
       const allPresets = [...DEFAULT_DATE_PRESETS, customPreset];
       const grouped = getGroupedPresets(allPresets);

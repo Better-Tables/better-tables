@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { DateColumnBuilder } from '../../src/builders/date-column-builder';
 
 interface TestEvent {
@@ -426,7 +426,7 @@ describe('DateColumnBuilder', () => {
     });
 
     it('should configure date range with validation', () => {
-      const validation = vi.fn<(value: Date) => boolean | string>().mockReturnValue(true);
+      const validation = mock<(value: Date) => boolean | string>().mockReturnValue(true);
 
       const builder = new DateColumnBuilder<TestEvent>();
       const column = builder
@@ -449,8 +449,12 @@ describe('DateColumnBuilder', () => {
         .dateRange({ minDate })
         .build();
 
-      expect(column.meta?.dateRange?.minDate).toEqual(minDate);
-      expect(column.meta?.dateRange?.maxDate).toBeUndefined();
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toEqual(
+        minDate
+      );
+      expect(
+        (column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate
+      ).toBeUndefined();
     });
 
     it('should configure date range with maxDate', () => {
@@ -463,8 +467,12 @@ describe('DateColumnBuilder', () => {
         .dateRange({ maxDate })
         .build();
 
-      expect(column.meta?.dateRange?.maxDate).toEqual(maxDate);
-      expect(column.meta?.dateRange?.minDate).toBeUndefined();
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toEqual(
+        maxDate
+      );
+      expect(
+        (column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate
+      ).toBeUndefined();
     });
 
     it('should configure date range with both minDate and maxDate', () => {
@@ -478,14 +486,18 @@ describe('DateColumnBuilder', () => {
         .dateRange({ minDate, maxDate })
         .build();
 
-      expect(column.meta?.dateRange?.minDate).toEqual(minDate);
-      expect(column.meta?.dateRange?.maxDate).toEqual(maxDate);
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toEqual(
+        minDate
+      );
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toEqual(
+        maxDate
+      );
     });
 
     it('should configure date range with all options', () => {
       const minDate = new Date('2024-01-01');
       const maxDate = new Date('2024-12-31');
-      const validation = vi.fn<(value: Date) => boolean | string>().mockReturnValue(true);
+      const validation = mock<(value: Date) => boolean | string>().mockReturnValue(true);
 
       const builder = new DateColumnBuilder<TestEvent>();
       const column = builder
@@ -502,8 +514,12 @@ describe('DateColumnBuilder', () => {
 
       expect(column.filter?.includeNull).toBe(true);
       expect(column.filter?.validation).toBe(validation);
-      expect(column.meta?.dateRange?.minDate).toEqual(minDate);
-      expect(column.meta?.dateRange?.maxDate).toEqual(maxDate);
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toEqual(
+        minDate
+      );
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toEqual(
+        maxDate
+      );
     });
 
     it('should set correct operators for date range', () => {
@@ -917,7 +933,7 @@ describe('DateColumnBuilder', () => {
         .format('MMM dd, yyyy')
         .build();
 
-      expect(column.meta?.dateRange?.minDate).toBeDefined();
+      expect((column.meta?.dateRange as { minDate?: Date })?.minDate).toBeDefined();
       expect(column.filter?.includeNull).toBe(false);
       expect(column.meta?.dateFormat?.format).toBe('MMM dd, yyyy');
     });
@@ -948,7 +964,7 @@ describe('DateColumnBuilder', () => {
         .build();
 
       expect(column.meta?.dateFormat?.showTime).toBe(true);
-      expect(column.meta?.dateRange?.maxDate).toBeDefined();
+      expect((column.meta?.dateRange as { maxDate?: Date })?.maxDate).toBeDefined();
     });
 
     it('should combine timeOnly with chronological', () => {
@@ -983,8 +999,8 @@ describe('DateColumnBuilder', () => {
         .build();
 
       expect(column.meta?.dateFormat?.format).toBe('MMM dd, yyyy');
-      expect(column.meta?.dateRange?.minDate).toBeDefined();
-      expect(column.meta?.dateRange?.maxDate).toBeDefined();
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toBeDefined();
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toBeDefined();
       expect(column.filter?.operators).toHaveLength(4);
       expect(column.meta?.sortType).toBe('chronological');
     });
@@ -1013,8 +1029,12 @@ describe('DateColumnBuilder', () => {
         .dateRange({ minDate: sameDate, maxDate: sameDate })
         .build();
 
-      expect(column.meta?.dateRange?.minDate).toEqual(sameDate);
-      expect(column.meta?.dateRange?.maxDate).toEqual(sameDate);
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.minDate).toEqual(
+        sameDate
+      );
+      expect((column.meta?.dateRange as { minDate?: Date; maxDate?: Date })?.maxDate).toEqual(
+        sameDate
+      );
     });
 
     it('should handle dateOnly overriding dateTime', () => {

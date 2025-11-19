@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { PaginationManager } from '../../src/managers/pagination-manager';
 import type { PaginationConfig, PaginationState } from '../../src/types/pagination';
 
 describe('PaginationManager', () => {
   let manager: PaginationManager;
-  let mockSubscriber: ReturnType<typeof vi.fn>;
+  let mockSubscriber: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    mockSubscriber = vi.fn();
+    mockSubscriber = mock();
   });
 
   describe('initialization', () => {
@@ -145,7 +145,7 @@ describe('PaginationManager', () => {
 
       const state = manager.getPagination();
       expect(state.limit).toBe(100);
-      
+
       // Try to exceed max - should throw error
       expect(() => manager.changePageSize(200)).toThrow('Invalid page size');
     });
@@ -285,17 +285,17 @@ describe('PaginationManager', () => {
     it('should unsubscribe properly', () => {
       // Create a fresh manager to avoid interference from other tests
       const freshManager = new PaginationManager();
-      const freshSubscriber = vi.fn();
-      
+      const freshSubscriber = mock();
+
       const unsubscribe = freshManager.subscribe(freshSubscriber);
-      
+
       // Verify subscriber works before unsubscribe
       freshManager.goToPage(2);
       expect(freshSubscriber).toHaveBeenCalledTimes(1);
-      
+
       // Now unsubscribe and verify it doesn't get called
       unsubscribe();
-      
+
       freshManager.goToPage(3);
       expect(freshSubscriber).toHaveBeenCalledTimes(1); // Still only 1 call
     });
@@ -308,11 +308,11 @@ describe('PaginationManager', () => {
 
     it('should validate page numbers correctly', () => {
       manager.setTotal(50); // 5 pages with 10 per page
-      
+
       // Valid pages should not throw
       expect(() => manager.goToPage(1)).not.toThrow();
       expect(() => manager.goToPage(5)).not.toThrow();
-      
+
       // Invalid pages should throw
       expect(() => manager.goToPage(0)).toThrow();
       expect(() => manager.goToPage(6)).toThrow();
@@ -344,7 +344,7 @@ describe('PaginationManager', () => {
 
     it('should get visible page numbers', () => {
       manager = new PaginationManager({ pageNumbersToShow: 5 });
-        manager.setTotal(100);
+      manager.setTotal(100);
       manager.goToPage(5);
 
       const visiblePages = manager.getPageNumbers();
@@ -399,10 +399,12 @@ describe('PaginationManager', () => {
     });
 
     it('should handle subscriber errors gracefully', () => {
-      const errorCallback = vi.fn(() => {
+      const errorCallback = mock(() => {
         throw new Error('Subscriber error');
       });
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const originalError = console.error;
+      const consoleSpy = mock();
+      console.error = consoleSpy as typeof console.error;
 
       manager.subscribe(errorCallback);
 
@@ -416,7 +418,7 @@ describe('PaginationManager', () => {
         expect.any(Error)
       );
 
-      consoleSpy.mockRestore();
+      console.error = originalError;
     });
   });
 });

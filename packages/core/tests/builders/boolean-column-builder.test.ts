@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { BooleanColumnBuilder } from '../../src/builders/boolean-column-builder';
 
 interface TestUser {
@@ -124,7 +124,7 @@ describe('BooleanColumnBuilder', () => {
     });
 
     it('should configure interactive checkbox', () => {
-      const onChange = vi.fn();
+      const onChange = mock();
       const builder = new BooleanColumnBuilder<TestUser>();
       const column = builder
         .id('isActive')
@@ -171,7 +171,7 @@ describe('BooleanColumnBuilder', () => {
     });
 
     it('should configure interactive switch', () => {
-      const onChange = vi.fn();
+      const onChange = mock();
       const builder = new BooleanColumnBuilder<TestUser>();
       const column = builder
         .id('isActive')

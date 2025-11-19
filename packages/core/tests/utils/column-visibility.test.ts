@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { ColumnDefinition } from '../../src/types/column';
 import {
   getColumnVisibilityModifications,
@@ -282,6 +282,23 @@ describe('Column Visibility Utilities', () => {
         name: false,
         // invalid column is ignored
       });
+    });
+
+    it('should explicitly ignore unknown columns even if they have valid boolean values', () => {
+      const columns = [createMockColumn('name', true)];
+      const modifications = {
+        name: false,
+        unknownColumn: false,
+        anotherUnknown: true,
+      };
+
+      const visibility = mergeColumnVisibility(columns, modifications);
+
+      expect(visibility).toEqual({
+        name: false,
+      });
+      expect((visibility).unknownColumn).toBeUndefined();
+      expect((visibility).anotherUnknown).toBeUndefined();
     });
 
     it('should not mutate the modifications object', () => {
