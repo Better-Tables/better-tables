@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { DataEvent, FilterOperator } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closePostgresDatabase,
   createPostgresAdapter,
   createPostgresDatabase,
+  dropPostgresDatabase,
+  ensurePostgresDatabase,
   setupPostgresDatabase,
 } from './helpers/test-fixtures';
 import type { User } from './helpers/test-schema';
@@ -23,20 +25,43 @@ import type { User } from './helpers/test-schema';
  */
 describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createPostgresAdapter>;
-  let client: Awaited<ReturnType<typeof createPostgresDatabase>>['client'];
+  let client: ReturnType<typeof createPostgresDatabase>['client'];
+  let connectionString: string;
+  let databaseName: string;
+
+  beforeAll(async () => {
+    // Drop database if exists, create it, and set up tables with seed data once
+    connectionString = process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
+    databaseName = await ensurePostgresDatabase(connectionString);
+
+    // Connect and set up tables with seed data
+    const { db, client: setupClient } = createPostgresDatabase(connectionString);
+    await setupPostgresDatabase(db);
+    await closePostgresDatabase(setupClient);
+  });
 
   beforeEach(async () => {
-    const connectionString =
-      process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
-
+    // Connect to the existing database (no creation, tables already exist)
     const { db, client: pgClient } = createPostgresDatabase(connectionString);
     client = pgClient;
-    await setupPostgresDatabase(db);
     adapter = createPostgresAdapter(db);
   });
 
   afterEach(async () => {
+    // Close the connection after each test
     await closePostgresDatabase(client);
+  });
+
+  afterAll(async () => {
+    // Clean up: drop the test database after all tests complete
+    if (connectionString && databaseName) {
+      try {
+        await dropPostgresDatabase(connectionString, databaseName);
+      } catch (error) {
+        // Ignore errors during cleanup (database might already be dropped)
+        console.warn('Failed to drop test database:', error);
+      }
+    }
   });
 
   describe('Basic CRUD Operations', () => {

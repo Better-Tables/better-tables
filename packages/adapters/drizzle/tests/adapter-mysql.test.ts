@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { DataEvent, FilterOperator } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closeMySQLDatabase,
   createMySQLAdapter,
   createMySQLDatabase,
+  dropMySQLDatabase,
+  ensureMySQLDatabase,
   setupMySQLDatabase,
 } from './helpers/test-fixtures';
 import type { User } from './helpers/test-schema';
@@ -24,21 +26,47 @@ import type { User } from './helpers/test-schema';
 describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createMySQLAdapter>;
   let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
+  let connectionString: string;
+  let databaseName: string;
 
-  beforeEach(async () => {
-    const connectionString = process.env.MYSQL_TEST_URL;
-    if (!connectionString) {
+  beforeAll(async () => {
+    // Drop database if exists, create it, and set up tables with seed data once
+    const envConnectionString = process.env.MYSQL_TEST_URL;
+    if (!envConnectionString) {
       throw new Error('MYSQL_TEST_URL environment variable is required for MySQL tests');
     }
+    connectionString = envConnectionString;
 
+    databaseName = await ensureMySQLDatabase(connectionString);
+
+    // Connect and set up tables with seed data
+    const { connection: setupConnection } = await createMySQLDatabase(connectionString);
+    await setupMySQLDatabase(setupConnection);
+    await closeMySQLDatabase(setupConnection);
+  });
+
+  beforeEach(async () => {
+    // Connect to the existing database (no creation, tables already exist)
     const { db, connection: mysqlConnection } = await createMySQLDatabase(connectionString);
     connection = mysqlConnection;
-    await setupMySQLDatabase(connection);
     adapter = createMySQLAdapter(db);
   });
 
   afterEach(async () => {
+    // Close the connection after each test
     await closeMySQLDatabase(connection);
+  });
+
+  afterAll(async () => {
+    // Clean up: drop the test database after all tests complete
+    if (connectionString && databaseName) {
+      try {
+        await dropMySQLDatabase(connectionString, databaseName);
+      } catch (error) {
+        // Ignore errors during cleanup (database might already be dropped)
+        console.warn('Failed to drop test database:', error);
+      }
+    }
   });
 
   describe('Basic CRUD Operations', () => {
