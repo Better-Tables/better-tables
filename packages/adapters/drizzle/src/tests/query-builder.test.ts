@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
 import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
@@ -7,6 +6,7 @@ import { SQLiteQueryBuilder } from '../query-builders/sqlite-query-builder';
 import { RelationshipDetector } from '../relationship-detector';
 import { RelationshipManager } from '../relationship-manager';
 import type { SQLiteQueryBuilderWithJoins } from '../types';
+import BunSQLiteCompat, { type Database } from './helpers/bun-sqlite-compat';
 
 // Test schema
 const users = sqliteTable('users', {
@@ -67,10 +67,13 @@ describe('SQLiteQueryBuilder', () => {
   let db: BetterSQLite3Database;
   let queryBuilder: SQLiteQueryBuilder;
   let relationshipManager: RelationshipManager;
-  let sqlite: Database.Database;
+  let sqlite: Database;
 
   beforeEach(async () => {
-    sqlite = new Database(':memory:');
+    sqlite = new BunSQLiteCompat(':memory:');
+    // Type assertion needed because Drizzle expects better-sqlite3 Database,
+    // but at runtime Bun's SQLite should work similarly
+    // @ts-expect-error - Drizzle expects better-sqlite3 Database, but Bun's SQLite is compatible at runtime
     db = drizzle(sqlite);
 
     // Create tables

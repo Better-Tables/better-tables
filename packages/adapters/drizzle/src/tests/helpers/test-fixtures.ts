@@ -2,7 +2,6 @@
  * Shared test fixtures for database setup and teardown across all database types
  */
 
-import Database from 'better-sqlite3';
 import { sql } from 'drizzle-orm';
 import { type BetterSQLite3Database, drizzle as drizzleSQLite } from 'drizzle-orm/better-sqlite3';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
@@ -14,6 +13,7 @@ import postgres from 'postgres';
 import type { DrizzleAdapter } from '../../drizzle-adapter';
 import { DrizzleAdapter as DrizzleAdapterClass } from '../../drizzle-adapter';
 import type { DrizzleAdapterConfig, DrizzleDatabase } from '../../types';
+import BunSQLiteCompat, { type Database } from './bun-sqlite-compat';
 import { relationsSchema, schema } from './test-schema';
 
 /**
@@ -27,9 +27,12 @@ import { relationsSchema, schema } from './test-schema';
  */
 export function createSQLiteDatabase(): {
   db: BetterSQLite3Database<typeof schema>;
-  sqlite: Database.Database;
+  sqlite: Database;
 } {
-  const sqlite = new Database(':memory:');
+  const sqlite = new BunSQLiteCompat(':memory:');
+  // Type assertion needed because Drizzle expects better-sqlite3 Database,
+  // but at runtime Bun's SQLite should work similarly
+  // @ts-expect-error - Drizzle expects better-sqlite3 Database, but Bun's SQLite is compatible at runtime
   const db = drizzleSQLite(sqlite) as unknown as BetterSQLite3Database<typeof schema>;
   return { db, sqlite };
 }
@@ -114,7 +117,7 @@ export function createSQLiteAdapter(
 /**
  * Close SQLite database connection
  */
-export function closeSQLiteDatabase(sqlite: Database.Database): void {
+export function closeSQLiteDatabase(sqlite: Database): void {
   if (sqlite) {
     sqlite.close();
   }
