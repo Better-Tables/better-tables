@@ -17,12 +17,11 @@ import type { User } from './helpers/test-schema';
  * To run these tests:
  * 1. Start a MySQL database
  * 2. Set MYSQL_TEST_URL environment variable (or use default: mysql://localhost:3306/drizzle_test)
- * 3. Remove .skip from describe() to enable tests
- * 4. Or run: npm test -- mysql-setup.test.ts (requires test to be enabled)
+ * 3. Or run: npm test -- mysql-setup.test.ts (requires test to be enabled)
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe.skip('DrizzleAdapter - MySQL [Integration Tests]', () => {
+describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createMySQLAdapter>;
   let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
 
@@ -287,7 +286,7 @@ describe.skip('DrizzleAdapter - MySQL [Integration Tests]', () => {
     });
   });
 
-  describe.skip('Date Filter Operators - Skipped (no timestamp columns in test schema)', () => {
+  describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
       // Get current timestamp for exact match
       const now = new Date();

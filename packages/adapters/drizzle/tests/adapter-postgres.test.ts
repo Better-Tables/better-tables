@@ -17,12 +17,11 @@ import type { User } from './helpers/test-schema';
  * To run these tests:
  * 1. Start a PostgreSQL database
  * 2. Set POSTGRES_TEST_URL environment variable (or use default: postgresql://localhost:5432/drizzle_test)
- * 3. Remove .skip from describe() to enable tests
- * 4. Or run: npm test -- postgres-setup.test.ts (requires test to be enabled)
+ * 3. Or run: npm test -- postgres-setup.test.ts (requires test to be enabled)
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
+describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createPostgresAdapter>;
   let client: Awaited<ReturnType<typeof createPostgresDatabase>>['client'];
 
@@ -284,7 +283,7 @@ describe.skip('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
     });
   });
 
-  describe.skip('Date Filter Operators - Skipped (no timestamp columns in test schema)', () => {
+  describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
       // Get current timestamp for exact match
       const now = new Date();

@@ -19,8 +19,8 @@
     "lint:fix": "biome check --write ."
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.5",
     "@biomejs/biome": "2.2.7",
+    "@changesets/cli": "^2.29.5",
     "@types/node": "^24.0.12",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -32,7 +32,7 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@10.19.0",
+  "packageManager": "pnpm@10.22.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/better-tables"

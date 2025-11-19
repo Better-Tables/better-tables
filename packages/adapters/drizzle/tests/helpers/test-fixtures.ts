@@ -43,7 +43,8 @@ export async function setupSQLiteDatabase(db: BetterSQLite3Database<typeof schem
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
-    age INTEGER
+    age INTEGER,
+    created_at INTEGER
   )`);
 
   await db.run(sql`CREATE TABLE profiles (
@@ -73,7 +74,7 @@ export async function setupSQLiteDatabase(db: BetterSQLite3Database<typeof schem
   )`);
 
   // Insert test data
-  await db.run(sql`INSERT INTO users (id, name, email, age) VALUES 
+  await db.run(sql`INSERT INTO users (id, name, email, age, created_at) VALUES 
     (1, 'John Doe', 'john@example.com', 30, ${Date.now()}),
     (2, 'Jane Smith', 'jane@example.com', 25, ${Date.now()}),
     (3, 'Bob Johnson', 'bob@example.com', 35, ${Date.now()})`);
