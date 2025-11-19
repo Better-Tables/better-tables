@@ -26,7 +26,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --apply .",
     "format": "biome format --write .",
-    "clean": "rm -rf dist .turbo"
+    "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "peerDependencies": {
     "react": "^18.0.0",

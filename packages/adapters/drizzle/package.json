@@ -25,7 +25,7 @@
     "lint:fix": "biome check --apply .",
     "format": "biome format --write .",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
