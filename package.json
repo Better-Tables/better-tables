@@ -29,7 +29,7 @@
     "dev": "turbo watch dev",
     "dev:run": "turbo run dev",
     "test": "turbo run test",
-    "clean": "turbo run clean",
+    "clean": "bun run --filter '*' clean",
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
