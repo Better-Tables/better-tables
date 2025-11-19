@@ -161,7 +161,7 @@ jobs:
         env:
           # Disable SQLite tests in CI (better-sqlite3 requires native bindings)
           CI: 'true'
-          DISABLE_SQLITE: 'true'
+          DISABLE_SQLITE: 'false'
           # Set connection strings for MySQL and Postgres services
           # Using root for MySQL since tests need to create databases
           MYSQL_TEST_URL: mysql://root:testpassword@localhost:3306
