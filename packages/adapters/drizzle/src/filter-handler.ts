@@ -240,6 +240,12 @@ export class FilterHandler {
           // For SQLite with timestamp mode, compare as numbers
           if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
             conditions.push(sql`${column} = ${dateValue}`);
+          } else if (this.databaseType === 'postgres' && typeof dateValue === 'string') {
+            // For PostgreSQL, use SQL template with proper date casting
+            conditions.push(sql`${column} = ${dateValue}::timestamp`);
+          } else if (this.databaseType === 'mysql' && typeof dateValue === 'string') {
+            // For MySQL, use CAST function
+            conditions.push(sql`${column} = CAST(${dateValue} AS DATETIME)`);
           } else {
             conditions.push(eq(column, dateValue));
           }
@@ -256,6 +262,12 @@ export class FilterHandler {
           // For SQLite with timestamp mode, compare as numbers
           if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
             conditions.push(sql`${column} != ${dateValue}`);
+          } else if (this.databaseType === 'postgres' && typeof dateValue === 'string') {
+            // For PostgreSQL, use SQL template with proper date casting
+            conditions.push(sql`${column} != ${dateValue}::timestamp`);
+          } else if (this.databaseType === 'mysql' && typeof dateValue === 'string') {
+            // For MySQL, use CAST function
+            conditions.push(sql`${column} != CAST(${dateValue} AS DATETIME)`);
           } else {
             conditions.push(not(eq(column, dateValue)));
           }
@@ -271,6 +283,12 @@ export class FilterHandler {
         // For SQLite with timestamp mode, compare as numbers
         if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
           conditions.push(sql`${column} < ${dateValue}`);
+        } else if (this.databaseType === 'postgres' && typeof dateValue === 'string') {
+          // For PostgreSQL, use SQL template with proper date casting
+          conditions.push(sql`${column} < ${dateValue}::timestamp`);
+        } else if (this.databaseType === 'mysql' && typeof dateValue === 'string') {
+          // For MySQL, use CAST function
+          conditions.push(sql`${column} < CAST(${dateValue} AS DATETIME)`);
         } else {
           conditions.push(lt(column, dateValue));
         }
@@ -282,6 +300,12 @@ export class FilterHandler {
         // For SQLite with timestamp mode, compare as numbers
         if (this.databaseType === 'sqlite' && typeof dateValue === 'number') {
           conditions.push(sql`${column} > ${dateValue}`);
+        } else if (this.databaseType === 'postgres' && typeof dateValue === 'string') {
+          // For PostgreSQL, use SQL template with proper date casting
+          conditions.push(sql`${column} > ${dateValue}::timestamp`);
+        } else if (this.databaseType === 'mysql' && typeof dateValue === 'string') {
+          // For MySQL, use CAST function
+          conditions.push(sql`${column} > CAST(${dateValue} AS DATETIME)`);
         } else {
           conditions.push(gt(column, dateValue));
         }
@@ -398,22 +422,38 @@ export class FilterHandler {
   /**
    * Parse filter value to Date object or timestamp (database-specific)
    */
-  private parseFilterDate(value: unknown): Date | number {
+  private parseFilterDate(value: unknown): Date | number | string {
     // For SQLite with timestamp mode, keep numbers as-is
     if (this.databaseType === 'sqlite' && typeof value === 'number') {
       return value;
     }
 
     if (value instanceof Date) {
+      // For PostgreSQL and MySQL, convert Date to ISO string for proper serialization
+      if (this.databaseType === 'postgres' || this.databaseType === 'mysql') {
+        return value.toISOString();
+      }
       return value;
     }
     if (typeof value === 'string') {
       const parsed = new Date(value);
       // For SQLite, convert to timestamp
-      return this.databaseType === 'sqlite' ? parsed.getTime() : parsed;
+      if (this.databaseType === 'sqlite') {
+        return parsed.getTime();
+      }
+      // For PostgreSQL and MySQL, return ISO string
+      if (this.databaseType === 'postgres' || this.databaseType === 'mysql') {
+        return parsed.toISOString();
+      }
+      return parsed;
     }
     if (typeof value === 'number') {
-      return new Date(value);
+      const date = new Date(value);
+      // For PostgreSQL and MySQL, convert to ISO string
+      if (this.databaseType === 'postgres' || this.databaseType === 'mysql') {
+        return date.toISOString();
+      }
+      return date;
     }
     throw new QueryError('Invalid date value for filter', { value });
   }
@@ -428,6 +468,18 @@ export class FilterHandler {
       case 'today': {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+        if (this.databaseType === 'postgres') {
+          const startStr = startOfDay.toISOString();
+          const endStr = endOfDay.toISOString();
+          const condition = sql`${column} >= ${startStr}::timestamp AND ${column} <= ${endStr}::timestamp`;
+          return condition;
+        }
+        if (this.databaseType === 'mysql') {
+          const startStr = startOfDay.toISOString();
+          const endStr = endOfDay.toISOString();
+          const condition = sql`${column} >= CAST(${startStr} AS DATETIME) AND ${column} <= CAST(${endStr} AS DATETIME)`;
+          return condition;
+        }
         const condition = and(gte(column, startOfDay), lte(column, endOfDay));
         if (!condition) {
           throw new QueryError('Failed to create date condition', { period });
@@ -443,6 +495,18 @@ export class FilterHandler {
           yesterday.getDate()
         );
         const endOfYesterday = new Date(startOfYesterday.getTime() + 24 * 60 * 60 * 1000 - 1);
+        if (this.databaseType === 'postgres') {
+          const startStr = startOfYesterday.toISOString();
+          const endStr = endOfYesterday.toISOString();
+          const condition = sql`${column} >= ${startStr}::timestamp AND ${column} <= ${endStr}::timestamp`;
+          return condition;
+        }
+        if (this.databaseType === 'mysql') {
+          const startStr = startOfYesterday.toISOString();
+          const endStr = endOfYesterday.toISOString();
+          const condition = sql`${column} >= CAST(${startStr} AS DATETIME) AND ${column} <= CAST(${endStr} AS DATETIME)`;
+          return condition;
+        }
         const condition = and(gte(column, startOfYesterday), lte(column, endOfYesterday));
         if (!condition) {
           throw new QueryError('Failed to create date condition', { period });
@@ -457,6 +521,18 @@ export class FilterHandler {
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 7);
         endOfWeek.setHours(0, 0, 0, 0);
+        if (this.databaseType === 'postgres') {
+          const startStr = startOfWeek.toISOString();
+          const endStr = endOfWeek.toISOString();
+          const condition = sql`${column} >= ${startStr}::timestamp AND ${column} < ${endStr}::timestamp`;
+          return condition;
+        }
+        if (this.databaseType === 'mysql') {
+          const startStr = startOfWeek.toISOString();
+          const endStr = endOfWeek.toISOString();
+          const condition = sql`${column} >= CAST(${startStr} AS DATETIME) AND ${column} < CAST(${endStr} AS DATETIME)`;
+          return condition;
+        }
         const condition = and(gte(column, startOfWeek), lt(column, endOfWeek));
         if (!condition) {
           throw new QueryError('Failed to create date condition', { period });
@@ -467,6 +543,18 @@ export class FilterHandler {
       case 'thisMonth': {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        if (this.databaseType === 'postgres') {
+          const startStr = startOfMonth.toISOString();
+          const endStr = endOfMonth.toISOString();
+          const condition = sql`${column} >= ${startStr}::timestamp AND ${column} < ${endStr}::timestamp`;
+          return condition;
+        }
+        if (this.databaseType === 'mysql') {
+          const startStr = startOfMonth.toISOString();
+          const endStr = endOfMonth.toISOString();
+          const condition = sql`${column} >= CAST(${startStr} AS DATETIME) AND ${column} < CAST(${endStr} AS DATETIME)`;
+          return condition;
+        }
         const condition = and(gte(column, startOfMonth), lt(column, endOfMonth));
         if (!condition) {
           throw new QueryError('Failed to create date condition', { period });
@@ -477,6 +565,18 @@ export class FilterHandler {
       case 'thisYear': {
         const startOfYear = new Date(now.getFullYear(), 0, 1);
         const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
+        if (this.databaseType === 'postgres') {
+          const startStr = startOfYear.toISOString();
+          const endStr = endOfYear.toISOString();
+          const condition = sql`${column} >= ${startStr}::timestamp AND ${column} < ${endStr}::timestamp`;
+          return condition;
+        }
+        if (this.databaseType === 'mysql') {
+          const startStr = startOfYear.toISOString();
+          const endStr = endOfYear.toISOString();
+          const condition = sql`${column} >= CAST(${startStr} AS DATETIME) AND ${column} < CAST(${endStr} AS DATETIME)`;
+          return condition;
+        }
         const condition = and(gte(column, startOfYear), lt(column, endOfYear));
         if (!condition) {
           throw new QueryError('Failed to create date condition', { period });
@@ -569,9 +669,38 @@ export class FilterHandler {
     for (const filter of filters) {
       try {
         // Validate filter values before processing
-        if (!this.validateFilterValues(filter.operator, filter.values, filter.type)) {
-          // Skip invalid filters silently
-          continue;
+        const validationResult = validateOperatorValues(
+          filter.operator,
+          filter.values,
+          filter.type
+        );
+        if (validationResult !== true) {
+          // Check if the operator is supported by this adapter even if core doesn't recognize it
+          const supportedOperators = this.getSupportedOperators(filter.type || 'text');
+          const isSupportedByAdapter = supportedOperators.includes(filter.operator);
+
+          // If operator is supported by adapter, allow it even if core validation fails
+          // This handles cases like notEquals for text columns, where core only defines it for numbers
+          if (isSupportedByAdapter) {
+            // Operator is supported by adapter, proceed with building condition
+            // Skip core validation since adapter knows how to handle it
+          } else if (typeof validationResult === 'string') {
+            // Operator is not supported by adapter, throw error
+            if (validationResult === 'Unknown operator') {
+              throw new QueryError(`Invalid filter operator: ${filter.operator}`, {
+                operator: filter.operator,
+                error: validationResult,
+              });
+            } else {
+              throw new QueryError(`Invalid filter configuration: ${validationResult}`, {
+                operator: filter.operator,
+                error: validationResult,
+              });
+            }
+          } else {
+            // Skip invalid filters silently for value validation errors
+            continue;
+          }
         }
 
         const columnPath = this.relationshipManager.resolveColumnPath(
