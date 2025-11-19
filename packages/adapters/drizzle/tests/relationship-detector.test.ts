@@ -14,14 +14,14 @@ describe('RelationshipDetector', () => {
   it('should detect relationships from schema', () => {
     const relationships = detector.detectFromSchema(relationsSchema, schema);
 
-    expect(relationships).toHaveProperty('users.profile');
-    expect(relationships).toHaveProperty('users.posts');
-    expect(relationships).toHaveProperty('users.comments');
-    expect(relationships).toHaveProperty('profiles.user');
-    expect(relationships).toHaveProperty('posts.user');
-    expect(relationships).toHaveProperty('posts.comments');
-    expect(relationships).toHaveProperty('comments.post');
-    expect(relationships).toHaveProperty('comments.user');
+    expect(relationships['users.profile']).toBeDefined();
+    expect(relationships['users.posts']).toBeDefined();
+    expect(relationships['users.comments']).toBeDefined();
+    expect(relationships['profiles.user']).toBeDefined();
+    expect(relationships['posts.user']).toBeDefined();
+    expect(relationships['posts.comments']).toBeDefined();
+    expect(relationships['comments.post']).toBeDefined();
+    expect(relationships['comments.user']).toBeDefined();
   });
 
   it('should detect relationship cardinality', () => {

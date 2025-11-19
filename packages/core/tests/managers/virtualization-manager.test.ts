@@ -315,16 +315,18 @@ describe('VirtualizationManager', () => {
     });
 
     it('should observe elements when requested', () => {
-      const mockElement = document.createElement('div');
+      const mockElement = {
+        dataset: {} as Record<string, string>,
+      } as HTMLElement;
       const mockObserve = vi.fn();
       const mockDisconnect = vi.fn();
 
       // Mock the observe method
-      (manager as any).resizeObserver = {
+      (manager as unknown as { resizeObserver: ResizeObserver }).resizeObserver = {
         observe: mockObserve,
         unobserve: vi.fn(),
         disconnect: mockDisconnect,
-      };
+      } as ResizeObserver;
 
       manager.observeElement(mockElement, 5);
 
