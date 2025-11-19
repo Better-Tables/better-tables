@@ -123,7 +123,7 @@ export function mergeColumnVisibility<TData = unknown>(
   // Create a map of columns for quick lookup
   const columnMap = new Map(columns.map((col) => [col.id, col]));
 
-  // Override with any modifications, but only for existing columns
+  // Override with any modifications
   Object.entries(modifications).forEach(([columnId, value]) => {
     const column = columnMap.get(columnId);
 

@@ -74,9 +74,9 @@ export async function setupSQLiteDatabase(db: BetterSQLite3Database<typeof schem
 
   // Insert test data
   await db.run(sql`INSERT INTO users (id, name, email, age) VALUES 
-    (1, 'John Doe', 'john@example.com', 30),
-    (2, 'Jane Smith', 'jane@example.com', 25),
-    (3, 'Bob Johnson', 'bob@example.com', 35)`);
+    (1, 'John Doe', 'john@example.com', 30, ${Date.now()}),
+    (2, 'Jane Smith', 'jane@example.com', 25, ${Date.now()}),
+    (3, 'Bob Johnson', 'bob@example.com', 35, ${Date.now()})`);
 
   await db.run(sql`INSERT INTO profiles (id, user_id, bio, avatar) VALUES 
     (1, 1, 'Software developer', 'avatar1.jpg'),

@@ -284,6 +284,23 @@ describe('Column Visibility Utilities', () => {
       });
     });
 
+    it('should explicitly ignore unknown columns even if they have valid boolean values', () => {
+      const columns = [createMockColumn('name', true)];
+      const modifications = {
+        name: false,
+        unknownColumn: false,
+        anotherUnknown: true,
+      };
+
+      const visibility = mergeColumnVisibility(columns, modifications);
+
+      expect(visibility).toEqual({
+        name: false,
+      });
+      expect((visibility as any).unknownColumn).toBeUndefined();
+      expect((visibility as any).anotherUnknown).toBeUndefined();
+    });
+
     it('should not mutate the modifications object', () => {
       const columns = [createMockColumn('name', true), createMockColumn('email', false)];
 

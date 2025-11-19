@@ -635,7 +635,7 @@ describe('TableStateManager', () => {
       const calls = mockSubscriber.mock.calls;
       const stateChangedEvents = calls.filter((call) => call[0].type === 'state_changed');
       // Pagination manager might emit events even without state change
-      expect(stateChangedEvents.length).toBeGreaterThanOrEqual(0);
+      expect(stateChangedEvents.length).toBe(0);
     });
   });
 
@@ -666,7 +666,7 @@ describe('TableStateManager', () => {
       const state = manager.getState();
       expect(state.filters).toHaveLength(1);
       // updateState might not update page if already on that page
-      expect(state.pagination.page).toBe(1); // Was not changed by updateState
+      expect(state.pagination.page).toBe(3);
       expect(state.sorting).toHaveLength(1);
       expect(state.selectedRows.size).toBe(2);
       expect(state.columnVisibility.id).toBe(false);
