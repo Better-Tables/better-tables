@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { RelationshipDetector } from '../relationship-detector';
-import { RelationshipManager } from '../relationship-manager';
-import type { RelationshipMap } from '../types';
+import { RelationshipDetector } from '../src/relationship-detector';
+import { RelationshipManager } from '../src/relationship-manager';
+import type { RelationshipMap } from '../src/types';
 import { relationsSchema, schema } from './helpers/test-schema';
 
 describe('RelationshipDetector', () => {

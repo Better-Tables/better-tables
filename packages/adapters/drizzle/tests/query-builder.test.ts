@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { relations, sql } from 'drizzle-orm';
 import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { SQLiteQueryBuilder } from '../query-builders/sqlite-query-builder';
-import { RelationshipDetector } from '../relationship-detector';
-import { RelationshipManager } from '../relationship-manager';
-import type { SQLiteQueryBuilderWithJoins } from '../types';
+import { SQLiteQueryBuilder } from '../src/query-builders/sqlite-query-builder';
+import { RelationshipDetector } from '../src/relationship-detector';
+import { RelationshipManager } from '../src/relationship-manager';
+import type { SQLiteQueryBuilderWithJoins } from '../src/types';
 import BunSQLiteCompat, { type Database } from './helpers/bun-sqlite-compat';
 
 // Test schema

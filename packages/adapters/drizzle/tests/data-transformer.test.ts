@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { DataTransformer } from '../data-transformer';
-import { RelationshipDetector } from '../relationship-detector';
-import { RelationshipManager } from '../relationship-manager';
-import type { RelationshipMap } from '../types';
+import { DataTransformer } from '../src/data-transformer';
+import { RelationshipDetector } from '../src/relationship-detector';
+import { RelationshipManager } from '../src/relationship-manager';
+import type { RelationshipMap } from '../src/types';
 import { relationsSchema, schema, type User } from './helpers/test-schema';
 
 describe('DataTransformer', () => {

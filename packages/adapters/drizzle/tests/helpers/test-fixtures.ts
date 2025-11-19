@@ -10,9 +10,9 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import mysql from 'mysql2/promise';
 import postgres from 'postgres';
-import type { DrizzleAdapter } from '../../drizzle-adapter';
-import { DrizzleAdapter as DrizzleAdapterClass } from '../../drizzle-adapter';
-import type { DrizzleAdapterConfig, DrizzleDatabase } from '../../types';
+import type { DrizzleAdapter } from '../../src/drizzle-adapter';
+import { DrizzleAdapter as DrizzleAdapterClass } from '../../src/drizzle-adapter';
+import type { DrizzleAdapterConfig, DrizzleDatabase } from '../../src/types';
 import BunSQLiteCompat, { type Database } from './bun-sqlite-compat';
 import { relationsSchema, schema } from './test-schema';
 
