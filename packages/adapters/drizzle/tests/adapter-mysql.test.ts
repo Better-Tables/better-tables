@@ -317,13 +317,12 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
   describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
-      // Get current timestamp for exact match
-      const now = new Date();
+      // Use a future date that won't match any records
+      const futureDate = new Date(Date.now() + 86400000 * 365); // One year in the future
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [now] }],
+        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [futureDate] }],
       });
-      // This might be flaky due to exact timestamp matching
-      expect(result.data).toHaveLength(0); // No exact matches likely
+      expect(result.data).toHaveLength(0); // No records match future date
     });
 
     it('should filter by date isNot', async () => {

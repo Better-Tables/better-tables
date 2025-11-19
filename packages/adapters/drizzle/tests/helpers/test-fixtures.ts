@@ -154,11 +154,9 @@ export function createSQLiteAdapter(
   return new DrizzleAdapterClass(config);
 }
 
-
 export function closeSQLiteDatabase(sqlite: Database): void {
   sqlite.close();
 }
-
 
 /**
  * ============================================================================
@@ -380,7 +378,7 @@ function parseMySQLConnectionString(connectionString: string): {
   baseUrl: string;
 } {
   const url = new URL(connectionString);
-  const database = url.pathname.slice(1) || 'mysql';
+  const database = url.pathname.slice(1) || 'better_tables_test';
   // Create base URL without database name (connect to default mysql database)
   url.pathname = '';
   const baseUrl = url.toString().replace(/\/$/, '');
