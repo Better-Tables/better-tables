@@ -38,7 +38,7 @@ export function createSQLiteDatabase(): {
 } {
   const sqlite = new Database(':memory:');
 
-  // Key: explicitly use generic — no casting needed!
+  // Key: explicitly use generic - no casting needed!
   const db = drizzleSQLite<typeof schema>(sqlite, { schema });
 
   return { db, sqlite };
@@ -189,8 +189,8 @@ export function createSQLiteAdapter(
    * (`bun:sqlite` + `drizzle-orm/bun-sqlite`), which produces a different
    * database instance type.
    *
-   * To keep the adapter typing compatible — without modifying the
-   * adapter's public API — we cast the Bun SQLite database to the
+   * To keep the adapter typing compatible - without modifying the
+   * adapter's public API - we cast the Bun SQLite database to the
    * BetterSQLite3-based `DrizzleDatabase<'sqlite'>` type.
    *
    * This is safe **only** because:

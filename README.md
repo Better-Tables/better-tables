@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Better Tables is the React table library you wished existed. Define your columns once, and get powerful filtering, sorting, pagination, and virtualization—all with end-to-end type safety across your database queries and UI components.
+Better Tables is the React table library you wished existed. Define your columns once, and get powerful filtering, sorting, pagination, and virtualization-all with end-to-end type safety across your database queries and UI components.
 
 ---
 
@@ -30,7 +30,7 @@ Most table libraries ask you to:
 Better Tables revolutionizes how you work with relational data:
 
 - **Automatic Relationships**: Filter across joined tables without writing JOIN queries yourself
-- **Database Adapters**: Define your schema once—filters automatically work across relationships
+- **Database Adapters**: Define your schema once-filters automatically work across relationships
 - **Type-Safe End-to-End**: From your database query to your UI component, full type inference
 - **Zero Boilerplate**: Declarative column definitions give you filtering, sorting, and pagination automatically
 
@@ -170,20 +170,27 @@ Connect to any backend with a consistent API. No vendor lock-in.
 
 #### Drizzle Adapter
 ```tsx
-import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
-import { db, users } from './db';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import type { FilterState, SortingState } from '@better-tables/core';
 
-const adapter = new DrizzleAdapter({
-  db,
-  schema: users,
-  autoDetectRelationships: true,
-});
+// Set up your Drizzle database (schema and relations included)
+const db = drizzle(sqlite, { schema: { users, profiles, usersRelations } });
+
+// Create adapter - automatically detects schema and driver
+const adapter = drizzleAdapter(db);
 
 // Automatically handles joins, filtering, sorting, and pagination
+const filters: FilterState[] = [
+  { columnId: 'status', type: 'option', operator: 'is', values: ['active'] }
+];
+const sorting: SortingState = [{ columnId: 'name', direction: 'asc' }];
+
 const result = await adapter.fetchData({
+  columns: ['name', 'email', 'status'],
   pagination: { page: 1, limit: 20 },
-  filters: [{ columnId: 'status', operator: 'equals', values: ['active'] }],
-  sorting: [{ columnId: 'name', direction: 'asc' }],
+  filters,
+  sorting,
 });
 ```
 
@@ -326,6 +333,13 @@ Each package is independently versioned and can be used standalone or together.
 - **[API Reference](docs/core/TYPES_API_REFERENCE.md)** - Complete API documentation
 - **[Contributing](docs/CONTRIBUTING.md)** - How to contribute to Better Tables
 
+### Package Documentation
+
+- **[@better-tables/core](packages/core/README.md)** - Core package with builders and managers
+- **[@better-tables/ui](packages/ui/README.md)** - React components and hooks
+- **[@better-tables/adapters-drizzle](packages/adapters/drizzle/README.md)** - Drizzle ORM adapter
+- **[Demo App](apps/demo/README.md)** - Complete working example
+
 ### Quick Links
 
 - [Column Builders Guide](docs/core/COLUMN_BUILDERS_GUIDE.md)
@@ -337,26 +351,36 @@ Each package is independently versioned and can be used standalone or together.
 
 ## 🎨 Examples
 
+> **💡 Tip**: Check out the [complete demo app](apps/demo) for a full working example with all features!
+
 ### Cross-Table Filtering (The Magic Feature)
 
 Filter across relationships without writing SQL JOINs. This is what sets Better Tables apart.
 
 ```tsx
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { createColumnBuilder } from '@better-tables/core';
+
+// Set up adapter
+const db = drizzle(sqlite, { schema: { users, profiles, posts, usersRelations } });
+const adapter = drizzleAdapter(db);
+
 // Define columns that span multiple tables
+const cb = createColumnBuilder<UserWithRelations>();
 const columns = [
   cb.text().id('name').accessor(u => u.name).build(),
   cb.text().id('profile.location').accessor(u => u.profile?.location).build(),
-  cb.number().id('posts.count').accessor(u => u.posts?.length || 0).build(),
+  cb.number().id('posts_count').accessor(u => u.posts?.length || 0).build(),
   cb.text().id('profile.website').accessor(u => u.profile?.website).build(),
 ];
 
 // User filters by "profile.location" - automatic JOIN generated
-// User filters by "posts.count" - automatic COUNT and JOIN
+// User filters by "posts_count" - automatic COUNT and JOIN
 // All handled by the adapter, zero query writing required
 
 <BetterTable 
   columns={columns} 
-  adapter={drizzleAdapter}
+  adapter={adapter}
   features={{ filtering: true, sorting: true }}
 />
 ```
@@ -438,24 +462,27 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
 ## 🛣️ Roadmap
 
-### Current Status (v0.1)
+### Current Status (v0.5)
 
 - ✅ Core type system and builders
 - ✅ Complete filter manager with 6 filter types
-- ✅ Drizzle adapter with relationship detection
+- ✅ Drizzle adapter with automatic relationship detection
+- ✅ Factory function for easy adapter creation
 - ✅ UI components with shadcn/ui
 - ✅ Virtual scrolling support
 - ✅ URL state persistence
 - ✅ Server-side rendering support (Next.js)
+- ✅ Action builders for bulk operations
+- ✅ Primary table resolution for complex schemas
 
-### Coming Next (v0.2)
+### Coming Next (v0.6+)
 
 - [ ] REST adapter
-- [ ] Bulk operations API
 - [ ] Export functionality (CSV, Excel)
 - [ ] Saved filter presets
 - [ ] Advanced column customization
 - [ ] Performance benchmarks and optimization
+- [ ] Enhanced documentation and examples
 
 ### Future (v1.0)
 
@@ -464,6 +491,7 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 - [ ] Advanced analytics and aggregations
 - [ ] Plugin system for custom features
 - [ ] Official examples for Remix, Vite, CRA
+- [ ] UI package CLI for component generation
 
 ---
 

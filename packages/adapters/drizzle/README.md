@@ -13,6 +13,7 @@ A powerful Drizzle ORM adapter for Better Tables that provides automatic relatio
 - ⚡ **Performance Optimized** - Query caching, join optimization, and batch processing
 - 🛡️ **Full Type Safety** - Complete TypeScript support with schema inference
 - 🗄️ **Multi-Database** - Support for PostgreSQL, MySQL, and SQLite
+- 🏭 **Factory Function** - Simple API with automatic schema and driver detection
 
 ## Installation
 
@@ -96,13 +97,13 @@ import Database from 'better-sqlite3';
 
 // For SQLite
 const sqlite = new Database('database.db');
-const db = drizzle(sqlite);
+const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });
 
 // For PostgreSQL
 // import { drizzle } from 'drizzle-orm/postgres-js';
 // import postgres from 'postgres';
 // const sql = postgres('postgresql://user:password@localhost:5432/database');
-// const db = drizzle(sql);
+// const db = drizzle(sql, { schema: { ...schema, ...relationsSchema } });
 
 // For MySQL
 // import { drizzle } from 'drizzle-orm/mysql2';
@@ -113,27 +114,34 @@ const db = drizzle(sqlite);
 //   password: 'password',
 //   database: 'database'
 // });
-// const db = drizzle(connection);
+// const db = drizzle(connection, { schema: { ...schema, ...relationsSchema } });
 ```
 
-### 3. Create the Adapter
+### 3. Create the Adapter (Recommended: Factory Function)
+
+The factory function automatically detects the schema and driver from your Drizzle instance:
 
 ```typescript
-import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'sqlite', // 'postgres' | 'mysql' | 'sqlite'
-  autoDetectRelationships: true,
+// Simple usage - everything auto-detected
+const adapter = drizzleAdapter(db);
+
+// With options
+const adapter = drizzleAdapter(db, {
+  options: {
+    cache: { enabled: true, ttl: 300000, maxSize: 1000 },
+    logging: { enabled: true, level: 'info' },
+  },
 });
 ```
 
 ### 4. Define Columns with Dot Notation
 
 ```typescript
-import { columnBuilder as cb } from '@better-tables/core';
+import { createColumnBuilder } from '@better-tables/core';
+
+const cb = createColumnBuilder<UserWithRelations>();
 
 const columns = [
   // Direct columns
@@ -175,16 +183,32 @@ function UserTable() {
 
 ## Advanced Usage
 
+### Using the Constructor (Advanced)
+
+For more control, you can use the constructor directly:
+
+```typescript
+import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+
+// REQUIRED: Specify the driver type explicitly for proper type safety
+const adapter = new DrizzleAdapter<typeof schema, 'sqlite'>({
+  db,
+  schema,
+  driver: 'sqlite', // 'postgres' | 'mysql' | 'sqlite'
+  relations: relationsSchema, // For auto-detection
+  autoDetectRelationships: true,
+  options: {
+    cache: { enabled: true, ttl: 300000 },
+  },
+});
+```
+
 ### Custom Relationship Mapping
 
 If you need more control over relationships, you can provide manual mappings:
 
 ```typescript
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'sqlite',
+const adapter = drizzleAdapter(db, {
   autoDetectRelationships: false,
   relationships: {
     'profile.bio': {
@@ -211,11 +235,7 @@ const adapter = new DrizzleAdapter({
 ### Performance Optimization
 
 ```typescript
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'sqlite',
+const adapter = drizzleAdapter(db, {
   options: {
     cache: {
       enabled: true,
@@ -243,8 +263,10 @@ const adapter = new DrizzleAdapter({
 ### Complex Filtering
 
 ```typescript
+import type { FilterState } from '@better-tables/core';
+
 // Filter across multiple tables
-const filters = [
+const filters: FilterState[] = [
   {
     columnId: 'name',
     type: 'text',
@@ -265,7 +287,10 @@ const filters = [
   }
 ];
 
-const result = await adapter.fetchData({ filters });
+const result = await adapter.fetchData({ 
+  columns: ['name', 'email', 'profile.bio'],
+  filters 
+});
 ```
 
 ### Primary Table Specification
@@ -320,33 +345,111 @@ const columns = [
 ];
 ```
 
+### Server-Side Rendering (Next.js)
+
+```typescript
+// app/page.tsx
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import type { FilterState, SortingState } from '@better-tables/core';
+import { getDatabase } from '@/lib/db';
+
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const params = await searchParams;
+  
+  // Get database connection
+  const { db } = await getDatabase();
+  
+  // Create adapter (can be cached at module level)
+  const adapter = drizzleAdapter(db);
+  
+  // Parse URL params
+  const page = Number.parseInt(params.page || '1', 10);
+  const limit = Number.parseInt(params.limit || '10', 10);
+  
+  let filters: FilterState[] = [];
+  if (params.filters) {
+    filters = JSON.parse(params.filters);
+  }
+  
+  let sorting: SortingState = [];
+  if (params.sorting) {
+    sorting = JSON.parse(params.sorting);
+  }
+  
+  // Fetch data
+  const result = await adapter.fetchData({
+    columns: ['name', 'email', 'profile.bio'],
+    pagination: { page, limit },
+    filters,
+    sorting,
+  });
+  
+  return <Table data={result.data} totalCount={result.total} />;
+}
+```
+
 ## API Reference
 
-### DrizzleAdapter
+### Factory Function
+
+#### `drizzleAdapter<TDB>(db, factoryOptions?)`
+
+The recommended way to create an adapter. Automatically detects schema and driver.
+
+```typescript
+function drizzleAdapter<TDB>(
+  db: TDB,
+  factoryOptions?: DrizzleAdapterFactoryOptions
+): DrizzleAdapter
+```
+
+**Parameters:**
+- `db` - The Drizzle database instance (schema and driver auto-detected)
+- `factoryOptions` - Optional configuration:
+  - `schema?` - Override auto-detected schema
+  - `driver?` - Override auto-detected driver
+  - `relations?` - Provide relations for auto-detection
+  - `relationships?` - Manual relationship mappings
+  - `autoDetectRelationships?` - Enable/disable auto-detection (default: true)
+  - `options?` - Adapter configuration options
+  - `meta?` - Custom adapter metadata
+
+**Returns:** Fully typed `DrizzleAdapter` instance
+
+### DrizzleAdapter Class
 
 The main adapter class that implements the `TableAdapter` interface.
 
-#### Constructor Options
+#### Constructor
 
 ```typescript
-interface DrizzleAdapterConfig<TSchema> {
-  db: any;                    // Drizzle database instance
-  schema: TSchema;            // Schema with tables and relations
-  mainTable: keyof TSchema;   // Main table to query from
-  driver: 'postgres' | 'mysql' | 'sqlite';
-  autoDetectRelationships?: boolean;
-  relationships?: RelationshipMap;
-  options?: DrizzleAdapterOptions;
-  meta?: Partial<AdapterMeta>;
+new DrizzleAdapter<TSchema, TDriver>(config: DrizzleAdapterConfig<TSchema, TDriver>)
+```
+
+**Configuration:**
+```typescript
+interface DrizzleAdapterConfig<TSchema, TDriver> {
+  db: DrizzleDatabase<TDriver>;     // Drizzle database instance
+  schema: TSchema;                   // Schema with tables
+  driver: TDriver;                   // 'postgres' | 'mysql' | 'sqlite'
+  relations?: Record<string, Relations>; // Drizzle relations for auto-detection
+  autoDetectRelationships?: boolean; // Enable auto-detection (default: true)
+  relationships?: RelationshipMap;   // Manual relationship mappings
+  options?: DrizzleAdapterOptions;    // Adapter options
+  meta?: Partial<AdapterMeta>;       // Custom metadata
 }
 ```
 
 #### Methods
 
 - `fetchData(params)` - Fetch data with filtering, sorting, and pagination
-  - `params.primaryTable?: string` - Explicit primary table specification (optional)
-  - When provided, uses the specified table as primary table
-  - When not provided, automatically determines primary table from columns
+  - `params.columns` - Array of column IDs to fetch
+  - `params.primaryTable?` - Explicit primary table (optional, auto-detected if not provided)
+  - `params.filters?` - Array of filter states
+  - `params.sorting?` - Array of sort states
+  - `params.pagination?` - Pagination configuration
+  - Returns: `Promise<FetchDataResult<TRecord>>`
+
 - `getFilterOptions(columnId)` - Get available filter options for a column
 - `getFacetedValues(columnId)` - Get faceted values for a column
 - `getMinMaxValues(columnId)` - Get min/max values for number columns
@@ -369,9 +472,9 @@ interface RelationshipMap {
 
 interface RelationshipPath {
   from: string;           // Source table
-  to: string;             // Target table
-  foreignKey: string;     // Foreign key field in target table
-  localKey: string;       // Local key field in source table
+  to: string;              // Target table
+  foreignKey: string;      // Foreign key field in target table
+  localKey: string;        // Local key field in source table
   cardinality: 'one' | 'many';
   nullable?: boolean;
   joinType?: 'left' | 'inner';
@@ -385,16 +488,12 @@ interface RelationshipPath {
 ```typescript
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
 const sql = postgres('postgresql://user:password@localhost:5432/database');
-const db = drizzle(sql);
+const db = drizzle(sql, { schema: { ...schema, ...relationsSchema } });
 
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'postgres',
-});
+const adapter = drizzleAdapter(db);
 ```
 
 ### MySQL
@@ -402,6 +501,7 @@ const adapter = new DrizzleAdapter({
 ```typescript
 import { drizzle } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
 const connection = await mysql.createConnection({
   host: 'localhost',
@@ -409,14 +509,9 @@ const connection = await mysql.createConnection({
   password: 'password',
   database: 'database'
 });
-const db = drizzle(connection);
+const db = drizzle(connection, { schema: { ...schema, ...relationsSchema } });
 
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'mysql',
-});
+const adapter = drizzleAdapter(db);
 ```
 
 ### SQLite
@@ -424,16 +519,12 @@ const adapter = new DrizzleAdapter({
 ```typescript
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
 const sqlite = new Database('database.db');
-const db = drizzle(sqlite);
+const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });
 
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'sqlite',
-});
+const adapter = drizzleAdapter(db);
 ```
 
 ## Error Handling
@@ -468,12 +559,14 @@ try {
 3. **Enable Caching** - Use query result caching for repeated requests
 4. **Batch Large Queries** - Enable batching for large datasets
 5. **Monitor Performance** - Enable performance tracking to identify slow queries
+6. **Cache Adapter Instance** - Reuse the adapter instance instead of creating new ones
 
 ## Migration from Raw Drizzle
 
 If you're migrating from raw Drizzle queries, the adapter provides a seamless transition:
 
 ### Before (Raw Drizzle)
+
 ```typescript
 const users = await db
   .select()
@@ -489,21 +582,74 @@ const users = await db
 ```
 
 ### After (Drizzle Adapter)
+
 ```typescript
+import type { FilterState, SortingState } from '@better-tables/core';
+
+const filters: FilterState[] = [
+  { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
+  { columnId: 'posts.published', type: 'boolean', operator: 'isTrue', values: [] }
+];
+
+const sorting: SortingState = [{ columnId: 'name', direction: 'asc' }];
+
 const result = await adapter.fetchData({
-  filters: [
-    { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
-    { columnId: 'posts.published', type: 'boolean', operator: 'isTrue', values: [] }
-  ],
-  sorting: [{ columnId: 'name', direction: 'asc' }],
+  columns: ['name', 'email', 'profile.bio', 'posts.title'],
+  filters,
+  sorting,
   pagination: { page: 1, limit: 10 }
 });
 ```
 
+## Examples
+
+See the [demo app](../../apps/demo) for a complete working example:
+
+- **Adapter Setup**: [apps/demo/lib/adapter.ts](../../apps/demo/lib/adapter.ts)
+- **Column Definitions**: [apps/demo/lib/columns/user-columns.tsx](../../apps/demo/lib/columns/user-columns.tsx)
+- **Server Component**: [apps/demo/app/page.tsx](../../apps/demo/app/page.tsx)
+
+## Documentation
+
+For detailed documentation, see:
+
+- **[Core Package README](../core/README.md)** - Column builders and state management
+- **[Getting Started Guide](../../docs/GETTING_STARTED.md)** - Installation and setup
+- **[Adapters Architecture](../../docs/adapters/ADAPTERS_ARCHITECTURE.md)** - How adapters work
+- **[Advanced Usage](./docs/ADVANCED_USAGE.md)** - Advanced patterns and examples
+
 ## Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](../../CONTRIBUTING.md) for details.
+Contributions are welcome! This is an open-source project, and we appreciate any help you can provide.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`bun test`)
+5. Commit your changes (`git commit -m 'Add some amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 
 MIT License - see [LICENSE](../../LICENSE) for details.
+
+## Related Packages
+
+- **[@better-tables/core](../core)** - Core functionality and column builders
+- **[@better-tables/ui](../ui)** - React components built on top of core
+- **[Demo App](../../apps/demo)** - Complete working example
+
+## Support
+
+- **GitHub Issues** - Report bugs or request features
+- **GitHub Discussions** - Ask questions and share ideas
+- **Documentation** - Comprehensive guides in the `docs/` directory
+
+---
+
+Built with ❤️ by the Better Tables team. This package is part of the [Better Tables](https://github.com/Better-Tables/better-tables) project.
