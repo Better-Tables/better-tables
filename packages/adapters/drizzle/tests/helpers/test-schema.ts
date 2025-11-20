@@ -46,7 +46,19 @@ export const comments = sqliteTable('comments', {
   content: text('content').notNull(),
 });
 
-export const schema = { users, profiles, posts, comments };
+export const surveys = sqliteTable('surveys', {
+  id: integer('id').primaryKey(),
+  slug: text('slug').notNull(),
+  status: text('status').notNull(),
+  survey: text('survey'), // JSON stored as text in SQLite
+  surveyObject: text('survey_object'), // JSON stored as text in SQLite
+  surveyStats: text('survey_stats'), // JSON stored as text in SQLite
+  totalResponses: integer('total_responses').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+});
+
+export const schema = { users, profiles, posts, comments, surveys };
 
 /**
  * Drizzle relations definitions

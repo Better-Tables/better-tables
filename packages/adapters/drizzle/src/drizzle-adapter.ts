@@ -67,6 +67,7 @@ import type { InferSelectModel, Relations } from 'drizzle-orm';
 
 import { DataTransformer } from './data-transformer';
 import { getOperationsFactory } from './operations';
+import { PrimaryTableResolver } from './primary-table-resolver';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
@@ -133,6 +134,7 @@ export class DrizzleAdapter<
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
+  private primaryTableResolver: PrimaryTableResolver;
   private queryBuilder: BaseQueryBuilder;
   private dataTransformer: DataTransformer;
   private cache: Map<
@@ -211,6 +213,7 @@ export class DrizzleAdapter<
 
     // Initialize managers - they will be configured per query
     this.relationshipManager = new RelationshipManager(this.schema, this.relationships);
+    this.primaryTableResolver = new PrimaryTableResolver(this.schema, this.relationships);
 
     // Initialize query builder using factory pattern based on driver
     // Primary keys are auto-detected from schema
@@ -313,144 +316,6 @@ export class DrizzleAdapter<
   }
 
   /**
-   * Determine the primary table from column configurations.
-   *
-   * Analyzes the provided column identifiers to determine which table should be
-   * used as the primary table for the query. This is critical for proper join
-   * planning and relationship resolution.
-   *
-   * @description
-   * The primary table is determined by:
-   * 1. Counting how many columns belong to each table
-   * 2. Selecting the table with the most column references
-   * 3. Falling back to the first table in the schema if unclear
-   *
-   * @param {string[]} [columns] - Array of column identifiers (e.g., ['email', 'profile.bio'])
-   * @returns {string} The name of the primary table
-   *
-   * @throws {SchemaError} If no tables are found in the schema
-   *
-   * @example
-   * ```typescript
-   * // Returns 'users' as it has 2 column references
-   * const table = this.determinePrimaryTable(['email', 'name', 'profile.bio']);
-   * ```
-   *
-   * @since 1.0.0
-   * @internal
-   */
-  private determinePrimaryTable(columns?: string[]): string {
-    if (!columns || columns.length === 0) {
-      // If no columns specified, use the first table in schema
-      const tableNames = Object.keys(this.schema);
-      if (tableNames.length === 0) {
-        throw new SchemaError('No tables found in schema', { schema: this.schema });
-      }
-      const firstTable = tableNames[0];
-      if (!firstTable) {
-        throw new SchemaError('No tables found in schema', { schema: this.schema });
-      }
-      return firstTable;
-    }
-
-    // Analyze columns to find the most common table
-    const tableCounts = new Map<string, number>();
-
-    for (const columnId of columns) {
-      const parts = columnId.split('.');
-      if (parts.length === 1) {
-        // Direct column - find which table it belongs to
-        const fieldName = parts[0];
-        if (!fieldName) continue;
-
-        for (const [tableName, tableSchema] of Object.entries(this.schema)) {
-          if (this.hasColumn(tableSchema, fieldName)) {
-            tableCounts.set(tableName, (tableCounts.get(tableName) || 0) + 1);
-            break;
-          }
-        }
-      } else if (parts.length >= 2) {
-        // Relationship column - the first part is the table alias
-        const tableAlias = parts[0];
-        if (!tableAlias) continue;
-
-        // Find the actual table name from relationships
-        for (const [relKey] of Object.entries(this.relationships)) {
-          if (relKey.endsWith(`.${tableAlias}`)) {
-            const sourceTable = relKey.split('.')[0];
-            if (sourceTable) {
-              tableCounts.set(sourceTable, (tableCounts.get(sourceTable) || 0) + 1);
-            }
-            break;
-          }
-        }
-      }
-    }
-
-    // Return the table with the most column references
-    let primaryTable = '';
-    let maxCount = 0;
-    for (const [tableName, count] of tableCounts) {
-      if (count > maxCount) {
-        maxCount = count;
-        primaryTable = tableName;
-      }
-    }
-
-    // Fallback to first table if no clear primary table found
-    if (!primaryTable) {
-      const tableNames = Object.keys(this.schema);
-      if (tableNames.length === 0) {
-        throw new SchemaError('No tables found in schema', { schema: this.schema });
-      }
-      const firstTable = tableNames[0];
-      if (!firstTable) {
-        throw new SchemaError('No tables found in schema', { schema: this.schema });
-      }
-      primaryTable = firstTable;
-    }
-
-    return primaryTable;
-  }
-
-  /**
-   * Check if a table has a specific column.
-   *
-   * @description
-   * Safely checks whether a column exists in a table schema by accessing
-   * Drizzle's internal metadata. Returns false for invalid schemas or
-   * missing columns rather than throwing errors.
-   *
-   * @param {AnyTableType} tableSchema - The table schema to check
-   * @param {string} columnName - The name of the column to check for
-   * @returns {boolean} True if the column exists, false otherwise
-   *
-   * @example
-   * ```typescript
-   * const hasEmail = this.hasColumn(users, 'email'); // true
-   * const hasBad = this.hasColumn(users, 'nonexistent'); // false
-   * ```
-   *
-   * @since 1.0.0
-   * @internal
-   */
-  private hasColumn(tableSchema: AnyTableType, columnName: string): boolean {
-    try {
-      const tableObj = tableSchema as unknown as Record<string, unknown>;
-      if ('_' in tableObj && tableObj._ && typeof tableObj._ === 'object') {
-        const meta = tableObj._ as Record<string, unknown>;
-        if ('columns' in meta && meta.columns && typeof meta.columns === 'object') {
-          const columns = meta.columns as Record<string, unknown>;
-          return columnName in columns;
-        }
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
    * Fetch data with filtering, sorting, and pagination.
    *
    * This is the main method for retrieving data from the database. It handles:
@@ -503,8 +368,8 @@ export class DrizzleAdapter<
     const startTime = Date.now();
 
     try {
-      // Determine primary table from column configurations
-      const primaryTable = this.determinePrimaryTable(params.columns);
+      // Determine primary table - use explicit if provided, otherwise use resolver
+      const primaryTable = this.primaryTableResolver.resolve(params.columns, params.primaryTable);
 
       // Check cache first
       const cacheKey = this.getCacheKey(params);
@@ -584,7 +449,7 @@ export class DrizzleAdapter<
   async getFilterOptions(columnId: string): Promise<FilterOption[]> {
     try {
       // Determine primary table from the column
-      const primaryTable = this.determinePrimaryTable([columnId]);
+      const primaryTable = this.primaryTableResolver.resolve([columnId]);
       const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable);
       const results = await query.execute();
 
@@ -607,7 +472,7 @@ export class DrizzleAdapter<
   async getFacetedValues(columnId: string): Promise<Map<string, number>> {
     try {
       // Determine primary table from the column
-      const primaryTable = this.determinePrimaryTable([columnId]);
+      const primaryTable = this.primaryTableResolver.resolve([columnId]);
       const query = this.queryBuilder.buildAggregateQuery(columnId, 'count', primaryTable);
       const results = await query.execute();
 
@@ -633,7 +498,7 @@ export class DrizzleAdapter<
   async getMinMaxValues(columnId: string): Promise<[number, number]> {
     try {
       // Determine primary table from the column
-      const primaryTable = this.determinePrimaryTable([columnId]);
+      const primaryTable = this.primaryTableResolver.resolve([columnId]);
       const query = this.queryBuilder.buildMinMaxQuery(columnId, primaryTable);
       const results = await query.execute();
       const result = results[0] as { min: number | null; max: number | null } | undefined;
@@ -1058,8 +923,8 @@ export class DrizzleAdapter<
    * Utility methods
    */
   private getJoinCount(params: FetchDataParams): number {
-    // Determine primary table from params
-    const primaryTable = this.determinePrimaryTable(params.columns);
+    // Determine primary table from params - use explicit if provided
+    const primaryTable = this.primaryTableResolver.resolve(params.columns, params.primaryTable);
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],

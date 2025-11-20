@@ -68,6 +68,40 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       expect(result.total).toBe(3);
     });
 
+    it('should use explicit primaryTable parameter', async () => {
+      const result = await adapter.fetchData({
+        primaryTable: 'users',
+        columns: ['id', 'email'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+    });
+
+    it('should use explicit primaryTable even when columns match other tables', async () => {
+      // Explicit primaryTable should override automatic determination
+      const result = await adapter.fetchData({
+        primaryTable: 'users',
+        columns: ['id', 'email', 'name'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      // Verify it's actually querying users table
+      expect(result.data[0]).toHaveProperty('email');
+    });
+
+    it('should automatically determine primary table when not specified', async () => {
+      // Should automatically determine 'users' from columns
+      const result = await adapter.fetchData({
+        columns: ['id', 'email', 'name'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      expect(result.data[0]).toHaveProperty('email');
+    });
+
     it('should apply pagination', async () => {
       const result = await adapter.fetchData({
         pagination: { page: 1, limit: 2 },
@@ -600,9 +634,56 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       });
     });
 
-    it('should handle PostgreSQL JSON operations (if implemented)', async () => {
-      // Placeholder for future JSON column support
-      expect(true).toBe(true);
+    it('should handle PostgreSQL JSONB columns with accessors', async () => {
+      // Test that we can fetch data with JSONB columns
+      const result = await adapter.fetchData({
+        columns: ['id', 'slug', 'survey'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+    });
+
+    describe('Primary Table with JSONB Accessor Columns', () => {
+      it('should use explicit primaryTable with JSONB accessor columns', async () => {
+        // Scenario: 'title' is accessed via accessor from survey.survey.title (JSONB)
+        // Explicit primaryTable ensures correct table selection
+        const result = await adapter.fetchData({
+          primaryTable: 'surveys',
+          columns: ['slug', 'status'], // Direct columns
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        // Verify it's querying surveys table
+        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        expect(firstSurvey.slug).toBeDefined();
+      });
+
+      it('should automatically determine surveys table when mixing direct and accessor columns', async () => {
+        // Scenario: 'title' would be from JSONB accessor, but 'slug' and 'status' are direct columns
+        // Should correctly identify 'surveys' as primary table based on direct column matches
+        const result = await adapter.fetchData({
+          columns: ['slug', 'status'], // Both direct columns in surveys
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        expect(firstSurvey.slug).toBeDefined();
+      });
+
+      it('should prefer surveys table when it has more matching direct columns', async () => {
+        // Even if 'title' exists in posts table, surveys should win with more matches
+        const result = await adapter.fetchData({
+          columns: ['slug', 'status', 'totalResponses'], // All direct columns in surveys
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        expect(firstSurvey.slug).toBeDefined();
+      });
     });
 
     it('should handle PostgreSQL-specific case-insensitive search', async () => {

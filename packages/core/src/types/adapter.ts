@@ -27,6 +27,7 @@ import type { SortingParams } from './sorting';
  *   filters: [{ columnId: 'status', operator: 'equals', values: ['active'] }],
  *   search: 'john',
  *   columns: ['id', 'name', 'email'],
+ *   primaryTable: 'users', // Explicit primary table specification
  *   params: { includeDeleted: false }
  * };
  * ```
@@ -46,6 +47,28 @@ export interface FetchDataParams {
 
   /** Specific columns to include in the result */
   columns?: string[];
+
+  /**
+   * Explicit primary table specification.
+   * When provided, this table will be used as the primary table for the query.
+   * When not provided, the adapter will attempt to determine the primary table
+   * from the column IDs using heuristics.
+   *
+   * @example
+   * ```typescript
+   * // Explicit primary table - recommended for clarity
+   * const result = await adapter.fetchData({
+   *   primaryTable: 'surveys',
+   *   columns: ['title', 'slug'], // 'title' may be from JSONB accessor
+   * });
+   *
+   * // Automatic determination - adapter will infer from columns
+   * const result = await adapter.fetchData({
+   *   columns: ['id', 'slug', 'status'], // All direct columns
+   * });
+   * ```
+   */
+  primaryTable?: string;
 
   /** Additional custom parameters */
   params?: Record<string, unknown>;

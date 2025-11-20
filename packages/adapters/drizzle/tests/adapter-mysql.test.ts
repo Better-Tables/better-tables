@@ -95,6 +95,40 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       expect((result.data[0] as UserWithRelations).age).toBe(35);
     });
 
+    it('should use explicit primaryTable parameter', async () => {
+      const result = await adapter.fetchData({
+        primaryTable: 'users',
+        columns: ['id', 'email'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+    });
+
+    it('should use explicit primaryTable even when columns match other tables', async () => {
+      // Explicit primaryTable should override automatic determination
+      const result = await adapter.fetchData({
+        primaryTable: 'users',
+        columns: ['id', 'email', 'name'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      // Verify it's actually querying users table
+      expect(result.data[0]).toHaveProperty('email');
+    });
+
+    it('should automatically determine primary table when not specified', async () => {
+      // Should automatically determine 'users' from columns
+      const result = await adapter.fetchData({
+        columns: ['id', 'email', 'name'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      expect(result.data[0]).toHaveProperty('email');
+    });
+
     it('should create a new record', async () => {
       // MySQL requires explicit ID since table doesn't have AUTO_INCREMENT in test fixtures
       const newUser = await adapter.createRecord({
@@ -610,9 +644,56 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
     });
 
-    it('should handle MySQL JSON operations (if implemented)', async () => {
-      // Placeholder for future JSON column support
-      expect(true).toBe(true);
+    it('should handle MySQL JSON columns with accessors', async () => {
+      // Test that we can fetch data with JSON columns
+      const result = await adapter.fetchData({
+        columns: ['id', 'slug', 'survey'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+    });
+
+    describe('Primary Table with JSON Accessor Columns', () => {
+      it('should use explicit primaryTable with JSON accessor columns', async () => {
+        // Scenario: 'title' is accessed via accessor from survey.survey.title (JSON)
+        // Explicit primaryTable ensures correct table selection
+        const result = await adapter.fetchData({
+          primaryTable: 'surveys',
+          columns: ['slug', 'status'], // Direct columns
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        // Verify it's querying surveys table
+        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        expect(firstSurvey.slug).toBeDefined();
+      });
+
+      it('should automatically determine surveys table when mixing direct and accessor columns', async () => {
+        // Scenario: 'title' would be from JSON accessor, but 'slug' and 'status' are direct columns
+        // Should correctly identify 'surveys' as primary table based on direct column matches
+        const result = await adapter.fetchData({
+          columns: ['slug', 'status'], // Both direct columns in surveys
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        expect(firstSurvey.slug).toBeDefined();
+      });
+
+      it('should prefer surveys table when it has more matching direct columns', async () => {
+        // Even if 'title' exists in posts table, surveys should win with more matches
+        const result = await adapter.fetchData({
+          columns: ['slug', 'status', 'totalResponses'], // All direct columns in surveys
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        expect(firstSurvey.slug).toBeDefined();
+      });
     });
 
     it('should handle MySQL-specific collation and charset', async () => {

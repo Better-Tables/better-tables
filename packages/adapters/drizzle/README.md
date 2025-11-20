@@ -268,6 +268,38 @@ const filters = [
 const result = await adapter.fetchData({ filters });
 ```
 
+### Primary Table Specification
+
+When working with JSONB accessor columns or ambiguous column names, you can explicitly specify the primary table:
+
+```typescript
+// Explicit primary table - recommended for clarity and to avoid ambiguity
+const result = await adapter.fetchData({
+  primaryTable: 'surveys',
+  columns: ['title', 'slug', 'status'],
+  // 'title' may be accessed via accessor from survey.survey.title (JSONB)
+  // Explicit primaryTable ensures correct table selection
+});
+
+// Automatic determination - adapter infers from columns
+const result = await adapter.fetchData({
+  columns: ['id', 'slug', 'status'], // All direct columns
+  // Adapter will automatically determine 'surveys' as primary table
+});
+```
+
+**When to use explicit `primaryTable`:**
+- When column IDs reference JSONB nested fields via accessors
+- When column IDs are ambiguous across multiple tables
+- When you want explicit control over table selection
+- For better code clarity and maintainability
+
+**Automatic determination:**
+- The adapter uses improved heuristics to determine the primary table
+- Prefers tables with the most matching direct columns
+- Falls back to first table when truly ambiguous
+- Works well when all columns are direct schema columns
+
 ### Aggregate Columns
 
 ```typescript
@@ -312,6 +344,9 @@ interface DrizzleAdapterConfig<TSchema> {
 #### Methods
 
 - `fetchData(params)` - Fetch data with filtering, sorting, and pagination
+  - `params.primaryTable?: string` - Explicit primary table specification (optional)
+  - When provided, uses the specified table as primary table
+  - When not provided, automatically determines primary table from columns
 - `getFilterOptions(columnId)` - Get available filter options for a column
 - `getFacetedValues(columnId)` - Get faceted values for a column
 - `getMinMaxValues(columnId)` - Get min/max values for number columns
