@@ -389,7 +389,7 @@ describe('FilterManager', () => {
       expect(result.error).toContain('not allowed');
     });
 
-    it('should reject filter with wrong value count', () => {
+    it('should reject filter with wrong value count in strict mode', () => {
       const filter: FilterState = {
         columnId: 'age',
         type: 'number',
@@ -397,9 +397,24 @@ describe('FilterManager', () => {
         values: [25], // Should be 2 values
       };
 
-      const result = filterManager.validateFilter(filter);
+      // In strict mode (for query execution), incomplete filters should be rejected
+      const result = filterManager.validateFilter(filter, true);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('exactly 2 values');
+    });
+
+    it('should allow filter with wrong value count in lenient mode', () => {
+      const filter: FilterState = {
+        columnId: 'age',
+        type: 'number',
+        operator: 'between',
+        values: [25], // Should be 2 values, but lenient mode allows incomplete
+      };
+
+      // In lenient mode (for UI editing), incomplete filters should be allowed with a warning
+      const result = filterManager.validateFilter(filter, false);
+      expect(result.valid).toBe(true);
+      expect(result.warning).toContain('needs 2 values');
     });
 
     it('should reject filter with values for no-value operator', () => {

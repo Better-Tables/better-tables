@@ -84,6 +84,8 @@ export function TextFilterInput<TData = unknown>({
   // Handle Enter key - commit the value
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
       commitValue();
     }
   };
