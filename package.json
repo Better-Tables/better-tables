@@ -27,7 +27,6 @@
     "lint:fix": "biome check --write .",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish",
     "release": "bun run build && changeset publish"
   },
   "devDependencies": {
