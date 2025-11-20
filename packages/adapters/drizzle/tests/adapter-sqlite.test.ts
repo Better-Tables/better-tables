@@ -192,5 +192,23 @@ describe('DrizzleAdapter - SQLite Integration', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('should reject filters with missing required values', async () => {
+      await expect(
+        adapter.fetchData({
+          filters: [{ columnId: 'name', type: 'text', operator: 'contains', values: [] }],
+        })
+      ).rejects.toThrow(/Invalid filter configuration/);
+    });
+
+    it('should reject filters with undefined values', async () => {
+      await expect(
+        adapter.fetchData({
+          filters: [
+            { columnId: 'name', type: 'text', operator: 'contains', values: [undefined] },
+          ],
+        })
+      ).rejects.toThrow(/Invalid filter configuration/);
+    });
   });
 });

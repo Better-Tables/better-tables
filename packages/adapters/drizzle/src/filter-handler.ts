@@ -683,11 +683,11 @@ export class FilterHandler {
 
           // If operator is supported by adapter, allow it even if core validation fails
           // This handles cases like notEquals for text columns, where core only defines it for numbers
-          if (isSupportedByAdapter) {
+          if (isSupportedByAdapter && validationResult === 'Unknown operator') {
             // Operator is supported by adapter, proceed with building condition
             // Skip core validation since adapter knows how to handle it
           } else if (typeof validationResult === 'string') {
-            // Operator is not supported by adapter, throw error
+            // Operator is not supported by adapter, or value validation failed - throw error
             if (validationResult === 'Unknown operator') {
               throw new QueryError(`Invalid filter operator: ${filter.operator}`, {
                 operator: filter.operator,
