@@ -396,8 +396,9 @@ export class FilterManager<TData = unknown> {
       typeof operatorDef.valueCount === 'number' &&
       filter.values.length !== operatorDef.valueCount
     ) {
-      // In lenient mode, allow incomplete filters with missing values for UI editing
-      if (!strict) {
+      // In lenient mode, allow incomplete filters with fewer values for UI editing
+      // but still reject filters with too many values
+      if (!strict && filter.values.length < operatorDef.valueCount) {
         return {
           valid: true,
           warning: `Filter incomplete - needs ${operatorDef.valueCount} values`,
