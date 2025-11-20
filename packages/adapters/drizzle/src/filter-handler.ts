@@ -678,8 +678,13 @@ export class FilterHandler {
         );
         if (validationResult !== true) {
           // Check if the operator is supported by this adapter even if core doesn't recognize it
-          const supportedOperators = this.getSupportedOperators(filter.type || 'text');
-          const isSupportedByAdapter = supportedOperators.includes(filter.operator);
+          // Only check adapter support if we have a valid filter type
+          // Without a type, we can't safely determine which operators are supported
+          let isSupportedByAdapter = false;
+          if (filter.type) {
+            const supportedOperators = this.getSupportedOperators(filter.type);
+            isSupportedByAdapter = supportedOperators.includes(filter.operator);
+          }
 
           // If operator is supported by adapter, allow it even if core validation fails
           // This handles cases like notEquals for text columns, where core only defines it for numbers
