@@ -697,27 +697,13 @@ export class FilterHandler {
               !hasValidValues ||
               (expectedCount > 0 && filter.values.some((v) => v === undefined))
             ) {
-              throw new QueryError(
-                `Invalid filter values for operator ${filter.operator}: expected ${expectedCount} valid values`,
-                {
-                  operator: filter.operator,
-                  values: filter.values,
-                }
-              );
+              // Skip invalid filters silently - this allows for partial filter states in UI
+              continue;
             }
           } else if (typeof validationResult === 'string') {
-            // Operator is not supported by adapter, throw error
-            if (validationResult === 'Unknown operator') {
-              throw new QueryError(`Invalid filter operator: ${filter.operator}`, {
-                operator: filter.operator,
-                error: validationResult,
-              });
-            } else {
-              throw new QueryError(`Invalid filter configuration: ${validationResult}`, {
-                operator: filter.operator,
-                error: validationResult,
-              });
-            }
+            // Operator is not supported by adapter or validation failed
+            // We skip these silently to allow for partial states
+            continue;
           } else {
             // Skip invalid filters silently for value validation errors
             continue;
