@@ -71,8 +71,9 @@ bun add @better-tables/adapters-drizzle  # or @better-tables/adapters-rest
 ```
 
 ### Your First Table
-
+ 
 ```tsx
+// TODO: UI package will a CLI and is on the roadmap
 import { BetterTable } from '@better-tables/ui';
 import { createColumnBuilder } from '@better-tables/core';
 
