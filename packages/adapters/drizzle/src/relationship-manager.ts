@@ -174,33 +174,51 @@ export class RelationshipManager {
     }
 
     if (parts.length === 2) {
-      // Single level relationship (e.g., "profile.bio")
-      const [relationshipName, fieldName] = parts;
+      // Could be a relationship (e.g., "profile.bio") or JSON accessor (e.g., "survey.title")
+      const [firstPart, fieldName] = parts;
 
-      if (!relationshipName || !fieldName) {
+      if (!firstPart || !fieldName) {
         throw new RelationshipError(`Invalid column path: ${columnId}`, {
           columnId,
           reason: 'Missing relationship or field name',
-          suggestion: 'Use format: relationship.field',
+          suggestion: 'Use format: relationship.field or column.field for JSON accessors',
         });
       }
 
+      // Check if firstPart is a column in the primary table (JSON accessor case)
+      // This handles JSON/JSONB accessor columns like "survey.title" where "survey" is a column
+      const primaryTableSchema = this.schema[primaryTable];
+      if (primaryTableSchema) {
+        const columnExists = (primaryTableSchema as unknown as Record<string, AnyColumnType>)[
+          firstPart
+        ];
+        if (columnExists) {
+          // It's a JSON accessor column (e.g., "survey.title" where "survey" is a column in "surveys" table)
+          // Return as a direct column path (not nested) with the base column name as field
+          // The full columnId ("survey.title") will be used by the query builder for JSON accessor handling
+          return {
+            columnId,
+            table: primaryTable,
+            field: firstPart, // Use the base column name (e.g., "survey") so getColumnReference can find it
+            isNested: false,
+          };
+        }
+      }
+
+      // Not a column, so it must be a relationship
       // Find the relationship from primary table to the relationship name
-      const relationshipKey = `${primaryTable}.${relationshipName}`;
+      const relationshipKey = `${primaryTable}.${firstPart}`;
       const relationship = this.relationships[relationshipKey];
 
       if (!relationship) {
         const availableRelationships = this.getAvailableRelationships(primaryTable);
-        throw new RelationshipError(
-          `No relationship found from ${primaryTable} to ${relationshipName}`,
-          {
-            primaryTable: primaryTable,
-            relationshipName,
-            columnId,
-            availableRelationships,
-            suggestion: this.findSimilarRelationship(relationshipName, availableRelationships),
-          }
-        );
+        throw new RelationshipError(`No relationship found from ${primaryTable} to ${firstPart}`, {
+          primaryTable: primaryTable,
+          relationshipName: firstPart,
+          columnId,
+          availableRelationships,
+          suggestion: this.findSimilarRelationship(firstPart, availableRelationships),
+        });
       }
 
       // Validate field exists in target table (use real table from relationship)
@@ -208,7 +226,7 @@ export class RelationshipManager {
 
       return {
         columnId,
-        table: relationshipName, // expose alias (e.g., "profile")
+        table: firstPart, // expose alias (e.g., "profile")
         field: fieldName,
         isNested: true,
         relationshipPath: [relationship],
@@ -582,10 +600,17 @@ export class RelationshipManager {
       return []; // No joins needed for main table columns
     }
 
-    // Build join path to the target table (map alias to real table)
-    const finalRelationship = columnPath.relationshipPath?.[columnPath.relationshipPath.length - 1];
-    const realTargetTable = finalRelationship?.to || columnPath.table;
-    const joinPath = this.getJoinPath(primaryTable, realTargetTable);
+    // Use the relationshipPath from columnPath if available (preserves explicit multi-level paths)
+    // This is important for multi-level relationships where the explicit path might differ from
+    // the shortest path (e.g., users->posts->comments vs users->comments if both exist)
+    const joinPath =
+      columnPath.relationshipPath && columnPath.relationshipPath.length > 0
+        ? columnPath.relationshipPath
+        : (() => {
+            // Fallback: calculate the join path from primaryTable to the target table
+            const realTargetTable = columnPath.table;
+            return this.getJoinPath(primaryTable, realTargetTable);
+          })();
 
     return joinPath.map((relationship) => {
       const table = this.schema[relationship.to];

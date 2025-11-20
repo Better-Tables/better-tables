@@ -116,13 +116,39 @@ describe('RelationshipManager', () => {
   });
 
   it('should get required joins for columns', () => {
-    const joins = manager.getRequiredJoinsForColumn(
-      manager.resolveColumnPath('profile.bio', 'users'),
-      'users'
-    );
+    const columnPath = manager.resolveColumnPath('profile.bio', 'users');
+    const joins = manager.getRequiredJoinsForColumn(columnPath, 'users');
 
     expect(joins).toBeDefined();
-    expect(joins.length).toBeGreaterThan(0);
+    expect(joins.length).toBe(1);
+    // Verify that the join structure is correct for a single-level relationship
+    // JoinConfig has: type, table, condition, alias
+    expect(joins[0]?.type).toBe('left');
+    expect(joins[0]?.table).toBeDefined();
+    expect(joins[0]?.condition).toBeDefined();
+    expect(joins[0]?.alias).toBeDefined();
+    // Verify the relationship path structure from columnPath
+    expect(columnPath.relationshipPath).toHaveLength(1);
+    expect(columnPath.relationshipPath?.[0]?.from).toBe('users');
+    expect(columnPath.relationshipPath?.[0]?.to).toBe('profiles');
+
+    // Verify multi-level relationship joins
+    const multiLevelPath = manager.resolveColumnPath('posts.comments.content', 'users');
+    const multiLevelJoins = manager.getRequiredJoinsForColumn(multiLevelPath, 'users');
+    expect(multiLevelJoins.length).toBe(2);
+    // Verify join configs are properly structured
+    expect(multiLevelJoins[0]?.type).toBe('left');
+    expect(multiLevelJoins[0]?.table).toBeDefined();
+    expect(multiLevelJoins[0]?.condition).toBeDefined();
+    expect(multiLevelJoins[1]?.type).toBe('left');
+    expect(multiLevelJoins[1]?.table).toBeDefined();
+    expect(multiLevelJoins[1]?.condition).toBeDefined();
+    // Verify the relationship path structure from columnPath
+    expect(multiLevelPath.relationshipPath).toHaveLength(2);
+    expect(multiLevelPath.relationshipPath?.[0]?.from).toBe('users');
+    expect(multiLevelPath.relationshipPath?.[0]?.to).toBe('posts');
+    expect(multiLevelPath.relationshipPath?.[1]?.from).toBe('posts');
+    expect(multiLevelPath.relationshipPath?.[1]?.to).toBe('comments');
   });
 
   it('should optimize join order', () => {

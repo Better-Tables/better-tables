@@ -635,54 +635,108 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
     });
 
     it('should handle PostgreSQL JSONB columns with accessors', async () => {
-      // Test that we can fetch data with JSONB columns
+      // Test that we can fetch data with JSONB accessor columns
+      // This verifies that JSONB accessor resolution (e.g., survey.title) actually works
       const result = await adapter.fetchData({
-        columns: ['id', 'slug', 'survey'],
+        columns: ['id', 'slug', 'survey.title'], // Include JSONB accessor column to test accessor resolution
       });
 
       expect(result.data).toBeDefined();
       expect(result.data.length).toBeGreaterThan(0);
+      // Verify that the JSONB accessor was properly resolved
+      const firstSurvey = result.data[0] as {
+        id?: number;
+        slug?: string;
+        survey?: { title?: string };
+      };
+      expect(firstSurvey.survey?.title).toBeDefined();
+      expect(firstSurvey.survey?.title).toBe('Vividness of Visual Imagery Questionnaire');
     });
 
     describe('Primary Table with JSONB Accessor Columns', () => {
       it('should use explicit primaryTable with JSONB accessor columns', async () => {
         // Scenario: 'title' is accessed via accessor from survey.survey.title (JSONB)
-        // Explicit primaryTable ensures correct table selection
+        // Explicit primaryTable ensures correct table selection even when accessor columns are used
         const result = await adapter.fetchData({
           primaryTable: 'surveys',
-          columns: ['slug', 'status'], // Direct columns
+          columns: ['slug', 'status', 'survey.title'], // Mix of direct columns and JSONB accessor
         });
 
         expect(result.data).toBeDefined();
         expect(result.data.length).toBeGreaterThan(0);
         // Verify it's querying surveys table
-        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        const firstSurvey = result.data[0] as {
+          slug?: string;
+          status?: string;
+          survey?: { title?: string };
+        };
         expect(firstSurvey.slug).toBeDefined();
+        // Verify JSONB accessor was properly resolved
+        expect(firstSurvey.survey?.title).toBeDefined();
+        expect(firstSurvey.survey?.title).toBe('Vividness of Visual Imagery Questionnaire');
       });
 
       it('should automatically determine surveys table when mixing direct and accessor columns', async () => {
         // Scenario: 'title' would be from JSONB accessor, but 'slug' and 'status' are direct columns
         // Should correctly identify 'surveys' as primary table based on direct column matches
         const result = await adapter.fetchData({
-          columns: ['slug', 'status'], // Both direct columns in surveys
+          columns: ['slug', 'status', 'survey.title'], // Mix of direct columns and JSONB accessor
         });
 
         expect(result.data).toBeDefined();
         expect(result.data.length).toBeGreaterThan(0);
-        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        const firstSurvey = result.data[0] as {
+          slug?: string;
+          status?: string;
+          survey?: { title?: string };
+        };
         expect(firstSurvey.slug).toBeDefined();
+        // Verify JSONB accessor was properly resolved
+        expect(firstSurvey.survey?.title).toBeDefined();
       });
 
       it('should prefer surveys table when it has more matching direct columns', async () => {
         // Even if 'title' exists in posts table, surveys should win with more matches
+        // Include JSONB accessor to test that accessor resolution works correctly
         const result = await adapter.fetchData({
-          columns: ['slug', 'status', 'totalResponses'], // All direct columns in surveys
+          columns: ['slug', 'status', 'totalResponses', 'survey.description'], // All direct columns in surveys + JSONB accessor
         });
 
         expect(result.data).toBeDefined();
         expect(result.data.length).toBeGreaterThan(0);
-        const firstSurvey = result.data[0] as { slug?: string; status?: string };
+        const firstSurvey = result.data[0] as {
+          slug?: string;
+          status?: string;
+          survey?: { description?: string };
+        };
         expect(firstSurvey.slug).toBeDefined();
+        // Verify JSONB accessor was properly resolved
+        expect(firstSurvey.survey?.description).toBeDefined();
+        expect(firstSurvey.survey?.description).toBe(
+          'Discover the vividness of your visual imagination.'
+        );
+      });
+
+      it('should resolve JSONB accessor columns when using only accessors', async () => {
+        // Test that accessor resolution works even when ONLY accessor columns are requested
+        // This verifies that accessor resolution is actually being exercised, not just table selection
+        const result = await adapter.fetchData({
+          primaryTable: 'surveys',
+          columns: ['survey.title', 'survey.description'], // Only JSONB accessor columns, no direct columns
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as {
+          survey?: { title?: string; description?: string };
+        };
+        // Verify JSONB accessor was properly resolved - this would fail if accessor resolution is broken
+        expect(firstSurvey.survey?.title).toBeDefined();
+        expect(firstSurvey.survey?.title).toBe('Vividness of Visual Imagery Questionnaire');
+        expect(firstSurvey.survey?.description).toBeDefined();
+        expect(firstSurvey.survey?.description).toBe(
+          'Discover the vividness of your visual imagination.'
+        );
       });
     });
 
