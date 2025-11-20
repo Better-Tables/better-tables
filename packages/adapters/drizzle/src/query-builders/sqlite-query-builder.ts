@@ -8,7 +8,7 @@
  * @since 1.0.0
  */
 
-import { count, isNotNull, max, min, type SQL } from 'drizzle-orm';
+import { count, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { RelationshipManager } from '../relationship-manager';
@@ -303,6 +303,48 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
     return this.asSQLiteQueryBuilder(
       query.where(isNotNull(sqliteColumn)).groupBy(sqliteColumn).orderBy(sqliteColumn)
     );
+  }
+
+  /**
+   * Override buildColumnSelections to handle JSON accessor columns
+   * For SQLite, we need to use json_extract() to extract nested JSON fields
+   */
+  protected buildColumnSelections(
+    columns: string[],
+    primaryTable: string
+  ): Record<string, AnyColumnType> {
+    const baseSelections = super.buildColumnSelections(columns, primaryTable);
+    const selections: Record<string, AnyColumnType> = { ...baseSelections };
+
+    // Process each column to detect and handle JSON accessors
+    for (const columnId of columns) {
+      // Check if this is a JSON accessor (contains dot but isNested is false)
+      if (columnId.includes('.')) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+        // If it's not nested but has a dot, it's a JSON accessor
+        if (!columnPath.isNested && columnPath.field) {
+          const parts = columnId.split('.');
+          if (parts.length === 2) {
+            const [baseColumnName, jsonField] = parts;
+            const columnReference = this.relationshipManager.getColumnReference(
+              columnPath,
+              primaryTable
+            );
+
+            if (columnReference && baseColumnName && jsonField) {
+              const sqliteColumn = this.asSQLiteColumn(columnReference.column);
+              // Use json_extract to extract the nested JSON field
+              // Format: json_extract(column, '$.field')
+              const jsonExtract = sql<string>`json_extract(${sqliteColumn}, ${`$.${jsonField}`})`;
+              selections[columnId] = jsonExtract as unknown as AnyColumnType;
+            }
+          }
+        }
+      }
+    }
+
+    return selections;
   }
 
   /**
