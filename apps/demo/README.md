@@ -29,7 +29,7 @@ A comprehensive demonstration of Better Tables with Drizzle adapter, showcasing 
 
 ### Prerequisites
 - Node.js 18+
-- pnpm 8+
+- Bun 1.3+
 
 ### Installation
 
@@ -37,13 +37,13 @@ From the monorepo root:
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Navigate to demo app
 cd apps/demo
 
 # Run the development server
-pnpm dev
+bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the demo.
@@ -51,8 +51,8 @@ Open [http://localhost:3000](http://localhost:3000) to view the demo.
 ### Build for Production
 
 ```bash
-pnpm build
-pnpm start
+bun run build
+bun run start
 ```
 
 ## Architecture

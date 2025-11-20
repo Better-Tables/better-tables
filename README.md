@@ -64,13 +64,10 @@ No manual query building. No JOIN syntax to memorize. Just define your columns, 
 
 ```bash
 # Core package
-pnpm add @better-tables/core
-
-# UI components (optional)
-pnpm add @better-tables/ui
+bun add @better-tables/core
 
 # Choose an adapter
-pnpm add @better-tables/adapters-drizzle  # or @better-tables/adapters-rest
+bun add @better-tables/adapters-drizzle  # or @better-tables/adapters-rest
 ```
 
 ### Your First Table
@@ -421,7 +418,7 @@ Better Tables is in active development, and we'd love your help! Whether you're 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests (`pnpm test`)
+4. Run tests (`bun run test`)
 5. Commit your changes (`git commit -m 'Add some amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request

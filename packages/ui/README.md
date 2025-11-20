@@ -17,6 +17,8 @@ npm install @better-tables/ui @better-tables/core
 yarn add @better-tables/ui @better-tables/core
 # or
 pnpm add @better-tables/ui @better-tables/core
+# or
+bun add @better-tables/ui @better-tables/core
 ```
 
 ## Setup
