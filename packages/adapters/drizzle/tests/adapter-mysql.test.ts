@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import type { DataEvent, FilterOperator } from '@better-tables/core';
+import type { DataEvent, FilterOperator, FilterState } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closeMySQLDatabase,
@@ -46,9 +46,10 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
   });
 
   beforeEach(async () => {
-    // Connect to the existing database (no creation, tables already exist)
+    // Connect to the existing database and reset tables with seed data for each test
     const { db, connection: mysqlConnection } = await createMySQLDatabase(connectionString);
     connection = mysqlConnection;
+    await setupMySQLDatabase(connection); // Reset tables and seed data for test isolation
     adapter = createMySQLAdapter(db);
   });
 
@@ -129,7 +130,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       await adapter.deleteRecord('99');
       const result = await adapter.fetchData({});
       expect(result.data).toHaveLength(3); // Original 3 users remain
-      expect(result.data.find((u: UserWithRelations) => u.id === 99)).toBeUndefined();
+      expect((result.data as UserWithRelations[]).find((u) => u.id === 99)).toBeUndefined();
     });
 
     it('should bulk update records', async () => {
@@ -163,7 +164,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['John'] }],
       });
       expect(result.data).toHaveLength(2); // 'John Doe' and 'Bob Johnson' both contain 'John'
-      const names = result.data.map((r: UserWithRelations) => r.name).sort();
+      const names = (result.data as UserWithRelations[]).map((r) => r.name).sort();
       expect(names).toContain('John Doe');
       expect(names).toContain('Bob Johnson');
     });
@@ -215,7 +216,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       // Just verify it returns data and doesn't crash
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
-      const names = result.data.map((r: UserWithRelations) => r.name);
+      const names = (result.data as UserWithRelations[]).map((r) => r.name);
       expect(names.length).toBeGreaterThan(0);
     });
 
@@ -248,7 +249,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'age', type: 'number', operator: 'notEquals', values: [30] }],
       });
       expect(result.data).toHaveLength(2);
-      const ages = result.data.map((r: UserWithRelations) => r.age);
+      const ages = (result.data as UserWithRelations[]).map((r) => r.age);
       expect(ages).not.toContain(30);
     });
 
@@ -316,13 +317,12 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
   describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
-      // Get current timestamp for exact match
-      const now = new Date();
+      // Use a future date that won't match any records
+      const futureDate = new Date(Date.now() + 86400000 * 365); // One year in the future
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [now] }],
+        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [futureDate] }],
       });
-      // This might be flaky due to exact timestamp matching
-      expect(result.data).toHaveLength(0); // No exact matches likely
+      expect(result.data).toHaveLength(0); // No records match future date
     });
 
     it('should filter by date isNot', async () => {
@@ -475,7 +475,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
+      const johnUser = (result.data as UserWithRelations[]).find((u) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).profile).toBeDefined();
       expect((johnUser as UserWithRelations).profile?.bio).toBe('Software developer');
     });
@@ -486,7 +486,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const johnUser = result.data.find((u: UserWithRelations) => u.name === 'John Doe');
+      const johnUser = (result.data as UserWithRelations[]).find((u) => u.name === 'John Doe');
       expect((johnUser as UserWithRelations).posts).toBeDefined();
       expect((johnUser as UserWithRelations).posts).toHaveLength(2);
     });
@@ -514,7 +514,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      const bobUser = result.data.find((u: UserWithRelations) => u.name === 'Bob Johnson');
+      const bobUser = (result.data as UserWithRelations[]).find((u) => u.name === 'Bob Johnson');
       expect((bobUser as UserWithRelations).profile).toBeNull();
     });
   });
@@ -605,7 +605,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       });
 
       expect(result.data).toHaveLength(3);
-      result.data.forEach((user: UserWithRelations) => {
+      (result.data as UserWithRelations[]).forEach((user) => {
         expect(user.name).toBeDefined();
       });
     });
@@ -677,26 +677,33 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
     });
 
     it('should handle invalid filter operators', async () => {
-      // Adapter handles invalid operators gracefully (returns all data)
-      const result = await adapter.fetchData({
-        filters: [
-          {
-            columnId: 'name',
-            type: 'text',
-            operator: 'invalidOp' as FilterOperator,
-            values: ['test'],
-          },
-        ],
-      });
-      // Should return data without crashing
-      expect(result.data).toBeDefined();
-      expect(Array.isArray(result.data)).toBe(true);
-    });
-
-    it('should handle invalid relationship paths', async () => {
+      // Adapter should throw an error for invalid operators
       await expect(
         adapter.fetchData({
-          columns: ['invalidRelation.field'],
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'invalidOp' as FilterOperator,
+              values: ['test'],
+            },
+          ],
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should throw error for invalid filter values', async () => {
+      // Test invalid values (e.g. undefined for contains)
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'contains',
+              values: [undefined], // Invalid value
+            } as unknown as FilterState,
+          ],
         })
       ).rejects.toThrow();
     });

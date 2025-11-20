@@ -6,7 +6,7 @@ import { SQLiteQueryBuilder } from '../src/query-builders/sqlite-query-builder';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
 import type { SQLiteQueryBuilderWithJoins } from '../src/types';
-import BunSQLiteCompat, { type Database } from './helpers/bun-sqlite-compat';
+import { Database } from 'bun:sqlite';
 
 // Test schema
 const users = sqliteTable('users', {
@@ -70,7 +70,7 @@ describe('SQLiteQueryBuilder', () => {
   let sqlite: Database;
 
   beforeEach(async () => {
-    sqlite = new BunSQLiteCompat(':memory:');
+    sqlite = new Database(':memory:');
     // Type assertion needed because Drizzle expects better-sqlite3 Database,
     // but at runtime Bun's SQLite should work similarly
     // @ts-expect-error - Drizzle expects better-sqlite3 Database, but Bun's SQLite is compatible at runtime
