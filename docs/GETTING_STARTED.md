@@ -742,9 +742,9 @@ const customRenderer = (
 
 ### Community
 
-- [GitHub Repository](https://github.com/yourusername/better-tables)
-- [Issues & Bug Reports](https://github.com/yourusername/better-tables/issues)
-- [Discussions](https://github.com/yourusername/better-tables/discussions)
+- [GitHub Repository](https://github.com/Better-Tables/better-tables)
+- [Issues & Bug Reports](https://github.com/Better-Tables/better-tables/issues)
+- [Discussions](https://github.com/Better-Tables/better-tables/discussions)
 
 ### Contributing
 
@@ -819,8 +819,8 @@ const [filters, setFilters] = useState<FilterState[]>([]);
 If you're still having issues:
 
 1. Check the [FAQ](./FAQ.md)
-2. Search [existing issues](https://github.com/yourusername/better-tables/issues)
-3. Create a [new issue](https://github.com/yourusername/better-tables/issues/new) with:
+2. Search [existing issues](https://github.com/Better-Tables/better-tables/issues)
+3. Create a [new issue](https://github.com/Better-Tables/better-tables/issues/new) with:
    - Code example
    - Error messages
    - Environment details

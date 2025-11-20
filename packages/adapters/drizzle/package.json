@@ -1,6 +1,6 @@
 {
   "name": "@better-tables/adapters-drizzle",
-  "version": "0.0.1",
+  "version": "0.5.0",
   "description": "Drizzle ORM adapter for Better Tables - Multi-database support with automatic relationship detection",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -67,11 +67,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/better-tables",
+    "url": "https://github.com/Better-Tables/better-tables",
     "directory": "packages/adapters/drizzle"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/better-tables/issues"
+    "url": "https://github.com/Better-Tables/better-tables/issues"
   },
-  "homepage": "https://github.com/yourusername/better-tables#readme"
+  "homepage": "https://github.com/Better-Tables/better-tables#readme"
 }

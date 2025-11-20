@@ -33,6 +33,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnpm-debug.log*
+bun-debug.log*
+bun-error.log*
+*.bun-debug
 
 # Local env files
 .env

@@ -9,7 +9,7 @@
       "**/.next/**",
       "**/build/**",
       "coverage/**",
-      "pnpm-lock.yaml",
+      "bun.lock",
       ".git/**"
     ]
   },

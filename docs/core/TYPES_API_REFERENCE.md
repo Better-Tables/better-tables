@@ -529,7 +529,7 @@ The type system includes comprehensive tests to ensure:
 Run type tests:
 
 ```bash
-pnpm test -- --grep "types"
+bun test -- --grep "types"
 ```
 
 ## Related Documentation

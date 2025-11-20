@@ -20,7 +20,7 @@ Thank you for your interest in contributing to Better Tables! This guide will he
 ### Prerequisites
 
 - Node.js 18+
-- pnpm 8+
+- Bun 1.3+
 - Git
 - Code editor (VS Code recommended)
 
@@ -30,7 +30,7 @@ Thank you for your interest in contributing to Better Tables! This guide will he
 2. Clone your fork locally:
 
 ```bash
-git clone https://github.com/yourusername/better-tables.git
+git clone https://github.com/Better-Tables/better-tables.git
 cd better-tables
 ```
 
@@ -46,36 +46,36 @@ git remote add upstream https://github.com/originalowner/better-tables.git
 
 ```bash
 # Install all dependencies
-pnpm install
+bun install
 
 # Install dependencies for specific package
 cd packages/core
-pnpm install
+bun install
 ```
 
 ### Development Scripts
 
 ```bash
 # Build all packages
-pnpm build
+bun run build
 
 # Build specific package
-cd packages/core && pnpm build
+cd packages/core && bun run build
 
 # Run tests
-pnpm test
+bun run test
 
 # Run tests for specific package
-cd packages/core && pnpm test
+cd packages/core && bun run test
 
 # Run linting
-pnpm lint
+bun run lint
 
 # Run type checking
-pnpm --filter @better-tables/core type-check
+bun --filter @better-tables/core type-check
 
 # Start development mode
-pnpm dev
+bun run dev
 ```
 
 ### Environment Setup
@@ -528,10 +528,10 @@ describe("Table Integration", () => {
 
 ```bash
 # Run tests with coverage
-pnpm --filter @better-tables/core test:coverage
+bun --filter @better-tables/core test:coverage
 
 # Generate coverage report
-pnpm test:coverage --reporter=html
+bun run test:coverage --reporter=html
 ```
 
 ## Pull Request Process
@@ -642,13 +642,13 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ```bash
 # Prepare release
-pnpm changeset
+bun run changeset
 
 # Version packages
-pnpm changeset version
+bun run changeset:version
 
 # Publish packages
-pnpm changeset publish
+bun run changeset:publish
 ```
 
 ## Code of Conduct

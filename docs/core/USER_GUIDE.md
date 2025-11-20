@@ -25,6 +25,8 @@ npm install @better-tables/core
 yarn add @better-tables/core
 # or
 pnpm add @better-tables/core
+# or
+bun add @better-tables/core
 ```
 
 ### Basic Usage
