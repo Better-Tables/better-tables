@@ -397,7 +397,7 @@ export class FilterManager<TData = unknown> {
       filter.values.length !== operatorDef.valueCount
     ) {
       // In lenient mode, allow incomplete filters with missing values for UI editing
-      if (!strict && filter.values.length === 0) {
+      if (!strict) {
         return {
           valid: true,
           warning: `Filter incomplete - needs ${operatorDef.valueCount} values`,
@@ -417,8 +417,10 @@ export class FilterManager<TData = unknown> {
       return { valid: false, error: `Operator ${filter.operator} requires at least one value` };
     }
 
-    // Run operator validation - only in strict mode or if values are present
-    if (strict || filter.values.length > 0) {
+    // Run operator validation - only in strict mode
+    // In lenient mode (UI), we allow invalid values (like min > max) to be persisted
+    // so the user can correct them without the filter disappearing
+    if (strict) {
       if (operatorDef.validate && !operatorDef.validate(filter.values)) {
         return { valid: false, error: `Invalid values for operator ${filter.operator}` };
       }

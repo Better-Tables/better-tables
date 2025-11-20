@@ -191,6 +191,8 @@ export function NumberFilterInput<TData = unknown>({
   // Handle Enter key - commit the value
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
       commitValue();
     } else if (e.key === 'Escape') {
       // Clear current input on escape
