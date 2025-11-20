@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import type { FilterOperator } from '@better-tables/core';
+import type { FilterOperator, FilterState } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closeDatabase,
@@ -188,6 +188,22 @@ describe('DrizzleAdapter - SQLite Integration', () => {
               operator: 'invalidOperator' as FilterOperator,
               values: ['test'],
             },
+          ],
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should throw error for invalid filter values', async () => {
+      // Test invalid values (e.g. undefined for contains)
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'contains',
+              values: [undefined], // Invalid value
+            } as unknown as FilterState,
           ],
         })
       ).rejects.toThrow();

@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import type { DataEvent, FilterOperator } from '@better-tables/core';
+import type { DataEvent, FilterOperator, FilterState } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closePostgresDatabase,
@@ -677,6 +677,22 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
               operator: 'invalidOp' as FilterOperator,
               values: ['test'],
             },
+          ],
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should throw error for invalid filter values', async () => {
+      // Test invalid values (e.g. undefined for contains)
+      await expect(
+        adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'contains',
+              values: [undefined], // Invalid value
+            } as unknown as FilterState,
           ],
         })
       ).rejects.toThrow();

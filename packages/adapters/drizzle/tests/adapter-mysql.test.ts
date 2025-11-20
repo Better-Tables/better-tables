@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import type { DataEvent, FilterOperator } from '@better-tables/core';
+import type { DataEvent, FilterOperator, FilterState } from '@better-tables/core';
 import type { UserWithRelations } from './helpers';
 import {
   closeMySQLDatabase,
@@ -692,10 +692,18 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       ).rejects.toThrow();
     });
 
-    it('should handle invalid relationship paths', async () => {
+    it('should throw error for invalid filter values', async () => {
+      // Test invalid values (e.g. undefined for contains)
       await expect(
         adapter.fetchData({
-          columns: ['invalidRelation.field'],
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'contains',
+              values: [undefined], // Invalid value
+            } as unknown as FilterState,
+          ],
         })
       ).rejects.toThrow();
     });
