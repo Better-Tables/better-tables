@@ -166,18 +166,18 @@ export function BetterTable<TData = unknown>({
   // Initialize store synchronously during render
   // The store creation is idempotent - it only creates once per ID
   // All state management is delegated to the TableStateManager
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Only create once per table ID
-  const store = useMemo(() => {
-    return getOrCreateTableStore(id, {
-      columns,
-      filters: initialFilters,
-      pagination: initialPagination,
-      sorting: initialSorting,
-      selectedRows: initialSelectedRows,
-    });
-  }, [id]); // Only depend on id - we don't want to recreate on every prop change
+  // Create store synchronously (not in useMemo) to ensure it exists before hooks run
+  // This fixes React Strict Mode issues where useMemo may not execute on first render
+  const store = getOrCreateTableStore(id, {
+    columns,
+    filters: initialFilters,
+    pagination: initialPagination,
+    sorting: initialSorting,
+    selectedRows: initialSelectedRows,
+  });
 
   // Subscribe to store state
+  // Store is guaranteed to exist now since we created it synchronously above
   const { filters, setFilters, clearFilters } = useTableFilters(id);
   const { pagination, setPage, setPageSize } = useTablePagination(id);
   const { sorting: sortingState, toggleSort, setSorting } = useTableSorting(id);
@@ -762,7 +762,7 @@ export function BetterTable<TData = unknown>({
       if (overId.startsWith('sort-drop-')) {
         // Extract target index from drop zone ID
         const dropMatch = overId.match(/sort-drop-(before|after)-(\d+)/);
-        if (dropMatch) {
+        if (dropMatch && dropMatch[1] && dropMatch[2]) {
           const position = dropMatch[1];
           const targetIndex = parseInt(dropMatch[2], 10);
 
@@ -770,8 +770,10 @@ export function BetterTable<TData = unknown>({
           const [removed] = newSorts.splice(oldIndex, 1);
 
           // Insert before or after the target index
-          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
-          newSorts.splice(insertIndex, 0, removed);
+          if (removed) {
+            const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+            newSorts.splice(insertIndex, 0, removed);
+          }
 
           setSorting(newSorts);
           return;
@@ -796,15 +798,17 @@ export function BetterTable<TData = unknown>({
       if (overId.startsWith('column-drop-')) {
         // Dropped on a column drop zone
         const dropMatch = overId.match(/column-drop-(before|after)-(\d+)/);
-        if (dropMatch) {
+        if (dropMatch?.[1] && dropMatch[2]) {
           const position = dropMatch[1];
           const targetIndex = parseInt(dropMatch[2], 10);
 
           newOrder = [...columnOrder];
           const [removed] = newOrder.splice(columnOrderIndex, 1);
 
-          const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
-          newOrder.splice(insertIndex, 0, removed);
+          if (removed) {
+            const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+            newOrder.splice(insertIndex, 0, removed);
+          }
           setColumnOrder(newOrder);
         }
       } else if (
