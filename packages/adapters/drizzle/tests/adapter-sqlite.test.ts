@@ -60,6 +60,40 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       expect((result.data[1] as UserWithRelations).age).toBe(30);
       expect((result.data[2] as UserWithRelations).age).toBe(25);
     });
+
+    it('should use explicit primaryTable parameter', async () => {
+      const result = await adapter.fetchData({
+        primaryTable: 'users',
+        columns: ['id', 'email'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+    });
+
+    it('should use explicit primaryTable even when columns match other tables', async () => {
+      // Explicit primaryTable should override automatic determination
+      const result = await adapter.fetchData({
+        primaryTable: 'users',
+        columns: ['id', 'email', 'name'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      // Verify it's actually querying users table
+      expect(result.data[0]).toHaveProperty('email');
+    });
+
+    it('should automatically determine primary table when not specified', async () => {
+      // Should automatically determine 'users' from columns
+      const result = await adapter.fetchData({
+        columns: ['id', 'email', 'name'],
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      expect(result.data[0]).toHaveProperty('email');
+    });
   });
 
   describe('Filtering Operations', () => {
@@ -167,7 +201,115 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       expect((result.data[0] as UserWithRelations).name).toBe('John Doe');
     });
   });
-  
+
+  describe('JSON Accessor Columns', () => {
+    it('should handle SQLite JSON text columns with accessors', async () => {
+      // Test that we can fetch data with JSON accessor columns
+      // This verifies that JSON accessor resolution (e.g., survey.title) actually works
+      const result = await adapter.fetchData({
+        columns: ['id', 'slug', 'survey.title'], // Include JSON accessor column to test accessor resolution
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.length).toBeGreaterThan(0);
+      // Verify that the JSON accessor was properly resolved
+      const firstSurvey = result.data[0] as {
+        id?: number;
+        slug?: string;
+        survey?: { title?: string };
+      };
+      expect(firstSurvey.survey?.title).toBeDefined();
+      expect(firstSurvey.survey?.title).toBe('Vividness of Visual Imagery Questionnaire');
+    });
+
+    describe('Primary Table with JSON Accessor Columns', () => {
+      it('should use explicit primaryTable with JSON accessor columns', async () => {
+        // Scenario: 'title' is accessed via accessor from survey.survey.title (JSON text)
+        // Explicit primaryTable ensures correct table selection even when accessor columns are used
+        const result = await adapter.fetchData({
+          primaryTable: 'surveys',
+          columns: ['slug', 'status', 'survey.title'], // Mix of direct columns and JSON accessor
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        // Verify it's querying surveys table
+        const firstSurvey = result.data[0] as {
+          slug?: string;
+          status?: string;
+          survey?: { title?: string };
+        };
+        expect(firstSurvey.slug).toBeDefined();
+        // Verify JSON accessor was properly resolved
+        expect(firstSurvey.survey?.title).toBeDefined();
+        expect(firstSurvey.survey?.title).toBe('Vividness of Visual Imagery Questionnaire');
+      });
+
+      it('should automatically determine surveys table when mixing direct and accessor columns', async () => {
+        // Scenario: 'title' would be from JSON accessor, but 'slug' and 'status' are direct columns
+        // Should correctly identify 'surveys' as primary table based on direct column matches
+        const result = await adapter.fetchData({
+          columns: ['slug', 'status', 'survey.title'], // Mix of direct columns and JSON accessor
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as {
+          slug?: string;
+          status?: string;
+          survey?: { title?: string };
+        };
+        expect(firstSurvey.slug).toBeDefined();
+        // Verify JSON accessor was properly resolved
+        expect(firstSurvey.survey?.title).toBeDefined();
+      });
+
+      it('should prefer surveys table when it has more matching direct columns', async () => {
+        // Even if 'title' exists in posts table, surveys should win with more matches
+        // Include JSON accessor to test that accessor resolution works correctly
+        const result = await adapter.fetchData({
+          columns: ['slug', 'status', 'totalResponses', 'survey.description'], // All direct columns in surveys + JSON accessor
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as {
+          slug?: string;
+          status?: string;
+          survey?: { description?: string };
+        };
+        expect(firstSurvey.slug).toBeDefined();
+        // Verify JSON accessor was properly resolved
+        expect(firstSurvey.survey?.description).toBeDefined();
+        expect(firstSurvey.survey?.description).toBe(
+          'Discover the vividness of your visual imagination.'
+        );
+      });
+
+      it('should resolve JSON accessor columns when using only accessors', async () => {
+        // Test that accessor resolution works even when ONLY accessor columns are requested
+        // This verifies that accessor resolution is actually being exercised, not just table selection
+        const result = await adapter.fetchData({
+          primaryTable: 'surveys',
+          columns: ['survey.title', 'survey.description'], // Only JSON accessor columns, no direct columns
+        });
+
+        expect(result.data).toBeDefined();
+        expect(result.data.length).toBeGreaterThan(0);
+        const firstSurvey = result.data[0] as {
+          survey?: { title?: string; description?: string };
+        };
+        // Verify JSON accessor was properly resolved - this would fail if accessor resolution is broken
+        expect(firstSurvey.survey?.title).toBeDefined();
+        expect(firstSurvey.survey?.title).toBe('Vividness of Visual Imagery Questionnaire');
+        expect(firstSurvey.survey?.description).toBeDefined();
+        expect(firstSurvey.survey?.description).toBe(
+          'Discover the vividness of your visual imagination.'
+        );
+      });
+    });
+  });
+
   // TODO: Enable strict validation for invalid filter operators
   //
   // Skipped because URL-synced filters may contain invalid/partial states that

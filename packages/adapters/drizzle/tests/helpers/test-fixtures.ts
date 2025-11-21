@@ -38,7 +38,7 @@ export function createSQLiteDatabase(): {
 } {
   const sqlite = new Database(':memory:');
 
-  // Key: explicitly use generic — no casting needed!
+  // Key: explicitly use generic - no casting needed!
   const db = drizzleSQLite<typeof schema>(sqlite, { schema });
 
   return { db, sqlite };
@@ -87,6 +87,20 @@ export async function setupSQLiteDatabase(db: BunSQLiteDatabase): Promise<void> 
     );
   `);
 
+  await db.run(`
+    CREATE TABLE surveys (
+      id INTEGER PRIMARY KEY,
+      slug TEXT NOT NULL,
+      status TEXT NOT NULL,
+      survey TEXT,
+      survey_object TEXT,
+      survey_stats TEXT,
+      total_responses INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+  `);
+
   const now = Date.now();
 
   await db.run(`
@@ -115,6 +129,51 @@ export async function setupSQLiteDatabase(db: BunSQLiteDatabase): Promise<void> 
       (2, 1, 3, 'I agree'),
       (3, 3, 1, 'Nice design tips');
   `);
+
+  // Insert survey test data with JSON content
+  const survey1Json = JSON.stringify({
+    title: 'Vividness of Visual Imagery Questionnaire',
+    description: 'Discover the vividness of your visual imagination.',
+    pages: [
+      {
+        name: 'introduction',
+        elements: [
+          {
+            type: 'html',
+            name: 'vviq_introduction_html',
+            html: "<h2>How vivid is your mind's eye?</h2>",
+          },
+        ],
+      },
+    ],
+  });
+
+  const survey2Json = JSON.stringify({
+    title: 'Personality Assessment',
+    description: 'Assess your personality traits.',
+    pages: [
+      {
+        name: 'questions',
+        elements: [
+          {
+            type: 'radiogroup',
+            name: 'personality_question_1',
+            title: 'How would you describe yourself?',
+          },
+        ],
+      },
+    ],
+  });
+
+  // Escape single quotes in JSON strings for SQL
+  const survey1JsonEscaped = survey1Json.replace(/'/g, "''");
+  const survey2JsonEscaped = survey2Json.replace(/'/g, "''");
+
+  await db.run(`
+    INSERT INTO surveys (id, slug, status, survey, total_responses, created_at, updated_at) VALUES
+      (1, 'vviq', 'published', '${survey1JsonEscaped}', 2608049, ${now}, ${now}),
+      (2, 'personality', 'draft', '${survey2JsonEscaped}', 0, ${now}, ${now})
+  `);
 }
 
 export function createSQLiteAdapter(
@@ -130,8 +189,8 @@ export function createSQLiteAdapter(
    * (`bun:sqlite` + `drizzle-orm/bun-sqlite`), which produces a different
    * database instance type.
    *
-   * To keep the adapter typing compatible — without modifying the
-   * adapter's public API — we cast the Bun SQLite database to the
+   * To keep the adapter typing compatible - without modifying the
+   * adapter's public API - we cast the Bun SQLite database to the
    * BetterSQLite3-based `DrizzleDatabase<'sqlite'>` type.
    *
    * This is safe **only** because:
@@ -248,6 +307,7 @@ export function createPostgresDatabase(connectionString: string): {
  */
 export async function setupPostgresDatabase(db: PostgresJsDatabase<typeof schema>): Promise<void> {
   // Drop tables if they exist (for clean test runs)
+  await db.execute(sql`DROP TABLE IF EXISTS surveys CASCADE`);
   await db.execute(sql`DROP TABLE IF EXISTS comments CASCADE`);
   await db.execute(sql`DROP TABLE IF EXISTS posts CASCADE`);
   await db.execute(sql`DROP TABLE IF EXISTS profiles CASCADE`);
@@ -284,6 +344,18 @@ export async function setupPostgresDatabase(db: PostgresJsDatabase<typeof schema
     content TEXT NOT NULL
   )`);
 
+  await db.execute(sql`CREATE TABLE surveys (
+    id INTEGER PRIMARY KEY,
+    slug TEXT NOT NULL,
+    status TEXT NOT NULL,
+    survey JSONB,
+    survey_object JSONB,
+    survey_stats JSONB,
+    total_responses INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+  )`);
+
   // Insert test data
   const now = new Date();
   // Convert Date to ISO string for PostgreSQL compatibility
@@ -306,6 +378,51 @@ export async function setupPostgresDatabase(db: PostgresJsDatabase<typeof schema
     (1, 1, 2, 'Great post!'),
     (2, 1, 3, 'I agree'),
     (3, 3, 1, 'Nice design tips')`);
+
+  // Insert survey test data with JSONB content
+  const survey1Json = {
+    title: 'Vividness of Visual Imagery Questionnaire',
+    description: 'Discover the vividness of your visual imagination.',
+    pages: [
+      {
+        name: 'introduction',
+        elements: [
+          {
+            type: 'html',
+            name: 'vviq_introduction_html',
+            html: "<h2>How vivid is your mind's eye?</h2>",
+          },
+        ],
+      },
+    ],
+  };
+
+  const survey2Json = {
+    title: 'Personality Assessment',
+    description: 'Assess your personality traits.',
+    pages: [
+      {
+        name: 'questions',
+        elements: [
+          {
+            type: 'radiogroup',
+            name: 'personality_question_1',
+            title: 'How would you describe yourself?',
+          },
+        ],
+      },
+    ],
+  };
+
+  // Insert survey test data with JSONB content
+  const survey1JsonStr = JSON.stringify(survey1Json);
+  const survey2JsonStr = JSON.stringify(survey2Json);
+
+  await db.execute(
+    sql`INSERT INTO surveys (id, slug, status, survey, total_responses, created_at, updated_at) VALUES 
+      (1, 'vviq', 'published', ${survey1JsonStr}::jsonb, 2608049, ${nowTimestamp}, ${nowTimestamp}),
+      (2, 'personality', 'draft', ${survey2JsonStr}::jsonb, 0, ${nowTimestamp}, ${nowTimestamp})`
+  );
 }
 
 /**
@@ -447,6 +564,7 @@ export async function createMySQLDatabase(connectionString: string): Promise<{
  */
 export async function setupMySQLDatabase(connection: mysql.Connection): Promise<void> {
   // Drop tables if they exist (for clean test runs) - use query for DDL
+  await connection.query('DROP TABLE IF EXISTS surveys');
   await connection.query('DROP TABLE IF EXISTS comments');
   await connection.query('DROP TABLE IF EXISTS posts');
   await connection.query('DROP TABLE IF EXISTS profiles');
@@ -487,6 +605,18 @@ export async function setupMySQLDatabase(connection: mysql.Connection): Promise<
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`);
 
+  await connection.query(`CREATE TABLE surveys (
+    id INT PRIMARY KEY,
+    slug VARCHAR(255) NOT NULL,
+    status VARCHAR(255) NOT NULL,
+    survey JSON,
+    survey_object JSON,
+    survey_stats JSON,
+    total_responses INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+  )`);
+
   // Insert test data
   const now = new Date();
   const nowTimestamp = now.toISOString().slice(0, 19).replace('T', ' '); // MySQL datetime format
@@ -508,6 +638,49 @@ export async function setupMySQLDatabase(connection: mysql.Connection): Promise<
     (1, 1, 2, 'Great post!'),
     (2, 1, 3, 'I agree'),
     (3, 3, 1, 'Nice design tips')`);
+
+  // Insert survey test data with JSON content
+  const survey1Json = JSON.stringify({
+    title: 'Vividness of Visual Imagery Questionnaire',
+    description: 'Discover the vividness of your visual imagination.',
+    pages: [
+      {
+        name: 'introduction',
+        elements: [
+          {
+            type: 'html',
+            name: 'vviq_introduction_html',
+            html: "<h2>How vivid is your mind's eye?</h2>",
+          },
+        ],
+      },
+    ],
+  });
+
+  const survey2Json = JSON.stringify({
+    title: 'Personality Assessment',
+    description: 'Assess your personality traits.',
+    pages: [
+      {
+        name: 'questions',
+        elements: [
+          {
+            type: 'radiogroup',
+            name: 'personality_question_1',
+            title: 'How would you describe yourself?',
+          },
+        ],
+      },
+    ],
+  });
+
+  // Escape single quotes in JSON strings for SQL
+  const survey1JsonEscaped = survey1Json.replace(/'/g, "''");
+  const survey2JsonEscaped = survey2Json.replace(/'/g, "''");
+
+  await connection.query(`INSERT INTO surveys (id, slug, status, survey, total_responses, created_at, updated_at) VALUES 
+    (1, 'vviq', 'published', '${survey1JsonEscaped}', 2608049, '${nowTimestamp}', '${nowTimestamp}'),
+    (2, 'personality', 'draft', '${survey2JsonEscaped}', 0, '${nowTimestamp}', '${nowTimestamp}')`);
 }
 
 /**

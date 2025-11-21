@@ -8,7 +8,7 @@
  * @since 1.0.0
  */
 
-import { count, countDistinct, isNotNull, max, min, type SQL } from 'drizzle-orm';
+import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { RelationshipManager } from '../relationship-manager';
@@ -369,5 +369,47 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     }
 
     return this.asPostgresQueryBuilder(query.where(isNotNull(pgColumn)));
+  }
+
+  /**
+   * Override buildColumnSelections to handle JSON accessor columns
+   * For PostgreSQL, we need to use the ->> operator to extract nested JSONB fields
+   */
+  protected buildColumnSelections(
+    columns: string[],
+    primaryTable: string
+  ): Record<string, AnyColumnType> {
+    const baseSelections = super.buildColumnSelections(columns, primaryTable);
+    const selections: Record<string, AnyColumnType> = { ...baseSelections };
+
+    // Process each column to detect and handle JSON accessors
+    for (const columnId of columns) {
+      // Check if this is a JSON accessor (contains dot but isNested is false)
+      if (columnId.includes('.')) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+        // If it's not nested but has a dot, it's a JSON accessor
+        if (!columnPath.isNested && columnPath.field) {
+          const parts = columnId.split('.');
+          if (parts.length === 2) {
+            const [baseColumnName, jsonField] = parts;
+            const columnReference = this.relationshipManager.getColumnReference(
+              columnPath,
+              primaryTable
+            );
+
+            if (columnReference && baseColumnName && jsonField) {
+              const pgColumn = this.asPgColumn(columnReference.column);
+              // Use ->> operator to extract the nested JSONB field as text
+              // Format: column->>'field'
+              const jsonExtract = sql<string>`${pgColumn}->>${jsonField}`;
+              selections[columnId] = jsonExtract as unknown as AnyColumnType;
+            }
+          }
+        }
+      }
+    }
+
+    return selections;
   }
 }

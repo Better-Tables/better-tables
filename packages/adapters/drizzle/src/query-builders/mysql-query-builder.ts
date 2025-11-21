@@ -8,7 +8,7 @@
  * @since 1.0.0
  */
 
-import { count, isNotNull, max, min, type SQL } from 'drizzle-orm';
+import { count, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { MySqlColumn, MySqlTable } from 'drizzle-orm/mysql-core';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { RelationshipManager } from '../relationship-manager';
@@ -361,5 +361,47 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
     }
 
     return this.asMySQLQueryBuilder(query.where(isNotNull(mysqlColumn)));
+  }
+
+  /**
+   * Override buildColumnSelections to handle JSON accessor columns
+   * For MySQL, we need to use JSON_EXTRACT() or -> operator to extract nested JSON fields
+   */
+  protected buildColumnSelections(
+    columns: string[],
+    primaryTable: string
+  ): Record<string, AnyColumnType> {
+    const baseSelections = super.buildColumnSelections(columns, primaryTable);
+    const selections: Record<string, AnyColumnType> = { ...baseSelections };
+
+    // Process each column to detect and handle JSON accessors
+    for (const columnId of columns) {
+      // Check if this is a JSON accessor (contains dot but isNested is false)
+      if (columnId.includes('.')) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+        // If it's not nested but has a dot, it's a JSON accessor
+        if (!columnPath.isNested && columnPath.field) {
+          const parts = columnId.split('.');
+          if (parts.length === 2) {
+            const [baseColumnName, jsonField] = parts;
+            const columnReference = this.relationshipManager.getColumnReference(
+              columnPath,
+              primaryTable
+            );
+
+            if (columnReference && baseColumnName && jsonField) {
+              const mysqlColumn = this.asMySqlColumn(columnReference.column);
+              // Use JSON_EXTRACT to extract the nested JSON field
+              // Format: JSON_EXTRACT(column, '$.field')
+              const jsonExtract = sql<string>`JSON_EXTRACT(${mysqlColumn}, ${`$.${jsonField}`})`;
+              selections[columnId] = jsonExtract as unknown as AnyColumnType;
+            }
+          }
+        }
+      }
+    }
+
+    return selections;
   }
 }

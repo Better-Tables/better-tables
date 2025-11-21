@@ -168,16 +168,26 @@ export class DataTransformer {
     // Process each column to build nested structure
     if (columns && columns.length > 0) {
       // Group columns by relationship to avoid processing the same relationship multiple times
+      // But JSON accessor columns (e.g., survey.title) need to be processed individually
       const processedRelationships = new Set<string>();
 
       for (const columnId of columns) {
         const parts = columnId.split('.');
         if (parts.length > 1) {
-          // This is a relationship column - use first part as relationship key
-          const relationshipKey = parts[0];
-          if (relationshipKey && !processedRelationships.has(relationshipKey)) {
+          // Check if this is a JSON accessor column (not a relationship)
+          const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+          if (!columnPath.isNested) {
+            // This is a JSON accessor column - process it individually
+            // JSON accessors like survey.title and survey.description both need to be processed
             this.processColumn(nestedRecord, columnId, records, primaryTable);
-            processedRelationships.add(relationshipKey);
+          } else {
+            // This is a relationship column - use first part as relationship key
+            const relationshipKey = parts[0];
+            if (relationshipKey && !processedRelationships.has(relationshipKey)) {
+              this.processColumn(nestedRecord, columnId, records, primaryTable);
+              processedRelationships.add(relationshipKey);
+            }
           }
         } else {
           // Direct column - process normally
@@ -219,6 +229,29 @@ export class DataTransformer {
     const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
 
     if (!columnPath.isNested) {
+      // Check if this is a JSON accessor column (e.g., "survey.title")
+      if (columnId.includes('.')) {
+        const parts = columnId.split('.');
+        if (parts.length === 2) {
+          const [baseColumnName, jsonField] = parts;
+          if (baseColumnName && jsonField) {
+            // This is a JSON accessor - extract value and nest it
+            const firstRecord = records[0];
+            if (firstRecord && firstRecord[columnId] !== undefined) {
+              // Initialize the nested object if it doesn't exist
+              if (
+                !nestedRecord[baseColumnName] ||
+                typeof nestedRecord[baseColumnName] !== 'object'
+              ) {
+                nestedRecord[baseColumnName] = {};
+              }
+              // Set the extracted JSON field value
+              const nestedObj = nestedRecord[baseColumnName] as Record<string, unknown>;
+              nestedObj[jsonField] = firstRecord[columnId];
+            }
+          }
+        }
+      }
       // Direct column - already in base record
       return;
     }
