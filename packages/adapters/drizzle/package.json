@@ -16,8 +16,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -42,9 +42,9 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "dotenv": "^17.2.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tsup": "^8.5.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:"
   },
   "publishConfig": {
