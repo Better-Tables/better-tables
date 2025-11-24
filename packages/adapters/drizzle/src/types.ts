@@ -80,6 +80,26 @@ export type AnyTableType = SQLiteTable | PgTable | MySqlTable;
 export type AnyColumnType = AnyColumn;
 
 /**
+ * Union type for column references or SQL expressions.
+ * Used when a filter condition can operate on either a direct column
+ * or a computed SQL expression (e.g., JSONB field extraction).
+ *
+ * @description
+ * This type enables filter handlers to work with both:
+ * - Direct column references: `users.email`
+ * - SQL expressions: `users.metadata->>'title'` (JSONB extraction)
+ *
+ * @example
+ * ```typescript
+ * const column: ColumnOrExpression = users.email; // Direct column
+ * const expression: ColumnOrExpression = sql`${users.metadata}->>'title'`; // SQL expression
+ * ```
+ *
+ * @since 1.0.0
+ */
+export type ColumnOrExpression = AnyColumnType | SQL | SQLWrapper;
+
+/**
  * Primary key information extracted from a Drizzle table schema.
  *
  * @interface PrimaryKeyInfo

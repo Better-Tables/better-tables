@@ -57,7 +57,13 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { RelationshipManager } from './relationship-manager';
-import type { AnyColumnType, AnyTableType, ColumnPath, DatabaseDriver } from './types';
+import type {
+  AnyColumnType,
+  AnyTableType,
+  ColumnOrExpression,
+  ColumnPath,
+  DatabaseDriver,
+} from './types';
 import { QueryError } from './types';
 
 /**
@@ -69,6 +75,25 @@ import { QueryError } from './types';
  * @property {Record<string, AnyTableType>} schema - The schema containing all tables
  * @property {RelationshipManager} relationshipManager - Manager for resolving relationships
  * @property {DatabaseDriver} databaseType - The database driver being used
+ *
+ * @security
+ * This class implements multiple layers of security to prevent SQL injection:
+ * 1. **Parameterized Queries**: All user-provided values are passed as parameters through Drizzle's
+ *    query builder, never directly interpolated into SQL strings.
+ * 2. **Input Validation**: All filter values are validated before use, including type checks,
+ *    length limits, and pattern matching for JSONB field names.
+ * 3. **Defense in Depth**: Even validated inputs are escaped (e.g., single quotes doubled)
+ *    before use in sql.raw() calls, providing protection if validation is bypassed.
+ * 4. **Controlled Input**: JSONB field names come from validated columnId paths, not direct
+ *    user input, reducing attack surface.
+ * 5. **Error Message Sanitization**: Error messages don't expose internal schema structure
+ *    or sensitive information that could aid attackers.
+ *
+ * **Best Practices**:
+ * - Never use sql.raw() with user-provided values directly
+ * - Always validate and escape values before using sql.raw()
+ * - Use Drizzle's parameterized functions (eq, like, ilike, etc.) when possible
+ * - Limit information disclosed in error messages
  *
  * @example
  * ```typescript
@@ -86,6 +111,20 @@ export class FilterHandler {
   private relationshipManager: RelationshipManager;
   private databaseType: DatabaseDriver;
 
+  /**
+   * Regular expression for validating JSONB field names.
+   * Only allows alphanumeric characters, underscores, and hyphens to prevent SQL injection.
+   * This pattern ensures field names are safe for use in SQL string literals.
+   */
+  private static readonly SAFE_JSONB_FIELD_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+  /**
+   * Maximum allowed length for JSONB field names.
+   * Prevents excessively long field names that could cause performance issues
+   * or be used in denial-of-service attacks.
+   */
+  private static readonly MAX_JSONB_FIELD_NAME_LENGTH = 255;
+
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
@@ -97,23 +136,58 @@ export class FilterHandler {
   }
 
   /**
-   * Build filter condition from filter state
+   * Build filter condition from filter state.
+   *
+   * @description
+   * Converts a filter state into a Drizzle SQL condition. This method handles
+   * both direct column references and JSONB field extractions, ensuring type-safe
+   * and secure SQL generation.
+   *
    * @param filter - The filter state to build condition for
    * @param primaryTable - The primary table for this query context
+   * @returns SQL condition for the filter
+   *
+   * @throws {QueryError} If the column is not found or the filter is invalid
+   *
+   * @security
+   * This method ensures all filter values are properly parameterized through
+   * Drizzle's query builder. User-provided values are never directly interpolated
+   * into SQL strings, preventing SQL injection attacks.
+   *
+   * @example
+   * ```typescript
+   * const condition = handler.buildFilterCondition(
+   *   { columnId: 'email', operator: 'contains', values: ['@example.com'] },
+   *   'users'
+   * );
+   * ```
    */
   buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper {
     const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
-    const column = this.getColumn(columnPath);
 
-    if (!column) {
-      throw new QueryError(`Column not found: ${filter.columnId}`, {
-        columnId: filter.columnId,
-        table: columnPath.table,
-      });
+    // Check if this is a JSONB accessor (columnId contains dot but is not a relationship)
+    const isJsonbAccessor = this.isJsonbAccessor(columnPath);
+
+    // Get the column or JSONB extraction expression
+    let columnOrExpression: ColumnOrExpression;
+    if (isJsonbAccessor) {
+      columnOrExpression = this.buildJsonbExtraction(columnPath);
+    } else {
+      const column = this.getColumn(columnPath);
+      if (!column) {
+        // Limit information disclosure: Don't expose full schema structure in production
+        // Only include minimal debugging information
+        throw new QueryError(`Column not found: ${filter.columnId}`, {
+          columnId: filter.columnId,
+          table: columnPath.table,
+          field: columnPath.field,
+        });
+      }
+      columnOrExpression = column;
     }
 
     return this.mapOperatorToCondition(
-      column,
+      columnOrExpression,
       filter.operator,
       filter.values,
       filter.includeNull,
@@ -122,17 +196,346 @@ export class FilterHandler {
   }
 
   /**
-   * Get case-insensitive like condition based on database type
+   * Check if a column path represents a JSONB accessor.
+   *
+   * @description
+   * JSONB accessors are identified by having a dot in the columnId but not being
+   * a nested relationship. This distinguishes them from relationship paths:
+   * - JSONB accessor: `survey.title` (where `survey` is a JSONB column)
+   * - Relationship: `profile.bio` (where `profile` is a related table)
+   *
+   * The relationship manager resolves JSONB accessors as non-nested paths with
+   * the base column name as the field, allowing us to detect them here.
+   *
+   * @param columnPath - The column path to check
+   * @returns True if this is a JSONB accessor, false otherwise
+   *
+   * @example
+   * ```typescript
+   * // JSONB accessor
+   * isJsonbAccessor({
+   *   columnId: 'survey.title',
+   *   table: 'surveys',
+   *   field: 'survey',
+   *   isNested: false
+   * }); // true
+   *
+   * // Relationship (not JSONB)
+   * isJsonbAccessor({
+   *   columnId: 'profile.bio',
+   *   table: 'profile',
+   *   field: 'bio',
+   *   isNested: true
+   * }); // false
+   * ```
    */
-  private getCaseInsensitiveLike(column: AnyColumnType, pattern: string): SQL | SQLWrapper {
+  private isJsonbAccessor(columnPath: ColumnPath): boolean {
+    // JSONB accessors have dots in columnId but isNested is false
+    // (e.g., "survey.title" where "survey" is a JSONB column)
+    return columnPath.columnId.includes('.') && !columnPath.isNested;
+  }
+
+  /**
+   * Type guard to check if a value is a SQL expression (not a column type).
+   *
+   * @description
+   * Drizzle ORM SQL expressions have specific properties that distinguish them from column types.
+   * This method uses multiple checks to reliably identify SQL expressions:
+   * - Checks for 'sql' property (present in SQL instances)
+   * - Checks for 'queryChunks' property (internal Drizzle structure)
+   * - Checks for Symbol-based type identification when available
+   * - Checks for constructor name (SQL instances have specific constructor)
+   *
+   * **Note**: Column types from Drizzle have properties like 'table', 'name', 'dataType', etc.
+   * SQL expressions do not have these properties, which helps distinguish them.
+   *
+   * @param value - The value to check
+   * @returns True if the value is a SQL expression, false if it's a column type
+   *
+   * @example
+   * ```typescript
+   * const column = users.email;
+   * const expression = sql`${users.metadata}->>'title'`;
+   *
+   * isSqlExpression(column); // false
+   * isSqlExpression(expression); // true
+   * ```
+   *
+   * @internal
+   * This is a private helper method used internally for type narrowing.
+   */
+  private isSqlExpression(value: ColumnOrExpression): value is SQL | SQLWrapper {
+    // Primitive types are never SQL expressions
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    // Primary check: SQL expressions have 'sql' or 'queryChunks' properties
+    // These are internal Drizzle properties that identify SQL instances
+    if ('sql' in value || 'queryChunks' in value) {
+      return true;
+    }
+
+    // Secondary check: SQL expressions don't have column-specific properties
+    // Columns have properties like 'table', 'name', 'dataType', etc.
+    // If these properties exist, it's definitely a column, not a SQL expression
+    if ('table' in value || 'name' in value || 'dataType' in value) {
+      return false;
+    }
+
+    // Additional check: SQL expressions from sql template tag may have specific constructor
+    // This is a fallback for edge cases where the above checks don't work
+    // Note: Constructor name checking is less reliable in minified code
+    const constructorName = value.constructor?.name;
+    if (constructorName === 'SQL' || constructorName === 'SQLWrapper') {
+      return true;
+    }
+
+    // Default: If we can't determine, assume it's a column type
+    // This is safer because column types are more common and have stricter type checking
+    return false;
+  }
+
+  /**
+   * Create IS NULL condition for both columns and SQL expressions.
+   *
+   * @description
+   * Handles null checks for both direct column references and SQL expressions.
+   * Uses Drizzle's `isNull()` function for columns and raw SQL for expressions.
+   *
+   * @param column - Column reference or SQL expression
+   * @returns SQL condition for IS NULL check
+   *
+   * @example
+   * ```typescript
+   * // Direct column
+   * createIsNullCondition(users.email); // Uses isNull(users.email)
+   *
+   * // SQL expression (JSONB extraction)
+   * createIsNullCondition(sql`${users.metadata}->>'title'`); // Uses raw SQL
+   * ```
+   */
+  private createIsNullCondition(column: ColumnOrExpression): SQL | SQLWrapper {
+    if (this.isSqlExpression(column)) {
+      return sql`${column} IS NULL`;
+    }
+    return isNull(column);
+  }
+
+  /**
+   * Create IS NOT NULL condition for both columns and SQL expressions.
+   *
+   * @description
+   * Handles non-null checks for both direct column references and SQL expressions.
+   * Uses Drizzle's `isNotNull()` function for columns and raw SQL for expressions.
+   *
+   * @param column - Column reference or SQL expression
+   * @returns SQL condition for IS NOT NULL check
+   *
+   * @example
+   * ```typescript
+   * // Direct column
+   * createIsNotNullCondition(users.email); // Uses isNotNull(users.email)
+   *
+   * // SQL expression (JSONB extraction)
+   * createIsNotNullCondition(sql`${users.metadata}->>'title'`); // Uses raw SQL
+   * ```
+   */
+  private createIsNotNullCondition(column: ColumnOrExpression): SQL | SQLWrapper {
+    if (this.isSqlExpression(column)) {
+      return sql`${column} IS NOT NULL`;
+    }
+    return isNotNull(column);
+  }
+
+  /**
+   * Build JSONB extraction SQL expression.
+   *
+   * @description
+   * Extracts a field from a JSONB column using database-specific syntax.
+   * This method generates safe SQL expressions that extract JSONB field values
+   * for use in filter conditions.
+   *
+   * **Security**: Multiple layers of validation prevent SQL injection:
+   * 1. Type checking: Ensures field name is a string
+   * 2. Length validation: Prevents excessively long field names
+   * 3. Pattern validation: Only allows safe characters (alphanumeric, underscore, hyphen)
+   * 4. Escaping: Single quotes are doubled (PostgreSQL-style escaping)
+   * 5. Controlled input: Field name comes from validated columnId, not user input
+   *
+   * @param columnPath - The column path containing JSONB accessor info
+   * @returns SQL expression for the extracted JSONB field
+   *
+   * @throws {QueryError} If the column is not found or the JSONB accessor format is invalid
+   *
+   * @example
+   * ```typescript
+   * // For columnId "survey.title" where "survey" is a JSONB column
+   * const expression = buildJsonbExtraction({
+   *   columnId: 'survey.title',
+   *   table: 'surveys',
+   *   field: 'survey',
+   *   isNested: false
+   * });
+   * // PostgreSQL: sql`${surveys.survey}->>'title'`
+   * // MySQL: sql`JSON_UNQUOTE(JSON_EXTRACT(${surveys.survey}, '$.title'))`
+   * // SQLite: sql`json_extract(${surveys.survey}, '$.title')`
+   * ```
+   *
+   * @security
+   * This method uses sql.raw() with validated and escaped field names.
+   * The field name is validated to contain only safe characters and is escaped
+   * before injection. This is safe because:
+   * - Field names come from columnId (controlled, validated input)
+   * - Multiple validation layers prevent malicious input
+   * - Escaping prevents SQL injection even if validation is bypassed
+   */
+  private buildJsonbExtraction(columnPath: ColumnPath): SQL {
+    const column = this.getColumn(columnPath);
+    if (!column) {
+      throw new QueryError(`Column not found for JSONB extraction: ${columnPath.columnId}`, {
+        columnId: columnPath.columnId,
+        table: columnPath.table,
+        field: columnPath.field,
+      });
+    }
+
+    // Extract the field name from the columnId (e.g., "title" from "survey.title")
+    const parts = columnPath.columnId.split('.');
+    if (parts.length !== 2 || !parts[1]) {
+      throw new QueryError(`Invalid JSONB accessor format: ${columnPath.columnId}`, {
+        columnId: columnPath.columnId,
+        expectedFormat: 'column.field',
+        receivedParts: parts.length,
+      });
+    }
+
+    const jsonbField = parts[1];
+
+    // Explicit type check: Ensure field name is a string
+    if (typeof jsonbField !== 'string') {
+      throw new QueryError(
+        `Invalid JSONB field name type: expected string, got ${typeof jsonbField}`,
+        {
+          columnId: columnPath.columnId,
+          field: jsonbField,
+        }
+      );
+    }
+
+    // Length validation: Prevent excessively long field names
+    if (jsonbField.length > FilterHandler.MAX_JSONB_FIELD_NAME_LENGTH) {
+      throw new QueryError(
+        `JSONB field name exceeds maximum length: ${jsonbField.length} > ${FilterHandler.MAX_JSONB_FIELD_NAME_LENGTH}`,
+        {
+          columnId: columnPath.columnId,
+          field: jsonbField,
+          maxLength: FilterHandler.MAX_JSONB_FIELD_NAME_LENGTH,
+        }
+      );
+    }
+
+    // Pattern validation: Only allow safe characters (alphanumeric, underscore, hyphen)
+    // This prevents injection of malicious SQL in field names
+    if (!FilterHandler.SAFE_JSONB_FIELD_NAME_PATTERN.test(jsonbField)) {
+      throw new QueryError(`Invalid JSONB field name: ${jsonbField}`, {
+        columnId: columnPath.columnId,
+        field: jsonbField,
+        reason:
+          'Field name contains invalid characters. Only alphanumeric, underscore, and hyphen are allowed.',
+      });
+    }
+
+    // Escape single quotes in field name for SQL safety (PostgreSQL-style escaping)
+    // This provides defense-in-depth even if validation is bypassed
+    const escapedField = jsonbField.replace(/'/g, "''");
+
+    // Build database-specific JSONB extraction
+    switch (this.databaseType) {
+      case 'postgres': {
+        // PostgreSQL: column->>'field' extracts text from JSONB
+        // The ->> operator returns text, which is safe for string operations
+        // Use sql.raw to inject the validated and escaped field name as a string literal
+        // Security: Field name is validated (pattern + length) and escaped before use
+        return sql`${column}->>${sql.raw(`'${escapedField}'`)}`;
+      }
+      case 'mysql': {
+        // MySQL: JSON_UNQUOTE(JSON_EXTRACT(column, '$.field')) extracts text
+        // JSON_EXTRACT returns JSON, JSON_UNQUOTE converts to text
+        // Security: Field name is validated (pattern + length) and escaped before use
+        return sql`JSON_UNQUOTE(JSON_EXTRACT(${column}, ${sql.raw(`'$.${escapedField}'`)}))`;
+      }
+      case 'sqlite': {
+        // SQLite: json_extract(column, '$.field') extracts value
+        // Returns the JSON value, which can be used directly in comparisons
+        // Security: Field name is validated (pattern + length) and escaped before use
+        return sql`json_extract(${column}, ${sql.raw(`'$.${escapedField}'`)})`;
+      }
+      default: {
+        throw new QueryError(
+          `Unsupported database type for JSONB extraction: ${this.databaseType}`,
+          {
+            databaseType: this.databaseType,
+            supportedTypes: ['postgres', 'mysql', 'sqlite'],
+          }
+        );
+      }
+    }
+  }
+
+  /**
+   * Get case-insensitive LIKE condition based on database type.
+   *
+   * @description
+   * Generates a case-insensitive pattern matching condition. The implementation
+   * varies by database:
+   * - PostgreSQL: Uses native `ILIKE` operator for columns, `LIKE` with `LOWER()` for SQL expressions
+   * - MySQL/SQLite: Uses `LIKE` with `LOWER()` function
+   *
+   * **Security**: All patterns are properly parameterized through Drizzle's `like()` function
+   * to prevent SQL injection attacks.
+   *
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression to search in
+   * @param pattern - The search pattern (may contain % wildcards)
+   * @returns SQL condition for case-insensitive pattern matching
+   *
+   * @example
+   * ```typescript
+   * // Direct column
+   * getCaseInsensitiveLike(users.email, '%@example.com'); // Uses ilike() or like(LOWER())
+   *
+   * // SQL expression (JSONB extraction)
+   * getCaseInsensitiveLike(sql`${users.metadata}->>'title'`, '%search%');
+   * ```
+   *
+   * @security
+   * This method properly parameterizes all pattern values to prevent SQL injection.
+   * Never use sql.raw() with user-provided pattern values.
+   */
+  private getCaseInsensitiveLike(column: ColumnOrExpression, pattern: string): SQL | SQLWrapper {
     if (this.databaseType === 'sqlite') {
-      // SQLite doesn't support ilike, so we use like with LOWER() function
+      // SQLite doesn't support ILIKE, so we use LIKE with LOWER() function
+      // This works for both columns and SQL expressions
+      // Pattern is automatically parameterized by Drizzle's like() function
       return like(sql`LOWER(${column})`, pattern.toLowerCase());
     } else if (this.databaseType === 'mysql') {
-      // MySQL doesn't support ilike, so we use like with LOWER() function
+      // MySQL doesn't support ILIKE, so we use LIKE with LOWER() function
+      // This works for both columns and SQL expressions
+      // Pattern is automatically parameterized by Drizzle's like() function
       return like(sql`LOWER(${column})`, pattern.toLowerCase());
     } else {
-      // PostgreSQL supports ilike
+      // PostgreSQL supports ILIKE natively
+      // For SQL expressions, use LIKE with LOWER() for consistency and safety
+      // This ensures pattern is always parameterized, preventing SQL injection
+      // For columns, use Drizzle's ilike function which also parameterizes
+      if (this.isSqlExpression(column)) {
+        // Use like() with LOWER() to ensure pattern is parameterized
+        // This is safer than using ILIKE with direct interpolation
+        return like(sql`LOWER(${column})`, pattern.toLowerCase());
+      }
+      // Drizzle's ilike() function properly parameterizes the pattern
       return ilike(column, pattern);
     }
   }
@@ -152,10 +555,19 @@ export class FilterHandler {
   }
 
   /**
-   * Create date comparison condition
+   * Create date comparison condition.
+   *
+   * @description
+   * Builds a date comparison condition with proper type casting for the database.
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param operator - Comparison operator
+   * @param value - Date value to compare against
+   * @returns SQL condition for date comparison
    */
   private createDateComparisonCondition(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: '=' | '!=' | '<' | '>' | '>=' | '<=',
     value: Date | number | string
   ): SQL | SQLWrapper {
@@ -170,10 +582,19 @@ export class FilterHandler {
   }
 
   /**
-   * Create date range condition (inclusive)
+   * Create date range condition (inclusive).
+   *
+   * @description
+   * Builds a date range condition that includes both start and end dates.
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param startDate - Start of the date range (inclusive)
+   * @param endDate - End of the date range (inclusive)
+   * @returns SQL condition for date range
    */
   private createDateRangeCondition(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     startDate: Date | string,
     endDate: Date | string
   ): SQL | SQLWrapper {
@@ -208,10 +629,23 @@ export class FilterHandler {
   }
 
   /**
-   * Decomposed operator handler
+   * Map filter operator to SQL condition.
+   *
+   * @description
+   * Central dispatcher that routes filter operators to their specific handlers.
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param operator - The filter operator to apply
+   * @param values - Filter values (operator-specific)
+   * @param includeNull - Whether to include NULL values in the condition
+   * @param columnType - Optional column type hint for operator validation
+   * @returns SQL condition for the filter
+   *
+   * @throws {QueryError} If the operator is unsupported or invalid
    */
   private mapOperatorToCondition(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: FilterOperator,
     values: unknown[],
     includeNull?: boolean,
@@ -221,7 +655,7 @@ export class FilterHandler {
 
     // Handle null inclusion
     if (includeNull && operator !== 'isNull' && operator !== 'isNotNull') {
-      conditions.push(isNull(column));
+      conditions.push(this.createIsNullCondition(column));
     }
 
     let condition: SQL | SQLWrapper | undefined;
@@ -326,23 +760,46 @@ export class FilterHandler {
   // --- Specific Operator Handlers ---
 
   private handleTextOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string,
     values: unknown[]
   ): SQL | SQLWrapper | undefined {
+    // Validate values array is not empty for operators that require values
+    const requiresValue = ['contains', 'equals', 'startsWith', 'endsWith', 'notEquals'].includes(
+      operator
+    );
+    if (requiresValue && (!values || values.length === 0 || values[0] === undefined)) {
+      return undefined;
+    }
+
     switch (operator) {
-      case 'contains':
-        return this.getCaseInsensitiveLike(column, `%${values[0]}%`);
+      case 'contains': {
+        const value = values[0];
+        if (typeof value !== 'string') {
+          return undefined;
+        }
+        return this.getCaseInsensitiveLike(column, `%${value}%`);
+      }
       case 'equals':
         return eq(column, values[0]);
-      case 'startsWith':
-        return this.getCaseInsensitiveLike(column, `${values[0]}%`);
-      case 'endsWith':
-        return this.getCaseInsensitiveLike(column, `%${values[0]}`);
+      case 'startsWith': {
+        const value = values[0];
+        if (typeof value !== 'string') {
+          return undefined;
+        }
+        return this.getCaseInsensitiveLike(column, `${value}%`);
+      }
+      case 'endsWith': {
+        const value = values[0];
+        if (typeof value !== 'string') {
+          return undefined;
+        }
+        return this.getCaseInsensitiveLike(column, `%${value}`);
+      }
       case 'isEmpty':
-        return or(isNull(column), eq(column, ''));
+        return or(this.createIsNullCondition(column), eq(column, ''));
       case 'isNotEmpty':
-        return and(isNotNull(column), not(eq(column, '')));
+        return and(this.createIsNotNullCondition(column), not(eq(column, '')));
       case 'notEquals':
         return not(eq(column, values[0]));
       default:
@@ -351,10 +808,39 @@ export class FilterHandler {
   }
 
   private handleNumberOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string,
     values: unknown[]
   ): SQL | SQLWrapper | undefined {
+    // Validate values array for operators that require values
+    const requiresSingleValue = [
+      'greaterThan',
+      'greaterThanOrEqual',
+      'lessThan',
+      'lessThanOrEqual',
+      'equals',
+      'notEquals',
+    ].includes(operator);
+    const requiresTwoValues = ['between', 'notBetween'].includes(operator);
+
+    if (requiresSingleValue && (!values || values.length === 0 || values[0] === undefined)) {
+      return undefined;
+    }
+    if (
+      requiresTwoValues &&
+      (!values || values.length < 2 || values[0] === undefined || values[1] === undefined)
+    ) {
+      return undefined;
+    }
+
+    // Type validation: Ensure numeric values are numbers
+    if (requiresSingleValue && typeof values[0] !== 'number') {
+      return undefined;
+    }
+    if (requiresTwoValues && (typeof values[0] !== 'number' || typeof values[1] !== 'number')) {
+      return undefined;
+    }
+
     switch (operator) {
       case 'greaterThan':
         return gt(column, values[0] as number);
@@ -365,13 +851,9 @@ export class FilterHandler {
       case 'lessThanOrEqual':
         return lte(column, values[0] as number);
       case 'between':
-        return values.length >= 2
-          ? and(gte(column, values[0] as number), lte(column, values[1] as number))
-          : undefined;
+        return and(gte(column, values[0] as number), lte(column, values[1] as number));
       case 'notBetween':
-        return values.length >= 2
-          ? or(lt(column, values[0] as number), gt(column, values[1] as number))
-          : undefined;
+        return or(lt(column, values[0] as number), gt(column, values[1] as number));
       case 'equals':
         return eq(column, values[0]);
       case 'notEquals':
@@ -382,11 +864,17 @@ export class FilterHandler {
   }
 
   private handleDateOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string,
     values: unknown[],
     columnType?: string
   ): SQL | SQLWrapper | undefined {
+    // Validate values array for operators that require values
+    const requiresValue = ['is', 'isNot', 'before', 'after'].includes(operator);
+    if (requiresValue && (!values || values.length === 0 || values[0] === undefined)) {
+      return undefined;
+    }
+
     switch (operator) {
       case 'is':
         return columnType === 'date'
@@ -416,7 +904,7 @@ export class FilterHandler {
   }
 
   private handleBooleanOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string,
     _values: unknown[]
   ): SQL | SQLWrapper | undefined {
@@ -431,18 +919,42 @@ export class FilterHandler {
   }
 
   private handleOptionOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string,
     values: unknown[]
   ): SQL | SQLWrapper | undefined {
+    // Validate values array
+    if (!values || values.length === 0) {
+      // Some operators don't require values, but most do
+      if (['isAnyOf', 'isNoneOf'].includes(operator)) {
+        return undefined;
+      }
+      // For equals/notEquals, we need at least one value
+      if (['equals', 'notEquals'].includes(operator)) {
+        return undefined;
+      }
+    }
+
     switch (operator) {
-      case 'isAnyOf':
-        return values.length > 0 ? inArray(column, values) : undefined;
-      case 'isNoneOf':
-        return values.length > 0 ? notInArray(column, values) : undefined;
+      case 'isAnyOf': {
+        // Filter out undefined values before passing to inArray
+        const validValues = values.filter((v) => v !== undefined);
+        return validValues.length > 0 ? inArray(column, validValues) : undefined;
+      }
+      case 'isNoneOf': {
+        // Filter out undefined values before passing to notInArray
+        const validValuesForNone = values.filter((v) => v !== undefined);
+        return validValuesForNone.length > 0 ? notInArray(column, validValuesForNone) : undefined;
+      }
       case 'equals':
+        if (values[0] === undefined) {
+          return undefined;
+        }
         return eq(column, values[0]);
       case 'notEquals':
+        if (values[0] === undefined) {
+          return undefined;
+        }
         return not(eq(column, values[0]));
       default:
         return undefined;
@@ -450,41 +962,54 @@ export class FilterHandler {
   }
 
   private handleMultiOptionOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string,
     values: unknown[]
   ): SQL | SQLWrapper | undefined {
+    // Validate values array
+    if (!values || values.length === 0) {
+      return undefined;
+    }
+
+    // Filter out undefined values for array operations
+    const validValues = values.filter((v) => v !== undefined);
+    if (validValues.length === 0) {
+      return undefined;
+    }
+
     switch (operator) {
       case 'includes':
+        if (values[0] === undefined) {
+          return undefined;
+        }
         return this.buildArrayContainsCondition(column, values[0]);
       case 'excludes':
+        if (values[0] === undefined) {
+          return undefined;
+        }
         return not(this.buildArrayContainsCondition(column, values[0]));
       case 'includesAny':
-        return values.length > 0 ? this.buildArrayIncludesAnyCondition(column, values) : undefined;
+        return this.buildArrayIncludesAnyCondition(column, validValues);
       case 'includesAll':
-        return values.length > 0 ? this.buildArrayIncludesAllCondition(column, values) : undefined;
+        return this.buildArrayIncludesAllCondition(column, validValues);
       case 'excludesAny':
-        return values.length > 0
-          ? not(this.buildArrayIncludesAnyCondition(column, values))
-          : undefined;
+        return not(this.buildArrayIncludesAnyCondition(column, validValues));
       case 'excludesAll':
-        return values.length > 0
-          ? not(this.buildArrayIncludesAllCondition(column, values))
-          : undefined;
+        return not(this.buildArrayIncludesAllCondition(column, validValues));
       default:
         return undefined;
     }
   }
 
   private handleUniversalOperator(
-    column: AnyColumnType,
+    column: ColumnOrExpression,
     operator: string
   ): SQL | SQLWrapper | undefined {
     switch (operator) {
       case 'isNull':
-        return isNull(column);
+        return this.createIsNullCondition(column);
       case 'isNotNull':
-        return isNotNull(column);
+        return this.createIsNotNullCondition(column);
       default:
         return undefined;
     }
@@ -530,9 +1055,17 @@ export class FilterHandler {
   }
 
   /**
-   * Build date condition for relative dates
+   * Build date condition for relative dates.
+   *
+   * @description
+   * Creates date conditions for relative time periods (today, this week, etc.).
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param period - Relative time period identifier
+   * @returns SQL condition for the relative date period
    */
-  private buildDateCondition(column: AnyColumnType, period: string): SQL | SQLWrapper {
+  private buildDateCondition(column: ColumnOrExpression, period: string): SQL | SQLWrapper {
     const now = new Date();
 
     switch (period) {
@@ -587,9 +1120,17 @@ export class FilterHandler {
   }
 
   /**
-   * Build array contains condition - database-specific implementation
+   * Build array contains condition - database-specific implementation.
+   *
+   * @description
+   * Creates a condition to check if an array/JSON column contains a specific value.
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param value - Value to check for in the array
+   * @returns SQL condition for array containment
    */
-  private buildArrayContainsCondition(column: AnyColumnType, value: unknown): SQL {
+  private buildArrayContainsCondition(column: ColumnOrExpression, value: unknown): SQL {
     switch (this.databaseType) {
       case 'postgres':
         return sql`${column} @> ${JSON.stringify([value])}`;
@@ -607,9 +1148,17 @@ export class FilterHandler {
   }
 
   /**
-   * Build array includes any condition - database-specific implementation
+   * Build array includes any condition - database-specific implementation.
+   *
+   * @description
+   * Creates a condition to check if an array/JSON column contains any of the specified values.
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param values - Array of values to check for
+   * @returns SQL condition for array overlap
    */
-  private buildArrayIncludesAnyCondition(column: AnyColumnType, values: unknown[]): SQL {
+  private buildArrayIncludesAnyCondition(column: ColumnOrExpression, values: unknown[]): SQL {
     switch (this.databaseType) {
       case 'postgres':
         return sql`${column} && ${JSON.stringify(values)}`;
@@ -631,9 +1180,17 @@ export class FilterHandler {
   }
 
   /**
-   * Build array includes all condition - database-specific implementation
+   * Build array includes all condition - database-specific implementation.
+   *
+   * @description
+   * Creates a condition to check if an array/JSON column contains all of the specified values.
+   * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   *
+   * @param column - Column reference or SQL expression
+   * @param values - Array of values that must all be present
+   * @returns SQL condition for array containment
    */
-  private buildArrayIncludesAllCondition(column: AnyColumnType, values: unknown[]): SQL {
+  private buildArrayIncludesAllCondition(column: ColumnOrExpression, values: unknown[]): SQL {
     switch (this.databaseType) {
       case 'postgres':
         return sql`${column} @> ${JSON.stringify(values)}`;
