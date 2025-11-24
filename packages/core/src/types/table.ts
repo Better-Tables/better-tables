@@ -70,9 +70,6 @@ export interface TableConfig<TData = unknown> {
   /** Actions configuration and options */
   actionsConfig?: ActionsConfig;
 
-  /** Bulk actions available for selected rows (deprecated, use actions instead) */
-  bulkActions?: BulkActionDefinition<TData>[];
-
   /** Export configuration and options */
   exportOptions?: ExportConfig<TData>;
 
@@ -110,7 +107,6 @@ export interface TableConfig<TData = unknown> {
  *   filtering: true,
  *   sorting: true,
  *   pagination: true,
- *   bulkActions: true,
  *   export: true,
  *   columnResizing: true,
  *   columnReordering: false,
@@ -161,96 +157,6 @@ export interface TableFeatures {
 
   /** Configuration for header context menu */
   headerContextMenu?: HeaderContextMenuConfig;
-}
-
-/**
- * Bulk action definition interface.
- *
- * Defines actions that can be performed on multiple selected rows,
- * including custom components and confirmation dialogs.
- *
- * @template TData - The type of data being acted upon
- *
- * @example
- * ```typescript
- * const deleteAction: BulkActionDefinition<User> = {
- *   id: 'delete',
- *   label: 'Delete Selected',
- *   icon: TrashIcon,
- *   variant: 'destructive',
- *   handler: async (selectedIds, data) => {
- *     await deleteUsers(selectedIds);
- *   },
- *   requiresConfirmation: true,
- *   confirmationMessage: 'Are you sure you want to delete these users?'
- * };
- * ```
- */
-export interface BulkActionDefinition<TData = unknown> {
-  /** Unique identifier for the action */
-  id: string;
-
-  /** Display label for the action */
-  label: string;
-
-  /** Icon component for the action */
-  icon?: IconComponent;
-
-  /** Visual variant/style for the action */
-  variant?: 'default' | 'primary' | 'secondary' | 'destructive';
-
-  /** Custom component for complex actions */
-  component?: ComponentType<BulkActionProps>;
-
-  /** Action handler function */
-  handler?: (selectedIds: string[], data?: TData[]) => void | Promise<void>;
-
-  /** Whether the action requires user confirmation */
-  requiresConfirmation?: boolean;
-
-  /** Confirmation message to display */
-  confirmationMessage?: string;
-}
-
-/**
- * Props interface for bulk action components.
- *
- * Provides necessary props for custom bulk action components,
- * including selected data and event handlers.
- *
- * @example
- * ```typescript
- * const BulkDeleteComponent: React.FC<BulkActionProps> = ({
- *   selectedIds,
- *   onClose,
- *   onSuccess,
- *   onError
- * }) => {
- *   const handleDelete = async () => {
- *     try {
- *       await deleteUsers(selectedIds);
- *       onSuccess();
- *     } catch (error) {
- *       onError(error);
- *     }
- *   };
- *
- *   return <button onClick={handleDelete}>Delete {selectedIds.length} users</button>;
- * };
- * ```
- */
-export interface BulkActionProps {
-  /** Array of selected row identifiers */
-  selectedIds: string[];
-
-  /** Function to close the bulk action interface */
-  onClose: () => void;
-
-  /** Function to call on successful action completion */
-  onSuccess: () => void;
-
-  /** Function to call when an error occurs */
-  onError: (error: Error) => void;
 }
 
 /**

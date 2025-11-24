@@ -26,6 +26,8 @@ import {
   getOrCreateTableStore,
   getTableStore,
 } from '../../stores/table-registry';
+import type { UrlSyncAdapter, UrlSyncConfig } from '../../stores/url-sync-adapter';
+import { useTableUrlSync } from '../../stores/url-sync-adapter';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
@@ -110,6 +112,14 @@ export interface BetterTableProps<TData = unknown>
 
   /** Retry handler for error state */
   onRetry?: () => void;
+
+  /** URL synchronization configuration (optional) */
+  urlSync?: {
+    /** URL adapter for reading/writing URL parameters */
+    adapter: UrlSyncAdapter;
+    /** Configuration for which state to sync to URL */
+    config?: UrlSyncConfig;
+  };
 }
 
 export function BetterTable<TData = unknown>({
@@ -146,6 +156,9 @@ export function BetterTable<TData = unknown>({
   onRowClick,
   emptyMessage,
   onRetry,
+
+  // URL sync props
+  urlSync,
   ...props
 }: BetterTableProps<TData>) {
   const {
@@ -184,6 +197,30 @@ export function BetterTable<TData = unknown>({
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
   const { columnVisibility, toggleColumnVisibility } = useTableColumnVisibility(id);
   const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
+
+  // Set up URL synchronization if adapter is provided
+  // Base64 encoding/decoding is handled automatically by useTableUrlSync
+  // Always call the hook (React rules), but use a no-op adapter if urlSync is not provided
+  const urlAdapter = useMemo(
+    () =>
+      urlSync?.adapter || {
+        getParam: () => null,
+        setParams: () => {},
+      },
+    [urlSync?.adapter]
+  );
+
+  useTableUrlSync(
+    id,
+    urlSync?.config || {
+      filters: false,
+      pagination: false,
+      sorting: false,
+      columnVisibility: false,
+      columnOrder: false,
+    },
+    urlAdapter
+  );
 
   // Cleanup store on unmount to prevent memory leaks
   useEffect(() => {
@@ -762,7 +799,7 @@ export function BetterTable<TData = unknown>({
       if (overId.startsWith('sort-drop-')) {
         // Extract target index from drop zone ID
         const dropMatch = overId.match(/sort-drop-(before|after)-(\d+)/);
-        if (dropMatch && dropMatch[1] && dropMatch[2]) {
+        if (dropMatch?.[1] && dropMatch[2]) {
           const position = dropMatch[1];
           const targetIndex = parseInt(dropMatch[2], 10);
 

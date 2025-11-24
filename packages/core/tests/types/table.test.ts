@@ -1,7 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 import type {
-  BulkActionDefinition,
-  BulkActionProps,
   ColumnDefinition,
   EmptyStateConfig,
   EmptyStateProps,
@@ -118,7 +116,6 @@ describe('Table Types', () => {
         filtering: true,
         sorting: true,
         pagination: true,
-        bulkActions: true,
         export: true,
         columnResizing: false,
         columnReordering: false,
@@ -132,57 +129,6 @@ describe('Table Types', () => {
       for (const [_key, value] of Object.entries(features)) {
         expect(typeof value).toBe('boolean');
       }
-    });
-  });
-
-  describe('BulkActionDefinition', () => {
-    it('should define bulk actions', () => {
-      const deleteAction: BulkActionDefinition<unknown> = {
-        id: 'delete',
-        label: 'Delete Selected',
-        variant: 'destructive',
-        handler: async (_selectedIds) => {
-          // Delete selectedIds
-        },
-        requiresConfirmation: true,
-        confirmationMessage: 'Are you sure you want to delete the selected items?',
-      };
-
-      const exportAction: BulkActionDefinition<unknown> = {
-        id: 'export',
-        label: 'Export Selected',
-        variant: 'secondary',
-        handler: async (_selectedIds, _data) => {
-          // Export selectedIds and data
-        },
-      };
-
-      expectTypeOf(deleteAction.variant).toEqualTypeOf<
-        'default' | 'primary' | 'secondary' | 'destructive' | undefined
-      >();
-      expectTypeOf(deleteAction.handler).toEqualTypeOf<
-        ((selectedIds: string[], data?: unknown[]) => void | Promise<void>) | undefined
-      >();
-      expectTypeOf(exportAction.variant).toEqualTypeOf<
-        'default' | 'primary' | 'secondary' | 'destructive' | undefined
-      >();
-    });
-
-    it('should support custom bulk action components', () => {
-      const customAction: BulkActionDefinition<unknown> = {
-        id: 'custom',
-        label: 'Custom Action',
-        component: ({
-          selectedIds: _selectedIds,
-          onClose: _onClose,
-          onSuccess: _onSuccess,
-          onError: _onError,
-        }: BulkActionProps) => null,
-      };
-
-      expectTypeOf(customAction.component).toMatchTypeOf<
-        React.ComponentType<BulkActionProps> | undefined
-      >();
     });
   });
 
@@ -333,7 +279,6 @@ describe('Table Types', () => {
           filtering: true,
           sorting: true,
           pagination: true,
-          bulkActions: true,
           export: true,
           rowSelection: true,
         },
@@ -346,7 +291,7 @@ describe('Table Types', () => {
           multiSort: true,
           defaultSort: [{ columnId: 'name', direction: 'asc' }],
         },
-        bulkActions: [
+        actions: [
           {
             id: 'delete',
             label: 'Delete',

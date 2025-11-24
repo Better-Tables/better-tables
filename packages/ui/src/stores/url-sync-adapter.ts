@@ -7,6 +7,7 @@ import {
   mergeColumnVisibility,
 } from '@better-tables/core';
 import { useEffect, useRef } from 'react';
+import { decodeBase64, encodeBase64 } from '@/utils';
 import { getTableStore } from './table-registry';
 
 /**
@@ -87,14 +88,13 @@ export function useTableUrlSync(
     const manager = store.getState().manager;
     const updates: Parameters<typeof manager.updateState>[0] = {};
 
-    // Parse URL params
+    // Parse URL params (base64-decoded)
     if (config.filters) {
       const filtersParam = adapter.getParam('filters');
       if (filtersParam) {
-        try {
-          updates.filters = JSON.parse(filtersParam);
-        } catch {
-          // Silently ignore parse errors
+        const decoded = decodeBase64(filtersParam);
+        if (decoded && Array.isArray(decoded)) {
+          updates.filters = decoded;
         }
       }
     }
@@ -126,10 +126,9 @@ export function useTableUrlSync(
     if (config.sorting) {
       const sortingParam = adapter.getParam('sorting');
       if (sortingParam) {
-        try {
-          updates.sorting = JSON.parse(sortingParam);
-        } catch {
-          // Silently ignore parse errors
+        const decoded = decodeBase64(sortingParam);
+        if (decoded && Array.isArray(decoded)) {
+          updates.sorting = decoded;
         }
       }
     }
@@ -137,13 +136,11 @@ export function useTableUrlSync(
     if (config.columnVisibility) {
       const visibilityParam = adapter.getParam('columnVisibility');
       if (visibilityParam) {
-        try {
-          const modifications = JSON.parse(visibilityParam);
+        const decoded = decodeBase64<Record<string, boolean>>(visibilityParam);
+        if (decoded && typeof decoded === 'object' && decoded !== null && !Array.isArray(decoded)) {
           const { columns } = store.getState();
           // Merge modifications with defaults
-          updates.columnVisibility = mergeColumnVisibility(columns, modifications);
-        } catch {
-          // Silently ignore parse errors
+          updates.columnVisibility = mergeColumnVisibility(columns, decoded);
         }
       }
     }
@@ -151,16 +148,12 @@ export function useTableUrlSync(
     if (config.columnOrder) {
       const orderParam = adapter.getParam('columnOrder');
       if (orderParam) {
-        try {
-          const modifications = JSON.parse(orderParam);
-          // Guard against malformed URLs: ensure modifications is an array
-          if (Array.isArray(modifications)) {
-            const { columns } = store.getState();
-            // Merge modifications with defaults
-            updates.columnOrder = mergeColumnOrder(columns, modifications);
-          }
-        } catch {
-          // Silently ignore parse errors
+        const decoded = decodeBase64<string[]>(orderParam);
+        // Guard against malformed URLs: ensure modifications is an array
+        if (decoded && Array.isArray(decoded)) {
+          const { columns } = store.getState();
+          // Merge modifications with defaults
+          updates.columnOrder = mergeColumnOrder(columns, decoded);
         }
       }
     }
@@ -190,7 +183,7 @@ export function useTableUrlSync(
 
         if (config.filters) {
           updates.filters =
-            event.state.filters.length > 0 ? JSON.stringify(event.state.filters) : null;
+            event.state.filters.length > 0 ? encodeBase64(event.state.filters) : null;
         }
 
         if (config.pagination) {
@@ -200,7 +193,7 @@ export function useTableUrlSync(
 
         if (config.sorting) {
           updates.sorting =
-            event.state.sorting.length > 0 ? JSON.stringify(event.state.sorting) : null;
+            event.state.sorting.length > 0 ? encodeBase64(event.state.sorting) : null;
         }
 
         if (config.columnVisibility) {
@@ -211,14 +204,14 @@ export function useTableUrlSync(
             event.state.columnVisibility
           );
           updates.columnVisibility =
-            Object.keys(modifications).length > 0 ? JSON.stringify(modifications) : null;
+            Object.keys(modifications).length > 0 ? encodeBase64(modifications) : null;
         }
 
         if (config.columnOrder) {
           const { columns } = store.getState();
           // Get only modifications from defaults
           const modifications = getColumnOrderModifications(columns, event.state.columnOrder);
-          updates.columnOrder = modifications.length > 0 ? JSON.stringify(modifications) : null;
+          updates.columnOrder = modifications.length > 0 ? encodeBase64(modifications) : null;
         }
 
         adapter.setParams(updates);
