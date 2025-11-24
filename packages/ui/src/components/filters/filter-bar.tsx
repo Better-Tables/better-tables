@@ -116,6 +116,12 @@ export function FilterBar<TData = unknown>({
 }: FilterBarProps<TData>) {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  // Only render filter count after mount to avoid hydration mismatch
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Get filterable columns
   const filterableColumns = React.useMemo(
@@ -148,7 +154,7 @@ export function FilterBar<TData = unknown>({
       const newFilter: FilterState = {
         columnId,
         type: column.type,
-        operator: getDefaultOperatorsForType(column.type)[0], // Use first default operator from core
+        operator: getDefaultOperatorsForType(column.type)[0] ?? 'is', // Use first default operator from core
         values: [],
       };
 
@@ -200,11 +206,14 @@ export function FilterBar<TData = unknown>({
   return (
     <div className={cn('w-full', theme?.container, className)}>
       {/* Screen reader announcement for filter changes */}
-      <div aria-live="polite" aria-atomic="false" className="sr-only">
-        {filters.length > 0
-          ? `${filters.length} filter${filters.length !== 1 ? 's' : ''} active`
-          : 'No filters active'}
-      </div>
+      {/* Only render after mount to avoid hydration mismatch */}
+      {isMounted && (
+        <div aria-live="polite" aria-atomic="false" className="sr-only">
+          {filters.length > 0
+            ? `${filters.length} filter${filters.length !== 1 ? 's' : ''} active`
+            : 'No filters active'}
+        </div>
+      )}
 
       {/* Search Input for large column sets */}
       {searchable && availableColumns.length > 10 && (
