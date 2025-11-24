@@ -199,7 +199,7 @@ export function BetterTable<TData = unknown>({
   const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
 
   // Set up URL synchronization if adapter is provided
-  // Base64 encoding/decoding is handled automatically by useTableUrlSync
+  // Compression/decompression is handled automatically by useTableUrlSync
   // Always call the hook (React rules), but use a no-op adapter if urlSync is not provided
   const urlAdapter = useMemo(
     () =>

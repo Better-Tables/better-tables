@@ -1,45 +1,13 @@
 /**
- * Tests for URL serialization utilities with base64 encoding
+ * Tests for URL serialization utilities with lz-string compression
  */
 
 import { describe, expect, it } from 'bun:test';
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
-import {
-  decodeBase64,
-  deserializeTableStateFromUrl,
-  encodeBase64,
-  serializeTableStateToUrl,
-} from '../url-serialization';
-
-describe('encodeBase64 / decodeBase64', () => {
-  it('should encode and decode simple data', () => {
-    const data = { test: 'value', number: 123 };
-    const encoded = encodeBase64(data);
-    expect(encoded).toBeTruthy();
-    expect(typeof encoded).toBe('string');
-
-    const decoded = decodeBase64(encoded);
-    expect(decoded).toEqual(data);
-  });
-
-  it('should encode and decode arrays', () => {
-    const data = [1, 2, 3, 'test'];
-    const encoded = encodeBase64(data);
-    const decoded = decodeBase64(encoded);
-    expect(decoded).toEqual(data);
-  });
-
-  it('should produce URL-safe base64 (no +, /, =)', () => {
-    const data = { test: 'value with special chars: +/=' };
-    const encoded = encodeBase64(data);
-    expect(encoded).not.toContain('+');
-    expect(encoded).not.toContain('/');
-    expect(encoded).not.toContain('=');
-  });
-});
+import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../url-serialization';
 
 describe('serializeTableStateToUrl', () => {
-  it('should serialize filters to base64-encoded URL parameter', () => {
+  it('should serialize filters to compressed URL parameter', () => {
     const state = {
       filters: [
         {
@@ -55,14 +23,16 @@ describe('serializeTableStateToUrl', () => {
 
     expect(params.filters).toBeDefined();
     expect(typeof params.filters).toBe('string');
-    // Should be base64-encoded (not JSON)
+    // Should be compressed (starts with "c:")
+    expect(params.filters).toStartWith('c:');
+    // Should not contain JSON characters
     expect(params.filters).not.toContain('{');
     expect(params.filters).not.toContain('[');
 
     // Decode and verify
     if (params.filters) {
-      const decoded = decodeBase64<FilterState[]>(params.filters);
-      expect(decoded).toEqual(state.filters);
+      const deserialized = deserializeTableStateFromUrl({ filters: params.filters });
+      expect(deserialized.filters).toEqual(state.filters);
     }
   });
 
@@ -83,7 +53,7 @@ describe('serializeTableStateToUrl', () => {
     expect(params.limit).toBe('50');
   });
 
-  it('should serialize sorting to base64-encoded URL parameter', () => {
+  it('should serialize sorting to compressed URL parameter', () => {
     const state = {
       sorting: [
         { columnId: 'name', direction: 'asc' },
@@ -95,14 +65,15 @@ describe('serializeTableStateToUrl', () => {
 
     expect(params.sorting).toBeDefined();
     expect(typeof params.sorting).toBe('string');
-    // Should be base64-encoded
+    // Should be compressed (starts with "c:")
     if (params.sorting) {
-      const decoded = decodeBase64<SortingState>(params.sorting);
-      expect(decoded).toEqual(state.sorting);
+      expect(params.sorting).toStartWith('c:');
+      const deserialized = deserializeTableStateFromUrl({ sorting: params.sorting });
+      expect(deserialized.sorting).toEqual(state.sorting);
     }
   });
 
-  it('should serialize column visibility to base64-encoded URL parameter', () => {
+  it('should serialize column visibility to compressed URL parameter', () => {
     const state = {
       columnVisibility: {
         email: false,
@@ -114,12 +85,15 @@ describe('serializeTableStateToUrl', () => {
 
     expect(params.columnVisibility).toBeDefined();
     if (params.columnVisibility) {
-      const decoded = decodeBase64<Record<string, boolean>>(params.columnVisibility);
-      expect(decoded).toEqual(state.columnVisibility);
+      expect(params.columnVisibility).toStartWith('c:');
+      const deserialized = deserializeTableStateFromUrl({
+        columnVisibility: params.columnVisibility,
+      });
+      expect(deserialized.columnVisibility).toEqual(state.columnVisibility);
     }
   });
 
-  it('should serialize column order to base64-encoded URL parameter', () => {
+  it('should serialize column order to compressed URL parameter', () => {
     const state = {
       columnOrder: ['id', 'name', 'email', 'status'],
     };
@@ -128,8 +102,9 @@ describe('serializeTableStateToUrl', () => {
 
     expect(params.columnOrder).toBeDefined();
     if (params.columnOrder) {
-      const decoded = decodeBase64<string[]>(params.columnOrder);
-      expect(decoded).toEqual(state.columnOrder);
+      expect(params.columnOrder).toStartWith('c:');
+      const deserialized = deserializeTableStateFromUrl({ columnOrder: params.columnOrder });
+      expect(deserialized.columnOrder).toEqual(state.columnOrder);
     }
   });
 
@@ -183,7 +158,7 @@ describe('serializeTableStateToUrl', () => {
 });
 
 describe('deserializeTableStateFromUrl', () => {
-  it('should deserialize base64-encoded filters from URL parameter', () => {
+  it('should deserialize compressed filters from URL parameter', () => {
     const filters: FilterState[] = [
       {
         columnId: 'status',
@@ -192,9 +167,9 @@ describe('deserializeTableStateFromUrl', () => {
         type: 'option',
       },
     ];
-    const encoded = encodeBase64(filters);
+    const serialized = serializeTableStateToUrl({ filters });
     const params = {
-      filters: encoded,
+      filters: serialized.filters || '',
     };
 
     const state = deserializeTableStateFromUrl(params);
@@ -224,11 +199,11 @@ describe('deserializeTableStateFromUrl', () => {
     expect(state.pagination.limit).toBe(20);
   });
 
-  it('should deserialize base64-encoded sorting from URL parameter', () => {
+  it('should deserialize compressed sorting from URL parameter', () => {
     const sorting: SortingState = [{ columnId: 'name', direction: 'asc' }];
-    const encoded = encodeBase64(sorting);
+    const serialized = serializeTableStateToUrl({ sorting });
     const params = {
-      sorting: encoded,
+      sorting: serialized.sorting || '',
     };
 
     const state = deserializeTableStateFromUrl(params);
@@ -237,11 +212,11 @@ describe('deserializeTableStateFromUrl', () => {
     expect(state.sorting[0]).toMatchObject(sorting[0]);
   });
 
-  it('should deserialize base64-encoded column visibility from URL parameter', () => {
+  it('should deserialize compressed column visibility from URL parameter', () => {
     const visibility = { email: false, phone: true };
-    const encoded = encodeBase64(visibility);
+    const serialized = serializeTableStateToUrl({ columnVisibility: visibility });
     const params = {
-      columnVisibility: encoded,
+      columnVisibility: serialized.columnVisibility || '',
     };
 
     const state = deserializeTableStateFromUrl(params);
@@ -249,11 +224,11 @@ describe('deserializeTableStateFromUrl', () => {
     expect(state.columnVisibility).toMatchObject(visibility);
   });
 
-  it('should deserialize base64-encoded column order from URL parameter', () => {
+  it('should deserialize compressed column order from URL parameter', () => {
     const order = ['id', 'name', 'email'];
-    const encoded = encodeBase64(order);
+    const serialized = serializeTableStateToUrl({ columnOrder: order });
     const params = {
-      columnOrder: encoded,
+      columnOrder: serialized.columnOrder || '',
     };
 
     const state = deserializeTableStateFromUrl(params);
@@ -272,9 +247,9 @@ describe('deserializeTableStateFromUrl', () => {
     expect(state.columnOrder).toEqual([]);
   });
 
-  it('should handle invalid base64 gracefully', () => {
+  it('should handle invalid compressed data gracefully', () => {
     const params = {
-      filters: 'invalid base64!!!',
+      filters: 'invalid compressed data!!!',
       sorting: 'also invalid',
     };
 
@@ -297,16 +272,15 @@ describe('deserializeTableStateFromUrl', () => {
     const visibility = { email: false };
     const order = ['id', 'name'];
 
-    const params = {
-      filters: encodeBase64(filters),
-      page: '2',
-      limit: '50',
-      sorting: encodeBase64(sorting),
-      columnVisibility: encodeBase64(visibility),
-      columnOrder: encodeBase64(order),
-    };
+    const serialized = serializeTableStateToUrl({
+      filters,
+      pagination: { page: 2, limit: 50, totalPages: 10, hasNext: true, hasPrev: true },
+      sorting,
+      columnVisibility: visibility,
+      columnOrder: order,
+    });
 
-    const state = deserializeTableStateFromUrl(params);
+    const state = deserializeTableStateFromUrl(serialized);
 
     expect(state.filters).toHaveLength(1);
     expect(state.pagination.page).toBe(2);
@@ -412,15 +386,213 @@ describe('round-trip serialization', () => {
 
     const state = { filters: complexFilters };
     const params = serializeTableStateToUrl(state);
-    const base64Length = params.filters?.length || 0;
+    const compressedLength = params.filters?.length || 0;
 
     // Compare with JSON (would be much longer)
     const jsonString = JSON.stringify(complexFilters);
     const jsonLength = jsonString.length;
 
-    // Base64 should be shorter or similar length (base64 is ~33% larger than raw, but URL-encoded JSON is much larger)
-    // For this test, we just verify base64 encoding works
-    expect(base64Length).toBeGreaterThan(0);
-    expect(base64Length).toBeLessThan(jsonLength * 2); // Base64 shouldn't be more than 2x the JSON length
+    // Compressed should be significantly shorter than JSON
+    expect(compressedLength).toBeGreaterThan(0);
+    expect(compressedLength).toBeLessThan(jsonLength); // Compressed should be smaller than JSON
+  });
+});
+
+describe('compression', () => {
+  it('should compress large filter arrays', () => {
+    const largeFilters: FilterState[] = [
+      {
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['a'],
+      },
+      {
+        columnId: 'role',
+        type: 'option',
+        operator: 'is',
+        values: ['contributor'],
+      },
+      {
+        columnId: 'createdAt',
+        type: 'date',
+        operator: 'after',
+        values: ['2024-01-01T05:00:00.000Z'],
+      },
+      {
+        columnId: 'status',
+        type: 'option',
+        operator: 'is',
+        values: ['active'],
+      },
+    ];
+
+    const state = { filters: largeFilters };
+    const params = serializeTableStateToUrl(state);
+
+    expect(params.filters).toBeDefined();
+    if (params.filters) {
+      // Should be compressed (starts with "c:") for arrays this size
+      // The threshold is 500, and 4 filters should exceed it
+      expect(params.filters.length).toBeGreaterThan(0);
+      // Verify it can be decompressed
+      const deserialized = deserializeTableStateFromUrl({ filters: params.filters });
+      expect(deserialized.filters).toHaveLength(4);
+      expect(deserialized.filters[0]).toMatchObject(largeFilters[0]);
+    }
+  });
+
+  it('should handle compressed data with c: prefix', () => {
+    const filters: FilterState[] = [
+      {
+        columnId: 'status',
+        operator: 'equals',
+        values: ['active'],
+        type: 'option',
+      },
+      {
+        columnId: 'name',
+        operator: 'contains',
+        values: ['test'],
+        type: 'text',
+      },
+    ];
+
+    const state = { filters };
+    const params = serializeTableStateToUrl(state);
+
+    if (params.filters) {
+      // Should be compressed (starts with "c:")
+
+      // Should deserialize correctly
+      const deserialized = deserializeTableStateFromUrl({ filters: params.filters });
+      expect(deserialized.filters).toHaveLength(2);
+      expect(deserialized.filters[0]).toMatchObject(filters[0]);
+      expect(deserialized.filters[1]).toMatchObject(filters[1]);
+    }
+  });
+
+  it('should handle data without c: prefix gracefully', () => {
+    // Data without c: prefix should return empty (invalid format)
+    const deserialized = deserializeTableStateFromUrl({ filters: 'invalid-format' });
+    expect(deserialized.filters).toEqual([]);
+  });
+
+  it('should compress very large filter arrays significantly', () => {
+    // Create 10+ filters to ensure compression kicks in
+    const manyFilters: FilterState[] = Array.from({ length: 10 }, (_, i) => ({
+      columnId: `column${i}`,
+      type: 'text' as const,
+      operator: 'contains' as const,
+      values: [`value${i}`, `value${i}-alt`],
+    }));
+
+    const state = { filters: manyFilters };
+    const params = serializeTableStateToUrl(state);
+
+    expect(params.filters).toBeDefined();
+    if (params.filters) {
+      // Should be compressed (starts with "c:")
+      expect(params.filters).toStartWith('c:');
+
+      // Compressed version should be significantly shorter than JSON
+      const jsonString = JSON.stringify(manyFilters);
+      expect(params.filters.length).toBeLessThan(jsonString.length);
+
+      // Should deserialize correctly
+      const deserialized = deserializeTableStateFromUrl({ filters: params.filters });
+      expect(deserialized.filters).toHaveLength(10);
+    }
+  });
+
+  it('should compress sorting, columnVisibility, and columnOrder when large', () => {
+    const largeSorting: SortingState = Array.from({ length: 5 }, (_, i) => ({
+      columnId: `column${i}`,
+      direction: i % 2 === 0 ? 'asc' : 'desc',
+    }));
+
+    const largeVisibility: Record<string, boolean> = Object.fromEntries(
+      Array.from({ length: 20 }, (_, i) => [`column${i}`, i % 2 === 0])
+    );
+
+    const largeOrder = Array.from({ length: 20 }, (_, i) => `column${i}`);
+
+    const state = {
+      sorting: largeSorting,
+      columnVisibility: largeVisibility,
+      columnOrder: largeOrder,
+    };
+
+    const params = serializeTableStateToUrl(state);
+
+    // All should be serialized
+    expect(params.sorting).toBeDefined();
+    expect(params.columnVisibility).toBeDefined();
+    expect(params.columnOrder).toBeDefined();
+
+    // Should deserialize correctly
+    const deserialized = deserializeTableStateFromUrl(params);
+    expect(deserialized.sorting).toHaveLength(5);
+    expect(Object.keys(deserialized.columnVisibility)).toHaveLength(20);
+    expect(deserialized.columnOrder).toHaveLength(20);
+  });
+
+  it('should handle round-trip with compression', () => {
+    const original = {
+      filters: [
+        {
+          columnId: 'name',
+          type: 'text',
+          operator: 'contains',
+          values: ['a'],
+        },
+        {
+          columnId: 'role',
+          type: 'option',
+          operator: 'is',
+          values: ['contributor'],
+        },
+        {
+          columnId: 'createdAt',
+          type: 'date',
+          operator: 'after',
+          values: ['2024-01-01T05:00:00.000Z'],
+        },
+        {
+          columnId: 'status',
+          type: 'option',
+          operator: 'is',
+          values: ['active'],
+        },
+      ] as FilterState[],
+      sorting: [{ columnId: 'name', direction: 'asc' }] as SortingState,
+      columnVisibility: { email: false, phone: true },
+      columnOrder: ['id', 'name', 'email'],
+    };
+
+    const serialized = serializeTableStateToUrl(original);
+    const deserialized = deserializeTableStateFromUrl(serialized);
+
+    expect(deserialized.filters).toHaveLength(4);
+    expect(deserialized.filters[0]).toMatchObject(original.filters[0]);
+    expect(deserialized.filters[1]).toMatchObject(original.filters[1]);
+    expect(deserialized.filters[2]).toMatchObject(original.filters[2]);
+    expect(deserialized.filters[3]).toMatchObject(original.filters[3]);
+    expect(deserialized.sorting).toEqual(original.sorting);
+    expect(deserialized.columnVisibility).toEqual(original.columnVisibility);
+    expect(deserialized.columnOrder).toEqual(original.columnOrder);
+  });
+
+  it('should handle invalid compressed data gracefully', () => {
+    const params = {
+      filters: 'c:invalid-compressed-data!!!',
+      sorting: 'c:also-invalid',
+    };
+
+    const state = deserializeTableStateFromUrl(params);
+
+    // Should return empty defaults on decompression failure
+    expect(state.filters).toEqual([]);
+    expect(state.sorting).toEqual([]);
   });
 });

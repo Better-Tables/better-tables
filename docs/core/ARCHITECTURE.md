@@ -136,7 +136,7 @@ packages/core/
 ├── tests/              # Test suite
 ├── package.json        # Package configuration
 ├── tsconfig.json       # TypeScript configuration
-└── tsup.config.ts      # Build configuration
+└── tsdown.config.ts      # Build configuration
 ```
 
 ### Module Organization

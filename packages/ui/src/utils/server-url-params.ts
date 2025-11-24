@@ -3,7 +3,7 @@
  *
  * Pure functions for parsing URL parameters on the server. Works with
  * Next.js, Remix, or any server framework that provides searchParams.
- * Handles base64-encoded complex data structures automatically.
+ * Handles compressed complex data structures automatically.
  *
  * @module utils/server-url-params
  */
@@ -35,7 +35,7 @@ export interface ParsedTableSearchParams {
  * Extracts and parses all table-related URL parameters from server-side
  * searchParams (e.g., Next.js 15 searchParams, Remix searchParams).
  * Provides sensible defaults for missing parameters.
- * Automatically decodes base64-encoded complex data structures.
+ * Automatically decompresses complex data structures.
  *
  * @param searchParams - URL search parameters as a record (e.g., from Next.js or Remix)
  * @param defaults - Optional default values for pagination (defaults to page: 1, limit: 20)
@@ -69,7 +69,7 @@ export function parseTableSearchParams(
   const defaultPage = defaults?.page ?? 1;
   const defaultLimit = defaults?.limit ?? 20;
 
-  // Use the deserialization utility (handles base64 decoding automatically)
+  // Use the deserialization utility (handles decompression automatically)
   const deserialized = deserializeTableStateFromUrl(searchParams, {
     page: defaultPage,
     limit: defaultLimit,

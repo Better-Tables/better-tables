@@ -166,8 +166,8 @@ The serializer uses intelligent compression to minimize URL length:
    - `includeNull` → `n`
    - `meta` → `m`
 
-2. **Base64 Encoding**: Converts to URL-safe format
-3. **Automatic Compression**: Applies compression when URL length exceeds threshold
+2. **lz-string Compression**: Compresses data using lz-string (URL-safe)
+3. **Automatic Compression**: Always applies compression for optimal URL length
 
 #### Compression Example
 

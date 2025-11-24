@@ -7,7 +7,7 @@ import {
   mergeColumnVisibility,
 } from '@better-tables/core';
 import { useEffect, useRef } from 'react';
-import { decodeBase64, encodeBase64 } from '@/utils';
+import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../utils/url-serialization';
 import { getTableStore } from './table-registry';
 
 /**
@@ -86,76 +86,61 @@ export function useTableUrlSync(
     }
 
     const manager = store.getState().manager;
+
+    // Collect URL params
+    const urlParams: Record<string, string | undefined | null> = {};
+    if (config.filters) {
+      urlParams.filters = adapter.getParam('filters') ?? undefined;
+    }
+    if (config.pagination) {
+      urlParams.page = adapter.getParam('page') ?? undefined;
+      urlParams.limit = adapter.getParam('limit') ?? undefined;
+    }
+    if (config.sorting) {
+      urlParams.sorting = adapter.getParam('sorting') ?? undefined;
+    }
+    if (config.columnVisibility) {
+      urlParams.columnVisibility = adapter.getParam('columnVisibility') ?? undefined;
+    }
+    if (config.columnOrder) {
+      urlParams.columnOrder = adapter.getParam('columnOrder') ?? undefined;
+    }
+
+    // Deserialize table state from URL using utility function
+    const deserialized = deserializeTableStateFromUrl(urlParams);
+
+    // Build updates object
     const updates: Parameters<typeof manager.updateState>[0] = {};
 
-    // Parse URL params (base64-decoded)
-    if (config.filters) {
-      const filtersParam = adapter.getParam('filters');
-      if (filtersParam) {
-        const decoded = decodeBase64(filtersParam);
-        if (decoded && Array.isArray(decoded)) {
-          updates.filters = decoded;
-        }
-      }
+    if (config.filters && deserialized.filters.length > 0) {
+      updates.filters = deserialized.filters;
     }
 
     if (config.pagination) {
-      const pageParam = adapter.getParam('page');
-      const limitParam = adapter.getParam('limit');
-
-      if (pageParam || limitParam) {
-        // Start with current pagination state
-        const currentPagination = manager.getPagination();
-        updates.pagination = { ...currentPagination };
-
-        if (pageParam) {
-          const page = Number.parseInt(pageParam, 10);
-          if (!Number.isNaN(page)) {
-            updates.pagination.page = page;
-          }
-        }
-        if (limitParam) {
-          const limit = Number.parseInt(limitParam, 10);
-          if (!Number.isNaN(limit)) {
-            updates.pagination.limit = limit;
-          }
-        }
-      }
+      const currentPagination = manager.getPagination();
+      updates.pagination = {
+        ...currentPagination,
+        ...(deserialized.pagination.page !== undefined && { page: deserialized.pagination.page }),
+        ...(deserialized.pagination.limit !== undefined && {
+          limit: deserialized.pagination.limit,
+        }),
+      };
     }
 
-    if (config.sorting) {
-      const sortingParam = adapter.getParam('sorting');
-      if (sortingParam) {
-        const decoded = decodeBase64(sortingParam);
-        if (decoded && Array.isArray(decoded)) {
-          updates.sorting = decoded;
-        }
-      }
+    if (config.sorting && deserialized.sorting.length > 0) {
+      updates.sorting = deserialized.sorting;
     }
 
     if (config.columnVisibility) {
-      const visibilityParam = adapter.getParam('columnVisibility');
-      if (visibilityParam) {
-        const decoded = decodeBase64<Record<string, boolean>>(visibilityParam);
-        if (decoded && typeof decoded === 'object' && decoded !== null && !Array.isArray(decoded)) {
-          const { columns } = store.getState();
-          // Merge modifications with defaults
-          updates.columnVisibility = mergeColumnVisibility(columns, decoded);
-        }
-      }
+      const { columns } = store.getState();
+      // Merge modifications with defaults
+      updates.columnVisibility = mergeColumnVisibility(columns, deserialized.columnVisibility);
     }
 
     if (config.columnOrder) {
-      const orderParam = adapter.getParam('columnOrder');
-      if (orderParam) {
-        const decoded = decodeBase64<string[]>(orderParam);
-        // Guard against malformed URLs: ensure modifications is an array
-        if (decoded && Array.isArray(decoded)) {
-          const { columns } = store.getState();
-          // Merge modifications with defaults
-          updates.columnOrder = mergeColumnOrder(columns, decoded);
-        }
-      }
+      const { columns } = store.getState();
+      // Merge modifications with defaults
+      updates.columnOrder = mergeColumnOrder(columns, deserialized.columnOrder);
     }
 
     // Apply updates if we have any
@@ -179,42 +164,39 @@ export function useTableUrlSync(
       if (!hasHydratedFromUrl.current) return;
 
       if (event.type === 'state_changed') {
-        const updates: Record<string, string | null> = {};
+        // Build table state object for serialization
+        const tableState: Parameters<typeof serializeTableStateToUrl>[0] = {};
 
         if (config.filters) {
-          updates.filters =
-            event.state.filters.length > 0 ? encodeBase64(event.state.filters) : null;
+          tableState.filters = event.state.filters;
         }
 
         if (config.pagination) {
-          updates.page = event.state.pagination.page.toString();
-          updates.limit = event.state.pagination.limit.toString();
+          tableState.pagination = event.state.pagination;
         }
 
         if (config.sorting) {
-          updates.sorting =
-            event.state.sorting.length > 0 ? encodeBase64(event.state.sorting) : null;
+          tableState.sorting = event.state.sorting;
         }
 
         if (config.columnVisibility) {
           const { columns } = store.getState();
           // Get only modifications from defaults
-          const modifications = getColumnVisibilityModifications(
+          tableState.columnVisibility = getColumnVisibilityModifications(
             columns,
             event.state.columnVisibility
           );
-          updates.columnVisibility =
-            Object.keys(modifications).length > 0 ? encodeBase64(modifications) : null;
         }
 
         if (config.columnOrder) {
           const { columns } = store.getState();
           // Get only modifications from defaults
-          const modifications = getColumnOrderModifications(columns, event.state.columnOrder);
-          updates.columnOrder = modifications.length > 0 ? encodeBase64(modifications) : null;
+          tableState.columnOrder = getColumnOrderModifications(columns, event.state.columnOrder);
         }
 
-        adapter.setParams(updates);
+        // Serialize table state to URL params using utility function
+        const urlParams = serializeTableStateToUrl(tableState);
+        adapter.setParams(urlParams);
       }
     });
 

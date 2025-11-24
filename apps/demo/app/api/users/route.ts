@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Parse URL params using the utility (handles base64 decoding automatically)
+    // Parse URL params using the utility (handles decompression automatically)
     const params = Object.fromEntries(searchParams.entries());
     const tableParams = parseTableSearchParams(params, {
       page: 1,

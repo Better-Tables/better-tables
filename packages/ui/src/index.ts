@@ -55,5 +55,5 @@ export * from './stores/table-registry';
 export type { TableState, TableStoreInitialState } from './stores/table-store';
 export * from './stores/url-sync-adapter';
 // Export framework-agnostic utilities (opt-in)
-// Complex data structures (filters, sorting, etc.) are base64-encoded to keep URLs short
+// Complex data structures (filters, sorting, etc.) are compressed to keep URLs short
 export * from './utils';

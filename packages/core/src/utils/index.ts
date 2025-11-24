@@ -6,6 +6,7 @@
 // export * from './validation';
 export * from './column-order';
 export * from './column-visibility';
+export * from './compression';
 export * from './equality';
 export * from './filter-serialization';
 export * from './meta-accessors';

@@ -19,7 +19,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   // Parse URL params for SSR initial data fetch
-  // parseTableSearchParams automatically handles base64 decoding
+  // parseTableSearchParams automatically handles decompression
   const tableParams = parseTableSearchParams(params, {
     page: 1,
     limit: 10,

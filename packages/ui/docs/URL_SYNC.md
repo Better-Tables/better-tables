@@ -239,15 +239,24 @@ useTableUrlSync('my-table', {
 
 The hook uses the following query parameters:
 
-- **filters**: JSON-encoded array of filter states
-- **page**: Current page number
-- **limit**: Items per page
-- **sorting**: JSON-encoded array of sort states
+- **filters**: Compressed and encoded filter states (prefixed with "c:")
+- **page**: Current page number (plain string)
+- **limit**: Items per page (plain string)
+- **sorting**: Compressed and encoded sort states (prefixed with "c:")
+- **columnVisibility**: Compressed and encoded column visibility state (prefixed with "c:")
+- **columnOrder**: Compressed and encoded column order (prefixed with "c:")
+
+**Compression Strategy:**
+- Complex data structures (filters, sorting, column visibility, column order) are compressed using lz-string compression
+- Compressed data is prefixed with "c:" to identify the format
+- Simple values (page, limit) are stored as plain strings
 
 Example URL:
 ```
-/users?page=2&limit=20&filters=[{"columnId":"name","operator":"contains","values":["john"]}]&sorting=[{"columnId":"age","direction":"desc"}]
+/users?page=2&limit=20&filters=c:...&sorting=c:...
 ```
+
+Note: The actual compressed strings are much shorter than JSON and URL-safe.
 
 ## Server-Side Rendering (SSR)
 
@@ -255,13 +264,23 @@ For SSR frameworks like Next.js, you can parse URL params on the server and pass
 
 ```tsx
 // app/users/page.tsx (Next.js App Router)
+import { deserializeTableStateFromUrl } from '@better-tables/ui';
+
 export default async function UsersPage({ searchParams }) {
   const params = await searchParams;
   
-  const page = Number.parseInt(params.page || '1');
-  const limit = Number.parseInt(params.limit || '10');
-  const filters = params.filters ? JSON.parse(params.filters) : [];
-  const sorting = params.sorting ? JSON.parse(params.sorting) : [];
+  // Deserialize table state from URL (handles compression automatically)
+  const tableState = deserializeTableStateFromUrl({
+    filters: params.filters ?? undefined,
+    page: params.page ?? undefined,
+    limit: params.limit ?? undefined,
+    sorting: params.sorting ?? undefined,
+  });
+
+  const page = tableState.pagination?.page ?? 1;
+  const limit = tableState.pagination?.limit ?? 10;
+  const filters = tableState.filters ?? [];
+  const sorting = tableState.sorting ?? [];
 
   // Fetch data with URL params
   const data = await fetchUsers({ page, limit, filters, sorting });
@@ -329,9 +348,11 @@ export function MyTable({ data }) {
 
 ## Advanced: Custom Serialization
 
-If you need custom serialization (e.g., base64 encoding), implement it in your adapter:
+The default URL sync adapter automatically handles compression and serialization. However, if you need custom serialization, you can use the low-level compression utilities:
 
 ```typescript
+import { compressAndEncode, decompressAndDecode } from '@better-tables/ui';
+
 export function useCustomUrlAdapter(): UrlSyncAdapter {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -342,7 +363,11 @@ export function useCustomUrlAdapter(): UrlSyncAdapter {
       if (!value) return null;
       
       try {
-        return atob(value); // Decode from base64
+        // Decompress if it's a compressed value (prefixed with "c:")
+        if (value.startsWith('c:')) {
+          return decompressAndDecode(value);
+        }
+        return value; // Plain string
       } catch {
         return null;
       }
@@ -353,8 +378,12 @@ export function useCustomUrlAdapter(): UrlSyncAdapter {
       for (const [key, value] of Object.entries(updates)) {
         if (value === null) {
           params.delete(key);
+        } else if (typeof value === 'string' && value.startsWith('c:')) {
+          // Already compressed (from serializeTableStateToUrl)
+          params.set(key, value);
         } else {
-          params.set(key, btoa(value)); // Encode to base64
+          // Compress complex data structures
+          params.set(key, compressAndEncode(value));
         }
       }
 
@@ -363,6 +392,8 @@ export function useCustomUrlAdapter(): UrlSyncAdapter {
   };
 }
 ```
+
+**Note:** The default `useTableUrlSync` hook already uses `serializeTableStateToUrl` and `deserializeTableStateFromUrl` which handle compression automatically. You typically don't need to use `compressAndEncode`/`decompressAndDecode` directly unless you're building a custom adapter.
 
 ## Best Practices
 
