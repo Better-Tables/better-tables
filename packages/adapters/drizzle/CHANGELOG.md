@@ -1,5 +1,13 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.2
+
+### Patch Changes
+
+- Fixes filter and table state sync by creating the table store synchronously, and prevents hydration warnings in the FilterBar. Enhance FilterHandler to support JSONB field extraction and improve security validations.
+- Updated dependencies
+  - @better-tables/core@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
