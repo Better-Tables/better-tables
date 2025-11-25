@@ -32,6 +32,7 @@ jobs:
           days-before-pr-stale: -1
           days-before-pr-close: -1
           # Exclude certain labels from stale automation
+          # Issues with these labels will never be marked as stale or closed
           exempt-issue-labels: |
             pinned
             security
@@ -39,10 +40,6 @@ jobs:
             help wanted
             enhancement
             bug
-          # Don't close issues with these labels
-          exempt-all-issue-labels: |
-            pinned
-            security
           # Operations per run limit
           operations-per-run: 30
 
