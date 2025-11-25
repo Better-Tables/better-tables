@@ -4,16 +4,16 @@
   "description": "Command-line utilities for Better Tables",
   "type": "module",
   "bin": {
-    "better-tables": "./dist/cli.js"
+    "better-tables": "./dist/cli.mjs"
   },
-  "main": "./dist/cli.js",
+  "main": "./dist/cli.mjs",
   "module": "./dist/cli.mjs",
   "types": "./dist/cli.d.ts",
   "exports": {
     ".": {
       "types": "./dist/cli.d.ts",
       "import": "./dist/cli.mjs",
-      "require": "./dist/cli.js"
+      "require": "./dist/cli.cjs"
     }
   },
   "files": [
