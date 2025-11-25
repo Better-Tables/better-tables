@@ -1,0 +1,72 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for Better Tables
+title: "[Feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which package would this feature relate to?
+      options:
+        - "@better-tables/core"
+        - "@better-tables/ui"
+        - "@better-tables/adapters-drizzle"
+        - "Multiple packages"
+        - "New package"
+        - "Not sure"
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the feature you'd like to see.
+      placeholder: Describe the feature...
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Explain why this feature would be useful. What problem does it solve?
+      placeholder: |
+        This feature would help me because...
+        I need this when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this feature working? What would the API look like?
+      placeholder: |
+        I think this feature could work like...
+        The API might look like...
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative approaches or workarounds?
+      placeholder: |
+        I've tried...
+        Another approach could be...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, mockups, examples, or related issues about the feature request here.
+      placeholder: Any other information that might be helpful...
+    validations:
+      required: false
+
