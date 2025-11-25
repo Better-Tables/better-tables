@@ -512,7 +512,6 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
 Better Tables is inspired by and built with:
 
-- [TanStack Table](https://tanstack.com/table) - For the excellent query API
 - [shadcn/ui](https://ui.shadcn.com) - Beautiful, accessible components
 - [Drizzle ORM](https://orm.drizzle.team) - Type-safe database queries
 - [Radix UI](https://www.radix-ui.com) - Primitives for accessible components
