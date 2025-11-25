@@ -366,14 +366,28 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const page = Number.parseInt(params.page || '1', 10);
   const limit = Number.parseInt(params.limit || '10', 10);
   
+  // Deserialize filters (compressed format, prefixed with "c:")
   let filters: FilterState[] = [];
   if (params.filters) {
-    filters = JSON.parse(params.filters);
+    try {
+      const { deserializeFiltersFromURL } = await import('@better-tables/core');
+      filters = deserializeFiltersFromURL(params.filters);
+    } catch {
+      // Invalid or corrupted filter data, use empty array
+      filters = [];
+    }
   }
   
+  // Deserialize sorting (compressed format, prefixed with "c:")
   let sorting: SortingState = [];
   if (params.sorting) {
-    sorting = JSON.parse(params.sorting);
+    try {
+      const { decompressAndDecode } = await import('@better-tables/core');
+      sorting = decompressAndDecode<SortingState>(params.sorting);
+    } catch {
+      // Invalid or corrupted sorting data, use empty array
+      sorting = [];
+    }
   }
   
   // Fetch data

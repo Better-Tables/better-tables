@@ -16,8 +16,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -28,18 +28,19 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
-    "date-fns": "^2.30.0"
+    "date-fns": "^2.30.0",
+    "lz-string": "^1.5.0"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tsup": "^8.5.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:"
   },
   "publishConfig": {

@@ -1,4 +1,4 @@
-import type { FilterState, SortingState } from '@better-tables/core';
+import { parseTableSearchParams } from '@better-tables/ui/server';
 import { UsersTableClient } from '@/components/users-table-client';
 import { getAdapter } from '@/lib/adapter';
 import { defaultVisibleColumns } from '@/lib/columns/user-columns';
@@ -10,6 +10,8 @@ interface PageProps {
     limit?: string;
     filters?: string;
     sorting?: string;
+    columnVisibility?: string;
+    columnOrder?: string;
   }>;
 }
 
@@ -17,26 +19,13 @@ export default async function DemoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   // Parse URL params for SSR initial data fetch
-  const page = Number.parseInt(params.page || '1', 10);
-  const limit = Number.parseInt(params.limit || '10', 10);
+  // parseTableSearchParams automatically handles decompression
+  const tableParams = parseTableSearchParams(params, {
+    page: 1,
+    limit: 10,
+  });
 
-  let filters: FilterState[] = [];
-  if (params.filters) {
-    try {
-      filters = JSON.parse(params.filters);
-    } catch (e) {
-      console.error('Error parsing filters:', e);
-    }
-  }
-
-  let sorting: SortingState = [];
-  if (params.sorting) {
-    try {
-      sorting = JSON.parse(params.sorting);
-    } catch (e) {
-      console.error('Error parsing sorting:', e);
-    }
-  }
+  const { page, limit, filters, sorting } = tableParams;
 
   // Fetch data using adapter
   const adapter = await getAdapter();

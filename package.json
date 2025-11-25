@@ -13,6 +13,9 @@
     "catalog": {
       "@types/react": "^19.1.8",
       "@types/react-dom": "^19.1.6",
+      "react": "^19.2.0",
+      "react-dom": "^19.2.0",
+      "tsdown": "^0.16.6",
       "typescript": "^5.8.3"
     }
   },

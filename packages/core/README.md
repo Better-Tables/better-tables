@@ -389,11 +389,11 @@ import {
   shallowEqualArrays,
 } from '@better-tables/core';
 
-// Serialize filters for URL storage
+// Serialize filters for URL storage (compressed with lz-string)
 const urlParams = serializeFiltersToURL(filters);
-// Result: "filters=[{\"columnId\":\"name\",\"type\":\"text\",...}]"
+// Result: "c:..." (compressed URL-safe string, prefixed with "c:")
 
-// Deserialize from URL
+// Deserialize from URL (expects compressed format)
 const filters = deserializeFiltersFromURL(urlParams);
 
 // Equality checks
@@ -524,6 +524,8 @@ console.log(result.total); // Total count
 ```typescript
 // app/page.tsx
 import type { FilterState, SortingState } from '@better-tables/core';
+import { deserializeFiltersFromURL } from '@better-tables/core';
+import { decompressAndDecode } from '@better-tables/core';
 import { getAdapter } from '@/lib/adapter';
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
@@ -533,14 +535,26 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const page = Number.parseInt(params.page || '1', 10);
   const limit = Number.parseInt(params.limit || '10', 10);
 
+  // Deserialize filters (compressed format, prefixed with "c:")
   let filters: FilterState[] = [];
   if (params.filters) {
-    filters = JSON.parse(params.filters);
+    try {
+      filters = deserializeFiltersFromURL(params.filters);
+    } catch {
+      // Invalid or corrupted filter data, use empty array
+      filters = [];
+    }
   }
 
+  // Deserialize sorting (compressed format, prefixed with "c:")
   let sorting: SortingState = [];
   if (params.sorting) {
-    sorting = JSON.parse(params.sorting);
+    try {
+      sorting = decompressAndDecode<SortingState>(params.sorting);
+    } catch {
+      // Invalid or corrupted sorting data, use empty array
+      sorting = [];
+    }
   }
 
   // Fetch data
@@ -611,9 +625,9 @@ const filters: FilterState[] = [
 ];
 
 const urlParams = serializeFiltersToURL(filters);
-// Use in URL: ?filters=[{...}]
+// Use in URL: ?filters=c:... (compressed format, prefixed with "c:")
 
-// Restore from URL
+// Restore from URL (must be compressed format)
 const restoredFilters = deserializeFiltersFromURL(urlParams);
 ```
 

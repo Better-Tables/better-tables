@@ -1,4 +1,4 @@
-import type { FilterState, SortingState } from '@better-tables/core';
+import { parseTableSearchParams } from '@better-tables/ui/server';
 import { type NextRequest, NextResponse } from 'next/server';
 import { getAdapter } from '@/lib/adapter';
 
@@ -6,31 +6,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Parse pagination
-    const page = Number.parseInt(searchParams.get('page') || '1', 10);
-    const limit = Number.parseInt(searchParams.get('limit') || '10', 10);
+    // Parse URL params using the utility (handles decompression automatically)
+    const params = Object.fromEntries(searchParams.entries());
+    const tableParams = parseTableSearchParams(params, {
+      page: 1,
+      limit: 10,
+    });
 
-    // Parse filters
-    let filters: FilterState[] = [];
-    const filtersParam = searchParams.get('filters');
-    if (filtersParam) {
-      try {
-        filters = JSON.parse(filtersParam);
-      } catch (e) {
-        console.error('Error parsing filters:', e);
-      }
-    }
-
-    // Parse sorting
-    let sorting: SortingState = [];
-    const sortingParam = searchParams.get('sorting');
-    if (sortingParam) {
-      try {
-        sorting = JSON.parse(sortingParam);
-      } catch (e) {
-        console.error('Error parsing sorting:', e);
-      }
-    }
+    const { page, limit, filters, sorting } = tableParams;
 
     // Get adapter and fetch data
     const adapter = await getAdapter();
