@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - '@better-tables/*@*'  # Match Changesets tag format
 
 permissions:
   contents: write
@@ -15,26 +15,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # Full history for tag access
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.1
 
-      - name: Extract tag and version
+      - name: Extract tag, package, and version
         id: tag
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG_NAME#v}  # Remove 'v' prefix
+          # Extract package name and version from tag like @better-tables/core@0.5.3
+          if [[ "$TAG_NAME" =~ @better-tables/([^@]+)@(.+) ]]; then
+            PACKAGE_NAME="@better-tables/${BASH_REMATCH[1]}"
+            VERSION="${BASH_REMATCH[2]}"
+          else
+            # Fallback for v* format if needed
+            PACKAGE_NAME="Better Tables"
+            VERSION=${TAG_NAME#v}
+          fi
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "package=$PACKAGE_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Tag: $TAG_NAME, Version: $VERSION"
+          echo "Tag: $TAG_NAME, Package: $PACKAGE_NAME, Version: $VERSION"
 
       - name: Generate release notes from CHANGELOG
         id: changelog
         run: |
           VERSION="${{ steps.tag.outputs.version }}"
+          PACKAGE_NAME="${{ steps.tag.outputs.package }}"
           RELEASE_NOTES=""
           
           # Function to extract changelog section for a version
@@ -48,7 +58,6 @@ jobs:
             fi
             
             # Extract section between ## version and next ##
-            # Support both ## version and ## [version] formats
             local section=$(awk "/^## \[?$version\]?/,/^## /" "$changelog_file" | head -n -1)
             
             if [ -n "$section" ]; then
@@ -59,14 +68,28 @@ jobs:
             fi
           }
           
-          # Check package CHANGELOG files
-          extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "@better-tables/core"
-          extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "@better-tables/ui"
-          extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "@better-tables/adapters-drizzle"
+          # Determine which CHANGELOG to check based on package name
+          case "$PACKAGE_NAME" in
+            "@better-tables/core")
+              extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
+              ;;
+            "@better-tables/ui")
+              extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
+              ;;
+            "@better-tables/adapters-drizzle")
+              extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
+              ;;
+            *)
+              # Check all package CHANGELOG files
+              extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "@better-tables/core"
+              extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "@better-tables/ui"
+              extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "@better-tables/adapters-drizzle"
+              ;;
+          esac
           
           # If no changelog found, use default message
           if [ -z "$RELEASE_NOTES" ]; then
-            RELEASE_NOTES="Release ${{ steps.tag.outputs.tag }}\n\nSee [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.tag.outputs.tag }}/CHANGELOG.md) for details."
+            RELEASE_NOTES="Release $PACKAGE_NAME $VERSION\n\nSee [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.tag.outputs.tag }}/CHANGELOG.md) for details."
           fi
           
           {
@@ -89,8 +112,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: Release ${{ steps.tag.outputs.version }}
+          name: ${{ steps.tag.outputs.package }} ${{ steps.tag.outputs.version }}
           body: ${{ steps.changelog.outputs.body }}
           draft: false
           prerelease: ${{ steps.prerelease.outputs.prerelease == 'true' }}
-
