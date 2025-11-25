@@ -35,7 +35,7 @@
         "@types/react-dom": "catalog:",
         "autoprefixer": "^10.4.20",
         "postcss": "^8.4.49",
-        "tailwindcss": "^4.1.17",
+        "tailwindcss": "^3.4.17",
         "tailwindcss-animate": "^1.0.7",
         "typescript": "catalog:",
       },
@@ -66,7 +66,7 @@
     },
     "packages/cli": {
       "name": "@better-tables/cli",
-      "version": "0.5.3",
+      "version": "0.1.1",
       "bin": {
         "better-tables": "./dist/cli.js",
       },
@@ -75,6 +75,7 @@
         "open": "^10.1.0",
       },
       "devDependencies": {
+        "@types/bun": "latest",
         "@types/node": "^24.0.12",
         "tsdown": "catalog:",
         "typescript": "catalog:",
@@ -988,7 +989,7 @@
 
     "tailwind-merge": ["tailwind-merge@3.3.1", "", {}, "sha512-gBXpgUm/3rp1lMZZrM/w7D8GKqshif0zAymAhbCyIt8KMe+0v9DQ7cdYLR4FHH/cKpdTXb+A/tKKU3eolfsI+g=="],
 
-    "tailwindcss": ["tailwindcss@4.1.17", "", {}, "sha512-j9Ee2YjuQqYT9bbRTfTZht9W/ytp5H+jJpZKiYdP/bpnXARAuELt9ofP0lPnmHjbga7SNQIxdTAXCmtKVYjN+Q=="],
+    "tailwindcss": ["tailwindcss@3.4.18", "", { "dependencies": { "@alloc/quick-lru": "5.2.0", "arg": "5.0.2", "chokidar": "3.6.0", "didyoumean": "1.2.2", "dlv": "1.1.3", "fast-glob": "3.3.3", "glob-parent": "6.0.2", "is-glob": "4.0.3", "jiti": "1.21.7", "lilconfig": "3.1.3", "micromatch": "4.0.8", "normalize-path": "3.0.0", "object-hash": "3.0.0", "picocolors": "1.1.1", "postcss": "8.5.6", "postcss-import": "15.1.0", "postcss-js": "4.1.0", "postcss-load-config": "6.0.1", "postcss-nested": "6.2.0", "postcss-selector-parser": "6.1.2", "resolve": "1.22.11", "sucrase": "3.35.0" }, "bin": { "tailwind": "lib/cli.js", "tailwindcss": "lib/cli.js" } }, "sha512-6A2rnmW5xZMdw11LYjhcI5846rt9pbLSabY5XPxo+XWdxwZaFEn47Go4NzFiHu9sNNmr/kXivP1vStfvMaK1GQ=="],
 
     "tailwindcss-animate": ["tailwindcss-animate@1.0.7", "", { "peerDependencies": { "tailwindcss": "3.4.18" } }, "sha512-bl6mpH3T7I3UFxuvDEXLxy/VuFxBk5bbzplh7tXI68mwMokNYd1t9qPBHlnyTwfa4JGC4zP516I1hYYtQ/vspA=="],
 
@@ -1066,9 +1067,11 @@
 
     "zustand": ["zustand@5.0.8", "", { "optionalDependencies": { "@types/react": "19.2.2", "react": "18.3.1", "use-sync-external-store": "1.6.0" } }, "sha512-gyPKpIaxY9XcO2vSMrLbiER7QMAMGOQZVRdJ6Zi782jkbzZygq5GI9nG8g+sMgitRtndwaBSl7uiqC49o1SSiw=="],
 
+    "@better-tables/cli/@types/bun": ["@types/bun@1.3.3", "", { "dependencies": { "bun-types": "1.3.3" } }, "sha512-ogrKbJ2X5N0kWLLFKeytG0eHDleBYtngtlbu9cyBKFtNL3cnpDZkNdQj8flVf6WTZUX5ulI9AY1oa7ljhSrp+g=="],
+
     "@better-tables/ui/date-fns": ["date-fns@4.1.0", "", {}, "sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg=="],
 
-    "@better-tables/ui/tailwindcss": ["tailwindcss@3.4.18", "", { "dependencies": { "@alloc/quick-lru": "5.2.0", "arg": "5.0.2", "chokidar": "3.6.0", "didyoumean": "1.2.2", "dlv": "1.1.3", "fast-glob": "3.3.3", "glob-parent": "6.0.2", "is-glob": "4.0.3", "jiti": "1.21.7", "lilconfig": "3.1.3", "micromatch": "4.0.8", "normalize-path": "3.0.0", "object-hash": "3.0.0", "picocolors": "1.1.1", "postcss": "8.5.6", "postcss-import": "15.1.0", "postcss-js": "4.1.0", "postcss-load-config": "6.0.1", "postcss-nested": "6.2.0", "postcss-selector-parser": "6.1.2", "resolve": "1.22.11", "sucrase": "3.35.0" }, "bin": { "tailwind": "lib/cli.js", "tailwindcss": "lib/cli.js" } }, "sha512-6A2rnmW5xZMdw11LYjhcI5846rt9pbLSabY5XPxo+XWdxwZaFEn47Go4NzFiHu9sNNmr/kXivP1vStfvMaK1GQ=="],
+    "@better-tables/ui/tailwindcss": ["tailwindcss@4.1.17", "", {}, "sha512-j9Ee2YjuQqYT9bbRTfTZht9W/ytp5H+jJpZKiYdP/bpnXARAuELt9ofP0lPnmHjbga7SNQIxdTAXCmtKVYjN+Q=="],
 
     "@dnd-kit/accessibility/react": ["react@18.3.1", "", { "dependencies": { "loose-envify": "1.4.0" } }, "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ=="],
 
@@ -1332,7 +1335,7 @@
 
     "sucrase/commander": ["commander@4.1.1", "", {}, "sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA=="],
 
-    "tailwindcss-animate/tailwindcss": ["tailwindcss@3.4.18", "", { "dependencies": { "@alloc/quick-lru": "5.2.0", "arg": "5.0.2", "chokidar": "3.6.0", "didyoumean": "1.2.2", "dlv": "1.1.3", "fast-glob": "3.3.3", "glob-parent": "6.0.2", "is-glob": "4.0.3", "jiti": "1.21.7", "lilconfig": "3.1.3", "micromatch": "4.0.8", "normalize-path": "3.0.0", "object-hash": "3.0.0", "picocolors": "1.1.1", "postcss": "8.5.6", "postcss-import": "15.1.0", "postcss-js": "4.1.0", "postcss-load-config": "6.0.1", "postcss-nested": "6.2.0", "postcss-selector-parser": "6.1.2", "resolve": "1.22.11", "sucrase": "3.35.0" }, "bin": { "tailwind": "lib/cli.js", "tailwindcss": "lib/cli.js" } }, "sha512-6A2rnmW5xZMdw11LYjhcI5846rt9pbLSabY5XPxo+XWdxwZaFEn47Go4NzFiHu9sNNmr/kXivP1vStfvMaK1GQ=="],
+    "tailwindcss/chokidar": ["chokidar@3.6.0", "", { "dependencies": { "anymatch": "3.1.3", "braces": "3.0.3", "glob-parent": "5.1.2", "is-binary-path": "2.1.0", "is-glob": "4.0.3", "normalize-path": "3.0.0", "readdirp": "3.6.0" }, "optionalDependencies": { "fsevents": "2.3.3" } }, "sha512-7VT13fmjotKpGipCW9JEQAusEPE+Ei8nl6/g4FBAmIm0GOOLMua9NDDo/DWp0ZAxCr3cPq5ZpBqmPAQgDda2Pw=="],
 
     "use-callback-ref/react": ["react@18.3.1", "", { "dependencies": { "loose-envify": "1.4.0" } }, "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ=="],
 
@@ -1348,7 +1351,7 @@
 
     "zustand/react": ["react@18.3.1", "", { "dependencies": { "loose-envify": "1.4.0" } }, "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ=="],
 
-    "@better-tables/ui/tailwindcss/chokidar": ["chokidar@3.6.0", "", { "dependencies": { "anymatch": "3.1.3", "braces": "3.0.3", "glob-parent": "5.1.2", "is-binary-path": "2.1.0", "is-glob": "4.0.3", "normalize-path": "3.0.0", "readdirp": "3.6.0" }, "optionalDependencies": { "fsevents": "2.3.3" } }, "sha512-7VT13fmjotKpGipCW9JEQAusEPE+Ei8nl6/g4FBAmIm0GOOLMua9NDDo/DWp0ZAxCr3cPq5ZpBqmPAQgDda2Pw=="],
+    "@better-tables/cli/@types/bun/bun-types": ["bun-types@1.3.3", "", { "dependencies": { "@types/node": "*" } }, "sha512-z3Xwlg7j2l9JY27x5Qn3Wlyos8YAp0kKRlrePAOjgjMGS5IG6E7Jnlx736vH9UVI4wUICwwhC9anYL++XeOgTQ=="],
 
     "@dnd-kit/core/react-dom/scheduler": ["scheduler@0.23.2", "", { "dependencies": { "loose-envify": "1.4.0" } }, "sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ=="],
 
@@ -1446,22 +1449,14 @@
 
     "string-width/strip-ansi/ansi-regex": ["ansi-regex@6.2.2", "", {}, "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg=="],
 
-    "tailwindcss-animate/tailwindcss/chokidar": ["chokidar@3.6.0", "", { "dependencies": { "anymatch": "3.1.3", "braces": "3.0.3", "glob-parent": "5.1.2", "is-binary-path": "2.1.0", "is-glob": "4.0.3", "normalize-path": "3.0.0", "readdirp": "3.6.0" }, "optionalDependencies": { "fsevents": "2.3.3" } }, "sha512-7VT13fmjotKpGipCW9JEQAusEPE+Ei8nl6/g4FBAmIm0GOOLMua9NDDo/DWp0ZAxCr3cPq5ZpBqmPAQgDda2Pw=="],
+    "tailwindcss/chokidar/glob-parent": ["glob-parent@5.1.2", "", { "dependencies": { "is-glob": "4.0.3" } }, "sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow=="],
+
+    "tailwindcss/chokidar/readdirp": ["readdirp@3.6.0", "", { "dependencies": { "picomatch": "2.3.1" } }, "sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA=="],
 
     "wrap-ansi-cjs/string-width/emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 
     "wrap-ansi/strip-ansi/ansi-regex": ["ansi-regex@6.2.2", "", {}, "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg=="],
 
-    "@better-tables/ui/tailwindcss/chokidar/glob-parent": ["glob-parent@5.1.2", "", { "dependencies": { "is-glob": "4.0.3" } }, "sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow=="],
-
-    "@better-tables/ui/tailwindcss/chokidar/readdirp": ["readdirp@3.6.0", "", { "dependencies": { "picomatch": "2.3.1" } }, "sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA=="],
-
-    "tailwindcss-animate/tailwindcss/chokidar/glob-parent": ["glob-parent@5.1.2", "", { "dependencies": { "is-glob": "4.0.3" } }, "sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow=="],
-
-    "tailwindcss-animate/tailwindcss/chokidar/readdirp": ["readdirp@3.6.0", "", { "dependencies": { "picomatch": "2.3.1" } }, "sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA=="],
-
-    "@better-tables/ui/tailwindcss/chokidar/readdirp/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
-
-    "tailwindcss-animate/tailwindcss/chokidar/readdirp/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
+    "tailwindcss/chokidar/readdirp/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
   }
 }

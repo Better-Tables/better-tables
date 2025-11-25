@@ -79,11 +79,15 @@ jobs:
             "@better-tables/adapters-drizzle")
               extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
               ;;
+            "@better-tables/cli")
+              extract_changelog "packages/cli/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
+              ;;
             *)
               # Check all package CHANGELOG files
               extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "@better-tables/core"
               extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "@better-tables/ui"
               extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "@better-tables/adapters-drizzle"
+              extract_changelog "packages/cli/CHANGELOG.md" "$VERSION" "@better-tables/cli"
               ;;
           esac
           
