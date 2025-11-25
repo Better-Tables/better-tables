@@ -1,0 +1,68 @@
+{
+  "name": "@better-tables/cli",
+  "version": "0.5.3",
+  "description": "Command-line utilities for Better Tables",
+  "type": "module",
+  "bin": {
+    "better-tables": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "module": "./dist/cli.mjs",
+  "types": "./dist/cli.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.mjs",
+      "require": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --apply .",
+    "format": "biome format --write .",
+    "type-check": "tsc --noEmit",
+    "clean": "git clean -xdf .cache dist .turbo node_modules"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^24.0.12",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "better-tables",
+    "cli",
+    "command-line",
+    "table",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Better-Tables/better-tables",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/Better-Tables/better-tables/issues"
+  },
+  "homepage": "https://github.com/Better-Tables/better-tables#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
