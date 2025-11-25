@@ -63,7 +63,7 @@ function ActiveFiltersComponent<TData = unknown>({
           const isProtected = isFilterProtected?.(filter) ?? false;
 
           return (
-            <div key={filter.columnId} className="flex-shrink-0">
+            <div key={filter.columnId} className="shrink-0">
               <MemoizedFilterBadge
                 filter={filter}
                 column={column}
@@ -138,7 +138,7 @@ function FilterBadge<TData = unknown>({
   return (
     <div
       className={cn(
-        'flex items-center rounded-2xl border bg-background text-sm shadow-sm h-8',
+        'flex items-center rounded-2xl border bg-background text-sm shadow-xs h-8',
         disabled && 'opacity-50 cursor-not-allowed',
         isProtected && 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
       )}
@@ -201,7 +201,7 @@ function FilterBadge<TData = unknown>({
                 {isProtected && <Lock className="ml-1 h-4 w-4" />}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-sm">
+            <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-xs">
               <DialogHeader>
                 <DialogTitle>Edit Filter Value</DialogTitle>
               </DialogHeader>

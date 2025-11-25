@@ -401,7 +401,7 @@ export function FilterDropdown<TData = unknown>({
           value={search}
           onValueChange={setSearch}
           disabled={disabled}
-          className="focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent focus-visible:bg-transparent"
+          className="focus:outline-hidden focus-visible:outline-hidden focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent focus-visible:bg-transparent"
         />
       )}
 
@@ -414,10 +414,10 @@ export function FilterDropdown<TData = unknown>({
           )}
         >
           {/* Groups overview panel */}
-          <div className="w-full flex-shrink-0">{groupsOverview}</div>
+          <div className="w-full shrink-0">{groupsOverview}</div>
 
           {/* Group details panel */}
-          <div className="w-full flex-shrink-0">{groupView}</div>
+          <div className="w-full shrink-0">{groupView}</div>
         </div>
       </div>
     </Command>
@@ -460,7 +460,7 @@ export function FilterDropdown<TData = unknown>({
               } as React.HTMLAttributes<HTMLElement>)
             : children}
         </DialogTrigger>
-        <DialogContent className="max-w-sm backdrop-blur-sm">
+        <DialogContent className="max-w-sm backdrop-blur-xs">
           <DialogHeader>
             <DialogTitle className="text-left">
               {currentView.type === 'groups' ? 'Add Filter' : currentView.groupLabel}

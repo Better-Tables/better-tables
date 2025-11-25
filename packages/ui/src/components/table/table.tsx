@@ -607,7 +607,7 @@ export function BetterTable<TData = unknown>({
                   >
                     <TableHead
                       className={cn(
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                         column.align === 'center' && 'text-center',
                         column.align === 'right' && 'text-right',
                         isSortable && 'cursor-pointer hover:bg-muted/50'
@@ -640,7 +640,7 @@ export function BetterTable<TData = unknown>({
                   <TableHead
                     key={column.id}
                     className={cn(
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
                       isSortable && 'cursor-pointer hover:bg-muted/50'
@@ -748,7 +748,7 @@ export function BetterTable<TData = unknown>({
                                         </span>
                                       </TooltipTrigger>
                                       <TooltipContent side="top" className="max-w-xs" showArrow>
-                                        <div className="break-words whitespace-pre-wrap text-pretty">
+                                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
                                           {originalValue}
                                         </div>
                                       </TooltipContent>

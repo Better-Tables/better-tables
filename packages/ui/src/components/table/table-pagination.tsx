@@ -82,10 +82,10 @@ export function TablePagination({
       return (
         <Button
           key={page}
-          variant={currentPage === page ? 'default' : 'outline'}
+          variant={currentPage === page ? 'default' : 'outline-solid'}
           size="sm"
           onClick={() => onPageChange(page)}
-          className="w-8 h-8 p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-8 h-8 p-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-current={currentPage === page ? 'page' : undefined}
         >
           {page}
@@ -132,7 +132,7 @@ export function TablePagination({
           size="sm"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <ChevronLeft className="w-4 h-4 mr-1" />
           Previous
@@ -145,7 +145,7 @@ export function TablePagination({
           size="sm"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Next
           <ChevronRight className="w-4 h-4 ml-1" />

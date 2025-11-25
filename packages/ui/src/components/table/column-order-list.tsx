@@ -164,7 +164,7 @@ function ColumnOrderItem<TData = unknown>({
       )}
 
       {/* Column icon */}
-      {column.icon && <column.icon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+      {column.icon && <column.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
       {!column.icon && <div className="w-3.5" />}
 
       {/* Column name */}

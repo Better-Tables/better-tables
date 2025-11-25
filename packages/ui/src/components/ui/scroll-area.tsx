@@ -196,11 +196,11 @@ const ScrollMask = ({
           'pointer-events-none absolute inset-0 z-10',
           "before:absolute before:inset-x-0 before:top-0 before:transition-[height,opacity] before:duration-300 before:content-['']",
           "after:absolute after:inset-x-0 after:bottom-0 after:transition-[height,opacity] after:duration-300 after:content-['']",
-          'before:h-[var(--top-fade-height)] after:h-[var(--bottom-fade-height)]',
+          'before:h-(--top-fade-height) after:h-(--bottom-fade-height)',
           showMask.top ? 'before:opacity-100' : 'before:opacity-0',
           showMask.bottom ? 'after:opacity-100' : 'after:opacity-0',
-          'before:from-background before:bg-gradient-to-b before:to-transparent',
-          'after:from-background after:bg-gradient-to-t after:to-transparent',
+          'before:from-background before:bg-linear-to-b before:to-transparent',
+          'after:from-background after:bg-linear-to-t after:to-transparent',
           className
         )}
       />
@@ -217,11 +217,11 @@ const ScrollMask = ({
           'pointer-events-none absolute inset-0 z-10',
           "before:absolute before:inset-y-0 before:left-0 before:transition-[width,opacity] before:duration-300 before:content-['']",
           "after:absolute after:inset-y-0 after:right-0 after:transition-[width,opacity] after:duration-300 after:content-['']",
-          'before:w-[var(--left-fade-width)] after:w-[var(--right-fade-width)]',
+          'before:w-(--left-fade-width) after:w-(--right-fade-width)',
           showMask.left ? 'before:opacity-100' : 'before:opacity-0',
           showMask.right ? 'after:opacity-100' : 'after:opacity-0',
-          'before:from-background before:bg-gradient-to-r before:to-transparent',
-          'after:from-background after:bg-gradient-to-l after:to-transparent',
+          'before:from-background before:bg-linear-to-r before:to-transparent',
+          'after:from-background after:bg-linear-to-l after:to-transparent',
           className
         )}
       />

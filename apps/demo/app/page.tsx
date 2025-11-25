@@ -37,7 +37,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-purple-50">
       <div className="container mx-auto py-8 px-4">
         {/* Header */}
         <div className="mb-8">
@@ -49,7 +49,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="bg-white rounded-lg shadow-xs border p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Users</p>
@@ -58,7 +58,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="bg-white rounded-lg shadow-xs border p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Filters Applied</p>
@@ -67,7 +67,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="bg-white rounded-lg shadow-xs border p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Current Page</p>
@@ -78,7 +78,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="bg-white rounded-lg shadow-xs border p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Page Size</p>
@@ -89,7 +89,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
         </div>
 
         {/* Table */}
-        <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="bg-white p-4 rounded-lg shadow-xs">
           <UsersTableClient
             data={result.data as UserWithRelations[]}
             totalCount={result.total}
@@ -108,7 +108,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
         </div>
 
         {/* Features Info */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
+        <div className="mt-8 bg-white rounded-lg shadow-xs border p-6">
           <h2 className="text-2xl font-bold mb-4">Features Demonstrated</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
