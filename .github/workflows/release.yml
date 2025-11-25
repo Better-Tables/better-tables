@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Full history for tag access
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.1
+
+      - name: Extract tag and version
+        id: tag
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#v}  # Remove 'v' prefix
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Tag: $TAG_NAME, Version: $VERSION"
+
+      - name: Generate release notes from CHANGELOG
+        id: changelog
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          RELEASE_NOTES=""
+          
+          # Function to extract changelog section for a version
+          extract_changelog() {
+            local changelog_file=$1
+            local version=$2
+            local package_name=$3
+            
+            if [ ! -f "$changelog_file" ]; then
+              return
+            fi
+            
+            # Extract section between ## version and next ##
+            # Support both ## version and ## [version] formats
+            local section=$(awk "/^## \[?$version\]?/,/^## /" "$changelog_file" | head -n -1)
+            
+            if [ -n "$section" ]; then
+              if [ -n "$RELEASE_NOTES" ]; then
+                RELEASE_NOTES="$RELEASE_NOTES\n\n"
+              fi
+              RELEASE_NOTES="$RELEASE_NOTES## $package_name\n\n$section"
+            fi
+          }
+          
+          # Check package CHANGELOG files
+          extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "@better-tables/core"
+          extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "@better-tables/ui"
+          extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "@better-tables/adapters-drizzle"
+          
+          # If no changelog found, use default message
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Release ${{ steps.tag.outputs.tag }}\n\nSee [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.tag.outputs.tag }}/CHANGELOG.md) for details."
+          fi
+          
+          {
+            echo "body<<EOF"
+            echo -e "$RELEASE_NOTES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Determine if prerelease
+        id: prerelease
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.version }}
+          body: ${{ steps.changelog.outputs.body }}
+          draft: false
+          prerelease: ${{ steps.prerelease.outputs.prerelease == 'true' }}
+
