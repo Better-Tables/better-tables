@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/Better-Tables/better-tables/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 📚 Documentation
+    url: https://github.com/Better-Tables/better-tables/tree/main/docs
+    about: Check our documentation for guides and examples
+  - name: 🔒 Security Issues
+    url: https://github.com/Better-Tables/better-tables/security/advisories/new
+    about: Please report security vulnerabilities privately
+

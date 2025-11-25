@@ -1,0 +1,53 @@
+version: 2
+updates:
+  # Enable version updates for npm (Bun uses npm registry)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # Group updates for better PR management
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+    # Ignore major version updates for critical packages (review manually)
+    ignore:
+      # TypeScript - major updates need careful review
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # React - major updates need careful review
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      # Turbo - major updates need careful review
+      - dependency-name: "turbo"
+        update-types: ["version-update:semver-major"]
+      # Changesets - major updates need careful review
+      - dependency-name: "@changesets/cli"
+        update-types: ["version-update:semver-major"]
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "github-actions"
+      - "automated"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
