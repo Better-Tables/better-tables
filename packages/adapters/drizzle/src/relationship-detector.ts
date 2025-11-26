@@ -109,10 +109,199 @@ export class RelationshipDetector {
     // Extract relationship paths
     this.extractRelationshipPaths(relations, schema);
 
+    // Detect array foreign keys from schema
+    this.detectArrayForeignKeys(schema);
+
     // Backfill missing keys for forward relations using reverse relations when available
     this.backfillKeysFromReverse();
 
     return Object.fromEntries(this.relationships);
+  }
+
+  /**
+   * Detect array foreign keys from schema
+   * Array foreign keys are columns that are arrays and have foreign key references
+   * Example: organizerId: uuid().references(() => usersTable.id).array()
+   */
+  private detectArrayForeignKeys(schema?: Record<string, unknown>): void {
+    if (!schema) return;
+
+    for (const [tableName, tableSchema] of Object.entries(schema)) {
+      if (!tableSchema || typeof tableSchema !== 'object') continue;
+
+      const tableObj = tableSchema as Record<string, unknown>;
+
+      // Iterate through all columns in the table
+      for (const [columnName, columnValue] of Object.entries(tableObj)) {
+        if (!columnValue || typeof columnValue !== 'object') continue;
+
+        const columnObj = columnValue as Record<string, unknown>;
+
+        // Check if this column is an array type
+        const isArray = this.isArrayColumn(columnObj);
+        if (!isArray) continue;
+
+        // Check if this array column has foreign key references
+        const fkInfo = this.getForeignKeyInfo(columnObj);
+        if (!fkInfo) continue;
+
+        // Get the target table name
+        const targetTableName = this.getTableName(fkInfo.table);
+        if (!targetTableName) continue;
+
+        // Get the referenced column name in the target table
+        const referencedColumn = fkInfo.column;
+        const referencedColumnName = this.getFieldName(referencedColumn, targetTableName);
+        if (!referencedColumnName) continue;
+
+        // Create relationship path for array foreign key
+        const relationshipPath: RelationshipPath = {
+          from: tableName,
+          to: targetTableName,
+          foreignKey: referencedColumnName, // The column in the target table (e.g., 'id' in users)
+          localKey: columnName, // The array column in the source table (e.g., 'organizerId' in events)
+          cardinality: 'many', // Array FKs are always many-to-many conceptually
+          nullable: true, // Arrays can be empty
+          joinType: 'left',
+          isArray: true, // Mark as array relationship
+        };
+
+        // Store the relationship with a friendly alias name (plural form)
+        // For 'organizerId' -> 'organizers'
+        const aliasName = this.getArrayRelationshipAlias(columnName);
+        const forwardKey = `${tableName}.${aliasName}`;
+        this.relationships.set(forwardKey, relationshipPath);
+
+        // Also store reverse relationship
+        const reverseKey = `${targetTableName}.${this.getReverseRelationName(tableName, aliasName)}`;
+        this.relationships.set(reverseKey, this.reverseRelationshipPath(relationshipPath));
+
+        // Add to relationship graph
+        if (!this.relationshipGraph.has(tableName)) {
+          this.relationshipGraph.set(tableName, new Set());
+        }
+        const sourceSet = this.relationshipGraph.get(tableName);
+        if (sourceSet) {
+          sourceSet.add(targetTableName);
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if a column is an array type
+   */
+  private isArrayColumn(columnObj: Record<string, unknown>): boolean {
+    // Check for Drizzle array column indicators
+    // Array columns have specific metadata symbols
+    const arraySymbols = [Symbol.for('drizzle:Array'), Symbol.for('drizzle:ArrayType')];
+
+    for (const sym of arraySymbols) {
+      if (sym in columnObj) {
+        return true;
+      }
+    }
+
+    // Check for array-related properties
+    if ('dataType' in columnObj && columnObj.dataType === 'array') {
+      return true;
+    }
+
+    // Check column metadata for array type
+    const columnSymbols = Object.getOwnPropertySymbols(columnObj);
+    for (const sym of columnSymbols) {
+      const symValue = (columnObj as Record<symbol, unknown>)[sym];
+      if (symValue && typeof symValue === 'object') {
+        const metaObj = symValue as Record<string, unknown>;
+        if ('dataType' in metaObj && metaObj.dataType === 'array') {
+          return true;
+        }
+        if ('array' in metaObj && metaObj.array === true) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get foreign key information from a column
+   */
+  private getForeignKeyInfo(
+    columnObj: Record<string, unknown>
+  ): { table: unknown; column: unknown } | null {
+    // Check for foreign key metadata in column symbols
+    const columnSymbols = Object.getOwnPropertySymbols(columnObj);
+    for (const sym of columnSymbols) {
+      const symValue = (columnObj as Record<symbol, unknown>)[sym];
+      if (symValue && typeof symValue === 'object') {
+        const metaObj = symValue as Record<string, unknown>;
+
+        // Check for foreignKeys array
+        if ('foreignKeys' in metaObj && Array.isArray(metaObj.foreignKeys)) {
+          const foreignKeys = metaObj.foreignKeys;
+          if (foreignKeys.length > 0) {
+            const fk = foreignKeys[0];
+            if (fk && typeof fk === 'object') {
+              const fkObj = fk as Record<string, unknown>;
+              const refTable = fkObj.table;
+              const refColumn =
+                fkObj.column || (Array.isArray(fkObj.columns) ? fkObj.columns[0] : null);
+              if (refTable && refColumn) {
+                return { table: refTable, column: refColumn };
+              }
+            }
+          }
+        }
+
+        // Check for reference property (direct reference)
+        if ('reference' in metaObj && metaObj.reference) {
+          const ref = metaObj.reference;
+          if (typeof ref === 'function') {
+            try {
+              const refColumn = ref();
+              const refTable = this.getTableName(refColumn);
+              if (refTable) {
+                return { table: refColumn, column: refColumn };
+              }
+            } catch {
+              // Ignore if reference() fails
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get a friendly alias name for an array foreign key relationship
+   * Converts 'organizerId' -> 'organizers', 'userId' -> 'users', etc.
+   */
+  private getArrayRelationshipAlias(columnName: string): string {
+    // Remove common suffixes: Id, _id, ID, Ids, _ids, IDs
+    // Handle both singular (organizerId) and plural (tagIds) forms
+    let alias = columnName.replace(/(Ids|_ids|IDS|Id|_id|ID)$/i, '');
+
+    // Convert to plural form (simple heuristic)
+    if (alias.endsWith('y')) {
+      alias = `${alias.slice(0, -1)}ies`;
+    } else if (
+      alias.endsWith('s') ||
+      alias.endsWith('x') ||
+      alias.endsWith('z') ||
+      alias.endsWith('ch') ||
+      alias.endsWith('sh')
+    ) {
+      alias = `${alias}es`;
+    } else {
+      alias = `${alias}s`;
+    }
+
+    // Convert to camelCase if needed
+    return alias.charAt(0).toLowerCase() + alias.slice(1);
   }
 
   /**
@@ -300,7 +489,7 @@ export class RelationshipDetector {
                   const fieldObj = field as Record<string, unknown>;
 
                   // First, try to find the property name by matching the field object with the table schema
-                  if (schema && schema[tableName]) {
+                  if (schema?.[tableName]) {
                     const tableSchema = schema[tableName] as Record<string, unknown>;
 
                     // Iterate through all properties in the table schema
@@ -766,6 +955,11 @@ export class RelationshipDetector {
         return fieldObj.name;
       }
 
+      // Check for _name property (used in some Drizzle column metadata)
+      if ('_name' in fieldObj && typeof fieldObj._name === 'string') {
+        return fieldObj._name;
+      }
+
       const nameSymbol = Symbol.for('drizzle:Name');
       if (nameSymbol in fieldObj && typeof fieldObj[nameSymbol] === 'string') {
         return fieldObj[nameSymbol] as string;
@@ -805,7 +999,7 @@ export class RelationshipDetector {
    * Reverse a relationship path
    */
   private reverseRelationshipPath(path: RelationshipPath): RelationshipPath {
-    return {
+    const reversed: RelationshipPath = {
       from: path.to,
       to: path.from,
       foreignKey: path.localKey,
@@ -814,6 +1008,13 @@ export class RelationshipDetector {
       nullable: true, // Reverse relationships are typically nullable
       joinType: 'left',
     };
+
+    // Preserve array flag if it exists
+    if (path.isArray !== undefined) {
+      reversed.isArray = path.isArray;
+    }
+
+    return reversed;
   }
 
   /**

@@ -556,6 +556,9 @@ export interface RelationshipPath {
 
   /** Join type */
   joinType?: 'left' | 'inner';
+
+  /** Whether this is an array foreign key relationship */
+  isArray?: boolean;
 }
 
 /**

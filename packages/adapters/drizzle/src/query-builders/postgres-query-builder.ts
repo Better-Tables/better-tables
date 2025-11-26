@@ -59,6 +59,21 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
+   * Build join condition for array foreign keys in PostgreSQL
+   * Uses PostgreSQL's ANY() operator: targetColumn = ANY(sourceArrayColumn)
+   */
+  protected buildArrayJoinCondition(
+    targetColumn: AnyColumnType,
+    sourceArrayColumn: AnyColumnType
+  ): SQL {
+    const pgTargetColumn = this.asPgColumn(targetColumn);
+    const pgSourceArrayColumn = this.asPgColumn(sourceArrayColumn);
+
+    // PostgreSQL syntax: targetColumn = ANY(sourceArrayColumn)
+    return sql`${pgTargetColumn} = ANY(${pgSourceArrayColumn})`;
+  }
+
+  /**
    * Build SELECT query with joins
    */
   buildSelectQuery(
