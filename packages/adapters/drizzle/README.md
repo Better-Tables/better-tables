@@ -14,6 +14,7 @@ A powerful Drizzle ORM adapter for Better Tables that provides automatic relatio
 - 🛡️ **Full Type Safety** - Complete TypeScript support with schema inference
 - 🗄️ **Multi-Database** - Support for PostgreSQL, MySQL, and SQLite
 - 🏭 **Factory Function** - Simple API with automatic schema and driver detection
+- 🔢 **Array Foreign Keys** - Native support for array foreign key relationships (PostgreSQL arrays, MySQL/SQLite JSON arrays)
 
 ## Installation
 
@@ -324,6 +325,56 @@ const result = await adapter.fetchData({
 - Prefers tables with the most matching direct columns
 - Falls back to first table when truly ambiguous
 - Works well when all columns are direct schema columns
+
+### Array Foreign Keys
+
+The adapter automatically detects and handles array foreign key relationships. This is useful for scenarios where a column contains an array of foreign key references (e.g., `organizerId: uuid().array().references(() => users.id)`).
+
+**PostgreSQL Example:**
+```typescript
+import { pgTable, uuid } from 'drizzle-orm/pg-core';
+
+const events = pgTable('events', {
+  id: uuid('id').primaryKey(),
+  title: text('title').notNull(),
+  organizerId: uuid('organizer_id')
+    .array()
+    .references(() => users.id)
+    .notNull(),
+});
+
+// The adapter automatically detects this as an array FK relationship
+// You can now query organizer data directly:
+const columns = [
+  cb.text().id('organizers.name').displayName('Organizers')
+    .accessor(event => event.organizers?.map(org => org.name).join(', ') || '')
+    .build(),
+];
+
+// The adapter will automatically join with users table using array FK join
+const result = await adapter.fetchData({
+  columns: ['title', 'organizers.name', 'organizers.username'],
+});
+// Returns: { title: 'Event', organizers: [{ name: 'John', username: 'john' }, ...] }
+```
+
+**MySQL/SQLite Example:**
+```typescript
+import { json, mysqlTable } from 'drizzle-orm/mysql-core';
+
+const events = mysqlTable('events', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  organizerId: json('organizer_id'), // JSON array of user IDs
+});
+
+// Works the same way - adapter detects JSON array columns with FK references
+```
+
+The adapter uses database-specific syntax for array joins:
+- **PostgreSQL**: `target = ANY(source_array)` (native array support)
+- **MySQL**: `JSON_CONTAINS(source_array, JSON_ARRAY(target))` (JSON array support)
+- **SQLite**: `EXISTS (SELECT 1 FROM json_each(source_array) WHERE value = target)` (JSON array support)
 
 ### Aggregate Columns
 
