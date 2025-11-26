@@ -2,6 +2,7 @@
 
 import type {
   ColumnDefinition,
+  ColumnVisibility,
   FilterState,
   PaginationState,
   SortingState,
@@ -83,6 +84,12 @@ export interface BetterTableProps<TData = unknown>
   /** Initial selected rows (only used on mount) */
   initialSelectedRows?: Set<string>;
 
+  /** Initial column visibility (only used on mount) */
+  initialColumnVisibility?: ColumnVisibility;
+
+  /** Default visible column IDs - if provided, computes initialColumnVisibility automatically */
+  defaultVisibleColumns?: string[];
+
   /** Optional callback when filters change (for side effects) */
   onFiltersChange?: (filters: FilterState[]) => void;
 
@@ -142,6 +149,8 @@ export function BetterTable<TData = unknown>({
   initialSorting = [],
   initialPagination = { page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrev: false },
   initialSelectedRows = new Set<string>(),
+  initialColumnVisibility,
+  defaultVisibleColumns,
 
   // Optional callbacks for side effects
   onFiltersChange,
@@ -176,6 +185,25 @@ export function BetterTable<TData = unknown>({
   // Enable row selection automatically if actions are provided
   const shouldShowRowSelection = actions.length > 0 || rowSelection;
 
+  // Compute initial column visibility from defaultVisibleColumns if provided
+  // Priority: initialColumnVisibility > defaultVisibleColumns > undefined (all visible)
+  const computedColumnVisibility = useMemo<ColumnVisibility | undefined>(() => {
+    // If initialColumnVisibility is explicitly provided, use it
+    if (initialColumnVisibility) return initialColumnVisibility;
+
+    // If defaultVisibleColumns is provided, compute from it
+    if (defaultVisibleColumns) {
+      const visibility: ColumnVisibility = {};
+      columns.forEach((col) => {
+        visibility[col.id] = defaultVisibleColumns.includes(col.id);
+      });
+      return visibility;
+    }
+
+    // Default: all columns visible (undefined)
+    return undefined;
+  }, [columns, defaultVisibleColumns, initialColumnVisibility]);
+
   // Initialize store synchronously during render
   // The store creation is idempotent - it only creates once per ID
   // All state management is delegated to the TableStateManager
@@ -187,6 +215,7 @@ export function BetterTable<TData = unknown>({
     pagination: initialPagination,
     sorting: initialSorting,
     selectedRows: initialSelectedRows,
+    columnVisibility: computedColumnVisibility,
   });
 
   // Subscribe to store state
@@ -205,7 +234,7 @@ export function BetterTable<TData = unknown>({
     () =>
       urlSync?.adapter || {
         getParam: () => null,
-        setParams: () => {},
+        setParams: () => { },
       },
     [urlSync?.adapter]
   );
@@ -458,6 +487,7 @@ export function BetterTable<TData = unknown>({
             }}
             enableColumnReordering={columnReordering}
             onReset={handleReset}
+            searchable={false}
           />
         )}
         <EmptyState
@@ -521,6 +551,7 @@ export function BetterTable<TData = unknown>({
             }}
             enableColumnReordering={columnReordering}
             onReset={handleReset}
+            searchable={false}
           />
         )}
       </div>
@@ -616,11 +647,11 @@ export function BetterTable<TData = unknown>({
                       onKeyDown={
                         isSortable
                           ? (e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                handleSortingChange(column.id);
-                              }
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSortingChange(column.id);
                             }
+                          }
                           : undefined
                       }
                       tabIndex={isSortable ? 0 : undefined}
@@ -649,11 +680,11 @@ export function BetterTable<TData = unknown>({
                     onKeyDown={
                       isSortable
                         ? (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleSortingChange(column.id);
-                            }
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleSortingChange(column.id);
                           }
+                        }
                         : undefined
                     }
                     tabIndex={isSortable ? 0 : undefined}
@@ -718,47 +749,47 @@ export function BetterTable<TData = unknown>({
                       >
                         {column.cellRenderer
                           ? column.cellRenderer({
-                              value,
-                              row,
-                              column,
-                              rowIndex: index,
-                            })
+                            value,
+                            row,
+                            column,
+                            rowIndex: index,
+                          })
                           : (() => {
-                              const formatted = getFormatterForType(
-                                column.type,
-                                value,
-                                column.meta
-                              );
-                              const truncateConfig = column.meta?.truncate as
-                                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
-                                | undefined;
+                            const formatted = getFormatterForType(
+                              column.type,
+                              value,
+                              column.meta
+                            );
+                            const truncateConfig = column.meta?.truncate as
+                              | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                              | undefined;
 
-                              // Show tooltip for truncated text if showTooltip is enabled
-                              if (truncateConfig?.showTooltip && value != null) {
-                                const originalValue = String(value);
-                                const maxLen = truncateConfig.maxLength || 50;
-                                const isTruncated = originalValue.length > maxLen;
+                            // Show tooltip for truncated text if showTooltip is enabled
+                            if (truncateConfig?.showTooltip && value != null) {
+                              const originalValue = String(value);
+                              const maxLen = truncateConfig.maxLength || 50;
+                              const isTruncated = originalValue.length > maxLen;
 
-                                if (isTruncated) {
-                                  return (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="cursor-help truncate max-w-full inline-block">
-                                          {formatted}
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="max-w-xs" showArrow>
-                                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
-                                          {originalValue}
-                                        </div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                }
+                              if (isTruncated) {
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help truncate max-w-full inline-block">
+                                        {formatted}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs" showArrow>
+                                      <div className="wrap-break-word whitespace-pre-wrap text-pretty">
+                                        {originalValue}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
                               }
+                            }
 
-                              return <span>{formatted}</span>;
-                            })()}
+                            return <span>{formatted}</span>;
+                          })()}
                       </TableCell>
                     );
                   })}

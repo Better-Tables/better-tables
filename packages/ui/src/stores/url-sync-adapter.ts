@@ -81,8 +81,15 @@ export function useTableUrlSync(
 
     const store = getTableStore(tableId);
     if (!store) {
-      // Store doesn't exist yet - will retry when dependencies change
-      return;
+      // Store doesn't exist yet - retry after a short delay
+      const timeoutId = setTimeout(() => {
+        const retryStore = getTableStore(tableId);
+        if (retryStore && !hasHydratedFromUrl.current) {
+          // Retry hydration logic here if needed
+          hasHydratedFromUrl.current = true;
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
 
     const manager = store.getState().manager;

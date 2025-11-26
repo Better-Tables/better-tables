@@ -282,15 +282,17 @@ export function FilterBar<TData = unknown>({
 
           {/* Active Filters with horizontal scrolling on mobile */}
           <div className="flex-1 min-w-0">
-            <ActiveFilters
-              columns={columns}
-              filters={filters}
-              onUpdateFilter={handleUpdateFilter}
-              onRemoveFilter={handleRemoveFilter}
-              isFilterProtected={isFilterProtected}
-              disabled={disabled}
-              className={theme?.activeFilters}
-            />
+            {filters.length > 0 && (
+              <ActiveFilters
+                columns={columns}
+                filters={filters}
+                onUpdateFilter={handleUpdateFilter}
+                onRemoveFilter={handleRemoveFilter}
+                isFilterProtected={isFilterProtected}
+                disabled={disabled}
+                className={theme?.activeFilters}
+              />
+            )}
           </div>
         </div>
 
