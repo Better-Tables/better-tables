@@ -31,7 +31,7 @@
     "lint:fix": "biome check --write .",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "release": "bun run build && changeset publish"
+    "release": "bun i && bun run build && changeset publish"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.7",

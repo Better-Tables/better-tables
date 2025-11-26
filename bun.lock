@@ -42,7 +42,7 @@
     },
     "packages/adapters/drizzle": {
       "name": "@better-tables/adapters-drizzle",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "dependencies": {
         "better-sqlite3": "^12.4.6",
         "drizzle-orm": "^0.44.7",
@@ -66,7 +66,7 @@
     },
     "packages/cli": {
       "name": "@better-tables/cli",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "bin": {
         "better-tables": "./dist/cli.js",
       },
