@@ -373,7 +373,7 @@ const events = mysqlTable('events', {
 
 The adapter uses database-specific syntax for array joins:
 - **PostgreSQL**: `target = ANY(source_array)` (native array support)
-- **MySQL**: `JSON_CONTAINS(source_array, JSON_ARRAY(target))` (JSON array support)
+- **MySQL**: `JSON_SEARCH(source_array, 'one', target) IS NOT NULL` (JSON array support)
 - **SQLite**: `EXISTS (SELECT 1 FROM json_each(source_array) WHERE value = target)` (JSON array support)
 
 ### Aggregate Columns

@@ -1,118 +1,32 @@
-import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { relations, sql } from 'drizzle-orm';
-import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import type { SQL } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { SQLiteQueryBuilder } from '../src/query-builders/sqlite-query-builder';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
-import type { SQLiteQueryBuilderWithJoins } from '../src/types';
-
-// Test schema
-const users = sqliteTable('users', {
-  id: integer('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull(),
-  age: integer('age'),
-});
-
-const profiles = sqliteTable('profiles', {
-  id: integer('id').primaryKey(),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => users.id),
-  bio: text('bio'),
-});
-
-const posts = sqliteTable('posts', {
-  id: integer('id').primaryKey(),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => users.id),
-  title: text('title').notNull(),
-  published: integer('published', { mode: 'boolean' }).default(false),
-});
-
-const schema = { users, profiles, posts };
-
-const usersRelations = relations(users, ({ one, many }) => ({
-  profile: one(profiles, {
-    fields: [users.id],
-    references: [profiles.userId],
-  }),
-  posts: many(posts),
-}));
-
-const profilesRelations = relations(profiles, ({ one }) => ({
-  user: one(users, {
-    fields: [profiles.userId],
-    references: [users.id],
-  }),
-}));
-
-const postsRelations = relations(posts, ({ one }) => ({
-  user: one(users, {
-    fields: [posts.userId],
-    references: [users.id],
-  }),
-}));
-
-const relationsSchema = {
-  users: usersRelations,
-  profiles: profilesRelations,
-  posts: postsRelations,
-};
+import type { RelationshipPath, SQLiteQueryBuilderWithJoins } from '../src/types';
+import {
+  type BunSQLiteDatabase,
+  closeSQLiteDatabase,
+  createSQLiteDatabase,
+  setupSQLiteDatabase,
+} from './helpers/test-fixtures';
+import { relationsSchema, schema } from './helpers/test-schema';
 
 describe('SQLiteQueryBuilder', () => {
-  let db: BetterSQLite3Database;
+  let db: BunSQLiteDatabase;
   let queryBuilder: SQLiteQueryBuilder;
   let relationshipManager: RelationshipManager;
-  let sqlite: Database;
+  let sqlite: ReturnType<typeof createSQLiteDatabase>['sqlite'];
 
   beforeEach(async () => {
-    sqlite = new Database(':memory:');
-    // Type assertion needed because Drizzle expects better-sqlite3 Database,
-    // but at runtime Bun's SQLite should work similarly
-    // @ts-expect-error - Drizzle expects better-sqlite3 Database, but Bun's SQLite is compatible at runtime
-    db = drizzle(sqlite);
+    // Create database using shared fixtures
+    const { db: sqliteDb, sqlite: sqliteInstance } = createSQLiteDatabase();
+    db = sqliteDb;
+    sqlite = sqliteInstance;
 
-    // Create tables
-    await db.run(sql`CREATE TABLE users (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL,
-      age INTEGER
-    )`);
-
-    await db.run(sql`CREATE TABLE profiles (
-      id INTEGER PRIMARY KEY,
-      user_id INTEGER NOT NULL,
-      bio TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    await db.run(sql`CREATE TABLE posts (
-      id INTEGER PRIMARY KEY,
-      user_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      published INTEGER DEFAULT 0,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Insert test data
-    await db.run(sql`INSERT INTO users (id, name, email, age) VALUES 
-      (1, 'John Doe', 'john@example.com', 30),
-      (2, 'Jane Smith', 'jane@example.com', 25),
-      (3, 'Bob Johnson', 'bob@example.com', 35)`);
-
-    await db.run(sql`INSERT INTO profiles (id, user_id, bio) VALUES 
-      (1, 1, 'Software developer'),
-      (2, 2, 'Designer')`);
-
-    await db.run(sql`INSERT INTO posts (id, user_id, title, published) VALUES 
-      (1, 1, 'First Post', 1),
-      (2, 1, 'Second Post', 0),
-      (3, 2, 'Design Tips', 1)`);
+    // Setup tables and seed data using shared fixtures
+    await setupSQLiteDatabase(db);
 
     // Initialize relationship manager
     const detector = new RelationshipDetector();
@@ -120,12 +34,13 @@ describe('SQLiteQueryBuilder', () => {
     relationshipManager = new RelationshipManager(schema, relationships);
 
     // Initialize query builder
+    // @ts-expect-error - Type mismatch: BunSQLiteDatabase vs BetterSQLite3Database, but compatible at runtime
     queryBuilder = new SQLiteQueryBuilder(db, schema, relationshipManager);
   });
 
   afterEach(() => {
     if (sqlite) {
-      sqlite.close();
+      closeSQLiteDatabase(sqlite);
     }
   });
 
@@ -419,21 +334,122 @@ describe('SQLiteQueryBuilder', () => {
   });
 
   describe('Array Foreign Key Join Conditions', () => {
-    it('should have buildArrayJoinCondition method for SQLite', () => {
-      // Verify the method exists and can handle array joins
-      // The method is protected, so we test indirectly via buildJoinCondition
-      // when an array relationship is provided
-      const context = relationshipManager.buildQueryContext(
+    it('should generate correct json_each syntax for array FK joins in SQLite', async () => {
+      // Set up a schema with array FK relationships for SQLite
+      const { schemaSqlite } = await import('./helpers/test-schema-array-fk');
+
+      // Drop tables if they exist to avoid conflicts with beforeEach setup
+      await db.run(sql`DROP TABLE IF EXISTS events`);
+      await db.run(sql`DROP TABLE IF EXISTS events_users`);
+
+      // Create tables with array FK support
+      // Use different table names to avoid conflicts with existing test tables
+      await db.run(sql`
+        CREATE TABLE events (
+          id INTEGER PRIMARY KEY,
+          title TEXT NOT NULL,
+          organizer_id TEXT
+        )
+      `);
+
+      // Create a separate users table for this test to avoid conflicts
+      await db.run(sql`
+        CREATE TABLE events_users (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL
+        )
+      `);
+
+      // Insert test data
+      await db.run(sql`INSERT INTO events_users (id, name, email) VALUES 
+        (1, 'John Doe', 'john@example.com'),
+        (2, 'Jane Smith', 'jane@example.com')`);
+
+      await db.run(sql`INSERT INTO events (id, title, organizer_id) VALUES 
+        (1, 'Event 1', '["1", "2"]'),
+        (2, 'Event 2', '["1"]')`);
+
+      // Create relationship detector and detect array FK relationships
+      const arrayDetector = new RelationshipDetector();
+      let arrayRelationships = arrayDetector.detectFromSchema({}, schemaSqlite);
+
+      // For SQLite, text columns storing JSON arrays may not be auto-detected
+      // Manually add the array FK relationship if not detected to ensure we test the functionality
+      if (!arrayRelationships['events.organizers']) {
+        arrayRelationships = {
+          ...arrayRelationships,
+          'events.organizers': {
+            from: 'events',
+            to: 'users',
+            foreignKey: 'id',
+            localKey: 'organizerId',
+            cardinality: 'many',
+            nullable: true,
+            joinType: 'left',
+            isArray: true,
+          },
+        };
+      }
+
+      // Verify array FK relationship exists
+      expect(arrayRelationships['events.organizers']).toBeDefined();
+      expect(arrayRelationships['events.organizers']?.isArray).toBe(true);
+
+      // Create relationship manager with array FK relationships
+      const arrayRelationshipManager = new RelationshipManager(schemaSqlite, arrayRelationships);
+
+      // Create query builder with array FK relationships
+      // @ts-expect-error - Type mismatch: BunSQLiteDatabase vs BetterSQLite3Database, but compatible at runtime
+      const arrayQueryBuilder = new SQLiteQueryBuilder(db, schemaSqlite, arrayRelationshipManager);
+
+      // Test buildJoinCondition directly with array FK relationship
+      // This will call buildArrayJoinCondition internally
+      const arrayRelationship = arrayRelationships['events.organizers'];
+      expect(arrayRelationship).toBeDefined();
+      if (arrayRelationship) {
+        const joinCondition = (
+          arrayQueryBuilder as unknown as {
+            buildJoinCondition: (relationship: RelationshipPath) => SQL;
+          }
+        ).buildJoinCondition(arrayRelationship);
+
+        // Convert SQL to string to verify the syntax
+        // Use the database's dialect to convert SQL object to query string
+        // Accessing internal dialect property for testing purposes
+        // @ts-expect-error - Type mismatch: BunSQLiteDatabase vs BetterSQLite3Database, but compatible at runtime
+        const dialect = db.dialect;
+        if (dialect && typeof dialect.sqlToQuery === 'function') {
+          const queryResult = dialect.sqlToQuery(joinCondition);
+          const sqlString = queryResult.sql;
+
+          // Verify it uses json_each syntax for array FK join
+          expect(sqlString).toContain('json_each');
+          expect(sqlString).toContain('EXISTS');
+          expect(sqlString).toMatch(/json_each\([^)]+organizer_id/i);
+          expect(sqlString).toMatch(/json_each\.value\s*=/i);
+        } else {
+          // Fallback: just verify the SQL object is created (method doesn't throw)
+          // This ensures buildArrayJoinCondition is called correctly
+          expect(joinCondition).toBeDefined();
+        }
+      }
+
+      // Also test end-to-end query building
+      const context = arrayRelationshipManager.buildQueryContext(
         {
-          columns: ['name', 'profile.bio'],
+          columns: ['title', 'organizers.name'],
         },
-        'users'
+        'events'
       );
 
-      const { query } = queryBuilder.buildSelectQuery(context, 'users', ['name', 'profile.bio']);
+      const { query } = arrayQueryBuilder.buildSelectQuery(context, 'events', [
+        'title',
+        'organizers.name',
+      ]);
 
       expect(query).toBeDefined();
-      expect(queryBuilder.validateQuery(query)).toBe(true);
+      expect(arrayQueryBuilder.validateQuery(query)).toBe(true);
     });
 
     it('should use regular join for non-array relationships', () => {
@@ -448,6 +464,37 @@ describe('SQLiteQueryBuilder', () => {
 
       expect(query).toBeDefined();
       expect(queryBuilder.validateQuery(query)).toBe(true);
+
+      // Test that regular join doesn't use array FK syntax
+      // Get the relationship for profile.bio
+      const allRelationships = relationshipManager.getRelationships();
+      const profileRelationship = allRelationships['users.profile'];
+      expect(profileRelationship).toBeDefined();
+      expect(profileRelationship?.isArray).toBeUndefined(); // Regular FK, not array
+
+      if (profileRelationship) {
+        // Access protected method to test regular FK join (should not use array syntax)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const joinCondition = (
+          queryBuilder as unknown as { buildJoinCondition: (relationship: RelationshipPath) => SQL }
+        ).buildJoinCondition(profileRelationship);
+
+        // Use the database's dialect to convert SQL object to query string
+        // Accessing internal dialect property for testing purposes
+        // @ts-expect-error - Type mismatch: BunSQLiteDatabase vs BetterSQLite3Database, but compatible at runtime
+        const dialect = db.dialect;
+        if (dialect && typeof dialect.sqlToQuery === 'function') {
+          const queryResult = dialect.sqlToQuery(joinCondition);
+          const sqlString = queryResult.sql;
+
+          // Regular FK should NOT use json_each
+          expect(sqlString).not.toContain('json_each');
+          expect(sqlString).not.toContain('EXISTS');
+        } else {
+          // Fallback: just verify the SQL object is created (method doesn't throw)
+          expect(joinCondition).toBeDefined();
+        }
+      }
     });
   });
 });

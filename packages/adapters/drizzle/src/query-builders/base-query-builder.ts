@@ -262,7 +262,7 @@ export abstract class BaseQueryBuilder {
    * @remarks
    * Subclasses must override this method with driver-specific implementations:
    * - PostgreSQL: Uses ANY() operator with native arrays
-   * - MySQL: Uses JSON_CONTAINS() for JSON array columns
+   * - MySQL: Uses JSON_SEARCH() for JSON array columns
    * - SQLite: Uses json_each() for JSON array columns
    */
   protected buildArrayJoinCondition(

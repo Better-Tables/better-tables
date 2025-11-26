@@ -75,11 +75,13 @@ const result = await adapter.fetchData({
 });
 ```
 
-The adapter uses `JSON_CONTAINS()` for MySQL:
+The adapter uses `JSON_SEARCH()` for MySQL:
 ```sql
 SELECT * FROM events
-LEFT JOIN users ON JSON_CONTAINS(events.organizer_id, JSON_ARRAY(users.id))
+LEFT JOIN users ON JSON_SEARCH(events.organizer_id, 'one', users.id) IS NOT NULL
 ```
+
+Note: For MySQL 8.0.17+, the `MEMBER OF` operator could also be used, but `JSON_SEARCH` provides better compatibility with MySQL 5.7+.
 
 ### SQLite JSON Array Foreign Keys
 

@@ -79,6 +79,42 @@ describe('RelationshipDetector', () => {
     }).not.toThrow();
   });
 
+  describe('Array Foreign Key Detection - Graph Traversal', () => {
+    it('should allow getJoinPath to traverse from referenced table back to array-owning table', () => {
+      const mockSchema = {
+        events: {
+          id: { _name: 'id' },
+          organizerId: createMockArrayColumn({
+            hasArraySymbol: true,
+            hasForeignKey: true,
+            fkTable: { _name: 'users' },
+            fkColumn: { _name: 'id' },
+          }),
+        },
+        users: {
+          id: { _name: 'id' },
+          name: { _name: 'name' },
+        },
+      };
+
+      const detector = new RelationshipDetector();
+      detector.detectFromSchema({}, mockSchema);
+
+      // Test forward traversal: from events to users
+      const forwardPath = detector.getJoinPath('events', 'users');
+      expect(forwardPath).toBeDefined();
+      expect(forwardPath.length).toBeGreaterThan(0);
+      expect(forwardPath[0]?.isArray).toBe(true);
+
+      // Test reverse traversal: from users back to events
+      // This should now work because we added the reverse edge to relationshipGraph
+      const reversePath = detector.getJoinPath('users', 'events');
+      expect(reversePath).toBeDefined();
+      expect(reversePath.length).toBeGreaterThan(0);
+      expect(reversePath[0]?.isArray).toBe(true);
+    });
+  });
+
   describe('Array Foreign Key Detection', () => {
     describe('isArrayColumn()', () => {
       it('should detect PostgreSQL array columns via Drizzle symbols', () => {
@@ -257,7 +293,9 @@ describe('RelationshipDetector', () => {
 
       it('should handle special endings (s, x, z, ch, sh)', () => {
         const detector = new RelationshipDetector();
-        // Test with columns ending in special characters
+
+        // Test with columns ending in special characters that require "es" pluralization
+        // classId -> remove "Id" -> "class" -> ends with "s" -> add "es" -> "classes"
         const schemaWithSpecial = {
           events: {
             classId: createMockArrayColumn({
@@ -271,8 +309,11 @@ describe('RelationshipDetector', () => {
         };
         const relationships = detector.detectFromSchema({}, schemaWithSpecial);
 
-        // Should handle special endings correctly
-        expect(relationships).toBeDefined();
+        // Should handle special endings correctly - classId should create 'classes' alias
+        // classId -> classes (ends with 's', adds 'es')
+        expect(relationships['events.classes']).toBeDefined();
+        expect(relationships['events.classes']?.localKey).toBe('classId');
+        expect(relationships['events.classes']?.isArray).toBe(true);
       });
 
       it('should handle camelCase conversion', () => {

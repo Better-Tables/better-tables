@@ -176,13 +176,23 @@ export class RelationshipDetector {
         const reverseKey = `${targetTableName}.${this.getReverseRelationName(tableName, aliasName)}`;
         this.relationships.set(reverseKey, this.reverseRelationshipPath(relationshipPath));
 
-        // Add to relationship graph
+        // Add forward edge to relationship graph (from array-owning table to referenced table)
         if (!this.relationshipGraph.has(tableName)) {
           this.relationshipGraph.set(tableName, new Set());
         }
         const sourceSet = this.relationshipGraph.get(tableName);
         if (sourceSet) {
           sourceSet.add(targetTableName);
+        }
+
+        // Add reverse edge to relationship graph (from referenced table back to array-owning table)
+        // This allows getJoinPath to traverse in both directions
+        if (!this.relationshipGraph.has(targetTableName)) {
+          this.relationshipGraph.set(targetTableName, new Set());
+        }
+        const targetSet = this.relationshipGraph.get(targetTableName);
+        if (targetSet) {
+          targetSet.add(tableName);
         }
       }
     }
