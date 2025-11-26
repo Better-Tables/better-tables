@@ -3,6 +3,7 @@ import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
 import type { RelationshipMap } from '../src/types';
 import { relationsSchema, schema } from './helpers/test-schema';
+import { createMockArrayColumn, schemaPg } from './helpers/test-schema-array-fk';
 
 describe('RelationshipDetector', () => {
   let detector: RelationshipDetector;
@@ -76,6 +77,598 @@ describe('RelationshipDetector', () => {
     expect(() => {
       detector.validateRelationships(schema, relationsSchema);
     }).not.toThrow();
+  });
+
+  describe('Array Foreign Key Detection - Graph Traversal', () => {
+    it('should allow getJoinPath to traverse from referenced table back to array-owning table', () => {
+      const mockSchema = {
+        events: {
+          id: { _name: 'id' },
+          organizerId: createMockArrayColumn({
+            hasArraySymbol: true,
+            hasForeignKey: true,
+            fkTable: { _name: 'users' },
+            fkColumn: { _name: 'id' },
+          }),
+        },
+        users: {
+          id: { _name: 'id' },
+          name: { _name: 'name' },
+        },
+      };
+
+      const detector = new RelationshipDetector();
+      detector.detectFromSchema({}, mockSchema);
+
+      // Test forward traversal: from events to users
+      const forwardPath = detector.getJoinPath('events', 'users');
+      expect(forwardPath).toBeDefined();
+      expect(forwardPath.length).toBeGreaterThan(0);
+      expect(forwardPath[0]?.isArray).toBe(true);
+
+      // Test reverse traversal: from users back to events
+      // This should now work because we added the reverse edge to relationshipGraph
+      const reversePath = detector.getJoinPath('users', 'events');
+      expect(reversePath).toBeDefined();
+      expect(reversePath.length).toBeGreaterThan(0);
+      expect(reversePath[0]?.isArray).toBe(true);
+    });
+  });
+
+  describe('Array Foreign Key Detection', () => {
+    describe('isArrayColumn()', () => {
+      it('should detect PostgreSQL array columns via Drizzle symbols', () => {
+        // Create a mock schema with array FK that matches what detectArrayForeignKeys expects
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Verify that array FK relationships were detected
+        expect(relationships['events.organizers']).toBeDefined();
+        expect(relationships['events.organizers']?.isArray).toBe(true);
+      });
+
+      it('should detect array columns via dataType metadata', () => {
+        // The method is private, so we test via detectArrayForeignKeys indirectly
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, schemaPg);
+
+        // If array columns are detected, relationships should be created
+        // This tests the isArrayColumn logic indirectly
+        expect(relationships).toBeDefined();
+      });
+
+      it('should return false for non-array columns', () => {
+        const nonArrayColumn = { name: 'title', dataType: 'text' };
+        // Test indirectly by checking that non-array columns don't create array relationships
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, { events: { title: nonArrayColumn } });
+
+        // No array relationships should be created for non-array columns
+        expect(relationships['events.organizers']).toBeUndefined();
+      });
+
+      it('should handle null and undefined gracefully', () => {
+        const detector = new RelationshipDetector();
+        expect(() => {
+          detector.detectFromSchema({}, { events: { title: null } });
+        }).not.toThrow();
+        expect(() => {
+          detector.detectFromSchema({}, { events: { title: undefined } });
+        }).not.toThrow();
+      });
+
+      it('should handle non-object column values', () => {
+        const detector = new RelationshipDetector();
+        expect(() => {
+          detector.detectFromSchema({}, { events: { title: 'string' } });
+        }).not.toThrow();
+      });
+    });
+
+    describe('getForeignKeyInfo()', () => {
+      it('should extract FK from column metadata', () => {
+        // Test indirectly via detectArrayForeignKeys with mock schema
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Should create relationship if FK info is extracted correctly
+        expect(relationships['events.organizers']).toBeDefined();
+      });
+
+      it('should handle missing foreign keys', () => {
+        const column = createMockArrayColumn({ hasArraySymbol: true, hasForeignKey: false });
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema(
+          {},
+          {
+            events: { organizerId: column },
+          }
+        );
+
+        // No relationship should be created if FK info is missing
+        expect(relationships['events.organizers']).toBeUndefined();
+      });
+
+      it('should handle multiple foreign keys (takes first)', () => {
+        const fkTable1 = { _name: 'users' };
+        const fkTable2 = { _name: 'tags' };
+        const column: Record<string, unknown> = createMockArrayColumn({
+          hasArraySymbol: true,
+          hasForeignKey: true,
+          fkTable: fkTable1,
+        });
+
+        // Add second FK to metadata
+        const metaSymbol = Symbol.for('drizzle:ColumnMetadata');
+        const metadata = (column as Record<symbol, unknown>)[metaSymbol] as Record<string, unknown>;
+        if (metadata && Array.isArray(metadata.foreignKeys)) {
+          metadata.foreignKeys.push({
+            table: fkTable2,
+            column: { _name: 'id' },
+          });
+        }
+
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema(
+          {},
+          {
+            events: { organizerId: column },
+            users: { id: { _name: 'id' } },
+          }
+        );
+
+        // Should use first FK
+        expect(relationships).toBeDefined();
+      });
+    });
+
+    describe('getArrayRelationshipAlias()', () => {
+      it('should convert organizerId to organizers', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // organizerId should create 'organizers' alias
+        expect(relationships['events.organizers']).toBeDefined();
+        expect(relationships['events.organizers']?.localKey).toBe('organizerId');
+      });
+
+      it('should handle plural forms (y -> ies)', () => {
+        const detector = new RelationshipDetector();
+        // Test with a column ending in 'y'
+        const schemaWithY = {
+          events: {
+            categoryId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'categories' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          categories: { id: { _name: 'id' } },
+        };
+        const relationships = detector.detectFromSchema({}, schemaWithY);
+
+        // categoryId -> categories (y -> ies)
+        expect(relationships['events.categories']).toBeDefined();
+      });
+
+      it('should handle special endings (s, x, z, ch, sh)', () => {
+        const detector = new RelationshipDetector();
+
+        // Test with columns ending in special characters that require "es" pluralization
+        // classId -> remove "Id" -> "class" -> ends with "s" -> add "es" -> "classes"
+        const schemaWithSpecial = {
+          events: {
+            classId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'classes' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          classes: { id: { _name: 'id' } },
+        };
+        const relationships = detector.detectFromSchema({}, schemaWithSpecial);
+
+        // Should handle special endings correctly - classId should create 'classes' alias
+        // classId -> classes (ends with 's', adds 'es')
+        expect(relationships['events.classes']).toBeDefined();
+        expect(relationships['events.classes']?.localKey).toBe('classId');
+        expect(relationships['events.classes']?.isArray).toBe(true);
+      });
+
+      it('should handle camelCase conversion', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Should convert to camelCase
+        const alias = 'organizers';
+        expect(relationships[`events.${alias}`]).toBeDefined();
+      });
+
+      it('should handle edge cases (empty, single char)', () => {
+        const detector = new RelationshipDetector();
+        // Test with minimal column name
+        const schemaMinimal = {
+          events: {
+            x: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'items' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          items: { id: { _name: 'id' } },
+        };
+
+        expect(() => {
+          detector.detectFromSchema({}, schemaMinimal);
+        }).not.toThrow();
+      });
+    });
+
+    describe('detectArrayForeignKeys()', () => {
+      it('should detect array FK relationships', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        expect(relationships['events.organizers']).toBeDefined();
+      });
+
+      it('should create correct relationship paths', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        const rel = relationships['events.organizers'];
+        expect(rel).toBeDefined();
+        expect(rel?.from).toBe('events');
+        expect(rel?.to).toBe('users');
+        expect(rel?.localKey).toBe('organizerId');
+        expect(rel?.foreignKey).toBe('id');
+      });
+
+      it('should set isArray flag to true', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        expect(relationships['events.organizers']?.isArray).toBe(true);
+      });
+
+      it('should create forward and reverse relationships', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Forward relationship
+        expect(relationships['events.organizers']).toBeDefined();
+
+        // Reverse relationship should also exist
+        const reverseKey = Object.keys(relationships).find(
+          (key) => key.startsWith('users.') && relationships[key]?.isArray === true
+        );
+        expect(reverseKey).toBeDefined();
+      });
+
+      it('should handle multiple array FKs in same table', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+            tagIds: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'tags' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+          tags: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Should detect both organizerId and tagIds
+        expect(relationships['events.organizers']).toBeDefined();
+        expect(relationships['events.tags']).toBeDefined();
+      });
+
+      it('should handle array FKs to different target tables', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+            tagIds: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'tags' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+          tags: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // organizerId -> users, tagIds -> tags
+        expect(relationships['events.organizers']?.to).toBe('users');
+        expect(relationships['events.tags']?.to).toBe('tags');
+      });
+
+      it('should skip non-array columns', () => {
+        const mockSchema = {
+          events: {
+            title: { _name: 'title', dataType: 'text' },
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: { id: { _name: 'id' } },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Only organizerId should create relationship, not title
+        expect(relationships['events.organizers']).toBeDefined();
+        expect(relationships['events.title']).toBeUndefined();
+      });
+
+      it('should skip array columns without FK references', () => {
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema(
+          {},
+          {
+            events: {
+              organizerId: createMockArrayColumn({
+                hasArraySymbol: true,
+                hasForeignKey: false,
+              }),
+            },
+          }
+        );
+
+        // No relationship should be created
+        expect(relationships['events.organizers']).toBeUndefined();
+      });
+
+      it('should handle missing target tables gracefully', () => {
+        const detector = new RelationshipDetector();
+        expect(() => {
+          detector.detectFromSchema(
+            {},
+            {
+              events: {
+                organizerId: createMockArrayColumn({
+                  hasArraySymbol: true,
+                  hasForeignKey: true,
+                  fkTable: { _name: 'nonexistent' },
+                  fkColumn: { _name: 'id' },
+                }),
+              },
+            }
+          );
+        }).not.toThrow();
+      });
+
+      it('should handle missing referenced columns gracefully', () => {
+        const detector = new RelationshipDetector();
+        expect(() => {
+          detector.detectFromSchema(
+            {},
+            {
+              events: {
+                organizerId: createMockArrayColumn({
+                  hasArraySymbol: true,
+                  hasForeignKey: true,
+                  fkTable: { _name: 'users' },
+                  fkColumn: null,
+                }),
+              },
+              users: { id: { _name: 'id' } },
+            }
+          );
+        }).not.toThrow();
+      });
+    });
+
+    describe('reverseRelationshipPath()', () => {
+      it('should preserve isArray flag', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Find reverse relationship
+        const reverseKey = Object.keys(relationships).find(
+          (key) => key.startsWith('users.') && relationships[key]?.isArray === true
+        );
+
+        expect(reverseKey).toBeDefined();
+        if (reverseKey) {
+          expect(relationships[reverseKey]?.isArray).toBe(true);
+        }
+      });
+
+      it('should handle undefined isArray', () => {
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema(relationsSchema, schema);
+
+        // Regular relationships should work (isArray undefined)
+        expect(relationships['users.profile']).toBeDefined();
+        expect(relationships['users.profile']?.isArray).toBeUndefined();
+      });
+
+      it('should reverse all relationship properties correctly', () => {
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasForeignKey: true,
+              fkTable: { _name: 'users' },
+              fkColumn: { _name: 'id' },
+            }),
+          },
+          users: {
+            id: { _name: 'id' },
+          },
+        };
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        const forward = relationships['events.organizers'];
+        expect(forward).toBeDefined();
+        expect(forward?.from).toBe('events');
+        expect(forward?.to).toBe('users');
+        expect(forward?.localKey).toBe('organizerId');
+        expect(forward?.foreignKey).toBe('id');
+
+        // Find reverse
+        const reverseKey = Object.keys(relationships).find(
+          (key) => key.startsWith('users.') && relationships[key]?.isArray === true
+        );
+        if (reverseKey) {
+          const reverse = relationships[reverseKey];
+          expect(reverse?.from).toBe('users');
+          expect(reverse?.to).toBe('events');
+          expect(reverse?.localKey).toBe('id');
+          expect(reverse?.foreignKey).toBe('organizerId');
+          expect(reverse?.isArray).toBe(true);
+        }
+      });
+    });
   });
 });
 

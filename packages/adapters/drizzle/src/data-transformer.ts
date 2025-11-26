@@ -261,9 +261,15 @@ export class DataTransformer {
       const relationship = columnPath.relationshipPath[columnPath.relationshipPath.length - 1];
       if (!relationship) return;
 
-      if (relationship.cardinality === 'one') {
+      // Check if this is an array foreign key relationship
+      const isArrayRelationship = relationship.isArray === true;
+
+      if (relationship.cardinality === 'one' && !isArrayRelationship) {
         this.processOneToOneColumn(nestedRecord, columnPath, records);
       } else {
+        // Handle both regular many relationships and array foreign keys
+        // Array relationships are processed the same way as regular many relationships
+        // since the join already returns multiple rows (one per array element)
         this.processOneToManyColumn(nestedRecord, columnPath, records);
       }
     }
@@ -316,6 +322,8 @@ export class DataTransformer {
 
   /**
    * Process one-to-many relationship column
+   * Also handles array foreign key relationships
+   * Array relationships work the same way - the join returns multiple rows that get grouped
    */
   private processOneToManyColumn(
     nestedRecord: Record<string, unknown>,

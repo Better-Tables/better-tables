@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.4
+
+### Patch Changes
+
+- Add support for array foreign key relationships: introduced detection and handling of array foreign key relationships in Drizzle adapters. It updates the relationship detector to identify array FKs, adds driver-specific join condition logic for PostgreSQL, MySQL, and SQLite, and extends the data transformer to process array relationships. Comprehensive tests and a test schema for array FKs are included to ensure correct behavior across supported databases.
+
 ## 0.5.3
 
 ### Patch Changes

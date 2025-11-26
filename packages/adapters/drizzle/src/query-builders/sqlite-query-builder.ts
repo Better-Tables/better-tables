@@ -59,6 +59,24 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
+   * Build join condition for array foreign keys in SQLite
+   * SQLite doesn't have native array types, but supports JSON arrays
+   * Uses json_each to check if target column value is in source JSON array column
+   * Format: EXISTS (SELECT 1 FROM json_each(sourceArrayColumn) WHERE value = targetColumn)
+   */
+  protected buildArrayJoinCondition(
+    targetColumn: AnyColumnType,
+    sourceArrayColumn: AnyColumnType
+  ): SQL {
+    const sqliteTargetColumn = this.asSQLiteColumn(targetColumn);
+    const sqliteSourceArrayColumn = this.asSQLiteColumn(sourceArrayColumn);
+
+    // SQLite syntax: EXISTS (SELECT 1 FROM json_each(sourceArrayColumn) WHERE value = targetColumn)
+    // This checks if the target column value exists in the JSON array
+    return sql`EXISTS (SELECT 1 FROM json_each(${sqliteSourceArrayColumn}) WHERE json_each.value = ${sqliteTargetColumn})`;
+  }
+
+  /**
    * Build SELECT query with joins
    */
   buildSelectQuery(

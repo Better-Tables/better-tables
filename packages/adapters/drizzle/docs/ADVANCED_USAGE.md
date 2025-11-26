@@ -5,6 +5,7 @@ This guide covers advanced features and patterns for the Drizzle adapter.
 ## Table of Contents
 
 - [Custom Relationship Mappings](#custom-relationship-mappings)
+- [Array Foreign Key Relationships](#array-foreign-key-relationships)
 - [Query Optimization Strategies](#query-optimization-strategies)
 - [Handling Many-to-Many Relationships](#handling-many-to-many-relationships)
 - [Aggregate Columns](#aggregate-columns)
@@ -13,6 +14,149 @@ This guide covers advanced features and patterns for the Drizzle adapter.
 - [Performance Monitoring](#performance-monitoring)
 - [Error Handling Patterns](#error-handling-patterns)
 - [Testing Strategies](#testing-strategies)
+
+## Array Foreign Key Relationships
+
+The adapter now supports array foreign key relationships, where a column contains an array of foreign key references. This is automatically detected and handled with database-specific join syntax.
+
+### PostgreSQL Array Foreign Keys
+
+PostgreSQL supports native array types, which can be used for foreign key arrays:
+
+```typescript
+import { pgTable, uuid, text } from 'drizzle-orm/pg-core';
+
+const events = pgTable('events', {
+  id: uuid('id').primaryKey(),
+  title: text('title').notNull(),
+  organizerId: uuid('organizer_id')
+    .array()
+    .references(() => users.id)
+    .notNull(),
+});
+
+// The adapter automatically detects this relationship
+// Use dot notation to access organizer fields:
+const columns = [
+  cb.text().id('organizers.name').displayName('Organizers')
+    .accessor(event => event.organizers?.map(org => org.name).join(', ') || '')
+    .build(),
+];
+
+// Query with array FK join
+const result = await adapter.fetchData({
+  columns: ['title', 'organizers.name', 'organizers.username', 'organizers.image'],
+});
+// Returns nested structure: { title: 'Event', organizers: [{ name: 'John', ... }] }
+```
+
+The adapter uses PostgreSQL's `ANY()` operator for efficient array joins:
+```sql
+SELECT * FROM events
+LEFT JOIN users ON users.id = ANY(events.organizer_id)
+```
+
+### MySQL JSON Array Foreign Keys
+
+MySQL doesn't have native arrays, but you can use JSON columns:
+
+```typescript
+import { mysqlTable, json, varchar } from 'drizzle-orm/mysql-core';
+
+const events = mysqlTable('events', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  organizerId: json('organizer_id'), // JSON array: ["uuid1", "uuid2"]
+});
+
+// Works the same way - adapter detects JSON array with FK references
+const result = await adapter.fetchData({
+  columns: ['title', 'organizers.name'],
+});
+```
+
+The adapter uses `JSON_SEARCH()` for MySQL:
+```sql
+SELECT * FROM events
+LEFT JOIN users ON JSON_SEARCH(events.organizer_id, 'one', users.id) IS NOT NULL
+```
+
+Note: For MySQL 8.0.17+, the `MEMBER OF` operator could also be used, but `JSON_SEARCH` provides better compatibility with MySQL 5.7+.
+
+### SQLite JSON Array Foreign Keys
+
+SQLite also uses JSON columns for arrays:
+
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+const events = sqliteTable('events', {
+  id: integer('id').primaryKey(),
+  title: text('title').notNull(),
+  organizerId: text('organizer_id'), // JSON array: "[1, 2, 3]"
+});
+
+// Same API, different database
+const result = await adapter.fetchData({
+  columns: ['title', 'organizers.name'],
+});
+```
+
+The adapter uses `json_each()` for SQLite:
+```sql
+SELECT * FROM events
+LEFT JOIN users ON EXISTS (
+  SELECT 1 FROM json_each(events.organizer_id) 
+  WHERE json_each.value = users.id
+)
+```
+
+### Automatic Detection
+
+The adapter automatically detects array foreign keys by:
+1. Identifying array columns (PostgreSQL `.array()`, MySQL/SQLite JSON columns)
+2. Checking for foreign key references in the column metadata
+3. Creating relationship paths with `isArray: true` flag
+4. Generating pluralized alias names (e.g., `organizerId` → `organizers`)
+
+### Manual Override
+
+If you need to override the auto-detected relationship:
+
+```typescript
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  relationships: {
+    'organizers.name': {
+      from: 'events',
+      to: 'users',
+      foreignKey: 'id',
+      localKey: 'organizerId',
+      cardinality: 'many',
+      nullable: true,
+      joinType: 'left',
+      isArray: true, // Explicitly mark as array FK
+    },
+  },
+});
+```
+
+### Best Practices
+
+1. **Index Array Columns**: For PostgreSQL, use GIN indexes on array columns:
+   ```typescript
+   index('idx_events_organizer_id').using('gin', table.organizerId)
+   ```
+
+2. **Use Appropriate Data Types**: 
+   - PostgreSQL: Use native arrays for better performance
+   - MySQL/SQLite: Use JSON columns with proper validation
+
+3. **Handle Empty Arrays**: The adapter gracefully handles empty arrays and null values
+
+4. **Performance**: Array FK joins can be slower than regular joins - use indexes and limit result sets
 
 ## Custom Relationship Mappings
 

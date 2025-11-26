@@ -59,6 +59,28 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
+   * Build join condition for array foreign keys in MySQL
+   * MySQL doesn't have native array types like PostgreSQL, but supports JSON arrays
+   * Uses JSON_SEARCH to check if target column value exists in source JSON array column
+   * Format: JSON_SEARCH(sourceArrayColumn, 'one', targetColumn) IS NOT NULL
+   *
+   * Note: For MySQL 8.0.17+, could use: targetColumn MEMBER OF(sourceArrayColumn)
+   * But JSON_SEARCH works in MySQL 5.7+ for better compatibility
+   */
+  protected buildArrayJoinCondition(
+    targetColumn: AnyColumnType,
+    sourceArrayColumn: AnyColumnType
+  ): SQL {
+    const mysqlTargetColumn = this.asMySqlColumn(targetColumn);
+    const mysqlSourceArrayColumn = this.asMySqlColumn(sourceArrayColumn);
+
+    // MySQL syntax: JSON_SEARCH(sourceArrayColumn, 'one', targetColumn) IS NOT NULL
+    // This checks if the target column value exists as a scalar in the JSON array
+    // 'one' means return the first match (we just need to know if it exists)
+    return sql`JSON_SEARCH(${mysqlSourceArrayColumn}, 'one', ${mysqlTargetColumn}) IS NOT NULL`;
+  }
+
+  /**
    * Build SELECT query with joins
    */
   buildSelectQuery(

@@ -218,6 +218,7 @@ export abstract class BaseQueryBuilder {
 
   /**
    * Build join condition with proper type safety
+   * Handles both regular foreign keys and array foreign keys
    */
   protected buildJoinCondition(relationship: RelationshipPath): SQL | SQLWrapper {
     const sourceTable = this.schema[relationship.from];
@@ -240,7 +241,38 @@ export abstract class BaseQueryBuilder {
       );
     }
 
+    // Handle array foreign keys differently
+    // For array FKs: targetTable.id = ANY(sourceTable.arrayColumn)
+    // For regular FKs: sourceTable.fk = targetTable.id
+    if (relationship.isArray) {
+      return this.buildArrayJoinCondition(targetColumn, sourceColumn);
+    }
+
     return eq(sourceColumn, targetColumn);
+  }
+
+  /**
+   * Build join condition for array foreign keys
+   * Uses database-specific syntax to check if target column value is in source array column
+   *
+   * @param _targetColumn - The target column to check (unused in base implementation, used in subclasses)
+   * @param _sourceArrayColumn - The source array column (unused in base implementation, used in subclasses)
+   * @returns SQL condition for array foreign key join
+   *
+   * @remarks
+   * Subclasses must override this method with driver-specific implementations:
+   * - PostgreSQL: Uses ANY() operator with native arrays
+   * - MySQL: Uses JSON_SEARCH() for JSON array columns
+   * - SQLite: Uses json_each() for JSON array columns
+   */
+  protected buildArrayJoinCondition(
+    _targetColumn: AnyColumnType,
+    _sourceArrayColumn: AnyColumnType
+  ): SQL | SQLWrapper {
+    // Base implementation throws - subclasses must override with driver-specific syntax
+    throw new QueryError('Array foreign key joins are not supported for this database driver', {
+      suggestion: 'This method must be overridden by database-specific query builder subclasses',
+    });
   }
 
   /**
