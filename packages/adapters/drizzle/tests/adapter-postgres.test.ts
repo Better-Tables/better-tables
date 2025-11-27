@@ -1,5 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { DataEvent, FilterOperator, FilterState } from '@better-tables/core';
+import { boolean, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { DrizzleAdapter } from '../src/drizzle-adapter';
+import type { DrizzleDatabase } from '../src/types';
 import type { UserWithRelations } from './helpers';
 import {
   closePostgresDatabase,
@@ -53,9 +58,9 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
     if (connectionString && databaseName) {
       try {
         await dropPostgresDatabase(connectionString, databaseName);
-      } catch (error) {
+      } catch {
         // Ignore errors during cleanup (database might already be dropped)
-        console.warn('Failed to drop test database:', error);
+        // Silently ignore cleanup errors
       }
     }
   });
@@ -787,6 +792,285 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       const parsed = JSON.parse(result.data as string);
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Array Column Filtering', () => {
+    beforeEach(async () => {
+      // Create a test table with array columns for PostgreSQL
+      await client`
+        CREATE TABLE IF NOT EXISTS events (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          organizer_ids UUID[] NOT NULL,
+          tags TEXT[],
+          category_ids INTEGER[],
+          flags BOOLEAN[]
+        )
+      `;
+
+      // Insert test data
+      await client`
+        INSERT INTO events (id, name, organizer_ids, tags, category_ids, flags) VALUES
+          ('019a4f81-2758-73f9-9bc2-5832f88c0561'::uuid, 'Event 1', 
+           ARRAY['019a4f81-2758-73f9-9bc2-5832f88c056c'::uuid, '019a4f81-2758-73f9-9bc2-5832f88c056d'::uuid],
+           ARRAY['typescript', 'javascript']::TEXT[],
+           ARRAY[1, 2, 3]::INTEGER[],
+           ARRAY[true, false]::BOOLEAN[]),
+          ('019a4f81-2758-73f9-9bc2-5832f88c0562'::uuid, 'Event 2',
+           ARRAY['019a4f81-2758-73f9-9bc2-5832f88c056e'::uuid],
+           ARRAY['python', 'django']::TEXT[],
+           ARRAY[2, 4]::INTEGER[],
+           ARRAY[true]::BOOLEAN[]),
+          ('019a4f81-2758-73f9-9bc2-5832f88c0563'::uuid, 'Event 3',
+           ARRAY['019a4f81-2758-73f9-9bc2-5832f88c056c'::uuid, '019a4f81-2758-73f9-9bc2-5832f88c056f'::uuid],
+           ARRAY['typescript']::TEXT[],
+           ARRAY[1, 3, 5]::INTEGER[],
+           NULL)
+      `;
+    });
+
+    afterEach(async () => {
+      // Clean up test table
+      await client`DROP TABLE IF EXISTS events`;
+    });
+
+    it('should filter by isAnyOf operator on uuid[] column', async () => {
+      // Create a new database connection for events table
+      const eventsClient = postgres(connectionString, { max: 1, onnotice: () => {} });
+      const eventsTable = pgTable('events', {
+        id: uuid('id').primaryKey(),
+        name: text('name').notNull(),
+        organizerIds: uuid('organizer_ids').array().notNull(),
+        tags: text('tags').array(),
+        categoryIds: integer('category_ids').array(),
+        flags: boolean('flags').array(),
+      });
+      const eventsSchema = { events: eventsTable };
+      const eventsDb = drizzlePostgres<typeof eventsSchema>(eventsClient, { schema: eventsSchema });
+
+      const eventsAdapter = new DrizzleAdapter({
+        db: eventsDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: eventsSchema,
+        driver: 'postgres',
+        relations: {},
+      });
+
+      const result = await eventsAdapter.fetchData({
+        primaryTable: 'events',
+        columns: ['id', 'name', 'organizerIds'],
+        filters: [
+          {
+            columnId: 'organizerIds',
+            operator: 'isAnyOf',
+            values: ['019a4f81-2758-73f9-9bc2-5832f88c056c'],
+            type: 'option',
+          },
+        ],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      // Should match Event 1 and Event 3 (both contain the organizer ID)
+      expect(result.total).toBe(2);
+
+      await eventsClient.end();
+    });
+
+    it('should filter by isNoneOf operator on text[] column', async () => {
+      const eventsClient = postgres(connectionString, { max: 1, onnotice: () => {} });
+      const eventsTable = pgTable('events', {
+        id: uuid('id').primaryKey(),
+        name: text('name').notNull(),
+        organizerIds: uuid('organizer_ids').array().notNull(),
+        tags: text('tags').array(),
+        categoryIds: integer('category_ids').array(),
+        flags: boolean('flags').array(),
+      });
+      const eventsSchema = { events: eventsTable };
+      const eventsDb = drizzlePostgres<typeof eventsSchema>(eventsClient, { schema: eventsSchema });
+
+      const eventsAdapter = new DrizzleAdapter({
+        db: eventsDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: eventsSchema,
+        driver: 'postgres',
+        relations: {},
+      });
+
+      const result = await eventsAdapter.fetchData({
+        primaryTable: 'events',
+        columns: ['id', 'name', 'tags'],
+        filters: [
+          {
+            columnId: 'tags',
+            operator: 'isNoneOf',
+            values: ['python'],
+            type: 'option',
+          },
+        ],
+      });
+
+      // Should match Event 1 and Event 3 (neither contains 'python')
+      expect(result.total).toBe(2);
+
+      await eventsClient.end();
+    });
+
+    it('should filter by includes operator on integer[] column', async () => {
+      const eventsClient = postgres(connectionString, { max: 1, onnotice: () => {} });
+      const eventsTable = pgTable('events', {
+        id: uuid('id').primaryKey(),
+        name: text('name').notNull(),
+        organizerIds: uuid('organizer_ids').array().notNull(),
+        tags: text('tags').array(),
+        categoryIds: integer('category_ids').array(),
+        flags: boolean('flags').array(),
+      });
+      const eventsSchema = { events: eventsTable };
+      const eventsDb = drizzlePostgres<typeof eventsSchema>(eventsClient, { schema: eventsSchema });
+
+      const eventsAdapter = new DrizzleAdapter({
+        db: eventsDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: eventsSchema,
+        driver: 'postgres',
+        relations: {},
+      });
+
+      const result = await eventsAdapter.fetchData({
+        primaryTable: 'events',
+        columns: ['id', 'name', 'categoryIds'],
+        filters: [
+          {
+            columnId: 'categoryIds',
+            operator: 'includes',
+            values: ['1'],
+            type: 'multiOption',
+          },
+        ],
+      });
+
+      // Should match Event 1 and Event 3 (both contain category ID 1)
+      expect(result.total).toBe(2);
+
+      await eventsClient.end();
+    });
+
+    it('should filter by includesAny operator on text[] column', async () => {
+      const eventsClient = postgres(connectionString, { max: 1, onnotice: () => {} });
+      const eventsTable = pgTable('events', {
+        id: uuid('id').primaryKey(),
+        name: text('name').notNull(),
+        organizerIds: uuid('organizer_ids').array().notNull(),
+        tags: text('tags').array(),
+        categoryIds: integer('category_ids').array(),
+        flags: boolean('flags').array(),
+      });
+      const eventsSchema = { events: eventsTable };
+      const eventsDb = drizzlePostgres<typeof eventsSchema>(eventsClient, { schema: eventsSchema });
+
+      const eventsAdapter = new DrizzleAdapter({
+        db: eventsDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: eventsSchema,
+        driver: 'postgres',
+        relations: {},
+      });
+
+      const result = await eventsAdapter.fetchData({
+        primaryTable: 'events',
+        columns: ['id', 'name', 'tags'],
+        filters: [
+          {
+            columnId: 'tags',
+            operator: 'includesAny',
+            values: ['typescript', 'python'],
+            type: 'multiOption',
+          },
+        ],
+      });
+
+      // Should match all three events (all contain either 'typescript' or 'python')
+      expect(result.total).toBe(3);
+
+      await eventsClient.end();
+    });
+
+    it('should filter by includesAll operator on integer[] column', async () => {
+      const eventsClient = postgres(connectionString, { max: 1, onnotice: () => {} });
+      const eventsTable = pgTable('events', {
+        id: uuid('id').primaryKey(),
+        name: text('name').notNull(),
+        organizerIds: uuid('organizer_ids').array().notNull(),
+        tags: text('tags').array(),
+        categoryIds: integer('category_ids').array(),
+        flags: boolean('flags').array(),
+      });
+      const eventsSchema = { events: eventsTable };
+      const eventsDb = drizzlePostgres<typeof eventsSchema>(eventsClient, { schema: eventsSchema });
+
+      const eventsAdapter = new DrizzleAdapter({
+        db: eventsDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: eventsSchema,
+        driver: 'postgres',
+        relations: {},
+      });
+
+      const result = await eventsAdapter.fetchData({
+        primaryTable: 'events',
+        columns: ['id', 'name', 'categoryIds'],
+        filters: [
+          {
+            columnId: 'categoryIds',
+            operator: 'includesAll',
+            values: ['1', '3'],
+            type: 'multiOption',
+          },
+        ],
+      });
+
+      // Should match Event 1 and Event 3 (both contain both 1 and 3)
+      // Event 1: [1, 2, 3] contains both 1 and 3
+      // Event 3: [1, 3, 5] contains both 1 and 3
+      expect(result.total).toBe(2);
+
+      await eventsClient.end();
+    });
+
+    it('should filter by isNull operator on array column', async () => {
+      const eventsClient = postgres(connectionString, { max: 1, onnotice: () => {} });
+      const eventsTable = pgTable('events', {
+        id: uuid('id').primaryKey(),
+        name: text('name').notNull(),
+        organizerIds: uuid('organizer_ids').array().notNull(),
+        tags: text('tags').array(),
+        categoryIds: integer('category_ids').array(),
+        flags: boolean('flags').array(),
+      });
+      const eventsSchema = { events: eventsTable };
+      const eventsDb = drizzlePostgres<typeof eventsSchema>(eventsClient, { schema: eventsSchema });
+
+      const eventsAdapter = new DrizzleAdapter({
+        db: eventsDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: eventsSchema,
+        driver: 'postgres',
+        relations: {},
+      });
+
+      const result = await eventsAdapter.fetchData({
+        primaryTable: 'events',
+        columns: ['id', 'name', 'flags'],
+        filters: [
+          {
+            columnId: 'flags',
+            operator: 'isNull',
+            values: [],
+            type: 'multiOption',
+          },
+        ],
+      });
+
+      // Should match Event 3 (flags is NULL)
+      expect(result.total).toBe(1);
+
+      await eventsClient.end();
     });
   });
 

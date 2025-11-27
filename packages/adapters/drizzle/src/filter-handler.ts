@@ -65,6 +65,7 @@ import type {
   DatabaseDriver,
 } from './types';
 import { QueryError } from './types';
+import { getArrayElementType, isArrayColumn } from './utils/drizzle-schema-utils';
 
 /**
  * Filter handler that maps Better Tables filter operators to Drizzle conditions.
@@ -145,9 +146,10 @@ export class FilterHandler {
    *
    * @param filter - The filter state to build condition for
    * @param primaryTable - The primary table for this query context
-   * @returns SQL condition for the filter
+   * @returns SQL condition for the filter, or undefined if no valid condition can be generated (e.g., empty values)
    *
    * @throws {QueryError} If the column is not found or the filter is invalid
+   * @throws {RelationshipError} If the column path cannot be resolved
    *
    * @security
    * This method ensures all filter values are properly parameterized through
@@ -162,7 +164,7 @@ export class FilterHandler {
    * );
    * ```
    */
-  buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper {
+  buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper | undefined {
     const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
 
     // Check if this is a JSONB accessor (columnId contains dot but is not a relationship)
@@ -186,13 +188,21 @@ export class FilterHandler {
       columnOrExpression = column;
     }
 
-    return this.mapOperatorToCondition(
+    const condition = this.mapOperatorToCondition(
       columnOrExpression,
       filter.operator,
       filter.values,
       filter.includeNull,
       filter.type
     );
+
+    // Return undefined if no valid condition was generated (e.g., empty values)
+    // This allows callers to handle empty filters gracefully
+    if (!condition) {
+      return undefined as unknown as SQL | SQLWrapper;
+    }
+
+    return condition;
   }
 
   /**
@@ -640,7 +650,7 @@ export class FilterHandler {
    * @param values - Filter values (operator-specific)
    * @param includeNull - Whether to include NULL values in the condition
    * @param columnType - Optional column type hint for operator validation
-   * @returns SQL condition for the filter
+   * @returns SQL condition for the filter, or undefined if no valid condition can be generated (e.g., empty values)
    *
    * @throws {QueryError} If the operator is unsupported or invalid
    */
@@ -650,7 +660,7 @@ export class FilterHandler {
     values: unknown[],
     includeNull?: boolean,
     columnType?: string
-  ): SQL | SQLWrapper {
+  ): SQL | SQLWrapper | undefined {
     const conditions: (SQL | SQLWrapper)[] = [];
 
     // Handle null inclusion
@@ -683,8 +693,10 @@ export class FilterHandler {
       conditions.push(condition);
     }
 
+    // If no conditions were generated (e.g., empty values), return undefined
+    // This allows callers to handle empty filters gracefully
     if (conditions.length === 0) {
-      throw new QueryError('No valid conditions generated', { operator, values });
+      return undefined;
     }
 
     if (conditions.length === 1) {
@@ -935,6 +947,48 @@ export class FilterHandler {
       }
     }
 
+    // Check if this is a PostgreSQL array column for isAnyOf/isNoneOf operators
+    if (
+      (operator === 'isAnyOf' || operator === 'isNoneOf') &&
+      !this.isSqlExpression(column) &&
+      this.isPostgresArrayColumn(column)
+    ) {
+      const elementType = this.getPostgresArrayElementType(column);
+      if (!elementType) {
+        // Fallback to text if type cannot be determined
+        const fallbackType = 'text';
+        const arrayLiteral = this.buildPostgresArrayLiteral(
+          values.filter((v) => v !== undefined),
+          fallbackType
+        );
+
+        if (operator === 'isAnyOf') {
+          // Use PostgreSQL overlap operator: column && ARRAY[values]::type[]
+          return sql`${column} && ${arrayLiteral}`;
+        } else {
+          // Use negated overlap: NOT (column && ARRAY[values]::type[])
+          return sql`NOT (${column} && ${arrayLiteral})`;
+        }
+      }
+
+      // Filter out undefined values
+      const validValues = values.filter((v) => v !== undefined);
+      if (validValues.length === 0) {
+        return undefined;
+      }
+
+      const arrayLiteral = this.buildPostgresArrayLiteral(validValues, elementType);
+
+      if (operator === 'isAnyOf') {
+        // Use PostgreSQL overlap operator: column && ARRAY[values]::type[]
+        return sql`${column} && ${arrayLiteral}`;
+      } else {
+        // Use negated overlap: NOT (column && ARRAY[values]::type[])
+        return sql`NOT (${column} && ${arrayLiteral})`;
+      }
+    }
+
+    // For non-array columns, use existing behavior
     switch (operator) {
       case 'isAnyOf': {
         // Filter out undefined values before passing to inArray
@@ -977,6 +1031,49 @@ export class FilterHandler {
       return undefined;
     }
 
+    // Check if this is a PostgreSQL array column
+    const isPostgresArray = !this.isSqlExpression(column) && this.isPostgresArrayColumn(column);
+
+    if (isPostgresArray) {
+      const elementType = this.getPostgresArrayElementType(column) || 'text';
+
+      switch (operator) {
+        case 'includes': {
+          // Use @> operator with single-element array: column @> ARRAY[value]::type[]
+          const arrayLiteral = this.buildPostgresArrayLiteral([validValues[0]], elementType);
+          return sql`${column} @> ${arrayLiteral}`;
+        }
+        case 'excludes': {
+          // Use NOT (@>) operator: NOT (column @> ARRAY[value]::type[])
+          const arrayLiteral = this.buildPostgresArrayLiteral([validValues[0]], elementType);
+          return sql`NOT (${column} @> ${arrayLiteral})`;
+        }
+        case 'includesAny': {
+          // Use && (overlap) operator: column && ARRAY[values]::type[]
+          const arrayLiteral = this.buildPostgresArrayLiteral(validValues, elementType);
+          return sql`${column} && ${arrayLiteral}`;
+        }
+        case 'includesAll': {
+          // Use @> (contains) operator: column @> ARRAY[values]::type[]
+          const arrayLiteral = this.buildPostgresArrayLiteral(validValues, elementType);
+          return sql`${column} @> ${arrayLiteral}`;
+        }
+        case 'excludesAny': {
+          // Use NOT (&&) operator: NOT (column && ARRAY[values]::type[])
+          const arrayLiteral = this.buildPostgresArrayLiteral(validValues, elementType);
+          return sql`NOT (${column} && ${arrayLiteral})`;
+        }
+        case 'excludesAll': {
+          // Use NOT (@>) operator: NOT (column @> ARRAY[values]::type[])
+          const arrayLiteral = this.buildPostgresArrayLiteral(validValues, elementType);
+          return sql`NOT (${column} @> ${arrayLiteral})`;
+        }
+        default:
+          return undefined;
+      }
+    }
+
+    // For non-array columns (JSONB), use existing behavior
     switch (operator) {
       case 'includes':
         if (values[0] === undefined) {
@@ -1125,6 +1222,7 @@ export class FilterHandler {
    * @description
    * Creates a condition to check if an array/JSON column contains a specific value.
    * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   * For PostgreSQL, detects native array columns and uses proper array operators.
    *
    * @param column - Column reference or SQL expression
    * @param value - Value to check for in the array
@@ -1132,8 +1230,17 @@ export class FilterHandler {
    */
   private buildArrayContainsCondition(column: ColumnOrExpression, value: unknown): SQL {
     switch (this.databaseType) {
-      case 'postgres':
+      case 'postgres': {
+        // Check if this is a native PostgreSQL array column
+        if (!this.isSqlExpression(column) && this.isPostgresArrayColumn(column)) {
+          const elementType = this.getPostgresArrayElementType(column) || 'text';
+          const arrayLiteral = this.buildPostgresArrayLiteral([value], elementType);
+          // Use @> operator for native arrays: column @> ARRAY[value]::type[]
+          return sql`${column} @> ${arrayLiteral}`;
+        }
+        // For JSONB columns, use existing JSON.stringify approach
         return sql`${column} @> ${JSON.stringify([value])}`;
+      }
       case 'mysql':
         return sql`JSON_CONTAINS(${column}, ${JSON.stringify([value])})`;
       case 'sqlite':
@@ -1153,6 +1260,7 @@ export class FilterHandler {
    * @description
    * Creates a condition to check if an array/JSON column contains any of the specified values.
    * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   * For PostgreSQL, detects native array columns and uses proper array operators.
    *
    * @param column - Column reference or SQL expression
    * @param values - Array of values to check for
@@ -1160,8 +1268,17 @@ export class FilterHandler {
    */
   private buildArrayIncludesAnyCondition(column: ColumnOrExpression, values: unknown[]): SQL {
     switch (this.databaseType) {
-      case 'postgres':
+      case 'postgres': {
+        // Check if this is a native PostgreSQL array column
+        if (!this.isSqlExpression(column) && this.isPostgresArrayColumn(column)) {
+          const elementType = this.getPostgresArrayElementType(column) || 'text';
+          const arrayLiteral = this.buildPostgresArrayLiteral(values, elementType);
+          // Use && (overlap) operator for native arrays: column && ARRAY[values]::type[]
+          return sql`${column} && ${arrayLiteral}`;
+        }
+        // For JSONB columns, use existing JSON.stringify approach
         return sql`${column} && ${JSON.stringify(values)}`;
+      }
       case 'mysql':
         return sql`JSON_OVERLAPS(${column}, ${JSON.stringify(values)})`;
       case 'sqlite': {
@@ -1185,6 +1302,7 @@ export class FilterHandler {
    * @description
    * Creates a condition to check if an array/JSON column contains all of the specified values.
    * Supports both direct column references and SQL expressions (e.g., JSONB extractions).
+   * For PostgreSQL, detects native array columns and uses proper array operators.
    *
    * @param column - Column reference or SQL expression
    * @param values - Array of values that must all be present
@@ -1192,8 +1310,17 @@ export class FilterHandler {
    */
   private buildArrayIncludesAllCondition(column: ColumnOrExpression, values: unknown[]): SQL {
     switch (this.databaseType) {
-      case 'postgres':
+      case 'postgres': {
+        // Check if this is a native PostgreSQL array column
+        if (!this.isSqlExpression(column) && this.isPostgresArrayColumn(column)) {
+          const elementType = this.getPostgresArrayElementType(column) || 'text';
+          const arrayLiteral = this.buildPostgresArrayLiteral(values, elementType);
+          // Use @> (contains) operator for native arrays: column @> ARRAY[values]::type[]
+          return sql`${column} @> ${arrayLiteral}`;
+        }
+        // For JSONB columns, use existing JSON.stringify approach
         return sql`${column} @> ${JSON.stringify(values)}`;
+      }
       case 'mysql':
         return sql`JSON_CONTAINS(${column}, ${JSON.stringify(values)})`;
       case 'sqlite': {
@@ -1280,7 +1407,8 @@ export class FilterHandler {
         }
 
         const condition = this.buildFilterCondition(filter, primaryTable);
-        if (condition) {
+        // Only add condition if it's defined (undefined means empty/invalid filter)
+        if (condition !== undefined && condition !== null) {
           conditions.push(condition);
         }
       } catch (error) {
@@ -1340,6 +1468,121 @@ export class FilterHandler {
     }
 
     return (table as unknown as Record<string, AnyColumnType>)[columnPath.field] || null;
+  }
+
+  /**
+   * Check if a column is a PostgreSQL array column.
+   *
+   * @description
+   * Determines if a column is a native PostgreSQL array type (e.g., uuid[], text[]).
+   * This is only applicable for PostgreSQL databases. For other database types,
+   * this will always return false.
+   *
+   * @param column - The column to check
+   * @returns `true` if the column is a PostgreSQL array column, `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * const isArray = this.isPostgresArrayColumn(eventsTable.organizerIds);
+   * // Returns true for uuid[] column in PostgreSQL
+   * ```
+   *
+   * @since 1.0.0
+   */
+  private isPostgresArrayColumn(column: AnyColumnType): boolean {
+    // Only PostgreSQL supports native array types
+    if (this.databaseType !== 'postgres') {
+      return false;
+    }
+
+    // SQL expressions (like JSONB extractions) are not array columns
+    if (this.isSqlExpression(column)) {
+      return false;
+    }
+
+    return isArrayColumn(column);
+  }
+
+  /**
+   * Get the element type of a PostgreSQL array column.
+   *
+   * @description
+   * Extracts the base element type from a PostgreSQL array column.
+   * For example, a `uuid[]` array column would return `'uuid'`,
+   * and a `text[]` array column would return `'text'`.
+   *
+   * @param column - The column to examine
+   * @returns The element type as a string (e.g., 'uuid', 'text'), or `null` if not an array or type cannot be determined
+   *
+   * @example
+   * ```typescript
+   * const elementType = this.getPostgresArrayElementType(eventsTable.organizerIds);
+   * // Returns 'uuid' for uuid[] column
+   * ```
+   *
+   * @since 1.0.0
+   */
+  private getPostgresArrayElementType(column: AnyColumnType): string | null {
+    if (!this.isPostgresArrayColumn(column)) {
+      return null;
+    }
+
+    return getArrayElementType(column);
+  }
+
+  /**
+   * Build a PostgreSQL array literal with proper type casting.
+   *
+   * @description
+   * Generates a PostgreSQL array literal with proper type casting for each element.
+   * For example, for uuid values ['uuid1', 'uuid2'], this generates:
+   * `ARRAY['uuid1'::uuid, 'uuid2'::uuid]::uuid[]`
+   *
+   * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
+   * The element type is validated to prevent SQL injection.
+   *
+   * @param values - Array of values to include in the array literal
+   * @param elementType - The PostgreSQL type for array elements (e.g., 'uuid', 'text', 'integer')
+   * @returns SQL expression representing the PostgreSQL array literal
+   *
+   * @throws {QueryError} If the element type is invalid or values cannot be cast
+   *
+   * @example
+   * ```typescript
+   * const arrayLiteral = this.buildPostgresArrayLiteral(['uuid1', 'uuid2'], 'uuid');
+   * // Generates: ARRAY['uuid1'::uuid, 'uuid2'::uuid]::uuid[]
+   * ```
+   *
+   * @since 1.0.0
+   */
+  private buildPostgresArrayLiteral(values: unknown[], elementType: string): SQL {
+    // Validate element type to prevent SQL injection
+    const validTypes = ['uuid', 'text', 'integer', 'bigint', 'boolean', 'numeric', 'varchar'];
+    if (!validTypes.includes(elementType)) {
+      throw new QueryError(`Unsupported array element type: ${elementType}`, {
+        elementType,
+        validTypes,
+        suggestion: 'Supported types are: uuid, text, integer, bigint, boolean, numeric, varchar',
+      });
+    }
+
+    // Filter out null values (they are handled separately with isNull/isNotNull operators)
+    const nonNullValues = values.filter((v) => v !== null && v !== undefined);
+
+    // Handle empty arrays - return empty array literal
+    if (nonNullValues.length === 0) {
+      return sql`ARRAY[]::${sql.raw(elementType)}[]`;
+    }
+
+    // Build typed array elements
+    const typedValues = nonNullValues.map((value) => {
+      // Use Drizzle's sql template tag to safely cast each value
+      // The value is parameterized, and only the type name is raw (which we validated)
+      return sql`${value}::${sql.raw(elementType)}`;
+    });
+
+    // Join typed values and cast the entire array
+    return sql`ARRAY[${sql.join(typedValues, sql`, `)}]::${sql.raw(elementType)}[]`;
   }
 
   /**

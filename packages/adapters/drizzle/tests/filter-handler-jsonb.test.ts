@@ -363,11 +363,10 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'text',
       };
 
-      // This should not throw, but return undefined condition
-      // The handler should gracefully handle this
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow(); // buildFilterCondition throws when no condition is generated
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      // This allows callers to handle empty filters gracefully
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should return undefined for text operators with undefined value', () => {
@@ -378,9 +377,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'text',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should handle number operators with empty values array', () => {
@@ -391,9 +390,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'number',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should handle number operators with undefined value', () => {
@@ -404,9 +403,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'number',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should handle between operator with insufficient values', () => {
@@ -417,9 +416,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'number',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should handle date operators with empty values array', () => {
@@ -430,9 +429,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'date',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should handle option operators with empty values array', () => {
@@ -443,9 +442,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'option',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined when no valid condition can be generated
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should filter out undefined values in isAnyOf operator', () => {
@@ -470,10 +469,9 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'option',
       };
 
-      // After filtering, we have no valid values, so it should throw
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // After filtering, we have no valid values, so it returns undefined
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
   });
 
@@ -482,7 +480,7 @@ describe('FilterHandler - JSONB Support', () => {
     const relationshipManager = new RelationshipManager(schema, {});
     const handler = new FilterHandler(schema, relationshipManager, 'postgres');
 
-    it('should reject non-string values for text operators', () => {
+    it('should return undefined for non-string values in text operators', () => {
       const filter: FilterState = {
         columnId: 'survey.title',
         operator: 'contains',
@@ -490,12 +488,13 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'text',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined for type mismatches
+      // This allows callers to handle invalid inputs gracefully
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
-    it('should reject non-number values for number operators', () => {
+    it('should return undefined for non-number values in number operators', () => {
       const filter: FilterState = {
         columnId: 'survey.count',
         operator: 'greaterThan',
@@ -503,9 +502,10 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'number',
       };
 
-      expect(() => {
-        handler.buildFilterCondition(filter, 'surveys');
-      }).toThrow();
+      // buildFilterCondition now returns undefined for type mismatches
+      // This allows callers to handle invalid inputs gracefully
+      const condition = handler.buildFilterCondition(filter, 'surveys');
+      expect(condition).toBeUndefined();
     });
 
     it('should accept valid string values for text operators', () => {

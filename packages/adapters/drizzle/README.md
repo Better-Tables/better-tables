@@ -572,6 +572,142 @@ interface RelationshipPath {
 
 ## Database-Specific Notes
 
+### PostgreSQL Array Column Filtering
+
+The Drizzle adapter supports filtering on PostgreSQL array columns (e.g., `uuid[]`, `text[]`, `integer[]`) using `multiOption` filter types. This enables efficient filtering on array columns that store relationships, tags, permissions, or other multi-value fields.
+
+#### Supported Array Types
+
+- `uuid[]` - UUID arrays
+- `text[]` - Text arrays
+- `integer[]` - Integer arrays
+- `bigint[]` - BigInt arrays
+- `boolean[]` - Boolean arrays
+- `numeric[]` - Numeric arrays
+- `varchar[]` - Varchar arrays
+
+#### Schema Definition
+
+Define array columns in your Drizzle schema:
+
+```typescript
+import { pgTable, uuid, text, integer } from 'drizzle-orm/pg-core';
+
+export const eventsTable = pgTable('events', {
+  id: uuid('id').primaryKey(),
+  name: text('name').notNull(),
+  organizerIds: uuid('organizer_ids').array().notNull(), // uuid[]
+  tags: text('tags').array(), // text[]
+  categoryIds: integer('category_ids').array(), // integer[]
+});
+```
+
+#### Supported Operators
+
+**Option Operators** (for `type: 'option'`):
+- `isAnyOf` - Array overlaps with any of the specified values (`column && ARRAY[values]::type[]`)
+- `isNoneOf` - Array does not overlap with any of the specified values (`NOT (column && ARRAY[values]::type[])`)
+- `isNull` - Array column is NULL
+- `isNotNull` - Array column is not NULL
+
+**MultiOption Operators** (for `type: 'multiOption'`):
+- `includes` - Array contains a specific value (`column @> ARRAY[value]::type[]`)
+- `excludes` - Array does not contain a specific value (`NOT (column @> ARRAY[value]::type[])`)
+- `includesAny` - Array overlaps with any of the specified values (`column && ARRAY[values]::type[]`)
+- `includesAll` - Array contains all of the specified values (`column @> ARRAY[values]::type[]`)
+- `excludesAny` - Array does not overlap with any of the specified values (`NOT (column && ARRAY[values]::type[])`)
+- `excludesAll` - Array does not contain all of the specified values (`NOT (column @> ARRAY[values]::type[])`)
+- `isNull` - Array column is NULL
+- `isNotNull` - Array column is not NULL
+
+#### Usage Examples
+
+**Filter events by organizer IDs (uuid[]):**
+
+```typescript
+const result = await adapter.fetchData({
+  primaryTable: 'events',
+  columns: ['id', 'name', 'organizerIds'],
+  filters: [
+    {
+      columnId: 'organizerIds',
+      operator: 'isAnyOf',
+      values: ['019a4f81-2758-73f9-9bc2-5832f88c056c', '019a4f81-2758-73f9-9bc2-5832f88c056d'],
+      type: 'option',
+    },
+  ],
+});
+```
+
+**Filter events by tags (text[]):**
+
+```typescript
+const result = await adapter.fetchData({
+  primaryTable: 'events',
+  columns: ['id', 'name', 'tags'],
+  filters: [
+    {
+      columnId: 'tags',
+      operator: 'includesAny',
+      values: ['typescript', 'javascript'],
+      type: 'multiOption',
+    },
+  ],
+});
+```
+
+**Filter events by category IDs (integer[]):**
+
+```typescript
+const result = await adapter.fetchData({
+  primaryTable: 'events',
+  columns: ['id', 'name', 'categoryIds'],
+  filters: [
+    {
+      columnId: 'categoryIds',
+      operator: 'includesAll',
+      values: ['1', '3'], // Note: values are strings in FilterState
+      type: 'multiOption',
+    },
+  ],
+});
+```
+
+**Filter events with NULL array columns:**
+
+```typescript
+const result = await adapter.fetchData({
+  primaryTable: 'events',
+  columns: ['id', 'name', 'tags'],
+  filters: [
+    {
+      columnId: 'tags',
+      operator: 'isNull',
+      values: [],
+      type: 'multiOption',
+    },
+  ],
+});
+```
+
+#### Performance Considerations
+
+- **GIN Indexes**: For optimal performance with array columns, create GIN indexes:
+
+```sql
+CREATE INDEX idx_events_organizer_ids ON events USING GIN (organizer_ids);
+CREATE INDEX idx_events_tags ON events USING GIN (tags);
+```
+
+- **Array Operators**: The adapter uses PostgreSQL's native array operators (`&&`, `@>`) which are optimized for array columns and can leverage GIN indexes.
+
+#### Common Use Cases
+
+1. **Event Management Systems**: Filter events by organizer IDs stored as `uuid[]`
+2. **Content Management Systems**: Filter posts/articles by tag IDs or category IDs
+3. **Permission Systems**: Filter users by role arrays or resources by permission arrays
+4. **Many-to-Many Relationships**: Handle many-to-many relationships stored as arrays in PostgreSQL
+
 ### PostgreSQL
 
 ```typescript

@@ -52,6 +52,7 @@ import type { AnyColumnType, AnyTableType } from '../types';
  * @property {boolean} isForeignKey - Whether this column is a foreign key
  * @property {boolean} isNullable - Whether this column allows null values
  * @property {string} dataType - The data type of the column (e.g., 'string', 'number', 'date')
+ * @property {boolean} isArray - Whether this column is a PostgreSQL array type
  */
 export interface ColumnInfo {
   name: string;
@@ -60,6 +61,7 @@ export interface ColumnInfo {
   isForeignKey: boolean;
   isNullable: boolean;
   dataType: string;
+  isArray: boolean;
 }
 
 /**
@@ -124,6 +126,7 @@ export function getTableColumns(tableSchema: AnyTableType): ColumnInfo[] {
         isForeignKey: 'references' in drizzleColumn && drizzleColumn.references !== undefined,
         isNullable: drizzleColumn.notNull !== true,
         dataType: drizzleColumn.dataType || 'unknown',
+        isArray: isArrayColumn(column),
       });
     }
   }
@@ -275,4 +278,168 @@ export function hasColumn(tableSchema: AnyTableType, columnName: string): boolea
 export function getColumnInfo(tableSchema: AnyTableType, columnName: string): ColumnInfo | null {
   const columns = getTableColumns(tableSchema);
   return columns.find((col) => col.name === columnName) || null;
+}
+
+/**
+ * Check if a column is a PostgreSQL array column.
+ *
+ * @description
+ * Detects PostgreSQL array columns by examining the column's internal structure.
+ * This function checks multiple indicators to reliably identify array columns:
+ * - The column's dataType property
+ * - The column's columnType property
+ * - The internal structure of the column object
+ *
+ * @param {AnyColumnType} column - The Drizzle column to check
+ * @returns {boolean} `true` if the column is an array column, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * import { users } from './schema';
+ * import { isArrayColumn } from './drizzle-schema-utils';
+ *
+ * const isArray = isArrayColumn(users.tags); // true for text[] column
+ * const isNotArray = isArrayColumn(users.email); // false for text column
+ * ```
+ *
+ * @since 1.0.0
+ */
+export function isArrayColumn(column: AnyColumnType): boolean {
+  if (!column || typeof column !== 'object') {
+    return false;
+  }
+
+  // Check for array dataType
+  if (column.dataType === 'array') {
+    return true;
+  }
+
+  // Check columnType property (PgArray for PostgreSQL)
+  const columnType = (column as unknown as { columnType?: string }).columnType;
+  if (columnType === 'PgArray') {
+    return true;
+  }
+
+  // Check for baseColumn property directly on column (PgArray structure)
+  // baseColumn is directly on the column object, not in _
+  const baseColumn = (column as unknown as { baseColumn?: unknown }).baseColumn;
+  if (baseColumn !== undefined) {
+    return true;
+  }
+
+  // Check internal structure for array indicators
+  const internal = (column as unknown as { _?: { data?: unknown } })._;
+  if (internal) {
+    // Check for array data type in internal structure
+    const dataType = (internal as unknown as { dataType?: string }).dataType;
+    if (dataType === 'array') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Get the element type of a PostgreSQL array column.
+ *
+ * @description
+ * Extracts the base element type from a PostgreSQL array column.
+ * For example, a `uuid[]` array column would return `'uuid'`,
+ * and a `text[]` array column would return `'text'`.
+ *
+ * Supported types:
+ * - `uuid` - UUID arrays
+ * - `text` - Text arrays
+ * - `integer` - Integer arrays
+ * - `bigint` - BigInt arrays
+ * - `boolean` - Boolean arrays
+ * - `numeric` - Numeric arrays
+ * - `varchar` - Varchar arrays
+ *
+ * @param {AnyColumnType} column - The Drizzle column to examine
+ * @returns {string | null} The element type as a string (e.g., 'uuid', 'text'), or `null` if not an array or type cannot be determined
+ *
+ * @example
+ * ```typescript
+ * import { users } from './schema';
+ * import { getArrayElementType } from './drizzle-schema-utils';
+ *
+ * const elementType = getArrayElementType(users.organizerIds); // 'uuid' for uuid[] column
+ * const notArray = getArrayElementType(users.email); // null for non-array column
+ * ```
+ *
+ * @since 1.0.0
+ */
+export function getArrayElementType(column: AnyColumnType): string | null {
+  if (!isArrayColumn(column)) {
+    return null;
+  }
+
+  // Try to extract from baseColumn if it exists (PgArray structure)
+  // baseColumn is directly on the column object, not in _
+  const baseColumn = (column as unknown as { baseColumn?: AnyColumnType }).baseColumn;
+  if (baseColumn) {
+    // Check columnType first (more specific than dataType)
+    // For example, UUID has dataType: "string" but columnType: "PgUUID"
+    const baseColumnType = (baseColumn as unknown as { columnType?: string }).columnType;
+    if (baseColumnType) {
+      // Map common Drizzle column types to PostgreSQL type names
+      const columnTypeMap: Record<string, string> = {
+        PgUUID: 'uuid',
+        PgText: 'text',
+        PgInteger: 'integer',
+        PgBigInt: 'bigint',
+        PgBigInt53: 'bigint', // BigInt with mode: 'number'
+        PgBoolean: 'boolean',
+        PgNumeric: 'numeric',
+        PgVarchar: 'varchar',
+      };
+
+      if (baseColumnType in columnTypeMap) {
+        return columnTypeMap[baseColumnType] ?? null;
+      }
+    }
+
+    // Fallback: try to infer from dataType
+    const baseDataType = baseColumn.dataType;
+    if (baseDataType) {
+      // Map Drizzle data types to PostgreSQL type names
+      const typeMap: Record<string, string> = {
+        uuid: 'uuid',
+        string: 'text', // Note: UUIDs have dataType "string" but columnType "PgUUID"
+        number: 'integer', // Note: BigInts may have dataType "number" but columnType "PgBigInt53"
+        bigint: 'bigint',
+        boolean: 'boolean',
+        numeric: 'numeric',
+        varchar: 'varchar',
+      };
+
+      if (baseDataType in typeMap) {
+        return typeMap[baseDataType] ?? null;
+      }
+    }
+  }
+
+  // Try direct dataType mapping
+  const dataType = column.dataType;
+  if (dataType && dataType !== 'array') {
+    const typeMap: Record<string, string> = {
+      uuid: 'uuid',
+      string: 'text',
+      number: 'integer',
+      bigint: 'bigint',
+      boolean: 'boolean',
+      numeric: 'numeric',
+      varchar: 'varchar',
+    };
+
+    if (dataType in typeMap) {
+      return typeMap[dataType] ?? null;
+    }
+  }
+
+  // Default fallback to text for unknown types
+  // This allows the feature to work even if type detection fails
+  return 'text';
 }
