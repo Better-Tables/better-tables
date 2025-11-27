@@ -151,10 +151,17 @@ export function FilterBar<TData = unknown>({
       const column = columns.find((col) => col.id === columnId);
       if (!column || hasReachedMaxFilters) return;
 
+      // Use first custom operator if available, otherwise use default for column type
+      const customOperators = column.filter?.operators;
+      const defaultOperator =
+        (customOperators && customOperators.length > 0
+          ? customOperators[0]
+          : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
+
       const newFilter: FilterState = {
         columnId,
         type: column.type,
-        operator: getDefaultOperatorsForType(column.type)[0] ?? 'is', // Use first default operator from core
+        operator: defaultOperator,
         values: [],
       };
 
