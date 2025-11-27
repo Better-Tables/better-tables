@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.6
+
+### Patch Changes
+
+- This update fixes the relationship detection logic to always call detectFromSchema, allowing for array foreign key detection even when explicit relations are not provided. An empty object is passed for relations if none are specified, ensuring compatibility and improved functionality in schema handling.
+
 ## 0.5.5
 
 ### Patch Changes
