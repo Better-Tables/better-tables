@@ -180,9 +180,8 @@ export function FilterBar<TData = unknown>({
 
   const handleUpdateFilter = React.useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      onFiltersChange(
-        filters.map((f) => (f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f))
-      );
+      const newFilters = filters.map((f) => (f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f));
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
