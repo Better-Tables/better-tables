@@ -279,6 +279,56 @@ describe('RelationshipDetector', () => {
         expect(relationships['events.organizers']).toBeUndefined();
       });
 
+      it('should extract FK from function-based .references() pattern', () => {
+        // Test the new functionality: .references(() => table.column) pattern
+        // Create a mock column with a reference function
+        const usersTable = { _name: 'users', id: { _name: 'id', table: { _name: 'users' } } };
+        const usersIdColumn = usersTable.id;
+
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasReferenceFunction: true,
+              fkTable: usersTable,
+              fkColumn: usersIdColumn,
+            }),
+          },
+          users: usersTable,
+        };
+
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Should create relationship if FK info is extracted from reference function
+        expect(relationships['events.organizers']).toBeDefined();
+        expect(relationships['events.organizers']?.isArray).toBe(true);
+      });
+
+      it('should handle function-based references with schema search fallback', () => {
+        // Test Method 4: schema search when table reference isn't directly available
+        const usersIdColumn = { _name: 'id' };
+        const usersTable = { _name: 'users', id: usersIdColumn };
+
+        // Create column with reference function but no direct table property
+        const mockSchema = {
+          events: {
+            organizerId: createMockArrayColumn({
+              hasArraySymbol: true,
+              hasReferenceFunction: true,
+              fkColumn: usersIdColumn, // Column exists in schema
+            }),
+          },
+          users: usersTable, // Table contains the column
+        };
+
+        const detector = new RelationshipDetector();
+        const relationships = detector.detectFromSchema({}, mockSchema);
+
+        // Should find table via schema search fallback
+        expect(relationships['events.organizers']).toBeDefined();
+      });
+
       it('should handle multiple foreign keys (takes first)', () => {
         const fkTable1 = { _name: 'users' };
         const fkTable2 = { _name: 'tags' };

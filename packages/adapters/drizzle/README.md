@@ -336,7 +336,23 @@ The adapter automatically handles conversion from database table names to schema
 
 ### Array Foreign Keys
 
-The adapter automatically detects and handles array foreign key relationships. This is useful for scenarios where a column contains an array of foreign key references (e.g., `organizerId: uuid().array().references(() => users.id)`).
+The adapter automatically detects and handles array foreign key relationships. This is useful for scenarios where a column contains an array of foreign key references.
+
+**Auto-Detection**: The adapter automatically detects array FK relationships from your schema definition. You don't need to manually configure them - just define your columns with `.references()` and `.array()`:
+
+```typescript
+// PostgreSQL example
+organizerId: uuid('organizer_id')
+  .references(() => usersTable.id)
+  .array()
+  .notNull()
+```
+
+The adapter will automatically:
+- Detect that `organizerId` is an array column
+- Extract the foreign key reference from `.references(() => usersTable.id)`
+- Create a relationship named `events.organizers` (auto-pluralized from `organizerId`)
+- Enable joins and filtering on the related `users` table
 
 **PostgreSQL Example:**
 ```typescript

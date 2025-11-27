@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.8
+
+### Patch Changes
+
+- This update introduces functionality to the RelationshipDetector that automatically identifies array foreign key relationships in the schema. It enhances the detection process by adding detailed documentation and improving the methods for checking array columns and extracting foreign key information. This change streamlines the handling of relationships, ensuring better integration with various schema configurations.
+
 ## 0.5.7
 
 ### Patch Changes

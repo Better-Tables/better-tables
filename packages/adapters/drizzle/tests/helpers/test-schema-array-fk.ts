@@ -84,6 +84,7 @@ export function createMockArrayColumn(options: {
   hasArraySymbol?: boolean;
   hasDataType?: boolean;
   hasForeignKey?: boolean;
+  hasReferenceFunction?: boolean; // New: function-based .references() pattern
   fkTable?: unknown;
   fkColumn?: unknown;
 }): Record<string, unknown> {
@@ -97,16 +98,25 @@ export function createMockArrayColumn(options: {
     column.dataType = 'array';
   }
 
+  const metaSymbol = Symbol.for('drizzle:ColumnMetadata');
+  const metadata: Record<string, unknown> = {};
+
   if (options.hasForeignKey) {
-    const metaSymbol = Symbol.for('drizzle:ColumnMetadata');
-    const metadata: Record<string, unknown> = {
-      foreignKeys: [
-        {
-          table: options.fkTable || { _name: 'users' },
-          column: options.fkColumn || { _name: 'id' },
-        },
-      ],
-    };
+    metadata.foreignKeys = [
+      {
+        table: options.fkTable || { _name: 'users' },
+        column: options.fkColumn || { _name: 'id' },
+      },
+    ];
+  }
+
+  // Test function-based .references() pattern
+  if (options.hasReferenceFunction && options.fkColumn) {
+    // Create a mock reference function that returns the column object
+    metadata.reference = () => options.fkColumn;
+  }
+
+  if (Object.keys(metadata).length > 0) {
     (column as Record<symbol, unknown>)[metaSymbol] = metadata;
   }
 

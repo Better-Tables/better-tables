@@ -15,6 +15,7 @@
  * - Detects circular relationships
  * - Validates relationship integrity
  * - Handles composite foreign keys
+ * - Automatically detects array foreign key relationships
  *
  * The detector works by calling Drizzle's config() function on Relations objects
  * and extracting the relationship metadata. It builds both forward and backward
@@ -25,9 +26,24 @@
  * const detector = new RelationshipDetector();
  * const relationships = detector.detectFromSchema(
  *   { users: usersRelations },
- *   { users, profiles }
+ *   { users, profiles, events }
  * );
- * // Returns: { 'users.profile': { from: 'users', to: 'profiles', ... }, ... }
+ * // Returns: {
+ * //   'users.profile': { from: 'users', to: 'profiles', ... },
+ * //   'events.organizers': { from: 'events', to: 'users', isArray: true, ... }
+ * // }
+ * ```
+ *
+ * Array foreign key detection:
+ * Automatically detects relationships from array columns with foreign key references:
+ * ```typescript
+ * // Schema definition
+ * organizerId: uuid()
+ *   .references(() => usersTable.id)
+ *   .array()
+ *   .notNull()
+ *
+ * // Automatically creates: 'eventsTable.organizers' relationship
  * ```
  *
  * @see {@link RelationshipMap} for the relationship structure
@@ -120,8 +136,26 @@ export class RelationshipDetector {
 
   /**
    * Detect array foreign keys from schema
-   * Array foreign keys are columns that are arrays and have foreign key references
-   * Example: organizerId: uuid().references(() => usersTable.id).array()
+   *
+   * Array foreign keys are columns that are arrays and have foreign key references.
+   * This method automatically detects relationships like:
+   *
+   * ```typescript
+   * organizerId: uuid()
+   *   .references(() => usersTable.id)
+   *   .array()
+   *   .notNull()
+   * ```
+   *
+   * The detection process:
+   * 1. Identifies array columns using `isArrayColumn()`
+   * 2. Extracts FK references using `getForeignKeyInfo()`
+   * 3. Resolves schema keys using `resolveSchemaKey()`
+   * 4. Resolves field names using `getFieldName()`
+   *
+   * The relationship is stored with a friendly alias (e.g., 'organizerId' → 'organizers').
+   *
+   * @param schema - The Drizzle schema object containing all tables
    */
   private detectArrayForeignKeys(schema?: Record<string, unknown>): void {
     if (!schema) return;
@@ -204,11 +238,19 @@ export class RelationshipDetector {
 
   /**
    * Check if a column is an array type
+   *
+   * Generic detection for any array column type (uuid[], text[], integer[], etc.)
+   * Works by checking Drizzle's internal metadata symbols and properties.
    */
   private isArrayColumn(columnObj: Record<string, unknown>): boolean {
     // Check for Drizzle array column indicators
     // Array columns have specific metadata symbols
-    const arraySymbols = [Symbol.for('drizzle:Array'), Symbol.for('drizzle:ArrayType')];
+    const arraySymbols = [
+      Symbol.for('drizzle:Array'),
+      Symbol.for('drizzle:ArrayType'),
+      Symbol.for('drizzle:ColumnArray'),
+      // Additional symbols that might be used in different Drizzle versions
+    ];
 
     for (const sym of arraySymbols) {
       if (sym in columnObj) {
@@ -216,8 +258,13 @@ export class RelationshipDetector {
       }
     }
 
-    // Check for array-related properties
+    // Check for array-related properties directly on the column
     if ('dataType' in columnObj && columnObj.dataType === 'array') {
+      return true;
+    }
+
+    // Check if column has array property set to true
+    if ('array' in columnObj && columnObj.array === true) {
       return true;
     }
 
@@ -227,10 +274,37 @@ export class RelationshipDetector {
       const symValue = (columnObj as Record<symbol, unknown>)[sym];
       if (symValue && typeof symValue === 'object') {
         const metaObj = symValue as Record<string, unknown>;
+
+        // Check dataType in metadata
         if ('dataType' in metaObj && metaObj.dataType === 'array') {
           return true;
         }
+
+        // Check array flag in metadata
         if ('array' in metaObj && metaObj.array === true) {
+          return true;
+        }
+
+        // Check for array-related flags
+        if ('isArray' in metaObj && metaObj.isArray === true) {
+          return true;
+        }
+
+        // Check for SQL type indicators (e.g., 'uuid[]', 'text[]')
+        if (
+          'sqlName' in metaObj &&
+          typeof metaObj.sqlName === 'string' &&
+          metaObj.sqlName.endsWith('[]')
+        ) {
+          return true;
+        }
+
+        // Check for column type that includes array
+        if (
+          'columnType' in metaObj &&
+          typeof metaObj.columnType === 'string' &&
+          metaObj.columnType.includes('Array')
+        ) {
           return true;
         }
       }
@@ -241,6 +315,9 @@ export class RelationshipDetector {
 
   /**
    * Get foreign key information from a column
+   *
+   * Generic method that extracts FK references from any column, including array columns.
+   * Handles both direct FK metadata and function-based references from .references() calls.
    */
   private getForeignKeyInfo(
     columnObj: Record<string, unknown>
@@ -252,7 +329,7 @@ export class RelationshipDetector {
       if (symValue && typeof symValue === 'object') {
         const metaObj = symValue as Record<string, unknown>;
 
-        // Check for foreignKeys array
+        // Check for foreignKeys array (standard Drizzle FK metadata)
         if ('foreignKeys' in metaObj && Array.isArray(metaObj.foreignKeys)) {
           const foreignKeys = metaObj.foreignKeys;
           if (foreignKeys.length > 0) {
@@ -269,18 +346,86 @@ export class RelationshipDetector {
           }
         }
 
-        // Check for reference property (direct reference)
+        // Check for reference property (function-based reference from .references(() => table.column))
+        // This is the key pattern: .references(() => usersTable.id) stores a function
         if ('reference' in metaObj && metaObj.reference) {
           const ref = metaObj.reference;
           if (typeof ref === 'function') {
             try {
+              // Call the reference function to get the target column object
               const refColumn = ref();
-              const refTable = this.getTableName(refColumn);
-              if (refTable) {
-                return { table: refColumn, column: refColumn };
+
+              // The column object has a reference to its parent table
+              // We need to extract both the table and the column name
+              if (refColumn && typeof refColumn === 'object') {
+                // Get the table from the column's metadata
+                // Drizzle columns store their table reference in metadata
+                const refColumnObj = refColumn as Record<string, unknown>;
+                const refColumnSymbols = Object.getOwnPropertySymbols(refColumnObj);
+
+                // Extract the table from the column object
+                // Drizzle columns store their parent table in various locations
+                let refTable: unknown = null;
+
+                // Method 1: Check for table in column metadata symbols
+                for (const colSym of refColumnSymbols) {
+                  const colSymValue = (refColumnObj as Record<symbol, unknown>)[colSym];
+                  if (colSymValue && typeof colSymValue === 'object') {
+                    const colMetaObj = colSymValue as Record<string, unknown>;
+
+                    // Check for table property in column metadata
+                    if ('table' in colMetaObj) {
+                      refTable = colMetaObj.table;
+                      break;
+                    }
+                  }
+                }
+
+                // Method 2: Check if column has a direct table property
+                if (!refTable && 'table' in refColumnObj) {
+                  refTable = refColumnObj.table;
+                }
+
+                // Method 3: Check column's _ property (common Drizzle pattern)
+                if (
+                  !refTable &&
+                  '_' in refColumnObj &&
+                  refColumnObj._ &&
+                  typeof refColumnObj._ === 'object'
+                ) {
+                  const colUnder = refColumnObj._ as Record<string, unknown>;
+                  if ('table' in colUnder) {
+                    refTable = colUnder.table;
+                  }
+                }
+
+                // Method 4: Search through schema to find which table contains this column
+                // This is a fallback when table reference isn't directly available
+                if (!refTable && this.schema) {
+                  for (const [, schemaTable] of Object.entries(this.schema)) {
+                    if (schemaTable && typeof schemaTable === 'object') {
+                      const tableObj = schemaTable as Record<string, unknown>;
+                      for (const [, tableColumn] of Object.entries(tableObj)) {
+                        // Use reference equality to find the matching column
+                        if (tableColumn === refColumn) {
+                          // Found the table that contains this column
+                          // Return the table object from schema
+                          refTable = schemaTable;
+                          break;
+                        }
+                      }
+                      if (refTable) break;
+                    }
+                  }
+                }
+
+                // If we found a table, return both table and column
+                if (refTable) {
+                  return { table: refTable, column: refColumn };
+                }
               }
             } catch {
-              // Ignore if reference() fails
+              // Ignore if reference() fails - this is expected for some column types
             }
           }
         }
@@ -1004,6 +1149,8 @@ export class RelationshipDetector {
    * This is a convenience method that handles both table objects and strings.
    * It's used when we have a table reference (object or string) and need to
    * find the corresponding schema key.
+   *
+   * Generic method that works for any table reference format.
    */
   private resolveSchemaKey(table: unknown, schema: Record<string, unknown>): string | null {
     // If it's already a string, check if it's a schema key
@@ -1015,15 +1162,50 @@ export class RelationshipDetector {
       return this.findSchemaKeyByTableName(schema, table);
     }
 
-    // If it's a table object, get DB name first, then find schema key
-    const dbName = this.getTableName(table);
-    if (!dbName) return null;
+    // If it's a table object, try multiple strategies to find the schema key
 
-    return this.findSchemaKeyByTableName(schema, dbName);
+    // Strategy 1: Direct reference equality - check if table object matches a schema table
+    if (table && typeof table === 'object') {
+      for (const [schemaKey, schemaTable] of Object.entries(schema)) {
+        if (schemaTable === table) {
+          return schemaKey; // Direct match found
+        }
+      }
+    }
+
+    // Strategy 2: Get DB name from table object, then find schema key
+    const dbName = this.getTableName(table);
+    if (dbName) {
+      // First check if DB name matches a schema key directly
+      if (dbName in schema) {
+        return dbName;
+      }
+      // Then try to find schema key by DB name
+      const schemaKey = this.findSchemaKeyByTableName(schema, dbName);
+      if (schemaKey) {
+        return schemaKey;
+      }
+    }
+
+    // Strategy 3: If table object has a name property, try matching by name
+    if (table && typeof table === 'object') {
+      const tableObj = table as Record<string, unknown>;
+      if ('name' in tableObj && typeof tableObj.name === 'string') {
+        const nameMatch = this.findSchemaKeyByTableName(schema, tableObj.name);
+        if (nameMatch) {
+          return nameMatch;
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
    * Get field name from field object
+   *
+   * Generic method that resolves column names from column objects.
+   * Works by matching column objects to property names in the table schema.
    */
   private getFieldName(field: unknown, tableName: string): string {
     if (typeof field === 'string') return field;
@@ -1031,32 +1213,62 @@ export class RelationshipDetector {
     if (field && typeof field === 'object') {
       const fieldObj = field as Record<string, unknown>;
 
-      // First, try to find the property name by matching the field object with the table schema
+      // Strategy 1: Find the property name by matching the field object with the table schema
+      // This is the most reliable method - use reference equality
       if (this?.schema?.[tableName]) {
         const tableSchema = this.schema[tableName] as Record<string, unknown>;
 
         // Iterate through all properties in the table schema
         for (const [propName, propValue] of Object.entries(tableSchema)) {
-          // Check if this property value matches our field object
+          // Check if this property value matches our field object (reference equality)
           if (propValue === field) {
             return propName;
           }
         }
       }
 
-      // Fallback: try to extract from the field object itself
+      // Strategy 2: Try to extract from the field object itself
+      // Check for name property
       if ('name' in fieldObj && typeof fieldObj.name === 'string') {
         return fieldObj.name;
       }
 
-      // Check for _name property (used in some Drizzle column metadata)
+      // Strategy 3: Check for _name property (used in some Drizzle column metadata)
       if ('_name' in fieldObj && typeof fieldObj._name === 'string') {
         return fieldObj._name;
       }
 
+      // Strategy 4: Check for Drizzle name symbol
       const nameSymbol = Symbol.for('drizzle:Name');
       if (nameSymbol in fieldObj && typeof fieldObj[nameSymbol] === 'string') {
         return fieldObj[nameSymbol] as string;
+      }
+
+      // Strategy 5: Check column metadata symbols for name
+      const fieldSymbols = Object.getOwnPropertySymbols(fieldObj);
+      for (const sym of fieldSymbols) {
+        const symValue = (fieldObj as Record<symbol, unknown>)[sym];
+        if (symValue && typeof symValue === 'object') {
+          const metaObj = symValue as Record<string, unknown>;
+
+          // Check for name in metadata
+          if ('name' in metaObj && typeof metaObj.name === 'string') {
+            return metaObj.name;
+          }
+
+          // Check for _name in metadata
+          if ('_name' in metaObj && typeof metaObj._name === 'string') {
+            return metaObj._name;
+          }
+        }
+      }
+
+      // Strategy 6: Check _ property for name
+      if ('_' in fieldObj && fieldObj._ && typeof fieldObj._ === 'object') {
+        const fieldUnder = fieldObj._ as Record<string, unknown>;
+        if ('name' in fieldUnder && typeof fieldUnder.name === 'string') {
+          return fieldUnder.name;
+        }
       }
     }
 

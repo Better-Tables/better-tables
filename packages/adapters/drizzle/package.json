@@ -1,6 +1,6 @@
 {
   "name": "@better-tables/adapters-drizzle",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Drizzle ORM adapter for Better Tables - Multi-database support with automatic relationship detection",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
