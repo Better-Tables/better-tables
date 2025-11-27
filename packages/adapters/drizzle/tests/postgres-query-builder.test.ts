@@ -351,9 +351,9 @@ describe('PostgresQueryBuilder', () => {
       databaseName = await ensurePostgresDatabase(connectionString);
 
       // Connect and set up tables with seed data
-      const { client: setupClient } = createPostgresDatabase(connectionString);
+      const { db: setupDb, client: setupClient } = createPostgresDatabase(connectionString);
       await setupPostgresDatabase(
-        setupClient as unknown as PostgresJsDatabase<typeof import('./helpers/test-schema').schema>
+        setupDb as unknown as PostgresJsDatabase<typeof import('./helpers/test-schema').schema>
       );
       await closePostgresDatabase(setupClient);
     });

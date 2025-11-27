@@ -116,8 +116,13 @@ LEFT JOIN users ON EXISTS (
 The adapter automatically detects array foreign keys by:
 1. Identifying array columns (PostgreSQL `.array()`, MySQL/SQLite JSON columns)
 2. Checking for foreign key references in the column metadata
-3. Creating relationship paths with `isArray: true` flag
-4. Generating pluralized alias names (e.g., `organizerId` → `organizers`)
+3. **Converting database table names to schema keys** - The adapter automatically converts database table names (e.g., `'users'`) to their corresponding schema keys (e.g., `'usersTable'`) for internal consistency
+4. Creating relationship paths with `isArray: true` flag
+5. Generating pluralized alias names (e.g., `organizerId` → `organizers`)
+
+**Important**: The adapter internally stores and resolves relationships using **schema keys** (e.g., `usersTable`, `eventsTable`) rather than raw database table names (e.g., `users`, `events`). This ensures consistency with Drizzle's schema object structure. The adapter automatically handles conversion from database table names to schema keys, supporting both naming conventions:
+- Schema keys different from DB names: `{ usersTable: usersTable }` where DB name is `'users'` → finds `'usersTable'`
+- Schema keys matching DB names: `{ users: usersTable }` → uses `'users'` as schema key (backward compatibility)
 
 ### Manual Override
 

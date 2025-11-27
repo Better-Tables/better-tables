@@ -100,7 +100,7 @@ describe('RelationshipDetector', () => {
       const detector = new RelationshipDetector();
       detector.detectFromSchema({}, mockSchema);
 
-      // Test forward traversal: from events to users
+      // Test forward traversal: from events to users (using schema keys)
       const forwardPath = detector.getJoinPath('events', 'users');
       expect(forwardPath).toBeDefined();
       expect(forwardPath.length).toBeGreaterThan(0);
@@ -112,6 +112,70 @@ describe('RelationshipDetector', () => {
       expect(reversePath).toBeDefined();
       expect(reversePath.length).toBeGreaterThan(0);
       expect(reversePath[0]?.isArray).toBe(true);
+    });
+
+    it('should handle schema keys different from database table names', () => {
+      // Test with schema where keys differ from DB names
+      const mockSchema = {
+        eventsTable: {
+          _name: 'events', // Database table name
+          id: { _name: 'id' },
+          organizerId: createMockArrayColumn({
+            hasArraySymbol: true,
+            hasForeignKey: true,
+            fkTable: { _name: 'users' }, // DB name is 'users'
+            fkColumn: { _name: 'id' },
+          }),
+        },
+        usersTable: {
+          _name: 'users', // Database table name
+          id: { _name: 'id' },
+          name: { _name: 'name' },
+        },
+      };
+
+      const detector = new RelationshipDetector();
+      const relationships = detector.detectFromSchema({}, mockSchema);
+
+      // Relationship should be stored with schema keys
+      const rel = relationships['eventsTable.organizers'];
+      expect(rel).toBeDefined();
+      expect(rel?.from).toBe('eventsTable'); // Schema key
+      expect(rel?.to).toBe('usersTable'); // Schema key (converted from DB name 'users')
+      expect(rel?.isArray).toBe(true);
+
+      // Graph traversal should work with schema keys
+      const path = detector.getJoinPath('eventsTable', 'usersTable');
+      expect(path).toBeDefined();
+      expect(path.length).toBeGreaterThan(0);
+    });
+
+    it('should handle schema keys matching database table names (backward compatibility)', () => {
+      // Test with schema where keys match DB names
+      const mockSchema = {
+        events: {
+          id: { _name: 'id' },
+          organizerId: createMockArrayColumn({
+            hasArraySymbol: true,
+            hasForeignKey: true,
+            fkTable: { _name: 'users' },
+            fkColumn: { _name: 'id' },
+          }),
+        },
+        users: {
+          id: { _name: 'id' },
+        },
+      };
+
+      const detector = new RelationshipDetector();
+      const relationships = detector.detectFromSchema({}, mockSchema);
+
+      // Should still work when schema keys match DB names
+      const rel = relationships['events.organizers'];
+      expect(rel).toBeDefined();
+      expect(rel?.from).toBe('events');
+      expect(rel?.to).toBe('users'); // Falls back to DB name as schema key
+      expect(rel?.isArray).toBe(true);
     });
   });
 

@@ -145,19 +145,23 @@ export class RelationshipDetector {
         const fkInfo = this.getForeignKeyInfo(columnObj);
         if (!fkInfo) continue;
 
-        // Get the target table name
-        const targetTableName = this.getTableName(fkInfo.table);
-        if (!targetTableName) continue;
+        // Convert table reference to schema key (handles both table objects and strings)
+        const targetTableSchemaKey = this.resolveSchemaKey(fkInfo.table, schema);
+        if (!targetTableSchemaKey) {
+          // Schema key not found - skip this relationship (graceful degradation)
+          // This can happen if the target table is not in the schema
+          continue;
+        }
 
         // Get the referenced column name in the target table
         const referencedColumn = fkInfo.column;
-        const referencedColumnName = this.getFieldName(referencedColumn, targetTableName);
+        const referencedColumnName = this.getFieldName(referencedColumn, targetTableSchemaKey);
         if (!referencedColumnName) continue;
 
         // Create relationship path for array foreign key
         const relationshipPath: RelationshipPath = {
           from: tableName,
-          to: targetTableName,
+          to: targetTableSchemaKey, // Use schema key, not database table name
           foreignKey: referencedColumnName, // The column in the target table (e.g., 'id' in users)
           localKey: columnName, // The array column in the source table (e.g., 'organizerId' in events)
           cardinality: 'many', // Array FKs are always many-to-many conceptually
@@ -172,8 +176,8 @@ export class RelationshipDetector {
         const forwardKey = `${tableName}.${aliasName}`;
         this.relationships.set(forwardKey, relationshipPath);
 
-        // Also store reverse relationship
-        const reverseKey = `${targetTableName}.${this.getReverseRelationName(tableName, aliasName)}`;
+        // Also store reverse relationship (use schema key)
+        const reverseKey = `${targetTableSchemaKey}.${this.getReverseRelationName(tableName, aliasName)}`;
         this.relationships.set(reverseKey, this.reverseRelationshipPath(relationshipPath));
 
         // Add forward edge to relationship graph (from array-owning table to referenced table)
@@ -182,15 +186,15 @@ export class RelationshipDetector {
         }
         const sourceSet = this.relationshipGraph.get(tableName);
         if (sourceSet) {
-          sourceSet.add(targetTableName);
+          sourceSet.add(targetTableSchemaKey); // Use schema key
         }
 
         // Add reverse edge to relationship graph (from referenced table back to array-owning table)
         // This allows getJoinPath to traverse in both directions
-        if (!this.relationshipGraph.has(targetTableName)) {
-          this.relationshipGraph.set(targetTableName, new Set());
+        if (!this.relationshipGraph.has(targetTableSchemaKey)) {
+          this.relationshipGraph.set(targetTableSchemaKey, new Set());
         }
-        const targetSet = this.relationshipGraph.get(targetTableName);
+        const targetSet = this.relationshipGraph.get(targetTableSchemaKey);
         if (targetSet) {
           targetSet.add(tableName);
         }
@@ -401,15 +405,18 @@ export class RelationshipDetector {
           // Check if this is a valid relation object
           if (this.isDrizzleRelationConfig(relation)) {
             const targetTable = relation.table;
-            const targetTableName = this.getTableName(targetTable);
 
-            if (targetTableName) {
-              const sourceSet = this.relationshipGraph.get(tableName);
-              if (sourceSet) {
-                sourceSet.add(targetTableName);
+            if (this.schema) {
+              // Convert table reference to schema key (handles both table objects and strings)
+              const targetTableSchemaKey = this.resolveSchemaKey(targetTable, this.schema);
+              if (targetTableSchemaKey) {
+                const sourceSet = this.relationshipGraph.get(tableName);
+                if (sourceSet) {
+                  sourceSet.add(targetTableSchemaKey); // Use schema key
+                }
+
+                // Directed graph: edge from source table to target table only
               }
-
-              // Directed graph: edge from source table to target table only
             }
           }
         }
@@ -485,9 +492,15 @@ export class RelationshipDetector {
           // Check if this is a valid relation object
           if (this.isDrizzleRelationConfig(relation)) {
             const targetTable = relation.table;
-            const targetTableName = this.getTableName(targetTable);
 
-            if (targetTableName) {
+            if (schema) {
+              // Convert table reference to schema key (handles both table objects and strings)
+              const targetTableSchemaKey = this.resolveSchemaKey(targetTable, schema);
+              if (!targetTableSchemaKey) {
+                // Schema key not found - skip this relationship
+                continue;
+              }
+
               // Determine cardinality based on relation type
               const cardinality = this.inferCardinalityFromRelation(relation);
 
@@ -530,28 +543,32 @@ export class RelationshipDetector {
                 : getFieldName(relation.fields, tableName);
 
               let foreignKey = Array.isArray(relation.references)
-                ? getFieldName(relation.references[0], targetTableName)
-                : getFieldName(relation.references, targetTableName);
+                ? getFieldName(relation.references[0], targetTableSchemaKey)
+                : getFieldName(relation.references, targetTableSchemaKey);
 
               // Handle composite foreign keys - use all fields/references
               if (Array.isArray(relation.fields) && Array.isArray(relation.references)) {
                 // For composite keys, we'll use the first field as the primary identifier
                 // but store all fields for proper join construction
                 localKey = getFieldName(relation.fields[0], tableName);
-                foreignKey = getFieldName(relation.references[0], targetTableName);
+                foreignKey = getFieldName(relation.references[0], targetTableSchemaKey);
               }
 
               // Handle many() relationships without explicit field mappings
               if (!localKey && !foreignKey && relation.type === 'many') {
                 // For many() relationships, infer from foreign key constraints
-                const inferredKeys = this.inferManyRelationshipKeys(tableName, targetTableName);
+                // Pass schema keys to inferManyRelationshipKeys
+                const inferredKeys = this.inferManyRelationshipKeys(
+                  tableName,
+                  targetTableSchemaKey
+                );
                 localKey = inferredKeys.localKey;
                 foreignKey = inferredKeys.foreignKey;
               }
 
               const relationshipPath: RelationshipPath = {
                 from: tableName,
-                to: targetTableName,
+                to: targetTableSchemaKey, // Use schema key, not database table name
                 foreignKey,
                 localKey,
                 cardinality,
@@ -562,7 +579,7 @@ export class RelationshipDetector {
 
               // Store both directions
               const forwardKey = `${tableName}.${relationName}`;
-              const backwardKey = `${targetTableName}.${this.getReverseRelationName(tableName, relationName)}`;
+              const backwardKey = `${targetTableSchemaKey}.${this.getReverseRelationName(tableName, relationName)}`;
 
               this.relationships.set(forwardKey, relationshipPath);
               this.relationships.set(backwardKey, this.reverseRelationshipPath(relationshipPath));
@@ -761,7 +778,7 @@ export class RelationshipDetector {
     fromTable: string,
     toTable: string
   ): { localKey: string; foreignKey: string } {
-    // Get both table schemas
+    // Get both table schemas (fromTable and toTable are now schema keys)
     const targetTableSchema = this.schema?.[toTable];
     const sourceTableSchema = this.schema?.[fromTable];
 
@@ -769,6 +786,13 @@ export class RelationshipDetector {
       return { localKey: '', foreignKey: '' };
     }
     if (!sourceTableSchema || typeof sourceTableSchema !== 'object') {
+      return { localKey: '', foreignKey: '' };
+    }
+
+    // Get database table name from source table schema key for comparison
+    // FK metadata stores database table names, so we need to compare DB names
+    const sourceTableDbName = this.getTableName(sourceTableSchema);
+    if (!sourceTableDbName) {
       return { localKey: '', foreignKey: '' };
     }
 
@@ -796,7 +820,8 @@ export class RelationshipDetector {
                   const refTable = fkObj.table;
                   const refTableName = this.getTableName(refTable);
 
-                  if (refTableName === fromTable) {
+                  // Compare database table names (refTableName is DB name, sourceTableDbName is DB name)
+                  if (refTableName === sourceTableDbName) {
                     // Found it! The foreign key column in target table
                     const foreignKey = propName;
                     // The referenced column in source table
@@ -833,7 +858,8 @@ export class RelationshipDetector {
                 const refColumn = fkObj.reference();
                 const refTableName = this.getTableName(refColumn);
 
-                if (refTableName === fromTable) {
+                // Compare database table names (refTableName is DB name, sourceTableDbName is DB name)
+                if (refTableName === sourceTableDbName) {
                   // Find which column in target table has this FK
                   const columns = fkObj.columns;
                   const foreignKey = String(
@@ -936,6 +962,64 @@ export class RelationshipDetector {
     }
 
     return null;
+  }
+
+  /**
+   * Find the schema key from a database table name with fallback
+   *
+   * Strategy:
+   * 1. Try to find schema key by matching DB name via getTableName()
+   * 2. If not found, check if DB name exists as schema key directly (fallback)
+   * 3. Return null only if both fail
+   *
+   * This handles both naming conventions:
+   * - { usersTable: usersTable } where DB name is 'users' → finds 'usersTable'
+   * - { users: usersTable } where schema key matches DB name → returns 'users'
+   */
+  private findSchemaKeyByTableName(
+    schema: Record<string, unknown>,
+    dbTableName: string
+  ): string | null {
+    // Strategy 1: Find schema key by matching database table name
+    for (const [schemaKey, tableSchema] of Object.entries(schema)) {
+      if (!tableSchema || typeof tableSchema !== 'object') continue;
+      const tableDbName = this.getTableName(tableSchema);
+      if (tableDbName === dbTableName) {
+        return schemaKey;
+      }
+    }
+
+    // Strategy 2: Fallback - check if DB name exists as schema key directly
+    // This handles cases where schema keys match DB names: { users: usersTable }
+    if (dbTableName in schema) {
+      return dbTableName;
+    }
+
+    return null;
+  }
+
+  /**
+   * Resolve schema key from table reference with fallback
+   *
+   * This is a convenience method that handles both table objects and strings.
+   * It's used when we have a table reference (object or string) and need to
+   * find the corresponding schema key.
+   */
+  private resolveSchemaKey(table: unknown, schema: Record<string, unknown>): string | null {
+    // If it's already a string, check if it's a schema key
+    if (typeof table === 'string') {
+      if (table in schema) {
+        return table; // It's already a schema key
+      }
+      // Try to find schema key by DB name
+      return this.findSchemaKeyByTableName(schema, table);
+    }
+
+    // If it's a table object, get DB name first, then find schema key
+    const dbName = this.getTableName(table);
+    if (!dbName) return null;
+
+    return this.findSchemaKeyByTableName(schema, dbName);
   }
 
   /**

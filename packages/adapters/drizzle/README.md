@@ -328,6 +328,14 @@ const result = await adapter.fetchData({
 
 ### Array Foreign Keys
 
+**Important**: The adapter internally stores and resolves relationships using **schema keys** (e.g., `usersTable`, `eventsTable`) rather than raw database table names (e.g., `users`, `events`). This ensures consistency with Drizzle's schema object structure. When defining custom relationships or debugging, ensure you refer to tables by their schema keys.
+
+The adapter automatically handles conversion from database table names to schema keys:
+- If your schema keys differ from database table names (e.g., `{ usersTable: usersTable }` where DB name is `'users'`), the adapter will find the correct schema key.
+- If your schema keys match database table names (e.g., `{ users: usersTable }`), the adapter will use the database table name as the schema key (backward compatibility).
+
+### Array Foreign Keys
+
 The adapter automatically detects and handles array foreign key relationships. This is useful for scenarios where a column contains an array of foreign key references (e.g., `organizerId: uuid().array().references(() => users.id)`).
 
 **PostgreSQL Example:**
