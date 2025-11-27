@@ -201,10 +201,17 @@ export class DrizzleAdapter<
       // Always call detectFromSchema to enable array FK detection
       // Pass empty relations if not provided - detectArrayForeignKeys only needs schema
       // This allows array FK relationships to be detected even without explicit Drizzle relations
-      this.relationships = this.relationshipDetector.detectFromSchema(
+      const autoDetectedRelationships = this.relationshipDetector.detectFromSchema(
         (config.relations as Record<string, Relations>) || {},
         this.schema as Record<string, unknown>
       );
+
+      // Merge auto-detected relationships with manually provided ones
+      // Manual relationships take precedence over auto-detected ones (allows overrides)
+      this.relationships = {
+        ...autoDetectedRelationships,
+        ...(config.relationships || {}),
+      };
     } else {
       this.relationships = config.relationships || {};
     }

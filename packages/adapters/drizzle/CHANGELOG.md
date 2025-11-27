@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.7
+
+### Patch Changes
+
+- This update refines the relationship detection logic by merging auto-detected relationships with manually provided ones, ensuring that manual relationships take precedence. This change improves the handling of relationships in the schema, allowing for more flexible configuration while maintaining compatibility with array foreign key detection.
+
 ## 0.5.6
 
 ### Patch Changes
