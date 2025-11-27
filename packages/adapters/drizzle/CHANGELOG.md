@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.9
+
+### Patch Changes
+
+- This update introduces functionality in the FilterHandler to handle PostgreSQL array columns, allowing for the use of native array operators in filter conditions. It includes methods to check for array columns, retrieve their element types, and build array literals with proper type casting. Additionally, the buildFilterCondition method has been updated to return undefined for empty filters, improving error handling and flexibility in filter configurations.
+
 ## 0.5.8
 
 ### Patch Changes
