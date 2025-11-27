@@ -185,6 +185,17 @@ export function BetterTable<TData = unknown>({
   // Enable row selection automatically if actions are provided
   const shouldShowRowSelection = actions.length > 0 || rowSelection;
 
+  // Set defaultVisible on columns based on defaultVisibleColumns if provided
+  // This ensures mergeColumnVisibility in URL sync uses the correct defaults
+  const columnsWithDefaults = useMemo(() => {
+    if (!defaultVisibleColumns) return columns;
+
+    return columns.map((col) => ({
+      ...col,
+      defaultVisible: defaultVisibleColumns.includes(col.id),
+    }));
+  }, [columns, defaultVisibleColumns]);
+
   // Compute initial column visibility from defaultVisibleColumns if provided
   // Priority: initialColumnVisibility > defaultVisibleColumns > undefined (all visible)
   const computedColumnVisibility = useMemo<ColumnVisibility | undefined>(() => {
@@ -194,7 +205,7 @@ export function BetterTable<TData = unknown>({
     // If defaultVisibleColumns is provided, compute from it
     if (defaultVisibleColumns) {
       const visibility: ColumnVisibility = {};
-      columns.forEach((col) => {
+      columnsWithDefaults.forEach((col) => {
         visibility[col.id] = defaultVisibleColumns.includes(col.id);
       });
       return visibility;
@@ -202,7 +213,7 @@ export function BetterTable<TData = unknown>({
 
     // Default: all columns visible (undefined)
     return undefined;
-  }, [columns, defaultVisibleColumns, initialColumnVisibility]);
+  }, [columnsWithDefaults, defaultVisibleColumns, initialColumnVisibility]);
 
   // Initialize store synchronously during render
   // The store creation is idempotent - it only creates once per ID
@@ -210,7 +221,7 @@ export function BetterTable<TData = unknown>({
   // Create store synchronously (not in useMemo) to ensure it exists before hooks run
   // This fixes React Strict Mode issues where useMemo may not execute on first render
   const store = getOrCreateTableStore(id, {
-    columns,
+    columns: columnsWithDefaults,
     filters: initialFilters,
     pagination: initialPagination,
     sorting: initialSorting,
@@ -371,15 +382,15 @@ export function BetterTable<TData = unknown>({
     if (sortingState.length === 0) return '';
     return sortingState
       .map((sort) => {
-        const column = columns.find((c) => c.id === sort.columnId);
+        const column = columnsWithDefaults.find((c) => c.id === sort.columnId);
         return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
       })
       .join(', ');
-  }, [sortingState, columns]);
+  }, [sortingState, columnsWithDefaults]);
 
   // Filter columns by visibility and apply column order (must be before any early returns)
   const visibleColumns = useMemo(() => {
-    const visible = columns.filter((col) => columnVisibility[col.id] !== false);
+    const visible = columnsWithDefaults.filter((col) => columnVisibility[col.id] !== false);
 
     // If we have a custom column order, apply it
     if (columnOrder.length > 0) {
@@ -389,7 +400,7 @@ export function BetterTable<TData = unknown>({
       // Apply the order from columnOrder, filtering to only include visible columns
       const ordered = columnOrder
         .map((id) => columnMap.get(id))
-        .filter((col): col is (typeof columns)[0] => col !== undefined);
+        .filter((col): col is (typeof columnsWithDefaults)[0] => col !== undefined);
 
       // Add any columns that are visible but not in columnOrder (shouldn't happen, but defensive)
       const unorderedIds = new Set(ordered.map((col) => col.id));
@@ -399,7 +410,7 @@ export function BetterTable<TData = unknown>({
     }
 
     return visible;
-  }, [columns, columnVisibility, columnOrder]);
+  }, [columnsWithDefaults, columnVisibility, columnOrder]);
 
   // Render loading state
   if (loading) {
@@ -426,7 +437,7 @@ export function BetterTable<TData = unknown>({
                     <Skeleton className="h-4 w-4" />
                   </TableHead>
                 )}
-                {columns.map((column) => (
+                {columnsWithDefaults.map((column) => (
                   <TableHead key={column.id}>
                     <Skeleton className="h-4 w-[100px]" />
                   </TableHead>
@@ -444,7 +455,7 @@ export function BetterTable<TData = unknown>({
                         <Skeleton className="h-4 w-4" />
                       </TableCell>
                     )}
-                    {columns.map((column) => (
+                    {columnsWithDefaults.map((column) => (
                       <TableCell key={`${rowKey}-col-${column.id}`}>
                         <Skeleton className="h-4 w-[100px]" />
                       </TableCell>
@@ -474,7 +485,7 @@ export function BetterTable<TData = unknown>({
       <div className={cn('space-y-4', className)}>
         {filtering && (
           <FilterBar
-            columns={columns}
+            columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}
             showColumnVisibility={features.columnVisibility !== false}
@@ -538,7 +549,7 @@ export function BetterTable<TData = unknown>({
         {/* Filter Bar - only show when filtering is enabled */}
         {filtering && (
           <FilterBar
-            columns={columns}
+            columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}
             showColumnVisibility={features.columnVisibility !== false}
@@ -634,7 +645,7 @@ export function BetterTable<TData = unknown>({
                     }}
                     onSortReorder={setSorting}
                     onToggleVisibility={() => toggleColumnVisibility(column.id)}
-                    columns={columns}
+                    columns={columnsWithDefaults}
                   >
                     <TableHead
                       className={cn(
@@ -897,7 +908,7 @@ export function BetterTable<TData = unknown>({
     const sort = sortingState.find((s) => s.columnId === activeId);
     if (!sort) return null;
 
-    const column = columns.find((col) => col.id === sort.columnId);
+    const column = columnsWithDefaults.find((col) => col.id === sort.columnId);
     const columnName = column?.displayName || sort.columnId;
     const index = sortingState.findIndex((s) => s.columnId === activeId);
 
