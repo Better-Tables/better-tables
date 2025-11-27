@@ -151,10 +151,17 @@ export function FilterBar<TData = unknown>({
       const column = columns.find((col) => col.id === columnId);
       if (!column || hasReachedMaxFilters) return;
 
+      // Use first custom operator if available, otherwise use default for column type
+      const customOperators = column.filter?.operators;
+      const defaultOperator =
+        (customOperators && customOperators.length > 0
+          ? customOperators[0]
+          : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
+
       const newFilter: FilterState = {
         columnId,
         type: column.type,
-        operator: getDefaultOperatorsForType(column.type)[0] ?? 'is', // Use first default operator from core
+        operator: defaultOperator,
         values: [],
       };
 
@@ -173,9 +180,8 @@ export function FilterBar<TData = unknown>({
 
   const handleUpdateFilter = React.useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      onFiltersChange(
-        filters.map((f) => (f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f))
-      );
+      const newFilters = filters.map((f) => (f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f));
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
@@ -282,15 +288,17 @@ export function FilterBar<TData = unknown>({
 
           {/* Active Filters with horizontal scrolling on mobile */}
           <div className="flex-1 min-w-0">
-            <ActiveFilters
-              columns={columns}
-              filters={filters}
-              onUpdateFilter={handleUpdateFilter}
-              onRemoveFilter={handleRemoveFilter}
-              isFilterProtected={isFilterProtected}
-              disabled={disabled}
-              className={theme?.activeFilters}
-            />
+            {filters.length > 0 && (
+              <ActiveFilters
+                columns={columns}
+                filters={filters}
+                onUpdateFilter={handleUpdateFilter}
+                onRemoveFilter={handleRemoveFilter}
+                isFilterProtected={isFilterProtected}
+                disabled={disabled}
+                className={theme?.activeFilters}
+              />
+            )}
           </div>
         </div>
 

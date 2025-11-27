@@ -34,6 +34,29 @@ export function FilterValueInput<TData = unknown>({
 
   // Get the appropriate input component based on column type
   const getInputComponent = () => {
+    // Check if column has a custom filter component
+    if (column.filter?.customComponent) {
+      const CustomComponent = column.filter.customComponent;
+      // Create a typed onChange handler that matches FilterComponentProps signature
+      const handleCustomChange = (value: unknown[]) => {
+        // Flatten nested arrays - if value is string[][], flatten to string[]
+        // This handles the case where custom components pass nested arrays due to type inference
+        const flattenedValue = Array.isArray(value) && value.length > 0 && Array.isArray(value[0])
+          ? (value as unknown as string[][]).flat()
+          : value;
+        onChange(flattenedValue);
+      };
+      return (
+        <CustomComponent
+          value={(filter.values || []) as unknown[]}
+          onChange={handleCustomChange}
+          operator={filter.operator}
+          column={column as ColumnDefinition<unknown, unknown>}
+        />
+      );
+    }
+
+    // Fall back to default type-based components
     switch (column.type) {
       case 'text':
       case 'email':
