@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.5
+
+### Patch Changes
+
+- This update modifies the RelationshipDetector to resolve table references using schema keys instead of database table names. It introduces methods to handle schema key resolution and ensures that both forward and reverse relationships in the relationship graph utilize schema keys. This change enhances compatibility and maintains graceful degradation when schema keys are not found.
+
 ## 0.5.4
 
 ### Patch Changes
