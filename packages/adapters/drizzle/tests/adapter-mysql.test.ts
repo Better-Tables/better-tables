@@ -1,5 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { DataEvent, FilterOperator, FilterState } from '@better-tables/core';
+import { count, eq, gt, gte, lt, lte } from 'drizzle-orm';
+import { DrizzleAdapter } from '../src/drizzle-adapter';
+import type { DrizzleDatabase } from '../src/types';
 import type { UserWithRelations } from './helpers';
 import {
   closeMySQLDatabase,
@@ -10,6 +13,7 @@ import {
   setupMySQLDatabase,
 } from './helpers/test-fixtures';
 import type { User } from './helpers/test-schema';
+import { relationsSchema as testRelations, schema as testSchema } from './helpers/test-schema';
 
 /**
  * MySQL Integration Tests
@@ -25,6 +29,7 @@ import type { User } from './helpers/test-schema';
  */
 describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createMySQLAdapter>;
+  let testDb: Awaited<ReturnType<typeof createMySQLDatabase>>['db'];
   let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
   let connectionString: string;
   let databaseName: string;
@@ -48,6 +53,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
   beforeEach(async () => {
     // Connect to the existing database and reset tables with seed data for each test
     const { db, connection: mysqlConnection } = await createMySQLDatabase(connectionString);
+    testDb = db;
     connection = mysqlConnection;
     await setupMySQLDatabase(connection); // Reset tables and seed data for test isolation
     adapter = createMySQLAdapter(db);
@@ -65,6 +71,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         await dropMySQLDatabase(connectionString, databaseName);
       } catch (error) {
         // Ignore errors during cleanup (database might already be dropped)
+        // biome-ignore lint/suspicious/noConsole: Test cleanup warning is acceptable
         console.warn('Failed to drop test database:', error);
       }
     }
@@ -877,6 +884,342 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
           ],
         })
       ).rejects.toThrow();
+    });
+  });
+
+  describe('Computed Fields', () => {
+    it('should compute simple fields from row data', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'fullName',
+              type: 'text',
+              compute: (row: Record<string, unknown>) => `${row.name} (${row.email})`,
+            },
+            {
+              field: 'isAdult',
+              type: 'boolean',
+              compute: (row: Record<string, unknown>) => {
+                const age = (row.age as number | undefined) ?? 0;
+                return age >= 18;
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'email', 'fullName', 'isAdult'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      expect(firstRow.fullName).toBeDefined();
+      expect(firstRow.fullName).toBe(`${firstRow.name} (${firstRow.email})`);
+      expect(firstRow.isAdult).toBeDefined();
+      expect(typeof firstRow.isAdult).toBe('boolean');
+    });
+
+    it('should compute fields with database queries', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'postCount',
+              type: 'number',
+              compute: async (row: Record<string, unknown>, context) => {
+                // Type assertion needed: test schema uses SQLite types but runs on MySQL
+                // context.schema.posts is AnyTableType | undefined, but MySQL needs MySqlTable
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const postsTable = context.schema.posts as any;
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const result = await (context.db as any)
+                  .select({ count: count() })
+                  .from(postsTable)
+                  .where(eq(postsTable.userId, row.id as number));
+                return Number(result[0]?.count || 0);
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'postCount'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      expect(firstRow.postCount).toBeDefined();
+      expect(typeof firstRow.postCount).toBe('number');
+      expect(firstRow.postCount).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should filter computed fields from query building', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'fullName',
+              type: 'text',
+              compute: (row) => `${row.name} (${row.email})`,
+            },
+          ],
+        },
+      });
+
+      // Should not throw "Field not found" error
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'fullName'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      expect(firstRow.name).toBeDefined();
+      expect(firstRow.fullName).toBeDefined();
+    });
+
+    it('should handle computed field filtering', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'postCount',
+              type: 'number',
+              compute: async (row: Record<string, unknown>, context) => {
+                // Type assertion needed: test schema uses SQLite types but runs on MySQL
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const postsTable = context.schema.posts as any;
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const result = await (context.db as any)
+                  .select({ count: count() })
+                  .from(postsTable)
+                  .where(eq(postsTable.userId, row.id as number));
+                return Number(result[0]?.count || 0);
+              },
+              filter: async (filter, context) => {
+                // Type assertion needed: test schema uses SQLite types but runs on MySQL
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const postsTable = context.schema.posts as any;
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const postCountsSubquery = (context.db as any)
+                  .select({
+                    userId: postsTable.userId,
+                    count: count().as('post_count'),
+                  })
+                  .from(postsTable)
+                  .groupBy(postsTable.userId)
+                  .as('post_counts');
+
+                const filterValue = Number(filter.values?.[0] || 0);
+                let condition: unknown;
+                switch (filter.operator) {
+                  case 'greaterThan':
+                    condition = gt(postCountsSubquery.count, filterValue);
+                    break;
+                  case 'greaterThanOrEqual':
+                    condition = gte(postCountsSubquery.count, filterValue);
+                    break;
+                  case 'lessThan':
+                    condition = lt(postCountsSubquery.count, filterValue);
+                    break;
+                  case 'lessThanOrEqual':
+                    condition = lte(postCountsSubquery.count, filterValue);
+                    break;
+                  case 'equals':
+                    condition = eq(postCountsSubquery.count, filterValue);
+                    break;
+                  default:
+                    return [];
+                }
+
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on MySQL
+                const matchingUsers = await (context.db as any)
+                  .select({ userId: postCountsSubquery.userId })
+                  .from(postCountsSubquery)
+                  .where(condition);
+
+                return [
+                  {
+                    columnId: 'id',
+                    operator: 'isAnyOf',
+                    values: matchingUsers.map((u: { userId: number }) => String(u.userId)),
+                    type: 'text',
+                  },
+                ];
+              },
+            },
+          ],
+        },
+      });
+
+      // Filter by computed field
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'postCount'],
+        filters: [{ columnId: 'postCount', operator: 'greaterThan', values: [0], type: 'number' }],
+      });
+
+      expect(result.data.length).toBeGreaterThanOrEqual(0);
+      // All returned users should have postCount > 0
+      for (const row of result.data) {
+        const rowObj = row as Record<string, unknown>;
+        if (rowObj.postCount !== undefined) {
+          expect(Number(rowObj.postCount)).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it('should handle errors in compute functions gracefully', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'errorField',
+              type: 'text',
+              compute: () => {
+                throw new Error('Computation failed');
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'errorField'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      // Error field should be undefined when computation fails
+      expect(firstRow.errorField).toBeUndefined();
+    });
+
+    it('should handle batch computation with context.allRows', async () => {
+      const computeCalls: Array<{ rowId: unknown; allRowsCount: number }> = [];
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'batchComputed',
+              type: 'number',
+              compute: (row: Record<string, unknown>, context) => {
+                computeCalls.push({ rowId: row.id, allRowsCount: context.allRows.length });
+                // Return index in allRows as a simple batch computation example
+                return context.allRows.findIndex(
+                  (r) => (r as Record<string, unknown>).id === row.id
+                );
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'batchComputed'],
+        pagination: { page: 1, limit: 5 },
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      expect(computeCalls.length).toBe(result.data.length);
+      // Verify all rows received the same allRows array
+      const allRowsCounts = computeCalls.map((c) => (c as { allRowsCount: number }).allRowsCount);
+      expect(new Set(allRowsCounts).size).toBe(1); // All should have same count
+    });
+
+    it('should include joinCount in meta', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'fullName',
+              type: 'text',
+              compute: (row) => `${row.name} (${row.email})`,
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'profile.bio', 'fullName'],
+      });
+
+      expect(result.meta).toBeDefined();
+      expect(result.meta?.joinCount).toBeDefined();
+      expect(typeof result.meta?.joinCount).toBe('number');
+      expect(result.meta?.joinCount).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should work with multiple computed fields', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'mysql'>,
+        schema: testSchema,
+        driver: 'mysql',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'fullName',
+              type: 'text',
+              compute: (row) => `${row.name} (${row.email})`,
+            },
+            {
+              field: 'isAdult',
+              type: 'boolean',
+              compute: (row: Record<string, unknown>) =>
+                ((row.age as number | undefined) ?? 0) >= 18,
+            },
+            {
+              field: 'ageGroup',
+              type: 'text',
+              compute: (row: Record<string, unknown>) => {
+                const age = (row.age as number | undefined) ?? 0;
+                if (age < 18) return 'minor';
+                if (age < 65) return 'adult';
+                return 'senior';
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'fullName', 'isAdult', 'ageGroup'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      expect(firstRow.fullName).toBeDefined();
+      expect(firstRow.isAdult).toBeDefined();
+      expect(firstRow.ageGroup).toBeDefined();
     });
   });
 });
