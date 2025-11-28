@@ -382,7 +382,57 @@ export class DataTransformer {
       }
     }
 
-    return nestedRecord;
+    // Clean up flattened fields from related tables after building nested structure
+    // Remove all flattened fields (pattern: {tableName}_{columnName}) that have been converted to nested objects
+    // Keep only:
+    // 1. Direct columns from the primary table
+    // 2. Nested relationship objects/arrays (already created by processColumn)
+    // 3. JSON accessor fields (don't match flattened pattern)
+    const cleanedRecord: Record<string, unknown> = {};
+    const flattenedFieldPattern = /^[a-zA-Z_][a-zA-Z0-9_]*_[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+    // Collect all relationship target tables that have been processed (these are nested objects now)
+    const processedRelationshipTables = new Set<string>();
+    if (columns && columns.length > 0) {
+      for (const columnId of columns) {
+        const parts = columnId.split('.');
+        if (parts.length > 1) {
+          const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+          const relationshipPath = columnPath.relationshipPath;
+          if (columnPath.isNested && relationshipPath && relationshipPath.length > 0) {
+            // Get the target table from the relationship
+            const relationship = relationshipPath[relationshipPath.length - 1];
+            if (relationship?.to) {
+              processedRelationshipTables.add(relationship.to);
+            }
+          }
+        }
+      }
+    }
+
+    for (const [key, value] of Object.entries(nestedRecord)) {
+      // Check if this is a flattened field
+      if (flattenedFieldPattern.test(key)) {
+        // This is a flattened field - check if it belongs to a processed relationship table
+        // Extract table name from flattened field (e.g., "usersTable_id" -> "usersTable")
+        const parts = key.split('_');
+        if (parts.length >= 2) {
+          const tableName = parts[0];
+          if (tableName) {
+            // If this table was processed as a relationship, remove the flattened field
+            if (processedRelationshipTables.has(tableName)) {
+              // Skip this flattened field - it's been converted to a nested object
+              continue;
+            }
+          }
+        }
+      }
+
+      // Keep this field (not a flattened field, or flattened field for unprocessed relationship)
+      cleanedRecord[key] = value;
+    }
+
+    return cleanedRecord;
   }
 
   /**
