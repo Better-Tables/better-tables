@@ -15,7 +15,7 @@
  * databases while maintaining full TypeScript type safety.
  */
 
-import type { AdapterMeta } from '@better-tables/core';
+import type { AdapterMeta, ColumnType, FilterState } from '@better-tables/core';
 import type { AnyColumn, InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
@@ -517,6 +517,9 @@ export interface DrizzleAdapterConfig<
   /** Manual relationship mappings (overrides auto-detection) */
   relationships?: RelationshipMap;
 
+  /** Computed/virtual fields that don't exist in the database schema */
+  computedFields?: Record<string, ComputedFieldConfig[]>;
+
   /** Adapter options */
   options?: DrizzleAdapterOptions;
 
@@ -559,6 +562,78 @@ export interface RelationshipPath {
 
   /** Whether this is an array foreign key relationship */
   isArray?: boolean;
+}
+
+/**
+ * Context provided to computed field functions
+ */
+export interface ComputedFieldContext<
+  TSchema extends Record<string, AnyTableType> = Record<string, AnyTableType>,
+  TDriver extends DatabaseDriver = DatabaseDriver,
+> {
+  /** Primary table name */
+  primaryTable: string;
+
+  /** All rows being processed (for batch computation) */
+  allRows: unknown[];
+
+  /** Database instance (for querying related tables) */
+  db: DrizzleDatabase<TDriver>;
+
+  /** Schema */
+  schema: TSchema;
+}
+
+/**
+ * Configuration for a computed/virtual field that doesn't exist in the database schema
+ *
+ * @description
+ * Computed fields allow you to add virtual columns that are calculated at runtime.
+ * These fields can be computed from the row data, related tables, or any other source.
+ *
+ * @example
+ * ```typescript
+ * {
+ *   field: 'attendeeCount',
+ *   type: 'number',
+ *   compute: async (row, context) => {
+ *     const count = await context.db
+ *       .select({ count: count() })
+ *       .from(eventAttendeesTable)
+ *       .where(eq(eventAttendeesTable.eventId, row.id));
+ *     return count[0]?.count || 0;
+ *   },
+ *   filter: async (filter, context) => {
+ *     // Transform filter to query related table
+ *     const matchingIds = await getMatchingEventIds(filter, context);
+ *     return [{
+ *       columnId: 'id',
+ *       operator: 'isAnyOf',
+ *       values: matchingIds,
+ *       type: 'text',
+ *     }];
+ *   },
+ * }
+ * ```
+ */
+export interface ComputedFieldConfig<TData = Record<string, unknown>> {
+  /** Field name (e.g., 'attendeeCount') */
+  field: string;
+
+  /** Function to compute the field value from the row data */
+  compute: (row: TData, context: ComputedFieldContext) => Promise<unknown> | unknown;
+
+  /** Function to handle filtering on this computed field */
+  filter?: (
+    filter: FilterState,
+    context: ComputedFieldContext
+  ) => Promise<FilterState[]> | FilterState[];
+
+  /** Type of the computed field (for validation) */
+  type?: ColumnType;
+
+  /** Whether this field should be included by default when no columns specified */
+  includeByDefault?: boolean;
 }
 
 /**

@@ -61,6 +61,7 @@ import type {
   FetchDataResult,
   FilterOperator,
   FilterOption,
+  FilterState,
   TableAdapter,
 } from '@better-tables/core';
 import type { InferSelectModel, Relations } from 'drizzle-orm';
@@ -73,6 +74,8 @@ import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
 import type {
   AnyTableType,
+  ComputedFieldConfig,
+  ComputedFieldContext,
   DatabaseDriver,
   DatabaseOperations,
   DrizzleAdapterConfig,
@@ -148,6 +151,7 @@ export class DrizzleAdapter<
   private subscribers: Array<(event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>) => void> =
     [];
   private options: DrizzleAdapterConfig<TSchema, TDriver>['options'];
+  private computedFields: Record<string, ComputedFieldConfig[]> = {};
 
   public readonly meta: AdapterMeta;
 
@@ -190,6 +194,7 @@ export class DrizzleAdapter<
     this.db = config.db;
     this.schema = config.schema;
     this.options = config.options || {};
+    this.computedFields = config.computedFields || {};
 
     // Initialize database operations strategy based on driver
     this.operations = this.createOperationsStrategy(config.driver);
@@ -393,26 +398,121 @@ export class DrizzleAdapter<
       // Determine primary table - use explicit if provided, otherwise use resolver
       const primaryTable = this.primaryTableResolver.resolve(params.columns, params.primaryTable);
 
-      // Check cache first
-      const cacheKey = this.getCacheKey(params);
+      // Get computed fields for this table
+      const tableComputedFields = this.computedFields[primaryTable] || [];
+
+      // Filter out computed fields from columns and track which ones were requested
+      const requestedComputedFields: ComputedFieldConfig[] = [];
+      const columnsWithoutComputed = (params.columns || []).filter((col) => {
+        const isComputed = tableComputedFields.some((cf) => cf.field === col);
+        if (isComputed) {
+          const computedField = tableComputedFields.find((cf) => cf.field === col);
+          if (computedField) {
+            requestedComputedFields.push(computedField);
+          }
+          return false; // Filter out computed fields
+        }
+        return true;
+      });
+
+      // Handle computed field filtering
+      let processedFilters = [...(params.filters || [])];
+      const computedFieldFilters: Array<{ filter: FilterState; config: ComputedFieldConfig }> = [];
+
+      for (const filter of processedFilters) {
+        const computedField = tableComputedFields.find((cf) => cf.field === filter.columnId);
+        if (computedField?.filter) {
+          computedFieldFilters.push({ filter, config: computedField });
+        }
+      }
+
+      // Build cache params early (needed for error handling)
+      const cacheParams = {
+        ...params,
+        columns: columnsWithoutComputed,
+        filters: processedFilters,
+      };
+
+      // Process computed field filters
+      if (computedFieldFilters.length > 0) {
+        const context: ComputedFieldContext<TSchema, TDriver> = {
+          primaryTable,
+          allRows: [],
+          db: this.db,
+          schema: this.schema,
+        };
+
+        const replacementFilters: FilterState[] = [];
+        for (const { filter, config } of computedFieldFilters) {
+          try {
+            if (config.filter) {
+              const replacements = await Promise.resolve(config.filter(filter, context));
+              replacementFilters.push(...replacements);
+            }
+          } catch {
+            // If filter transformation fails, return empty result
+            const emptyPagination = params.pagination
+              ? {
+                  page: params.pagination.page,
+                  limit: params.pagination.limit,
+                  totalPages: 0,
+                  hasNext: false,
+                  hasPrev: params.pagination.page > 1,
+                }
+              : {
+                  page: 1,
+                  limit: 10,
+                  totalPages: 0,
+                  hasNext: false,
+                  hasPrev: false,
+                };
+            return {
+              data: [],
+              total: 0,
+              pagination: emptyPagination,
+              meta: {
+                cached: false,
+                executionTime: Date.now() - startTime,
+                joinCount: this.getJoinCount(cacheParams),
+              },
+            };
+          }
+        }
+
+        // Remove computed field filters and add replacements
+        processedFilters = processedFilters.filter(
+          (f) => !computedFieldFilters.some((cff) => cff.filter === f)
+        );
+        processedFilters.push(...replacementFilters);
+
+        // Update cache params with processed filters
+        cacheParams.filters = processedFilters;
+      }
+      const cacheKey = this.getCacheKey(cacheParams);
       const cached = this.getFromCache(cacheKey);
 
       if (cached && !this.isCacheExpired(cacheKey)) {
-        // Mark as cached
+        // Mark as cached and add computed fields
+        const resultWithComputed = await this.addComputedFields(
+          cached,
+          requestedComputedFields,
+          primaryTable
+        );
         return {
-          ...cached,
+          ...resultWithComputed,
           meta: {
-            ...cached.meta,
+            ...resultWithComputed.meta,
             cached: true,
+            joinCount: this.getJoinCount(cacheParams),
           },
         };
       }
 
-      // Build queries - pass primaryTable to query builder
+      // Build queries - pass primaryTable to query builder (without computed fields)
       const { dataQuery, countQuery, columnMetadata, isNested } =
         this.queryBuilder.buildCompleteQuery({
-          columns: params.columns || [],
-          filters: params.filters || [],
+          columns: columnsWithoutComputed,
+          filters: processedFilters,
           sorting: params.sorting || [],
           pagination: params.pagination || { page: 1, limit: 10 },
           primaryTable,
@@ -438,32 +538,47 @@ export class DrizzleAdapter<
       }
       const transformedData = this.dataTransformer.transformToNested<
         InferSelectModel<TSchema[keyof TSchema]>
-      >(data, primaryTable, params.columns, transformerMetadata);
+      >(data, primaryTable, columnsWithoutComputed, transformerMetadata);
+
+      // Build pagination info
+      const paginationInfo = params.pagination
+        ? {
+            page: params.pagination.page,
+            limit: params.pagination.limit,
+            totalPages: Math.ceil(Number(total) / params.pagination.limit),
+            hasNext: params.pagination.page * params.pagination.limit < Number(total),
+            hasPrev: params.pagination.page > 1,
+          }
+        : {
+            page: 1,
+            limit: Number(total),
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          };
+
+      // Add computed fields to results
+      const dataWithComputed = await this.addComputedFields(
+        {
+          data: transformedData,
+          total: Number(total),
+          pagination: paginationInfo,
+          meta: {
+            cached: false,
+            executionTime: Date.now() - startTime,
+            joinCount: this.getJoinCount(cacheParams),
+          },
+        },
+        requestedComputedFields,
+        primaryTable
+      );
 
       // Build result
       const result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> = {
-        data: transformedData,
-        total: Number(total),
-        pagination: params.pagination
-          ? {
-              page: params.pagination.page,
-              limit: params.pagination.limit,
-              totalPages: Math.ceil(Number(total) / params.pagination.limit),
-              hasNext: params.pagination.page * params.pagination.limit < Number(total),
-              hasPrev: params.pagination.page > 1,
-            }
-          : {
-              page: 1,
-              limit: Number(total),
-              totalPages: 1,
-              hasNext: false,
-              hasPrev: false,
-            },
-        meta: {
-          executionTime: Date.now() - startTime,
-          joinCount: this.getJoinCount(params),
-          cached: false,
-        },
+        data: dataWithComputed.data,
+        total: dataWithComputed.total,
+        pagination: dataWithComputed.pagination,
+        meta: dataWithComputed.meta || {},
       };
 
       // Cache result
@@ -910,6 +1025,50 @@ export class DrizzleAdapter<
    */
   private getCacheKey(params: FetchDataParams): string {
     return JSON.stringify(params);
+  }
+
+  /**
+   * Add computed fields to result data
+   */
+  private async addComputedFields(
+    result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>,
+    computedFields: ComputedFieldConfig[],
+    primaryTable: string
+  ): Promise<FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>> {
+    if (computedFields.length === 0 || result.data.length === 0) {
+      return result;
+    }
+
+    const context: ComputedFieldContext<TSchema, TDriver> = {
+      primaryTable,
+      allRows: result.data,
+      db: this.db,
+      schema: this.schema,
+    };
+
+    // Compute fields for all rows
+    const dataWithComputed = await Promise.all(
+      result.data.map(async (row) => {
+        const rowWithComputed = { ...row } as Record<string, unknown>;
+        for (const computedField of computedFields) {
+          try {
+            const value = await Promise.resolve(computedField.compute(row, context));
+            rowWithComputed[computedField.field] = value;
+          } catch {
+            // If computation fails, set to undefined
+            rowWithComputed[computedField.field] = undefined;
+          }
+        }
+        return rowWithComputed;
+      })
+    );
+
+    return {
+      data: dataWithComputed as InferSelectModel<TSchema[keyof TSchema]>[],
+      total: result.total,
+      pagination: result.pagination,
+      meta: result.meta || {},
+    };
   }
 
   private getFromCache(
