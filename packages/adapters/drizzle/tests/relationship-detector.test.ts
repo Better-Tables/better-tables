@@ -938,4 +938,191 @@ describe('RelationshipManager', () => {
     expect(stats.oneToMany).toBeGreaterThan(0);
     expect(stats.oneToOne).toBeGreaterThan(0);
   });
+
+  describe('isArrayRelationship', () => {
+    it('should return true for array relationships', () => {
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          isArray: true,
+        },
+      };
+      const arrayManager = new RelationshipManager(schema, arrayRelationships);
+
+      const columnPath = arrayManager.resolveColumnPath('organizers.name', 'events');
+      expect(columnPath.relationshipPath).toBeDefined();
+      if (columnPath.relationshipPath) {
+        expect(arrayManager.isArrayRelationship(columnPath.relationshipPath)).toBe(true);
+      }
+    });
+
+    it('should return false for non-array relationships', () => {
+      const columnPath = manager.resolveColumnPath('profile.bio', 'users');
+      expect(columnPath.relationshipPath).toBeDefined();
+      if (columnPath.relationshipPath) {
+        expect(manager.isArrayRelationship(columnPath.relationshipPath)).toBe(false);
+      }
+    });
+
+    it('should return false for empty path', () => {
+      expect(manager.isArrayRelationship([])).toBe(false);
+    });
+
+    it('should check last relationship in path', () => {
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          isArray: true,
+        },
+      };
+      const arrayManager = new RelationshipManager(schema, arrayRelationships);
+
+      // Multi-level path where last relationship is array
+      const columnPath = arrayManager.resolveColumnPath('organizers.name', 'events');
+      expect(columnPath.relationshipPath).toBeDefined();
+      if (columnPath.relationshipPath) {
+        expect(arrayManager.isArrayRelationship(columnPath.relationshipPath)).toBe(true);
+      }
+    });
+  });
+
+  describe('getRelationshipByAlias', () => {
+    it('should return correct relationship by alias', () => {
+      const relationship = manager.getRelationshipByAlias('users', 'profile');
+      expect(relationship).toBeDefined();
+      expect(relationship?.from).toBe('users');
+      expect(relationship?.to).toBe('profiles');
+    });
+
+    it('should return null for non-existent alias', () => {
+      const relationship = manager.getRelationshipByAlias('users', 'nonexistent');
+      expect(relationship).toBeNull();
+    });
+
+    it('should handle array relationships', () => {
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          isArray: true,
+        },
+      };
+      const arrayManager = new RelationshipManager(schema, arrayRelationships);
+
+      const relationship = arrayManager.getRelationshipByAlias('events', 'organizers');
+      expect(relationship).toBeDefined();
+      expect(relationship?.isArray).toBe(true);
+    });
+  });
+});
+
+describe('RelationshipDetector - mergeManualRelationships', () => {
+  let detector: RelationshipDetector;
+
+  beforeEach(() => {
+    detector = new RelationshipDetector();
+  });
+
+  it('should merge manual relationships with isArray flag', () => {
+    detector.detectFromSchema(relationsSchema, schema);
+
+    const manualRelationships: RelationshipMap = {
+      'events.organizers': {
+        from: 'events',
+        to: 'users',
+        foreignKey: 'id',
+        localKey: 'organizerId',
+        cardinality: 'many',
+        isArray: true,
+      },
+    };
+
+    detector.mergeManualRelationships(manualRelationships);
+
+    expect(manualRelationships['events.organizers']?.isArray).toBe(true);
+  });
+
+  it('should preserve all properties from manual relationships', () => {
+    detector.detectFromSchema(relationsSchema, schema);
+
+    const manualRelationships: RelationshipMap = {
+      'users.customProfile': {
+        from: 'users',
+        to: 'profiles',
+        foreignKey: 'userId',
+        localKey: 'id',
+        cardinality: 'one',
+        nullable: false,
+        joinType: 'inner',
+        isArray: false,
+      },
+    };
+
+    detector.mergeManualRelationships(manualRelationships);
+
+    expect(manualRelationships['users.customProfile']?.joinType).toBe('inner');
+    expect(manualRelationships['users.customProfile']?.nullable).toBe(false);
+  });
+
+  it('should preserve isArray when undefined in manual relationship', () => {
+    detector.detectFromSchema(relationsSchema, schema);
+
+    const manualRelationships: RelationshipMap = {
+      'users.profile': {
+        from: 'users',
+        to: 'profiles',
+        foreignKey: 'userId',
+        localKey: 'id',
+        cardinality: 'one',
+        // isArray not set (undefined)
+      },
+    };
+
+    detector.mergeManualRelationships(manualRelationships);
+    // Should not throw and should handle undefined isArray
+    expect(() => {
+      detector.detectFromSchema(relationsSchema, schema);
+    }).not.toThrow();
+  });
+
+  it('should handle multiple manual relationships', () => {
+    detector.detectFromSchema(relationsSchema, schema);
+
+    const manualRelationships: RelationshipMap = {
+      'events.organizers': {
+        from: 'events',
+        to: 'users',
+        foreignKey: 'id',
+        localKey: 'organizerId',
+        cardinality: 'many',
+        isArray: true,
+      },
+      'events.tags': {
+        from: 'events',
+        to: 'tags',
+        foreignKey: 'id',
+        localKey: 'tagIds',
+        cardinality: 'many',
+        isArray: true,
+      },
+    };
+
+    detector.mergeManualRelationships(manualRelationships);
+    expect(() => {
+      detector.detectFromSchema(relationsSchema, schema);
+    }).not.toThrow();
+    expect(manualRelationships['events.organizers']?.isArray).toBe(true);
+    expect(manualRelationships['events.tags']?.isArray).toBe(true);
+  });
 });

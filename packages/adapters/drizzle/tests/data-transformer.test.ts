@@ -283,4 +283,255 @@ describe('DataTransformer', () => {
       expect((result[0] as Record<string, unknown>).title).toBe('Event 1');
     });
   });
+
+  describe('Nested Data Detection', () => {
+    it('should detect nested data from Drizzle relational queries', () => {
+      // Simulate nested data structure from Drizzle relational queries
+      const nestedData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          email: 'john@example.com',
+          profile: {
+            id: 1,
+            bio: 'Software developer',
+            avatar: 'avatar.jpg',
+          },
+        },
+      ];
+
+      const result = transformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'users',
+        ['name', 'email', 'profile.bio'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true, // Flag indicating data is already nested
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      expect((result[0] as Record<string, unknown>).name).toBe('John Doe');
+      // Nested data should be preserved
+      expect((result[0] as Record<string, unknown>).profile).toBeDefined();
+    });
+
+    it('should filter nested data to requested columns only', () => {
+      const nestedData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          email: 'john@example.com',
+          age: 30,
+          profile: {
+            id: 1,
+            bio: 'Software developer',
+            avatar: 'avatar.jpg',
+          },
+        },
+      ];
+
+      const result = transformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'users',
+        ['name', 'profile.bio'], // Only request name and bio
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true,
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.name).toBe('John Doe');
+      expect(record.email).toBeUndefined(); // Not requested
+      expect(record.age).toBeUndefined(); // Not requested
+      expect(record.profile).toBeDefined();
+      const profile = record.profile as Record<string, unknown>;
+      expect(profile.bio).toBe('Software developer');
+      expect(profile.avatar).toBeUndefined(); // Not requested
+      expect(profile.id).toBeDefined(); // Always included for identification
+    });
+
+    it('should handle array relationships in nested data', () => {
+      const nestedData = [
+        {
+          id: 1,
+          title: 'Event 1',
+          organizers: [
+            { id: 'user1', name: 'John Doe' },
+            { id: 'user2', name: 'Jane Smith' },
+          ],
+        },
+      ];
+
+      const arraySchema = {
+        events: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'events',
+        ['title', 'organizers.name'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true,
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Event 1');
+      expect(Array.isArray(record.organizers)).toBe(true);
+      const organizers = record.organizers as Array<Record<string, unknown>>;
+      expect(organizers).toHaveLength(2);
+      expect(organizers[0]?.name).toBe('John Doe');
+      expect(organizers[1]?.name).toBe('Jane Smith');
+    });
+
+    it('should handle one-to-one relationships in nested data', () => {
+      const nestedData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          profile: {
+            id: 1,
+            bio: 'Software developer',
+            avatar: 'avatar.jpg',
+          },
+        },
+      ];
+
+      const result = transformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'users',
+        ['name', 'profile.bio'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true,
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.profile).toBeDefined();
+      const profile = record.profile as Record<string, unknown>;
+      expect(profile.bio).toBe('Software developer');
+      expect(profile.avatar).toBeUndefined(); // Not requested
+    });
+
+    it('should transform flat data normally when isNested is false', () => {
+      const flatData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          email: 'john@example.com',
+          profiles_userId: 1,
+          profiles_bio: 'Software developer',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'users', [
+        'name',
+        'email',
+        'profile.bio',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.name).toBe('John Doe');
+      expect(record.profile).toBeDefined();
+      const profile = record.profile as Record<string, unknown>;
+      expect(profile.bio).toBe('Software developer');
+    });
+
+    it('should handle empty nested arrays', () => {
+      const nestedData = [
+        {
+          id: 1,
+          title: 'Event 1',
+          organizers: [],
+        },
+      ];
+
+      const arraySchema = {
+        events: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'events',
+        ['title', 'organizers.name'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true,
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(Array.isArray(record.organizers)).toBe(true);
+      expect((record.organizers as unknown[]).length).toBe(0);
+    });
+
+    it('should handle null nested relationships', () => {
+      const nestedData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          profile: null,
+        },
+      ];
+
+      const result = transformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'users',
+        ['name', 'profile.bio'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true,
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.profile).toBeNull();
+    });
+  });
 });
