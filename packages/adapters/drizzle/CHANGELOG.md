@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.12
+
+### Patch Changes
+
+- This update introduces computed fields functionality, allowing users to define virtual columns that are calculated at runtime. The implementation includes examples for basic computations, database queries, and filtering support. Additionally, it enhances the DrizzleAdapter to handle computed fields efficiently, including batch processing and error handling. Documentation has been updated to reflect these changes, providing clear guidance on usage and best practices.
+
 ## 0.5.11
 
 ### Patch Changes
