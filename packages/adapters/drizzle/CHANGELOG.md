@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.10
+
+### Patch Changes
+
+- This update introduces functionality to the DataTransformer to detect and handle nested data structures from relational queries. It adds methods for filtering nested data to include only requested columns and checks if data is already nested. Additionally, the query builders (Postgres, MySQL, SQLite) are updated to pass an `isNested` flag, ensuring proper handling of nested data during transformations. The RelationshipDetector is also enhanced to merge manual relationships while preserving the `isArray` flag, improving overall relationship management. It introduces functionality to filter nested data by requested columns and handle various relationship types, including one-to-one and array relationships. Additionally, the PostgresQueryBuilder is enhanced to support fallback mechanisms for manual joins when the relational API is unavailable, ensuring robust query handling. The RelationshipManager is also improved with tests for identifying array relationships and merging manual relationships, enhancing overall relationship management.
+
 ## 0.5.9
 
 ### Patch Changes
