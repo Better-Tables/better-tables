@@ -151,6 +151,8 @@ export class DrizzleAdapter<
   private subscribers: Array<(event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>) => void> =
     [];
   private options: DrizzleAdapterConfig<TSchema, TDriver>['options'];
+  // Internal storage uses generic type for runtime flexibility
+  // Type safety is enforced at config level via DrizzleAdapterConfig
   private computedFields: Record<string, ComputedFieldConfig[]> = {};
 
   public readonly meta: AdapterMeta;
@@ -194,7 +196,10 @@ export class DrizzleAdapter<
     this.db = config.db;
     this.schema = config.schema;
     this.options = config.options || {};
-    this.computedFields = config.computedFields || {};
+    // Type assertion is safe: config.computedFields is validated at compile time
+    // Runtime structure matches Record<string, ComputedFieldConfig[]>
+    this.computedFields =
+      (config.computedFields as Record<string, ComputedFieldConfig[]> | undefined) || {};
 
     // Initialize database operations strategy based on driver
     this.operations = this.createOperationsStrategy(config.driver);
@@ -427,10 +432,12 @@ export class DrizzleAdapter<
       }
 
       // Build cache params early (needed for error handling)
-      const cacheParams = {
+      // Include computed fields in cache key to prevent cache collisions
+      const cacheParams: FetchDataParams & { computedFields?: string[] } = {
         ...params,
         columns: columnsWithoutComputed,
         filters: processedFilters,
+        computedFields: requestedComputedFields.map((cf) => cf.field),
       };
 
       // Process computed field filters
@@ -1023,7 +1030,7 @@ export class DrizzleAdapter<
   /**
    * Cache management
    */
-  private getCacheKey(params: FetchDataParams): string {
+  private getCacheKey(params: FetchDataParams & { computedFields?: string[] }): string {
     return JSON.stringify(params);
   }
 

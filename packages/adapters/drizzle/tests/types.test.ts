@@ -9,7 +9,12 @@
 import { describe, expect, it } from 'bun:test';
 import { eq, ilike, isNull, sql } from 'drizzle-orm';
 import { jsonb as pgJsonb, pgTable, text as pgText } from 'drizzle-orm/pg-core';
-import type { ColumnOrExpression } from '../src/types';
+import type {
+  ColumnOrExpression,
+  ComputedFieldConfig,
+  DrizzleAdapterConfig,
+  DrizzleDatabase,
+} from '../src/types';
 
 // Create test schema
 const mockTable = pgTable('users', {
@@ -86,5 +91,127 @@ describe('ColumnOrExpression Type', () => {
     // Both should be assignable to the same type
     const conditions: ColumnOrExpression[] = [column, expression];
     expect(conditions).toHaveLength(2);
+  });
+});
+
+describe('ComputedFieldConfig Type', () => {
+  it('should accept valid computed field configuration', () => {
+    const computedField: ComputedFieldConfig<{ id: string; name: string }> = {
+      field: 'fullName',
+      type: 'text',
+      compute: (row) => `${row.name} (${row.id})`,
+    };
+
+    expect(computedField.field).toBe('fullName');
+    expect(computedField.type).toBe('text');
+    expect(computedField.compute).toBeDefined();
+  });
+
+  it('should accept computed field with filter function', () => {
+    const computedField: ComputedFieldConfig<{ id: string }> = {
+      field: 'count',
+      type: 'number',
+      compute: () => 0,
+      filter: async (filter) => {
+        return [
+          {
+            columnId: 'id',
+            operator: 'equals',
+            values: [String(filter.values[0])],
+            type: 'text',
+          },
+        ];
+      },
+    };
+
+    expect(computedField.filter).toBeDefined();
+  });
+
+  it('should accept computed field with includeByDefault flag', () => {
+    const computedField: ComputedFieldConfig = {
+      field: 'alwaysIncluded',
+      type: 'text',
+      compute: () => 'value',
+      includeByDefault: true,
+    };
+
+    expect(computedField.includeByDefault).toBe(true);
+  });
+});
+
+describe('DrizzleAdapterConfig with ComputedFields', () => {
+  // Create a simple test schema
+  const testSchema = {
+    users: mockTable,
+  };
+
+  it('should accept valid computedFields configuration', () => {
+    const mockDb = {} as DrizzleDatabase<'postgres'>;
+    const config: DrizzleAdapterConfig<typeof testSchema, 'postgres'> = {
+      db: mockDb,
+      schema: testSchema,
+      driver: 'postgres',
+      computedFields: {
+        users: [
+          {
+            field: 'fullName',
+            type: 'text',
+            compute: (row) => row.email,
+          },
+        ],
+      },
+    };
+
+    expect(config.computedFields).toBeDefined();
+    expect(config.computedFields?.users).toHaveLength(1);
+  });
+
+  it('should accept empty computedFields', () => {
+    const mockDb = {} as DrizzleDatabase<'postgres'>;
+    const config: DrizzleAdapterConfig<typeof testSchema, 'postgres'> = {
+      db: mockDb,
+      schema: testSchema,
+      driver: 'postgres',
+      computedFields: {},
+    };
+
+    expect(config.computedFields).toBeDefined();
+    expect(Object.keys(config.computedFields || {})).toHaveLength(0);
+  });
+
+  it('should accept undefined computedFields', () => {
+    const mockDb = {} as DrizzleDatabase<'postgres'>;
+    const config: DrizzleAdapterConfig<typeof testSchema, 'postgres'> = {
+      db: mockDb,
+      schema: testSchema,
+      driver: 'postgres',
+    };
+
+    expect(config.computedFields).toBeUndefined();
+  });
+
+  it('should accept multiple computed fields for a table', () => {
+    const mockDb = {} as DrizzleDatabase<'postgres'>;
+    const config: DrizzleAdapterConfig<typeof testSchema, 'postgres'> = {
+      db: mockDb,
+      schema: testSchema,
+      driver: 'postgres',
+      computedFields: {
+        users: [
+          {
+            field: 'fullName',
+            type: 'text',
+            compute: (row) => row.email,
+          },
+          {
+            field: 'isActive',
+            type: 'option',
+            compute: () => true,
+          },
+        ],
+      },
+    };
+
+    expect(config.computedFields?.users).toHaveLength(2);
   });
 });

@@ -402,6 +402,8 @@ computedFields: {
 **With Filtering Support:**
 
 ```typescript
+import { count, eq, gt } from 'drizzle-orm';
+
 computedFields: {
   eventsTable: [
     {
@@ -417,15 +419,16 @@ computedFields: {
       },
       filter: async (filter, context) => {
         // Transform computed field filter into database filter
-        const subquery = context.db
+        const eventAttendeeCounts = context.db
           .select({ eventId: eventAttendeesTable.eventId })
           .from(eventAttendeesTable)
           .groupBy(eventAttendeesTable.eventId)
-          .having(count(eventAttendeesTable.userId) > filter.values[0]);
+          .having(gt(count(eventAttendeesTable.userId), filter.values[0]))
+          .as('event_attendee_counts');
         
         const matchingIds = await context.db
-          .select({ id: subquery.eventId })
-          .from(subquery);
+          .select({ id: eventAttendeeCounts.eventId })
+          .from(eventAttendeeCounts);
         
         return [{
           columnId: 'id',

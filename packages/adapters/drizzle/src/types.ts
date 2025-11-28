@@ -518,7 +518,9 @@ export interface DrizzleAdapterConfig<
   relationships?: RelationshipMap;
 
   /** Computed/virtual fields that don't exist in the database schema */
-  computedFields?: Record<string, ComputedFieldConfig[]>;
+  computedFields?: {
+    [K in keyof TSchema]?: ComputedFieldConfig<InferSelectModel<TSchema[K]>>[];
+  };
 
   /** Adapter options */
   options?: DrizzleAdapterOptions;

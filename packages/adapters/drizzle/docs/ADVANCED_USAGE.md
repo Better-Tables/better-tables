@@ -447,7 +447,7 @@ const result = await adapter.fetchData({
 For computed fields that require querying related tables:
 
 ```typescript
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 
 const adapter = new DrizzleAdapter({
   db,

@@ -1076,7 +1076,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
         filters: [{ columnId: 'postCount', operator: 'greaterThan', values: [0], type: 'number' }],
       });
 
-      expect(result.data.length).toBeGreaterThanOrEqual(0);
+      expect(result.data.length).toBeGreaterThan(0); // Should have at least one user with posts
       // All returned users should have postCount > 0
       for (const row of result.data) {
         const rowObj = row as Record<string, unknown>;
