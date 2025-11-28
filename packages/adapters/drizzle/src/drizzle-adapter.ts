@@ -198,20 +198,27 @@ export class DrizzleAdapter<
     this.relationshipDetector = new RelationshipDetector();
 
     if (config.autoDetectRelationships !== false) {
-      // Always call detectFromSchema to enable array FK detection
-      // Pass empty relations if not provided - detectArrayForeignKeys only needs schema
-      // This allows array FK relationships to be detected even without explicit Drizzle relations
-      const autoDetectedRelationships = this.relationshipDetector.detectFromSchema(
-        (config.relations as Record<string, Relations>) || {},
-        this.schema as Record<string, unknown>
-      );
-
-      // Merge auto-detected relationships with manually provided ones
-      // Manual relationships take precedence over auto-detected ones (allows overrides)
-      this.relationships = {
-        ...autoDetectedRelationships,
-        ...(config.relationships || {}),
-      };
+      // Auto-detect relationships from provided relations
+      if (config.relations) {
+        this.relationships = this.relationshipDetector.detectFromSchema(
+          config.relations as Record<string, Relations>,
+          this.schema as Record<string, unknown>
+        );
+        // Merge manual relationships to preserve isArray flags and other overrides
+        if (config.relationships) {
+          // Use mergeManualRelationships to properly merge and preserve manual overrides
+          this.relationshipDetector.mergeManualRelationships(config.relationships);
+          // Re-detect to get the merged relationships
+          this.relationships = this.relationshipDetector.detectFromSchema(
+            config.relations as Record<string, Relations>,
+            this.schema as Record<string, unknown>
+          );
+          // Apply manual relationships after detection to override auto-detected ones
+          this.relationships = { ...this.relationships, ...config.relationships };
+        }
+      } else {
+        this.relationships = config.relationships || {};
+      }
     } else {
       this.relationships = config.relationships || {};
     }
@@ -392,13 +399,14 @@ export class DrizzleAdapter<
       }
 
       // Build queries - pass primaryTable to query builder
-      const { dataQuery, countQuery, columnMetadata } = this.queryBuilder.buildCompleteQuery({
-        columns: params.columns || [],
-        filters: params.filters || [],
-        sorting: params.sorting || [],
-        pagination: params.pagination || { page: 1, limit: 10 },
-        primaryTable,
-      });
+      const { dataQuery, countQuery, columnMetadata, isNested } =
+        this.queryBuilder.buildCompleteQuery({
+          columns: params.columns || [],
+          filters: params.filters || [],
+          sorting: params.sorting || [],
+          pagination: params.pagination || { page: 1, limit: 10 },
+          primaryTable,
+        });
 
       // Execute queries in parallel
       const [data, countResult] = await Promise.all([dataQuery.execute(), countQuery.execute()]);
@@ -406,9 +414,21 @@ export class DrizzleAdapter<
       const total = (countResult[0] as { count: number } | undefined)?.count || 0;
 
       // Transform data to nested structure - pass primaryTable to transformer
+      // If data is already nested from relational query, transformer will detect and handle accordingly
+      const transformerMetadata: {
+        selections: Record<string, unknown>;
+        columnMapping: Record<string, string>;
+        isNested?: boolean;
+      } = {
+        selections: columnMetadata.selections as Record<string, unknown>,
+        columnMapping: columnMetadata.columnMapping,
+      };
+      if (isNested !== undefined) {
+        transformerMetadata.isNested = isNested;
+      }
       const transformedData = this.dataTransformer.transformToNested<
         InferSelectModel<TSchema[keyof TSchema]>
-      >(data, primaryTable, params.columns, columnMetadata);
+      >(data, primaryTable, params.columns, transformerMetadata);
 
       // Build result
       const result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> = {

@@ -353,6 +353,29 @@ export class RelationshipManager {
   }
 
   /**
+   * Check if a relationship is an array relationship
+   * @param relationshipPath - The relationship path to check
+   * @returns True if the relationship is an array relationship
+   */
+  isArrayRelationship(relationshipPath: RelationshipPath[]): boolean {
+    if (relationshipPath.length === 0) return false;
+    // Check the last relationship in the path (the direct relationship)
+    const lastRelationship = relationshipPath[relationshipPath.length - 1];
+    return lastRelationship?.isArray === true;
+  }
+
+  /**
+   * Get relationship by alias from primary table
+   * @param primaryTable - The primary table for this query context
+   * @param alias - The relationship alias (e.g., 'organizers', 'profile')
+   * @returns The relationship path if found, null otherwise
+   */
+  getRelationshipByAlias(primaryTable: string, alias: string): RelationshipPath | null {
+    const relationshipKey = `${primaryTable}.${alias}`;
+    return this.relationships[relationshipKey] || null;
+  }
+
+  /**
    * Optimize join order for best performance
    * @param requiredJoins - Map of required joins
    * @param primaryTable - The primary table for this query context

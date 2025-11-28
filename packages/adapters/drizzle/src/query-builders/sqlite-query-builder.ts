@@ -89,6 +89,7 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
       selections: Record<string, AnyColumnType>;
       columnMapping: Record<string, string>;
     };
+    isNested?: boolean; // Flag to indicate if data is already nested from relational query
   } {
     const primaryTableSchema = this.schema[primaryTable];
     if (!primaryTableSchema) {
@@ -158,6 +159,7 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
         selections,
         columnMapping,
       },
+      isNested: false, // SQLite uses manual joins, returns flat data
     };
   }
 
