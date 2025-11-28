@@ -217,7 +217,17 @@ export class DrizzleAdapter<
           this.relationships = { ...this.relationships, ...config.relationships };
         }
       } else {
-        this.relationships = config.relationships || {};
+        // No relations provided - try to detect from schema columns (e.g., array FKs)
+        // This ensures array FK relationships are still detected even without relations config
+        this.relationships = this.relationshipDetector.detectFromSchema(
+          {},
+          this.schema as Record<string, unknown>
+        );
+        // Merge manual relationships if provided
+        if (config.relationships) {
+          this.relationshipDetector.mergeManualRelationships(config.relationships);
+          this.relationships = { ...this.relationships, ...config.relationships };
+        }
       }
     } else {
       this.relationships = config.relationships || {};

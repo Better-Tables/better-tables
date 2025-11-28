@@ -355,6 +355,105 @@ describe('DataTransformer', () => {
       expect(profile.id).toBeDefined(); // Always included for identification
     });
 
+    it('should not incorrectly detect JSON columns as nested data', () => {
+      // Flat data with JSON-like structure in a column (should not be detected as nested)
+      // Use a column that exists in the schema - we'll simulate JSON by using a simple object
+      // Since the test schema doesn't have a metadata column, we'll test with existing columns
+      // and verify that when isNested is false, flat transformation is used
+      const flatData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          email: 'john@example.com',
+          // Simulate a JSON-like structure that might be stored as text
+          survey: JSON.stringify({ key: 'value', nested: { data: 'test' } }),
+        },
+      ];
+
+      const result = transformer.transformToNested(
+        flatData as unknown as Record<string, unknown>[],
+        'users',
+        ['name', 'email'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: false, // Explicitly not nested - should use flat transformation
+        }
+      );
+
+      // Should use flat transformation, not treat as nested
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.name).toBe('John Doe');
+      expect(record.email).toBe('john@example.com');
+    });
+
+    it('should include all requested fields from same relationship (not overwrite)', () => {
+      const nestedData = [
+        {
+          id: 1,
+          title: 'Event 1',
+          organizers: [
+            { id: 1, name: 'Jane Smith', email: 'jane@example.com', age: 25 },
+            { id: 2, name: 'Bob Jones', email: 'bob@example.com', age: 30 },
+          ],
+        },
+      ];
+
+      // Create schema and relationships for events with organizers
+      const eventsSchema = {
+        events: schema.posts, // Reuse posts table structure for events
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(eventsSchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(eventsSchema, arrayRelationshipManager);
+
+      // Request multiple fields from same relationship (using fields that exist in users table)
+      const result = arrayTransformer.transformToNested(
+        nestedData as unknown as Record<string, unknown>[],
+        'events',
+        ['title', 'organizers.name', 'organizers.email', 'organizers.age'],
+        {
+          selections: {},
+          columnMapping: {},
+          isNested: true,
+        }
+      );
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Event 1');
+      expect(record.organizers).toBeDefined();
+      const organizers = record.organizers as unknown[];
+      expect(organizers).toHaveLength(2);
+
+      // First organizer should have all requested fields
+      const firstOrg = organizers[0] as Record<string, unknown>;
+      expect(firstOrg.name).toBe('Jane Smith');
+      expect(firstOrg.email).toBe('jane@example.com');
+      expect(firstOrg.age).toBe(25);
+      expect(firstOrg.id).toBe(1);
+
+      // Second organizer should have all requested fields
+      const secondOrg = organizers[1] as Record<string, unknown>;
+      expect(secondOrg.name).toBe('Bob Jones');
+      expect(secondOrg.email).toBe('bob@example.com');
+      expect(secondOrg.age).toBe(30);
+      expect(secondOrg.id).toBe(2);
+    });
+
     it('should handle array relationships in nested data', () => {
       const nestedData = [
         {

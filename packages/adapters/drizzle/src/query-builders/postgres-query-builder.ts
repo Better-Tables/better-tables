@@ -9,6 +9,7 @@
  */
 
 import {
+  and,
   count,
   countDistinct,
   isNotNull,
@@ -118,9 +119,13 @@ class RelationalQueryWrapper implements PostgresQueryBuilderWithJoins {
     if (this.whereConditions.length > 0) {
       // For relational queries, we need to pass the where condition
       // Drizzle's relational API expects a where object, not SQL
-      // For now, we'll execute the query and filter in memory if needed
-      // In a production implementation, this would need to convert SQL to Drizzle's where format
-      options.where = this.whereConditions.length === 1 ? this.whereConditions[0] : undefined;
+      // Combine multiple conditions using and() to ensure all predicates are applied
+      if (this.whereConditions.length === 1) {
+        options.where = this.whereConditions[0];
+      } else {
+        // Combine multiple conditions using and()
+        options.where = and(...this.whereConditions);
+      }
     }
 
     // Combine orderBy clauses if any
@@ -202,7 +207,8 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
    */
   private buildRelationalQuery(
     primaryTable: string,
-    columns?: string[]
+    columns?: string[],
+    context?: QueryContext
   ): {
     query: PostgresQueryBuilderWithJoins;
     columnMetadata: {
@@ -271,6 +277,27 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
       // If we have array relationships, we can't use relational queries - need manual joins
       if (hasArrayRelationship) {
         return null;
+      }
+
+      // Process joinPaths from context to include relationships required by filters
+      if (context && context.joinPaths.size > 0) {
+        for (const [targetTable, relationshipPath] of context.joinPaths) {
+          // Get the relationship alias from the path
+          if (relationshipPath.length > 0) {
+            // Find the relationship by target table
+            const relationship = this.relationshipManager.getRelationshipByAlias(
+              primaryTable,
+              targetTable
+            );
+
+            // If relationship exists and not already in relationshipColumns, add it
+            if (relationship && !relationshipColumns.has(targetTable)) {
+              relationshipColumns.set(targetTable, new Set());
+              // Add all fields from the relationship (or at least id)
+              relationshipColumns.get(targetTable)?.add('id');
+            }
+          }
+        }
       }
 
       // Build with object for each relationship
@@ -391,7 +418,7 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     }
 
     // Try to use Drizzle relational queries first (for non-array relationships)
-    const relationalQuery = this.buildRelationalQuery(primaryTable, columns);
+    const relationalQuery = this.buildRelationalQuery(primaryTable, columns, context);
     if (relationalQuery) {
       return {
         query: relationalQuery.query,

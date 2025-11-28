@@ -488,6 +488,7 @@ export class RelationshipDetector {
 
   /**
    * Merge manual relationships with auto-detected ones, preserving manual overrides
+   * Also updates the relationship graph so graph-based methods can use manual relationships
    */
   mergeManualRelationships(manualRelationships: RelationshipMap): void {
     for (const [key, manualRelationship] of Object.entries(manualRelationships)) {
@@ -500,6 +501,26 @@ export class RelationshipDetector {
         mergedRelationship.isArray = manualRelationship.isArray;
       }
       this.relationships.set(key, mergedRelationship);
+
+      // Update relationship graph for graph-based methods
+      const fromTable = manualRelationship.from;
+      const toTable = manualRelationship.to;
+
+      // Ensure both tables exist in the graph
+      if (!this.relationshipGraph.has(fromTable)) {
+        this.relationshipGraph.set(fromTable, new Set());
+      }
+      if (!this.relationshipGraph.has(toTable)) {
+        this.relationshipGraph.set(toTable, new Set());
+      }
+
+      // Add bidirectional edges (relationships are bidirectional for graph traversal)
+      const fromSet = this.relationshipGraph.get(fromTable);
+      const toSet = this.relationshipGraph.get(toTable);
+      if (fromSet && toSet) {
+        fromSet.add(toTable);
+        toSet.add(fromTable);
+      }
     }
   }
 

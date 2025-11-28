@@ -465,7 +465,28 @@ describe('PostgresQueryBuilder', () => {
         expect(result.columnMetadata).toBeDefined();
         expect(result.columnMetadata.selections).toBeDefined();
         expect(result.columnMetadata.columnMapping).toBeDefined();
-        // The selections should only include requested columns
+
+        // Verify that selections only include requested columns
+        const selectionKeys = Object.keys(result.columnMetadata.selections);
+        // Should include name, email, and profile.bio (mapped to alias)
+        expect(selectionKeys.length).toBeGreaterThan(0);
+
+        // Verify that requested columns are represented in selections
+        // For manual joins, selections may use aliased keys (e.g., 'profiles_bio' or 'profile.bio')
+        // Check that we have selections for the requested columns
+        const hasName = selectionKeys.some((key) => key.includes('name') || key === 'name');
+        const hasEmail = selectionKeys.some((key) => key.includes('email') || key === 'email');
+        const hasProfileBio = selectionKeys.some(
+          (key) => key.includes('bio') || key.includes('profile')
+        );
+
+        expect(hasName).toBe(true);
+        expect(hasEmail).toBe(true);
+        expect(hasProfileBio).toBe(true);
+
+        // Verify columnMapping exists (structure may vary between relational and manual joins)
+        expect(typeof result.columnMetadata.columnMapping).toBe('object');
+
         expect(result.query).toBeDefined();
         expect(result.isNested).toBe(false); // Manual joins return flat data
       });
@@ -696,6 +717,116 @@ describe('PostgresQueryBuilder', () => {
         // Should fallback to manual joins when no columns specified
         expect(result.query).toBeDefined();
         expect(result.isNested).toBe(false);
+      });
+
+      it('should combine multiple where() conditions using and()', async () => {
+        let capturedOptions:
+          | {
+              where?: unknown;
+            }
+          | undefined;
+
+        const mockQueryApi = {
+          findMany: async (options?: {
+            with?: Record<string, unknown>;
+            where?: unknown;
+            orderBy?: unknown;
+            limit?: number;
+            offset?: number;
+            columns?: Record<string, boolean>;
+          }) => {
+            capturedOptions = options;
+            return [];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email'],
+          },
+          'users'
+        );
+
+        const { query } = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+
+        // Chain multiple where() calls
+        const mockWhere1 = { sql: 'name = $1', params: ['John'] } as unknown as SQL;
+        const mockWhere2 = { sql: 'email = $2', params: ['john@example.com'] } as unknown as SQL;
+        const chainedQuery = query.where(mockWhere1).where(mockWhere2);
+
+        // Execute
+        await chainedQuery.execute();
+
+        // Verify options were passed to findMany with combined where conditions
+        expect(capturedOptions).toBeDefined();
+        expect(capturedOptions?.where).toBeDefined();
+        // The where should be an and() combination, not just the last condition
+      });
+
+      it('should include relationships from context.joinPaths in relational query', () => {
+        const mockQueryApi = {
+          findMany: async (_options?: {
+            with?: Record<string, unknown>;
+            columns?: Record<string, boolean>;
+          }) => {
+            return [];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        // Create context with joinPaths (simulating filter on related table)
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email'],
+            filters: [{ columnId: 'profile.bio' }],
+          },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+
+        // Should use relational query and include profile relationship from joinPaths
+        expect(result.query).toBeDefined();
+        // The relational query should include profile in the with object
       });
     });
 

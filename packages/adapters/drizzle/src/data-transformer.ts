@@ -96,7 +96,10 @@ export class DataTransformer {
     }
 
     // Check if data is already nested (from Drizzle relational queries)
-    const isNested = columnMetadata?.isNested ?? this.detectNestedData(flatData[0]);
+    // Prefer the explicit flag from query builder, only use auto-detection as fallback
+    const isNested =
+      columnMetadata?.isNested ??
+      (flatData.length > 0 ? this.detectNestedData(flatData[0], primaryTable) : false);
 
     if (isNested) {
       // Data is already nested - just filter to requested columns
@@ -122,23 +125,43 @@ export class DataTransformer {
    * Detect if data is already nested (from Drizzle relational queries)
    * Checks if the first record contains nested objects or arrays
    */
-  private detectNestedData(record: Record<string, unknown> | undefined): boolean {
+  private detectNestedData(
+    record: Record<string, unknown> | undefined,
+    primaryTable: string
+  ): boolean {
     if (!record || typeof record !== 'object') {
       return false;
     }
 
-    // Check if any value is an object (but not null, Date, or Array of primitives)
-    for (const value of Object.values(record)) {
+    // Check if any value matches relationship-like structures
+    // Look for keys that match relationship aliases from the relationship manager
+    for (const [key, value] of Object.entries(record)) {
       if (value && typeof value === 'object') {
-        // Check if it's a nested object (not an array of primitives)
+        // Check if this key is a known relationship alias
+        const relationship = this.relationshipManager.getRelationshipByAlias(primaryTable, key);
+        if (relationship) {
+          // This is a known relationship - data is nested
+          return true;
+        }
+
+        // Also check for relationship-like structures (arrays of objects with id, or objects with id)
         if (Array.isArray(value)) {
-          // If array contains objects, it's nested
-          if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
+          // If array contains objects with 'id' field, it's likely a relationship
+          if (
+            value.length > 0 &&
+            typeof value[0] === 'object' &&
+            value[0] !== null &&
+            'id' in (value[0] as Record<string, unknown>)
+          ) {
             return true;
           }
         } else if (!(value instanceof Date)) {
-          // It's a nested object
-          return true;
+          // Check if it's an object with 'id' field (likely a relationship)
+          const obj = value as Record<string, unknown>;
+          if ('id' in obj && Object.keys(obj).length > 1) {
+            // Has id and other fields - likely a relationship object
+            return true;
+          }
         }
       }
     }
@@ -158,66 +181,88 @@ export class DataTransformer {
       return nestedData; // No filtering needed if no columns specified
     }
 
+    // Group columns by relationship to avoid overwriting fields
+    const relationshipFields = new Map<string, Set<string>>();
+    const directColumns = new Set<string>();
+
+    for (const columnId of columns) {
+      const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+      if (columnPath.isNested) {
+        // Extract relationship alias and field
+        const parts = columnId.split('.');
+        if (parts.length >= 2) {
+          const [relationshipAlias, ...fieldParts] = parts;
+          const field = fieldParts.join('.');
+
+          if (relationshipAlias) {
+            if (!relationshipFields.has(relationshipAlias)) {
+              relationshipFields.set(relationshipAlias, new Set());
+            }
+            relationshipFields.get(relationshipAlias)?.add(field);
+          }
+        }
+      } else {
+        // Direct column
+        directColumns.add(columnPath.field);
+      }
+    }
+
     return nestedData.map((record) => {
       const filtered: Record<string, unknown> = {};
       const recordObj = record as Record<string, unknown>;
 
-      for (const columnId of columns) {
-        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+      // Process direct columns
+      for (const field of directColumns) {
+        if (recordObj[field] !== undefined) {
+          filtered[field] = recordObj[field];
+        }
+      }
 
-        if (columnPath.isNested) {
-          // Extract nested value (e.g., 'organizers.firstName' from nested structure)
-          const parts = columnId.split('.');
-          if (parts.length >= 2) {
-            const [relationshipAlias, ...fieldParts] = parts;
-            const field = fieldParts.join('.');
+      // Process relationship columns (grouped by relationship)
+      for (const [relationshipAlias, fields] of relationshipFields) {
+        if (recordObj[relationshipAlias] !== undefined) {
+          const relationshipValue = recordObj[relationshipAlias];
 
-            if (relationshipAlias && recordObj[relationshipAlias] !== undefined) {
-              const relationshipValue = recordObj[relationshipAlias];
-
-              // Handle null values explicitly - preserve null for one-to-one relationships
-              if (relationshipValue === null) {
-                filtered[relationshipAlias] = null;
-              } else if (Array.isArray(relationshipValue)) {
-                // Handle array relationships
-                // Filter each item in the array to only include requested fields
-                const filteredArray = relationshipValue.map((item: unknown) => {
-                  if (item && typeof item === 'object') {
-                    const itemObj = item as Record<string, unknown>;
-                    const filteredItem: Record<string, unknown> = {};
-                    // Include the requested field
-                    if (field && itemObj[field] !== undefined) {
-                      filteredItem[field] = itemObj[field];
-                    }
-                    // Always include id for identification
-                    if (itemObj.id !== undefined) {
-                      filteredItem.id = itemObj.id;
-                    }
-                    return filteredItem;
+          // Handle null values explicitly - preserve null for one-to-one relationships
+          if (relationshipValue === null) {
+            filtered[relationshipAlias] = null;
+          } else if (Array.isArray(relationshipValue)) {
+            // Handle array relationships - filter each item to include all requested fields
+            const filteredArray = relationshipValue.map((item: unknown) => {
+              if (item && typeof item === 'object') {
+                const itemObj = item as Record<string, unknown>;
+                const filteredItem: Record<string, unknown> = {};
+                // Include all requested fields for this relationship
+                for (const field of fields) {
+                  if (itemObj[field] !== undefined) {
+                    filteredItem[field] = itemObj[field];
                   }
-                  return item;
-                });
-                filtered[relationshipAlias] = filteredArray;
-              } else if (relationshipValue && typeof relationshipValue === 'object') {
-                // Handle one-to-one relationships
-                const relObj = relationshipValue as Record<string, unknown>;
-                const filteredRel: Record<string, unknown> = {};
-                if (field && relObj[field] !== undefined) {
-                  filteredRel[field] = relObj[field];
                 }
-                // Always include id
-                if (relObj.id !== undefined) {
-                  filteredRel.id = relObj.id;
+                // Always include id for identification
+                if (itemObj.id !== undefined) {
+                  filteredItem.id = itemObj.id;
                 }
-                filtered[relationshipAlias] =
-                  Object.keys(filteredRel).length > 0 ? filteredRel : null;
+                return filteredItem;
+              }
+              return item;
+            });
+            filtered[relationshipAlias] = filteredArray;
+          } else if (relationshipValue && typeof relationshipValue === 'object') {
+            // Handle one-to-one relationships - include all requested fields
+            const relObj = relationshipValue as Record<string, unknown>;
+            const filteredRel: Record<string, unknown> = {};
+            // Include all requested fields for this relationship
+            for (const field of fields) {
+              if (relObj[field] !== undefined) {
+                filteredRel[field] = relObj[field];
               }
             }
-          }
-        } else {
-          // Direct column - include it
-          if (recordObj[columnPath.field] !== undefined) {
-            filtered[columnPath.field] = recordObj[columnPath.field];
+            // Always include id
+            if (relObj.id !== undefined) {
+              filteredRel.id = relObj.id;
+            }
+            filtered[relationshipAlias] = Object.keys(filteredRel).length > 0 ? filteredRel : null;
           }
         }
       }
