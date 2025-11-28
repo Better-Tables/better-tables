@@ -186,13 +186,16 @@ describe('SQLiteQueryBuilder', () => {
           'users'
         );
 
-        const { query, columnMetadata } = queryBuilder.buildSelectQuery(context, 'users', [
-          'name',
-          'profile.bio',
-        ]);
+        const { query, columnMetadata, isNested } = queryBuilder.buildSelectQuery(
+          context,
+          'users',
+          ['name', 'profile.bio']
+        );
 
         expect(query).toBeDefined();
         expect(columnMetadata).toBeDefined();
+        // SQLite always uses manual joins, so isNested should be false
+        expect(isNested).toBe(false);
       });
 
       it('should handle JSON accessor columns (tests buildColumnSelections override)', () => {

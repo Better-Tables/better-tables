@@ -471,12 +471,55 @@ export class RelationshipDetector {
       if (!relationship.localKey || !relationship.foreignKey) {
         const reverse = this.findRelationship(relationship.to, relationship.from);
         if (reverse?.localKey && reverse.foreignKey) {
-          this.relationships.set(key, {
+          const updatedRelationship: RelationshipPath = {
             ...relationship,
             localKey: reverse.foreignKey,
             foreignKey: reverse.localKey,
-          });
+          };
+          // Preserve isArray flag if present in either relationship
+          if (relationship.isArray !== undefined || reverse.isArray !== undefined) {
+            updatedRelationship.isArray = relationship.isArray ?? reverse.isArray ?? false;
+          }
+          this.relationships.set(key, updatedRelationship);
         }
+      }
+    }
+  }
+
+  /**
+   * Merge manual relationships with auto-detected ones, preserving manual overrides
+   * Also updates the relationship graph so graph-based methods can use manual relationships
+   */
+  mergeManualRelationships(manualRelationships: RelationshipMap): void {
+    for (const [key, manualRelationship] of Object.entries(manualRelationships)) {
+      // Preserve all properties from manual relationship, including isArray
+      const mergedRelationship: RelationshipPath = {
+        ...manualRelationship,
+      };
+      // Only set isArray if it's explicitly provided (preserve undefined if not set)
+      if (manualRelationship.isArray !== undefined) {
+        mergedRelationship.isArray = manualRelationship.isArray;
+      }
+      this.relationships.set(key, mergedRelationship);
+
+      // Update relationship graph for graph-based methods
+      const fromTable = manualRelationship.from;
+      const toTable = manualRelationship.to;
+
+      // Ensure both tables exist in the graph
+      if (!this.relationshipGraph.has(fromTable)) {
+        this.relationshipGraph.set(fromTable, new Set());
+      }
+      if (!this.relationshipGraph.has(toTable)) {
+        this.relationshipGraph.set(toTable, new Set());
+      }
+
+      // Add bidirectional edges (relationships are bidirectional for graph traversal)
+      const fromSet = this.relationshipGraph.get(fromTable);
+      const toSet = this.relationshipGraph.get(toTable);
+      if (fromSet && toSet) {
+        fromSet.add(toTable);
+        toSet.add(fromTable);
       }
     }
   }
@@ -720,6 +763,7 @@ export class RelationshipDetector {
                 // Default to nullable (LEFT JOIN) for safety - only use INNER if explicitly non-nullable
                 nullable: relation.nullable ?? true,
                 joinType: relation.nullable === false ? 'inner' : 'left',
+                // isArray will be set from manual relationships via mergeManualRelationships if provided
               };
 
               // Store both directions

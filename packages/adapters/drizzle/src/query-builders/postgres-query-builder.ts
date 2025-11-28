@@ -8,7 +8,17 @@
  * @since 1.0.0
  */
 
-import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  countDistinct,
+  isNotNull,
+  max,
+  min,
+  type SQL,
+  type SQLWrapper,
+  sql,
+} from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { RelationshipManager } from '../relationship-manager';
@@ -22,6 +32,124 @@ import type {
 import { QueryError } from '../types';
 import { generateAlias } from '../utils/alias-generator';
 import { BaseQueryBuilder } from './base-query-builder';
+
+/**
+ * Wrapper class for Drizzle relational queries to implement QueryBuilderWithJoins interface
+ * This allows relational queries to be used seamlessly with the existing query builder pattern
+ */
+class RelationalQueryWrapper implements PostgresQueryBuilderWithJoins {
+  private queryFn: (options?: {
+    where?: unknown;
+    orderBy?: unknown;
+    limit?: number;
+    offset?: number;
+  }) => Promise<unknown[]>;
+  private whereConditions: (SQL | SQLWrapper)[] = [];
+  private orderByClauses: (AnyColumnType | SQL | SQLWrapper)[] = [];
+  private limitValue?: number;
+  private offsetValue?: number;
+  private groupByColumns: (AnyColumnType | SQL | SQLWrapper)[] = [];
+
+  constructor(
+    queryFn: (options?: {
+      where?: unknown;
+      orderBy?: unknown;
+      limit?: number;
+      offset?: number;
+    }) => Promise<unknown[]>
+  ) {
+    this.queryFn = queryFn;
+  }
+
+  leftJoin(_table: AnyTableType, _condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins {
+    // Relational queries don't support manual joins - they use 'with' instead
+    // Return self to allow chaining, but joins are ignored
+    return this;
+  }
+
+  innerJoin(_table: AnyTableType, _condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins {
+    // Relational queries don't support manual joins - they use 'with' instead
+    // Return self to allow chaining, but joins are ignored
+    return this;
+  }
+
+  select(
+    _selections?: Record<string, AnyColumnType | SQL | SQLWrapper>
+  ): PostgresQueryBuilderWithJoins {
+    // Selections are already handled in the relational query setup
+    // Return self to allow chaining
+    return this;
+  }
+
+  where(condition: SQL | SQLWrapper): PostgresQueryBuilderWithJoins {
+    this.whereConditions.push(condition);
+    return this;
+  }
+
+  orderBy(...clauses: (AnyColumnType | SQL | SQLWrapper)[]): PostgresQueryBuilderWithJoins {
+    this.orderByClauses.push(...clauses);
+    return this;
+  }
+
+  limit(count: number): PostgresQueryBuilderWithJoins {
+    this.limitValue = count;
+    return this;
+  }
+
+  offset(count: number): PostgresQueryBuilderWithJoins {
+    this.offsetValue = count;
+    return this;
+  }
+
+  groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): PostgresQueryBuilderWithJoins {
+    this.groupByColumns.push(...columns);
+    return this;
+  }
+
+  async execute(): Promise<Record<string, unknown>[]> {
+    // Build options object from accumulated query modifiers
+    const options: {
+      where?: unknown;
+      orderBy?: unknown;
+      limit?: number;
+      offset?: number;
+    } = {};
+
+    // Combine where conditions if any
+    if (this.whereConditions.length > 0) {
+      // For relational queries, we need to pass the where condition
+      // Drizzle's relational API expects a where object, not SQL
+      // Combine multiple conditions using and() to ensure all predicates are applied
+      if (this.whereConditions.length === 1) {
+        options.where = this.whereConditions[0];
+      } else {
+        // Combine multiple conditions using and()
+        options.where = and(...this.whereConditions);
+      }
+    }
+
+    // Combine orderBy clauses if any
+    if (this.orderByClauses.length > 0) {
+      options.orderBy =
+        this.orderByClauses.length === 1 ? this.orderByClauses[0] : this.orderByClauses;
+    }
+
+    if (this.limitValue !== undefined) {
+      options.limit = this.limitValue;
+    }
+
+    if (this.offsetValue !== undefined) {
+      options.offset = this.offsetValue;
+    }
+
+    // Execute the relational query
+    const results = await this.queryFn(options);
+
+    // Convert results to Record<string, unknown>[] format
+    // Results from Drizzle relational queries are already nested objects
+    return results as Record<string, unknown>[];
+  }
+}
 
 /**
  * PostgreSQL query builder implementation.
@@ -74,7 +202,201 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
+   * Build relational query using Drizzle's relational query API
+   * This returns nested objects instead of flattened fields
+   */
+  private buildRelationalQuery(
+    primaryTable: string,
+    columns?: string[],
+    context?: QueryContext
+  ): {
+    query: PostgresQueryBuilderWithJoins;
+    columnMetadata: {
+      selections: Record<string, AnyColumnType>;
+      columnMapping: Record<string, string>;
+    };
+    isNested: boolean; // Flag to indicate data is already nested
+  } | null {
+    // Check if db.query is available (requires schema with relations passed to drizzle())
+    const dbWithQuery = this.db as unknown as { query?: Record<string, unknown> };
+    if (!dbWithQuery.query || !dbWithQuery.query[primaryTable]) {
+      return null; // Relational query API not available, fall back to manual joins
+    }
+
+    const tableQuery = dbWithQuery.query[primaryTable] as {
+      findMany?: (options?: {
+        with?: Record<string, unknown>;
+        where?: unknown;
+        orderBy?: unknown;
+        limit?: number;
+        offset?: number;
+        columns?: Record<string, boolean>;
+      }) => Promise<unknown[]>;
+    };
+
+    if (!tableQuery?.findMany) {
+      return null;
+    }
+
+    // Build with object from requested columns
+    const withObject: Record<string, unknown> = {};
+    const selections: Record<string, AnyColumnType> = {};
+    const columnMapping: Record<string, string> = {};
+
+    // Group columns by relationship
+    const relationshipColumns = new Map<string, Set<string>>();
+    const primaryTableColumns = new Set<string>();
+    let hasArrayRelationship = false;
+
+    if (columns && columns.length > 0) {
+      for (const columnId of columns) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+        if (columnPath.isNested && columnPath.relationshipPath) {
+          // Check if this is an array relationship
+          if (this.relationshipManager.isArrayRelationship(columnPath.relationshipPath)) {
+            // Array relationships can't use Drizzle relational API - need manual joins
+            hasArrayRelationship = true;
+            continue;
+          }
+
+          // Extract relationship alias (first part of columnId)
+          const alias = columnId.split('.')[0];
+          if (alias) {
+            if (!relationshipColumns.has(alias)) {
+              relationshipColumns.set(alias, new Set());
+            }
+            relationshipColumns.get(alias)?.add(columnPath.field);
+          }
+        } else {
+          // Primary table column
+          primaryTableColumns.add(columnPath.field);
+        }
+      }
+
+      // If we have array relationships, we can't use relational queries - need manual joins
+      if (hasArrayRelationship) {
+        return null;
+      }
+
+      // Process joinPaths from context to include relationships required by filters
+      if (context && context.joinPaths.size > 0) {
+        for (const [targetTable, relationshipPath] of context.joinPaths) {
+          // Get the relationship alias from the path
+          if (relationshipPath.length > 0) {
+            // Find the relationship by target table
+            const relationship = this.relationshipManager.getRelationshipByAlias(
+              primaryTable,
+              targetTable
+            );
+
+            // If relationship exists and not already in relationshipColumns, add it
+            if (relationship && !relationshipColumns.has(targetTable)) {
+              relationshipColumns.set(targetTable, new Set());
+              // Add all fields from the relationship (or at least id)
+              relationshipColumns.get(targetTable)?.add('id');
+            }
+          }
+        }
+      }
+
+      // Build with object for each relationship
+      for (const [alias, fields] of relationshipColumns) {
+        const relationship = this.relationshipManager.getRelationshipByAlias(primaryTable, alias);
+        if (relationship) {
+          // Build columns object for this relationship
+          const relationshipColumnsObj: Record<string, boolean> = {};
+          for (const field of fields) {
+            relationshipColumnsObj[field] = true;
+          }
+
+          // Add to with object - use alias as the key (should match relation name in schema)
+          withObject[alias] = {
+            columns: relationshipColumnsObj,
+          };
+        }
+      }
+
+      // Build primary table columns selection
+      const primaryColumnsObj: Record<string, boolean> = {};
+      for (const field of primaryTableColumns) {
+        primaryColumnsObj[field] = true;
+      }
+
+      // Create a query function that will be executed later
+      const queryFn = async (options?: {
+        where?: unknown;
+        orderBy?: unknown;
+        limit?: number;
+        offset?: number;
+      }) => {
+        const queryOptions: {
+          columns: Record<string, boolean>;
+          with?: Record<string, unknown>;
+          where?: unknown;
+          orderBy?: unknown;
+          limit?: number;
+          offset?: number;
+        } = {
+          columns: primaryColumnsObj,
+          ...options,
+        };
+
+        if (Object.keys(withObject).length > 0) {
+          queryOptions.with = withObject;
+        }
+
+        return tableQuery.findMany?.(queryOptions) || [];
+      };
+
+      // Build column metadata
+      const primaryTableSchema = this.schema[primaryTable];
+      if (primaryTableSchema) {
+        for (const field of primaryTableColumns) {
+          const col = (primaryTableSchema as unknown as Record<string, AnyColumnType>)[field];
+          if (col) {
+            selections[field] = col;
+            columnMapping[field] = field;
+          }
+        }
+      }
+
+      for (const [alias, fields] of relationshipColumns) {
+        const relationship = this.relationshipManager.getRelationshipByAlias(primaryTable, alias);
+        if (relationship) {
+          const relatedTableSchema = this.schema[relationship.to];
+          if (relatedTableSchema) {
+            for (const field of fields) {
+              const col = (relatedTableSchema as unknown as Record<string, AnyColumnType>)[field];
+              if (col) {
+                const columnId = `${alias}.${field}`;
+                selections[columnId] = col;
+                columnMapping[columnId] = columnId;
+              }
+            }
+          }
+        }
+      }
+
+      // Create wrapper that implements PostgresQueryBuilderWithJoins
+      const wrapper = new RelationalQueryWrapper(queryFn);
+
+      return {
+        query: wrapper,
+        columnMetadata: {
+          selections,
+          columnMapping,
+        },
+        isNested: true, // Relational queries return nested data
+      };
+    }
+
+    return null;
+  }
+
+  /**
    * Build SELECT query with joins
+   * Attempts to use Drizzle relational queries first, falls back to manual joins
    */
   buildSelectQuery(
     context: QueryContext,
@@ -86,6 +408,7 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
       selections: Record<string, AnyColumnType>;
       columnMapping: Record<string, string>;
     };
+    isNested?: boolean; // Flag to indicate if data is already nested from relational query
   } {
     const primaryTableSchema = this.schema[primaryTable];
     if (!primaryTableSchema) {
@@ -94,6 +417,17 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
       });
     }
 
+    // Try to use Drizzle relational queries first (for non-array relationships)
+    const relationalQuery = this.buildRelationalQuery(primaryTable, columns, context);
+    if (relationalQuery) {
+      return {
+        query: relationalQuery.query,
+        columnMetadata: relationalQuery.columnMetadata,
+        isNested: relationalQuery.isNested,
+      };
+    }
+
+    // Fall back to manual SQL joins (for array relationships or when relational API unavailable)
     const selections: Record<string, AnyColumnType> = {};
     const columnMapping: Record<string, string> = {};
 
@@ -155,6 +489,7 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
         selections,
         columnMapping,
       },
+      isNested: false, // Manual joins return flat data
     };
   }
 

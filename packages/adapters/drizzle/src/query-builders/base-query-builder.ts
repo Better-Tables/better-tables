@@ -102,6 +102,7 @@ export abstract class BaseQueryBuilder {
       selections: Record<string, AnyColumnType>;
       columnMapping: Record<string, string>;
     };
+    isNested?: boolean; // Flag to indicate if data is already nested from relational query
   };
 
   /**
@@ -423,6 +424,7 @@ export abstract class BaseQueryBuilder {
       selections: Record<string, AnyColumnType>;
       columnMapping: Record<string, string>;
     };
+    isNested?: boolean; // Flag to indicate if data is already nested from relational query
   } {
     const context = this.relationshipManager.buildQueryContext(
       {
@@ -433,11 +435,8 @@ export abstract class BaseQueryBuilder {
       params.primaryTable
     );
 
-    const { query: dataQuery, columnMetadata } = this.buildSelectQuery(
-      context,
-      params.primaryTable,
-      params.columns
-    );
+    const selectResult = this.buildSelectQuery(context, params.primaryTable, params.columns);
+    const { query: dataQuery, columnMetadata, isNested } = selectResult;
     let finalDataQuery = this.applyFilters(dataQuery, params.filters || [], params.primaryTable);
     finalDataQuery = this.applySorting(finalDataQuery, params.sorting || [], params.primaryTable);
     if (params.pagination) {
@@ -447,7 +446,12 @@ export abstract class BaseQueryBuilder {
     let countQuery = this.buildCountQuery(context, params.primaryTable);
     countQuery = this.applyFilters(countQuery, params.filters || [], params.primaryTable);
 
-    return { dataQuery: finalDataQuery, countQuery, columnMetadata };
+    return {
+      dataQuery: finalDataQuery,
+      countQuery,
+      columnMetadata,
+      ...(isNested !== undefined && { isNested }),
+    };
   }
 
   /**

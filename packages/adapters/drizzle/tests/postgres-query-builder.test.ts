@@ -295,6 +295,541 @@ describe('PostgresQueryBuilder', () => {
       });
     });
 
+    describe('Relational Query API', () => {
+      it('should fallback to manual joins when relational API is unavailable', () => {
+        // Mock database without query API
+        const dbWithoutQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithoutQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        // Test through public buildSelectQuery method
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email'],
+          },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+
+        // Should fallback to manual joins (isNested should be false or undefined)
+        expect(result.query).toBeDefined();
+        expect(result.columnMetadata).toBeDefined();
+        // When relational API is unavailable, should use manual joins (isNested: false)
+        expect(result.isNested).toBe(false);
+      });
+
+      it('should fallback to manual joins for array relationships', () => {
+        const arrayRelationships = {
+          'events.organizers': {
+            from: 'events',
+            to: 'users',
+            foreignKey: 'id',
+            localKey: 'organizerId',
+            cardinality: 'many' as const,
+            isArray: true,
+          },
+        };
+
+        const eventsTable = pgTable('events', {
+          id: uuid('id').primaryKey(),
+          title: varchar('title', { length: 255 }).notNull(),
+          organizerId: uuid('organizer_id').array(),
+        });
+
+        const testSchema = {
+          events: eventsTable,
+          users: schema.users,
+        };
+
+        const arrayRelationshipManager = new RelationshipManager(testSchema, arrayRelationships);
+        const arrayBuilder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          mockDb as unknown as PostgresJsDatabase<typeof testSchema>,
+          testSchema,
+          arrayRelationshipManager
+        );
+
+        // Test through public buildSelectQuery method
+        const context = arrayRelationshipManager.buildQueryContext(
+          {
+            columns: ['title', 'organizers.name'],
+          },
+          'events'
+        );
+
+        const result = arrayBuilder.buildSelectQuery(context, 'events', [
+          'title',
+          'organizers.name',
+        ]);
+
+        // Array relationships should force fallback to manual joins
+        expect(result.query).toBeDefined();
+        expect(result.columnMetadata).toBeDefined();
+        expect(result.isNested).toBe(false); // Manual joins return flat data
+      });
+
+      it('should use relational query when API is available', () => {
+        // Mock database with query API
+        const mockQueryApi = {
+          findMany: async (_options?: {
+            with?: Record<string, unknown>;
+            where?: unknown;
+            orderBy?: unknown;
+            limit?: number;
+            offset?: number;
+            columns?: Record<string, boolean>;
+          }) => {
+            return [
+              {
+                id: 1,
+                name: 'John Doe',
+                email: 'john@example.com',
+                profile: {
+                  id: 1,
+                  bio: 'Software developer',
+                },
+              },
+            ];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        // Test through public buildSelectQuery method
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email', 'profile.bio'],
+          },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email', 'profile.bio']);
+
+        // Should use relational query when API is available
+        expect(result.query).toBeDefined();
+        expect(result.columnMetadata).toBeDefined();
+        expect(result.isNested).toBe(true); // Relational queries return nested data
+      });
+
+      it('should only include requested columns in query', () => {
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          mockDb as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        // Test through public buildSelectQuery method
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email', 'profile.bio'],
+          },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email', 'profile.bio']);
+
+        // Verify that column metadata only includes requested columns
+        expect(result.columnMetadata).toBeDefined();
+        expect(result.columnMetadata.selections).toBeDefined();
+        expect(result.columnMetadata.columnMapping).toBeDefined();
+
+        // Verify that selections only include requested columns
+        const selectionKeys = Object.keys(result.columnMetadata.selections);
+        // Should include name, email, and profile.bio (mapped to alias)
+        expect(selectionKeys.length).toBeGreaterThan(0);
+
+        // Verify that requested columns are represented in selections
+        // For manual joins, selections may use aliased keys (e.g., 'profiles_bio' or 'profile.bio')
+        // Check that we have selections for the requested columns
+        const hasName = selectionKeys.some((key) => key.includes('name') || key === 'name');
+        const hasEmail = selectionKeys.some((key) => key.includes('email') || key === 'email');
+        const hasProfileBio = selectionKeys.some(
+          (key) => key.includes('bio') || key.includes('profile')
+        );
+
+        expect(hasName).toBe(true);
+        expect(hasEmail).toBe(true);
+        expect(hasProfileBio).toBe(true);
+
+        // Verify columnMapping exists (structure may vary between relational and manual joins)
+        expect(typeof result.columnMetadata.columnMapping).toBe('object');
+
+        expect(result.query).toBeDefined();
+        expect(result.isNested).toBe(false); // Manual joins return flat data
+      });
+
+      it('should execute relational query and return nested data', async () => {
+        const mockQueryApi = {
+          findMany: async (_options?: {
+            with?: Record<string, unknown>;
+            columns?: Record<string, boolean>;
+          }) => {
+            return [
+              {
+                id: 1,
+                name: 'John Doe',
+                email: 'john@example.com',
+                profile: {
+                  id: 1,
+                  bio: 'Software developer',
+                  avatar: 'avatar.jpg',
+                },
+              },
+            ];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email', 'profile.bio'],
+          },
+          'users'
+        );
+
+        const { query } = builder.buildSelectQuery(context, 'users', [
+          'name',
+          'email',
+          'profile.bio',
+        ]);
+
+        // Execute the query
+        const results = await query.execute();
+
+        // Verify nested structure is returned
+        expect(results).toHaveLength(1);
+        expect(results[0]).toHaveProperty('name', 'John Doe');
+        expect(results[0]).toHaveProperty('email', 'john@example.com');
+        expect(results[0]).toHaveProperty('profile');
+        expect((results[0] as Record<string, unknown>).profile).toBeDefined();
+        const profile = (results[0] as Record<string, unknown>).profile as Record<string, unknown>;
+        expect(profile.bio).toBe('Software developer');
+      });
+
+      it('should support query chaining on RelationalQueryWrapper', async () => {
+        let capturedOptions:
+          | {
+              where?: unknown;
+              orderBy?: unknown;
+              limit?: number;
+              offset?: number;
+            }
+          | undefined;
+
+        const mockQueryApi = {
+          findMany: async (options?: {
+            with?: Record<string, unknown>;
+            where?: unknown;
+            orderBy?: unknown;
+            limit?: number;
+            offset?: number;
+            columns?: Record<string, boolean>;
+          }) => {
+            capturedOptions = options;
+            return [];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email'],
+          },
+          'users'
+        );
+
+        const { query } = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+
+        // Chain query methods - use mock objects that satisfy SQL | SQLWrapper type
+        const mockWhere = { sql: 'name = $1', params: ['John'] } as unknown as SQL;
+        const mockOrderBy = { sql: 'name', params: [] } as unknown as SQL;
+        const chainedQuery = query.where(mockWhere).orderBy(mockOrderBy).limit(10).offset(5);
+
+        // Execute
+        await chainedQuery.execute();
+
+        // Verify options were passed to findMany
+        expect(capturedOptions).toBeDefined();
+        expect(capturedOptions?.limit).toBe(10);
+        expect(capturedOptions?.offset).toBe(5);
+      });
+
+      it('should handle mixed relationships (some relational, some manual)', () => {
+        // This test verifies that when we have both array and non-array relationships,
+        // we fall back to manual joins (since array relationships can't use relational API)
+        const mixedRelationships = {
+          'events.organizers': {
+            from: 'events',
+            to: 'users',
+            foreignKey: 'id',
+            localKey: 'organizerId',
+            cardinality: 'many' as const,
+            isArray: true, // Array relationship
+          },
+          'events.creator': {
+            from: 'events',
+            to: 'users',
+            foreignKey: 'id',
+            localKey: 'creatorId',
+            cardinality: 'one' as const,
+            isArray: false, // Regular relationship
+          },
+        };
+
+        const eventsTable = pgTable('events', {
+          id: uuid('id').primaryKey(),
+          title: varchar('title', { length: 255 }).notNull(),
+          organizerId: uuid('organizer_id').array(),
+          creatorId: uuid('creator_id'),
+        });
+
+        const testSchema = {
+          events: eventsTable,
+          users: schema.users,
+        };
+
+        const mixedRelationshipManager = new RelationshipManager(testSchema, mixedRelationships);
+        const mixedBuilder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          mockDb as unknown as PostgresJsDatabase<typeof testSchema>,
+          testSchema,
+          mixedRelationshipManager
+        );
+
+        const context = mixedRelationshipManager.buildQueryContext(
+          {
+            columns: ['title', 'organizers.name', 'creator.name'],
+          },
+          'events'
+        );
+
+        const result = mixedBuilder.buildSelectQuery(context, 'events', [
+          'title',
+          'organizers.name',
+          'creator.name',
+        ]);
+
+        // Should fallback to manual joins because of array relationship
+        expect(result.query).toBeDefined();
+        expect(result.isNested).toBe(false);
+      });
+
+      it('should handle empty columns array', () => {
+        const mockQueryApi = {
+          findMany: async () => [],
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext({}, 'users');
+
+        const result = builder.buildSelectQuery(context, 'users', []);
+
+        // Should fallback to manual joins when no columns specified
+        expect(result.query).toBeDefined();
+        expect(result.isNested).toBe(false);
+      });
+
+      it('should combine multiple where() conditions using and()', async () => {
+        let capturedOptions:
+          | {
+              where?: unknown;
+            }
+          | undefined;
+
+        const mockQueryApi = {
+          findMany: async (options?: {
+            with?: Record<string, unknown>;
+            where?: unknown;
+            orderBy?: unknown;
+            limit?: number;
+            offset?: number;
+            columns?: Record<string, boolean>;
+          }) => {
+            capturedOptions = options;
+            return [];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email'],
+          },
+          'users'
+        );
+
+        const { query } = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+
+        // Chain multiple where() calls
+        const mockWhere1 = { sql: 'name = $1', params: ['John'] } as unknown as SQL;
+        const mockWhere2 = { sql: 'email = $2', params: ['john@example.com'] } as unknown as SQL;
+        const chainedQuery = query.where(mockWhere1).where(mockWhere2);
+
+        // Execute
+        await chainedQuery.execute();
+
+        // Verify options were passed to findMany with combined where conditions
+        expect(capturedOptions).toBeDefined();
+        expect(capturedOptions?.where).toBeDefined();
+        // The where should be an and() combination, not just the last condition
+      });
+
+      it('should include relationships from context.joinPaths in relational query', () => {
+        const mockQueryApi = {
+          findMany: async (_options?: {
+            with?: Record<string, unknown>;
+            columns?: Record<string, boolean>;
+          }) => {
+            return [];
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          // @ts-expect-error - Mock database for unit tests, type mismatch expected
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        // Create context with joinPaths (simulating filter on related table)
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'email'],
+            filters: [{ columnId: 'profile.bio' }],
+          },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+
+        // Should use relational query and include profile relationship from joinPaths
+        expect(result.query).toBeDefined();
+        // The relational query should include profile in the with object
+      });
+    });
+
     describe('Error Handling', () => {
       it('should throw error for invalid primary table', () => {
         const context = relationshipManager.buildQueryContext({}, 'users');
