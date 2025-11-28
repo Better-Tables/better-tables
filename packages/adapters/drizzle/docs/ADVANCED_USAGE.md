@@ -401,6 +401,255 @@ const columns = [
 ];
 ```
 
+## Computed Fields
+
+Computed fields allow you to add virtual columns that are calculated at runtime. These fields don't exist in the database schema but are computed from the row data, related tables, or any other source.
+
+### Basic Computed Field
+
+A simple computed field that performs a calculation on the row data:
+
+```typescript
+import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  computedFields: {
+    usersTable: [
+      {
+        field: 'fullName',
+        type: 'text',
+        compute: (row) => `${row.firstName} ${row.lastName}`,
+      },
+      {
+        field: 'age',
+        type: 'number',
+        compute: (row) => {
+          const birthDate = new Date(row.birthDate);
+          const today = new Date();
+          return today.getFullYear() - birthDate.getFullYear();
+        },
+      },
+    ],
+  },
+});
+
+// Use in queries
+const result = await adapter.fetchData({
+  columns: ['fullName', 'age', 'email'],
+});
+```
+
+### Computed Field with Database Query
+
+For computed fields that require querying related tables:
+
+```typescript
+import { and, count, eq, inArray } from 'drizzle-orm';
+
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  computedFields: {
+    eventsTable: [
+      {
+        field: 'attendeeCount',
+        type: 'number',
+        compute: async (row, context) => {
+          // Query related table to count attendees
+          const result = await context.db
+            .select({ count: count() })
+            .from(eventAttendeesTable)
+            .where(
+              and(
+                eq(eventAttendeesTable.eventId, row.id),
+                inArray(eventAttendeesTable.status, [
+                  AttendanceStatus.REGISTERED,
+                  AttendanceStatus.ATTENDED,
+                ])
+              )
+            );
+          return result[0]?.count || 0;
+        },
+      },
+    ],
+  },
+});
+```
+
+### Computed Field with Filtering
+
+When you need to filter by computed fields, provide a `filter` function that transforms the filter into a database query:
+
+```typescript
+import { count, eq, gt, gte, lt, lte, and, inArray } from 'drizzle-orm';
+
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  computedFields: {
+    eventsTable: [
+      {
+        field: 'attendeeCount',
+        type: 'number',
+        compute: async (row, context) => {
+          const result = await context.db
+            .select({ count: count() })
+            .from(eventAttendeesTable)
+            .where(
+              and(
+                eq(eventAttendeesTable.eventId, row.id),
+                inArray(eventAttendeesTable.status, [
+                  AttendanceStatus.REGISTERED,
+                  AttendanceStatus.ATTENDED,
+                ])
+              )
+            );
+          return result[0]?.count || 0;
+        },
+        filter: async (filter, context) => {
+          // Build subquery to find events matching the attendee count criteria
+          const attendeeCountsSubquery = context.db
+            .select({
+              eventId: eventAttendeesTable.eventId,
+              count: count(eventAttendeesTable.userId).as('attendee_count'),
+            })
+            .from(eventAttendeesTable)
+            .where(
+              inArray(eventAttendeesTable.status, [
+                AttendanceStatus.REGISTERED,
+                AttendanceStatus.ATTENDED,
+              ])
+            )
+            .groupBy(eventAttendeesTable.eventId)
+            .as('attendee_counts');
+
+          // Apply filter operator
+          const filterValue = Number(filter.values?.[0] || 0);
+          let condition;
+          switch (filter.operator) {
+            case 'equals':
+              condition = eq(attendeeCountsSubquery.count, filterValue);
+              break;
+            case 'greaterThan':
+              condition = gt(attendeeCountsSubquery.count, filterValue);
+              break;
+            case 'greaterThanOrEquals':
+              condition = gte(attendeeCountsSubquery.count, filterValue);
+              break;
+            case 'lessThan':
+              condition = lt(attendeeCountsSubquery.count, filterValue);
+              break;
+            case 'lessThanOrEquals':
+              condition = lte(attendeeCountsSubquery.count, filterValue);
+              break;
+            default:
+              return []; // Unsupported operator
+          }
+
+          // Get matching event IDs
+          const matchingEvents = await context.db
+            .select({ eventId: attendeeCountsSubquery.eventId })
+            .from(attendeeCountsSubquery)
+            .where(condition);
+
+          // Transform into id filter
+          return [{
+            columnId: 'id',
+            operator: 'isAnyOf',
+            values: matchingEvents.map(e => e.eventId),
+            type: 'text',
+          }];
+        },
+      },
+    ],
+  },
+});
+
+// Filter by computed field
+const result = await adapter.fetchData({
+  columns: ['title', 'attendeeCount'],
+  filters: [
+    { columnId: 'attendeeCount', operator: 'greaterThan', values: [10], type: 'number' },
+  ],
+});
+```
+
+### Batch Computation
+
+For better performance, you can compute fields for multiple rows at once using `context.allRows`:
+
+```typescript
+computedFields: {
+  eventsTable: [
+    {
+      field: 'attendeeCount',
+      type: 'number',
+      compute: async (row, context) => {
+        // Batch fetch all attendee counts for all rows
+        const eventIds = context.allRows.map(r => r.id);
+        const counts = await context.db
+          .select({
+            eventId: eventAttendeesTable.eventId,
+            count: count(eventAttendeesTable.userId),
+          })
+          .from(eventAttendeesTable)
+          .where(inArray(eventAttendeesTable.eventId, eventIds))
+          .groupBy(eventAttendeesTable.eventId);
+
+        const countsMap = new Map(
+          counts.map(c => [c.eventId, Number(c.count)])
+        );
+
+        // Return count for this specific row
+        return countsMap.get(row.id) || 0;
+      },
+    },
+  ],
+},
+```
+
+### ComputedFieldContext API
+
+The `context` object provides:
+
+- `primaryTable: string` - The primary table name
+- `allRows: unknown[]` - All rows being processed (for batch computation)
+- `db: DrizzleDatabase<TDriver>` - Database instance for querying
+- `schema: TSchema` - The full schema object
+
+### Best Practices
+
+1. **Use Batch Computation**: When computing fields that require database queries, use `context.allRows` to batch queries for better performance.
+
+2. **Handle Errors**: Wrap computation logic in try-catch to handle errors gracefully:
+
+```typescript
+compute: async (row, context) => {
+  try {
+    // Computation logic
+    return result;
+  } catch (error) {
+    console.error('Computation failed:', error);
+    return null; // or a default value
+  }
+},
+```
+
+3. **Cache Results**: For expensive computations, consider caching results at the application level.
+
+4. **Filter Transformation**: When implementing `filter`, ensure you return valid `FilterState[]` that the adapter can process.
+
+5. **Type Safety**: Always specify the `type` field to ensure proper type handling.
+
+### Cross-Database Compatibility
+
+Computed fields work with all database drivers (PostgreSQL, MySQL, SQLite) because they use the generic `DrizzleDatabase<TDriver>` type. The `context.db` instance is properly typed for your specific driver, so you can use any Drizzle query methods.
+
 ## Aggregate Columns
 
 ### Built-in Aggregates

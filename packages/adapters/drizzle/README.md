@@ -326,6 +326,132 @@ const result = await adapter.fetchData({
 - Falls back to first table when truly ambiguous
 - Works well when all columns are direct schema columns
 
+### Computed Fields
+
+Computed fields allow you to add virtual columns that are calculated at runtime. These fields don't exist in the database schema but are computed from the row data, related tables, or any other source.
+
+**Basic Example:**
+
+```typescript
+import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+import { count, eq } from 'drizzle-orm';
+
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  computedFields: {
+    eventsTable: [
+      {
+        field: 'attendeeCount',
+        type: 'number',
+        compute: async (row, context) => {
+          const result = await context.db
+            .select({ count: count() })
+            .from(eventAttendeesTable)
+            .where(eq(eventAttendeesTable.eventId, row.id));
+          return result[0]?.count || 0;
+        },
+        filter: async (filter, context) => {
+          // Transform attendeeCount filter into id filter
+          const matchingIds = await getEventIdsByAttendeeCount(filter, context);
+          return [{
+            columnId: 'id',
+            operator: 'isAnyOf',
+            values: matchingIds,
+            type: 'text',
+          }];
+        },
+      },
+    ],
+  },
+});
+
+// Use computed field in queries
+const result = await adapter.fetchData({
+  columns: ['title', 'attendeeCount'],
+  filters: [
+    { columnId: 'attendeeCount', operator: 'greaterThan', values: [10], type: 'number' },
+  ],
+});
+```
+
+**Simple Calculation Example:**
+
+```typescript
+computedFields: {
+  usersTable: [
+    {
+      field: 'fullName',
+      type: 'text',
+      compute: (row) => `${row.firstName} ${row.lastName}`,
+    },
+    {
+      field: 'age',
+      type: 'number',
+      compute: (row) => {
+        const birthDate = new Date(row.birthDate);
+        const today = new Date();
+        return today.getFullYear() - birthDate.getFullYear();
+      },
+    },
+  ],
+},
+```
+
+**With Filtering Support:**
+
+```typescript
+import { count, eq, gt } from 'drizzle-orm';
+
+computedFields: {
+  eventsTable: [
+    {
+      field: 'attendeeCount',
+      type: 'number',
+      compute: async (row, context) => {
+        // Compute from related table
+        const result = await context.db
+          .select({ count: count() })
+          .from(eventAttendeesTable)
+          .where(eq(eventAttendeesTable.eventId, row.id));
+        return result[0]?.count || 0;
+      },
+      filter: async (filter, context) => {
+        // Transform computed field filter into database filter
+        const eventAttendeeCounts = context.db
+          .select({ eventId: eventAttendeesTable.eventId })
+          .from(eventAttendeesTable)
+          .groupBy(eventAttendeesTable.eventId)
+          .having(gt(count(eventAttendeesTable.userId), filter.values[0]))
+          .as('event_attendee_counts');
+        
+        const matchingIds = await context.db
+          .select({ id: eventAttendeeCounts.eventId })
+          .from(eventAttendeeCounts);
+        
+        return [{
+          columnId: 'id',
+          operator: 'isAnyOf',
+          values: matchingIds.map(r => r.id),
+          type: 'text',
+        }];
+      },
+    },
+  ],
+},
+```
+
+**Key Features:**
+
+- **Runtime Computation**: Fields are computed after data is fetched
+- **Database Queries**: Can query related tables using `context.db`
+- **Filtering Support**: Optional `filter` function to transform computed field filters into database queries
+- **Batch Processing**: `context.allRows` provides all rows for batch computation
+- **Type Safety**: Full TypeScript support with proper types
+
+See [Advanced Usage Guide](./docs/ADVANCED_USAGE.md#computed-fields) for more examples.
+
 ### Array Foreign Keys
 
 **Important**: The adapter internally stores and resolves relationships using **schema keys** (e.g., `usersTable`, `eventsTable`) rather than raw database table names (e.g., `users`, `events`). This ensures consistency with Drizzle's schema object structure. When defining custom relationships or debugging, ensure you refer to tables by their schema keys.
