@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.13
+
+### Patch Changes
+
+- This update introduces the ComputedFieldContext type to enhance type definitions related to computed fields in the DrizzleAdapter.
+
 ## 0.5.12
 
 ### Patch Changes

@@ -82,6 +82,7 @@ export type {
 export type {
   AggregateColumn,
   ColumnPath,
+  ComputedFieldContext,
   DatabaseDriver,
   DrizzleAdapterConfig,
   DrizzleAdapterFactoryOptions,
