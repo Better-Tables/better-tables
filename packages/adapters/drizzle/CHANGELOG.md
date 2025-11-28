@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.11
+
+### Patch Changes
+
+- This update introduces logic to the DataTransformer for removing flattened fields from related tables after constructing a nested structure. It ensures that only direct columns from the primary table, nested relationship objects, and JSON accessor fields are retained, improving the handling of nested data structures in relational queries
+
 ## 0.5.10
 
 ### Patch Changes
