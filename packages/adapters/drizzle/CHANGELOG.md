@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.16
+
+### Patch Changes
+
+- Fix relationship handling in RelationshipManager to prioritize relationship checks over column checks. This change addresses cases where a column name may conflict with a relationship alias, ensuring proper validation and error handling for relationships and columns.
+
 ## 0.5.15
 
 ### Patch Changes
