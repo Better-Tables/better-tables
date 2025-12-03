@@ -114,13 +114,45 @@ export class DataTransformer {
     const nestedData: TData[] = [];
 
     for (const [, records] of groupedData) {
-      // Ensure we only process each group once
-      // If grouping worked correctly, records with the same primary key should be in the same group
+      // Process each group of records with the same primary key
+      // Records with the same primary key are grouped together by groupByMainTableKey
       const nestedRecord = this.buildNestedRecord(records, primaryTable, columns, columnMetadata);
       nestedData.push(nestedRecord as TData);
     }
 
     return nestedData;
+  }
+
+  /**
+   * Check if an array contains nested data structures (objects with 'id' field)
+   * @param value - Array to check
+   * @returns true if array contains objects with 'id' field (nested data), false otherwise
+   */
+  private isNestedArray(value: unknown): boolean {
+    if (!Array.isArray(value) || value.length === 0) {
+      return false;
+    }
+
+    const firstItem = value[0];
+    return (
+      typeof firstItem === 'object' &&
+      firstItem !== null &&
+      'id' in (firstItem as Record<string, unknown>)
+    );
+  }
+
+  /**
+   * Check if an object represents a nested data structure (has 'id' and other fields)
+   * @param value - Object to check
+   * @returns true if object has 'id' field and other fields (nested data), false otherwise
+   */
+  private isNestedObject(value: unknown): boolean {
+    if (!value || typeof value !== 'object' || value instanceof Date) {
+      return false;
+    }
+
+    const obj = value as Record<string, unknown>;
+    return 'id' in obj && Object.keys(obj).length > 1;
   }
 
   /**
@@ -147,47 +179,25 @@ export class DataTransformer {
         if (relationship) {
           // Check if this is actually nested data or just a raw array column
           if (Array.isArray(value)) {
-            // If array contains primitive values (strings, numbers), it's a raw array column (FLAT)
             // If array contains objects with 'id' field, it's nested relationship data (NESTED)
-            if (
-              value.length > 0 &&
-              typeof value[0] === 'object' &&
-              value[0] !== null &&
-              'id' in (value[0] as Record<string, unknown>)
-            ) {
-              // Array of objects with 'id' - this is nested data
+            // If array contains primitive values (strings, numbers), it's a raw array column (FLAT)
+            if (this.isNestedArray(value)) {
               return true;
             }
             // Array of primitives (strings, numbers) - this is a raw array column, data is FLAT
             // Continue checking other fields
-          } else if (!(value instanceof Date)) {
-            // Check if it's an object with 'id' field (likely a relationship)
-            const obj = value as Record<string, unknown>;
-            if ('id' in obj && Object.keys(obj).length > 1) {
-              // Has id and other fields - likely a relationship object (NESTED)
-              return true;
-            }
+          } else if (this.isNestedObject(value)) {
+            // Has id and other fields - likely a relationship object (NESTED)
+            return true;
           }
         } else {
           // Not a known relationship alias - check for relationship-like structures
-          if (Array.isArray(value)) {
-            // If array contains objects with 'id' field, it's likely a relationship (NESTED)
-            if (
-              value.length > 0 &&
-              typeof value[0] === 'object' &&
-              value[0] !== null &&
-              'id' in (value[0] as Record<string, unknown>)
-            ) {
-              return true;
-            }
-            // Array of primitives - continue checking
-          } else if (!(value instanceof Date)) {
-            // Check if it's an object with 'id' field (likely a relationship)
-            const obj = value as Record<string, unknown>;
-            if ('id' in obj && Object.keys(obj).length > 1) {
-              // Has id and other fields - likely a relationship object (NESTED)
-              return true;
-            }
+          if (this.isNestedArray(value)) {
+            // Array contains objects with 'id' field - likely a relationship (NESTED)
+            return true;
+          } else if (this.isNestedObject(value)) {
+            // Has id and other fields - likely a relationship object (NESTED)
+            return true;
           }
         }
       }
@@ -549,7 +559,9 @@ export class DataTransformer {
                 }
               }
             }
-          } catch {}
+          } catch {
+            // Skip columns that fail to resolve - they may not be valid relationship paths
+          }
         } else {
           // This is a direct column (e.g., 'id', 'title', 'authors')
           // Direct columns are preserved as-is, even if they might also be relationships
@@ -656,9 +668,9 @@ export class DataTransformer {
       if (primaryKeyName) {
         // Always try to get primary key value, prioritizing direct field, then prefixed field
         const pkValue =
-          baseRecord[primaryKeyName] ||
-          baseRecord[`${primaryTable}_${primaryKeyName}`] ||
-          nestedRecord[primaryKeyName] ||
+          baseRecord[primaryKeyName] ??
+          baseRecord[`${primaryTable}_${primaryKeyName}`] ??
+          nestedRecord[primaryKeyName] ??
           cleanedRecord[primaryKeyName];
 
         if (pkValue !== undefined && pkValue !== null) {
@@ -856,7 +868,7 @@ export class DataTransformer {
       // CRITICAL: Only use the flattened field name from generateAlias
       // Do NOT fallback to main table's primary key - that would be wrong!
       const relatedKeyValue = record[pkFlatKey];
-      const relatedKey = String(relatedKeyValue || '');
+      const relatedKey = String(relatedKeyValue ?? '');
 
       // Process record if we have a valid primary key
       // Only process if primary key is not null/undefined/empty

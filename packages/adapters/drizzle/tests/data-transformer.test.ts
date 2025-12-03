@@ -947,10 +947,9 @@ describe('DataTransformer', () => {
       // Nested 'authors' should be an empty array when no related records found
       // Note: The transformer creates an empty array when no related records are found
       expect(record.authors).toBeDefined();
-      if (record.authors !== null && record.authors !== undefined) {
-        expect(Array.isArray(record.authors)).toBe(true);
-        expect((record.authors as unknown[]).length).toBe(0);
-      }
+
+      expect(Array.isArray(record.authors)).toBe(true);
+      expect((record.authors as unknown[]).length).toBe(0);
     });
 
     it('should handle multiple array relationships correctly', () => {
@@ -1075,6 +1074,158 @@ describe('DataTransformer', () => {
       expect(record.profile).toBeDefined();
       const profile = record.profile as Record<string, unknown>;
       expect(profile.bio).toBe('Software developer');
+    });
+  });
+
+  describe('Primary Key Grouping Edge Cases', () => {
+    it('should group records with same primary key correctly', () => {
+      // Test that records with the same primary key are grouped into a single record
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          comments_id: 1,
+          comments_content: 'Comment 1',
+        },
+        {
+          id: 1, // Same primary key
+          title: 'Post 1',
+          comments_id: 2,
+          comments_content: 'Comment 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', [
+        'title',
+        'comments.id',
+        'comments.content',
+      ]);
+
+      // Should be grouped into a single record
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.id).toBe(1);
+      expect(record.title).toBe('Post 1');
+    });
+
+    it('should handle records with missing primary key gracefully', () => {
+      // Records without primary key should be grouped together (empty string key)
+      const flatData = [
+        {
+          // Missing 'id' field
+          title: 'Post 1',
+        },
+        {
+          // Missing 'id' field
+          title: 'Post 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', ['title']);
+
+      // Records without primary key will be grouped by empty string
+      // They should still be processed, but behavior may vary
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should handle records with null primary key gracefully', () => {
+      const flatData = [
+        {
+          id: null,
+          title: 'Post 1',
+        },
+        {
+          id: null,
+          title: 'Post 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', ['title']);
+
+      // Records with null primary key will be grouped by empty string
+      // They should still be processed, but behavior may vary
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should handle prefixed primary key names correctly', () => {
+      // Test that prefixed primary key names (e.g., 'posts_id') are correctly identified
+      const flatData = [
+        {
+          posts_id: 1, // Prefixed primary key
+          title: 'Post 1',
+          comments_id: 1,
+          comments_content: 'Comment 1',
+        },
+        {
+          posts_id: 1, // Same prefixed primary key
+          title: 'Post 1',
+          comments_id: 2,
+          comments_content: 'Comment 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', [
+        'title',
+        'comments.id',
+        'comments.content',
+      ]);
+
+      // Should be grouped into a single record
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.id).toBe(1);
+    });
+
+    it('should handle numeric and string primary keys consistently', () => {
+      // Test that numeric and string primary keys are handled correctly
+      const flatData = [
+        {
+          id: 1, // Numeric
+          title: 'Post 1',
+        },
+        {
+          id: '1', // String (should be treated as different)
+          title: 'Post 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', ['title']);
+
+      // Numeric 1 and string '1' are converted to strings for grouping
+      // Both become '1', so they'll be in the same group
+      // This is expected behavior - they're grouped by string representation
+      expect(result).toHaveLength(1);
+    });
+
+    it('should handle multiple records with different primary keys', () => {
+      // Test that records with different primary keys are not grouped together
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          comments_id: 1,
+          comments_content: 'Comment 1',
+        },
+        {
+          id: 2, // Different primary key
+          title: 'Post 2',
+          comments_id: 2,
+          comments_content: 'Comment 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', [
+        'title',
+        'comments.id',
+        'comments.content',
+      ]);
+
+      // Should have two separate records
+      expect(result).toHaveLength(2);
+      expect((result[0] as Record<string, unknown>).id).toBe(1);
+      expect((result[1] as Record<string, unknown>).id).toBe(2);
     });
   });
 });
