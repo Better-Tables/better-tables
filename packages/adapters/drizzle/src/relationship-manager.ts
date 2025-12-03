@@ -185,7 +185,26 @@ export class RelationshipManager {
         });
       }
 
-      // Check if firstPart is a column in the primary table (JSON accessor case)
+      // CRITICAL FIX: Check for relationship FIRST, even if firstPart is also a column
+      // This handles cases where a column name matches a relationship alias
+      // (e.g., "authors" is both an array column AND a relationship alias)
+      const relationshipKey = `${primaryTable}.${firstPart}`;
+      const relationship = this.relationships[relationshipKey];
+
+      if (relationship) {
+        // It's a relationship - validate field exists in target table
+        this.validateRelatedTableField(relationship.to, fieldName);
+
+        return {
+          columnId,
+          table: firstPart, // expose alias (e.g., "authors")
+          field: fieldName,
+          isNested: true,
+          relationshipPath: [relationship],
+        };
+      }
+
+      // Not a relationship, so check if firstPart is a column in the primary table (JSON accessor case)
       // This handles JSON/JSONB accessor columns like "survey.title" where "survey" is a column
       const primaryTableSchema = this.schema[primaryTable];
       if (primaryTableSchema) {
@@ -205,32 +224,15 @@ export class RelationshipManager {
         }
       }
 
-      // Not a column, so it must be a relationship
-      // Find the relationship from primary table to the relationship name
-      const relationshipKey = `${primaryTable}.${firstPart}`;
-      const relationship = this.relationships[relationshipKey];
-
-      if (!relationship) {
-        const availableRelationships = this.getAvailableRelationships(primaryTable);
-        throw new RelationshipError(`No relationship found from ${primaryTable} to ${firstPart}`, {
-          primaryTable: primaryTable,
-          relationshipName: firstPart,
-          columnId,
-          availableRelationships,
-          suggestion: this.findSimilarRelationship(firstPart, availableRelationships),
-        });
-      }
-
-      // Validate field exists in target table (use real table from relationship)
-      this.validateRelatedTableField(relationship.to, fieldName);
-
-      return {
+      // Neither a relationship nor a column - throw error
+      const availableRelationships = this.getAvailableRelationships(primaryTable);
+      throw new RelationshipError(`No relationship found from ${primaryTable} to ${firstPart}`, {
+        primaryTable: primaryTable,
+        relationshipName: firstPart,
         columnId,
-        table: firstPart, // expose alias (e.g., "profile")
-        field: fieldName,
-        isNested: true,
-        relationshipPath: [relationship],
-      };
+        availableRelationships,
+        suggestion: this.findSimilarRelationship(firstPart, availableRelationships),
+      });
     }
 
     if (parts.length > 2) {

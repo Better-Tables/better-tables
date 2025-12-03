@@ -1105,6 +1105,128 @@ describe('PostgresQueryBuilder', () => {
         expect(query).toBeDefined();
         expect(arrayQueryBuilder.validateQuery(query)).toBe(true);
       });
+
+      it('should build query context with join path for postsTable.authors', () => {
+        const postsTable = pgTable('posts', {
+          id: uuid('id').primaryKey(),
+          title: varchar('title', { length: 255 }).notNull(),
+          authors: uuid('author').array().notNull(),
+        });
+
+        const usersTable = pgTable('users', {
+          id: uuid('id').primaryKey(),
+          name: varchar('name', { length: 255 }).notNull(),
+          email: varchar('email', { length: 255 }).notNull(),
+        });
+
+        const postsTableSchema = {
+          postsTable,
+          usersTable,
+        };
+
+        const postsTableRelationships = {
+          'postsTable.authors': {
+            from: 'postsTable',
+            to: 'usersTable',
+            foreignKey: 'id',
+            localKey: 'authors',
+            cardinality: 'many' as const,
+            nullable: true,
+            joinType: 'left' as const,
+            isArray: true,
+          },
+        };
+
+        const postsTableRelationshipManager = new RelationshipManager(
+          postsTableSchema,
+          postsTableRelationships
+        );
+
+        // Debug: Test resolveColumnPath directly first
+        const columnPath = postsTableRelationshipManager.resolveColumnPath(
+          'authors.id',
+          'postsTable'
+        );
+        expect(columnPath.isNested).toBe(true);
+        expect(columnPath.relationshipPath).toBeDefined();
+
+        const context = postsTableRelationshipManager.buildQueryContext(
+          {
+            columns: ['id', 'title', 'authors.id', 'authors.name'],
+          },
+          'postsTable'
+        );
+
+        // Verify join path is added
+        expect(context.joinPaths.has('authors')).toBe(true);
+        const relationshipPath = context.joinPaths.get('authors');
+        expect(relationshipPath).toBeDefined();
+        expect(relationshipPath?.length).toBe(1);
+        expect(relationshipPath?.[0]?.from).toBe('postsTable');
+        expect(relationshipPath?.[0]?.to).toBe('usersTable');
+        expect(relationshipPath?.[0]?.isArray).toBe(true);
+      });
+
+      it('should build query context with join path for postsTable.authors', () => {
+        const postsTable = pgTable('posts', {
+          id: uuid('id').primaryKey(),
+          title: varchar('title', { length: 255 }).notNull(),
+          authors: uuid('author').array().notNull(),
+        });
+
+        const usersTable = pgTable('users', {
+          id: uuid('id').primaryKey(),
+          name: varchar('name', { length: 255 }).notNull(),
+          email: varchar('email', { length: 255 }).notNull(),
+        });
+
+        const postsTableSchema = {
+          postsTable,
+          usersTable,
+        };
+
+        const postsTableRelationships = {
+          'postsTable.authors': {
+            from: 'postsTable',
+            to: 'usersTable',
+            foreignKey: 'id',
+            localKey: 'authors',
+            cardinality: 'many' as const,
+            nullable: true,
+            joinType: 'left' as const,
+            isArray: true,
+          },
+        };
+
+        const postsTableRelationshipManager = new RelationshipManager(
+          postsTableSchema,
+          postsTableRelationships
+        );
+
+        // Debug: Test resolveColumnPath directly first
+        const columnPath = postsTableRelationshipManager.resolveColumnPath(
+          'authors.id',
+          'postsTable'
+        );
+        expect(columnPath.isNested).toBe(true);
+        expect(columnPath.relationshipPath).toBeDefined();
+
+        const context = postsTableRelationshipManager.buildQueryContext(
+          {
+            columns: ['id', 'title', 'authors.id', 'authors.name'],
+          },
+          'postsTable'
+        );
+
+        // Verify join path is added
+        expect(context.joinPaths.has('authors')).toBe(true);
+        const relationshipPath = context.joinPaths.get('authors');
+        expect(relationshipPath).toBeDefined();
+        expect(relationshipPath?.length).toBe(1);
+        expect(relationshipPath?.[0]?.from).toBe('postsTable');
+        expect(relationshipPath?.[0]?.to).toBe('usersTable');
+        expect(relationshipPath?.[0]?.isArray).toBe(true);
+      });
     });
 
     describe('Complete Query Building (Integration)', () => {

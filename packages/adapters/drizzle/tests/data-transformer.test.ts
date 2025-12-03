@@ -1228,4 +1228,203 @@ describe('DataTransformer', () => {
       expect((result[1] as Record<string, unknown>).id).toBe(2);
     });
   });
+
+  describe('PostsTable Authors Relationship (Real-world Scenario)', () => {
+    it('should detect authors relationship correctly with postsTable naming', () => {
+      // Simulate the exact scenario from user's codebase
+      // Table names: postsTable, usersTable (not posts, users)
+      // Relationship key: postsTable.authors
+      const postsTableSchema = {
+        postsTable: schema.posts,
+        usersTable: schema.users,
+      };
+
+      const postsTableRelationships: RelationshipMap = {
+        'postsTable.authors': {
+          from: 'postsTable',
+          to: 'usersTable',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const postsTableRelationshipManager = new RelationshipManager(
+        postsTableSchema,
+        postsTableRelationships
+      );
+
+      // Test 1: Relationship detection
+      const columnPath = postsTableRelationshipManager.resolveColumnPath(
+        'authors.id',
+        'postsTable'
+      );
+      expect(columnPath.isNested).toBe(true);
+      expect(columnPath.relationshipPath).toBeDefined();
+      expect(columnPath.relationshipPath?.length).toBe(1);
+      expect(columnPath.relationshipPath?.[0]?.from).toBe('postsTable');
+      expect(columnPath.relationshipPath?.[0]?.to).toBe('usersTable');
+
+      // Test 2: Array relationship detection
+      const isArray = postsTableRelationshipManager.isArrayRelationship(
+        columnPath.relationshipPath || []
+      );
+      expect(isArray).toBe(true);
+    });
+
+    it('should generate correct flattened field names for usersTable', () => {
+      // Test that generateAlias creates correct field names
+      const { generateAlias } = require('../src/utils/alias-generator');
+      const relationshipPath = [
+        {
+          from: 'postsTable',
+          to: 'usersTable',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many' as const,
+          nullable: true,
+          joinType: 'left' as const,
+          isArray: true,
+        },
+      ];
+
+      // Flattened fields should use target table name (usersTable)
+      expect(generateAlias(relationshipPath, 'id')).toBe('usersTable_id');
+      expect(generateAlias(relationshipPath, 'firstName')).toBe('usersTable_firstName');
+      expect(generateAlias(relationshipPath, 'lastName')).toBe('usersTable_lastName');
+      expect(generateAlias(relationshipPath, 'username')).toBe('usersTable_username');
+    });
+
+    it('should create nested authors array from flattened usersTable fields', () => {
+      // Simulate flat data from SQL join with usersTable fields
+      // Using test schema column names: name, email (not firstName, lastName, username)
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: [1, 2], // Raw array column
+          usersTable_id: 1,
+          usersTable_name: 'John Doe',
+          usersTable_email: 'john@example.com',
+        },
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: [1, 2], // Raw array column
+          usersTable_id: 2,
+          usersTable_name: 'Jane Smith',
+          usersTable_email: 'jane@example.com',
+        },
+      ];
+
+      const postsTableSchema = {
+        postsTable: schema.posts,
+        usersTable: schema.users,
+      };
+
+      const postsTableRelationships: RelationshipMap = {
+        'postsTable.authors': {
+          from: 'postsTable',
+          to: 'usersTable',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const postsTableRelationshipManager = new RelationshipManager(
+        postsTableSchema,
+        postsTableRelationships
+      );
+      const postsTableTransformer = new DataTransformer(
+        postsTableSchema,
+        postsTableRelationshipManager
+      );
+
+      const result = postsTableTransformer.transformToNested(flatData, 'postsTable', [
+        'id',
+        'title',
+        'authors.id',
+        'authors.name',
+        'authors.email',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Post 1');
+      expect(record.authors).toBeDefined();
+      expect(Array.isArray(record.authors)).toBe(true);
+
+      const authors = record.authors as Array<Record<string, unknown>>;
+      expect(authors.length).toBe(2);
+
+      // Verify first author
+      expect(authors[0]?.id).toBe(1);
+      expect(authors[0]?.name).toBe('John Doe');
+      expect(authors[0]?.email).toBe('john@example.com');
+
+      // Verify second author
+      expect(authors[1]?.id).toBe(2);
+      expect(authors[1]?.name).toBe('Jane Smith');
+      expect(authors[1]?.email).toBe('jane@example.com');
+
+      // Verify raw authors array is excluded (replaced by nested objects)
+      // Since alias == localKey, the raw array should be replaced
+      expect(record.authors).not.toEqual([1, 2]);
+    });
+
+    it('should add join path to query context when authors.id columns are requested', () => {
+      const postsTableSchema = {
+        postsTable: schema.posts,
+        usersTable: schema.users,
+      };
+
+      const postsTableRelationships: RelationshipMap = {
+        'postsTable.authors': {
+          from: 'postsTable',
+          to: 'usersTable',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const postsTableRelationshipManager = new RelationshipManager(
+        postsTableSchema,
+        postsTableRelationships
+      );
+
+      const context = postsTableRelationshipManager.buildQueryContext(
+        {
+          columns: ['id', 'title', 'authors.id', 'authors.name'],
+        },
+        'postsTable'
+      );
+
+      // Verify join path is added
+      expect(context.joinPaths.has('authors')).toBe(true);
+      const relationshipPath = context.joinPaths.get('authors');
+      expect(relationshipPath).toBeDefined();
+      expect(relationshipPath?.length).toBe(1);
+      expect(relationshipPath?.[0]?.from).toBe('postsTable');
+      expect(relationshipPath?.[0]?.to).toBe('usersTable');
+
+      // Verify required tables
+      expect(context.requiredTables.has('postsTable')).toBe(true);
+      expect(context.requiredTables.has('authors')).toBe(true);
+
+      // Verify columns are tracked
+      expect(context.columns.has('authors.id')).toBe(true);
+      expect(context.columns.has('authors.name')).toBe(true);
+    });
+  });
 });
