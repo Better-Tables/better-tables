@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.14
+
+### Patch Changes
+
+- This update refines the DataTransformer class to better manage nested data structures. Key changes include improved detection of nested vs. flat data, enhanced grouping logic for primary keys, and optimized processing of relationship columns. The logic now ensures that all relevant fields are preserved, including handling edge cases for empty relationships and direct columns. Additionally, the code has been structured for better clarity and maintainability, supporting more robust data transformations in relational queries.
+
 ## 0.5.13
 
 ### Patch Changes

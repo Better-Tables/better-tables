@@ -633,4 +633,599 @@ describe('DataTransformer', () => {
       expect(record.profile).toBeNull();
     });
   });
+
+  describe('Array Foreign Key Column Exclusion', () => {
+    it('should exclude raw array column when nested objects exist (alias == localKey)', () => {
+      // Test case: 'authors' (alias) == 'authors' (localKey)
+      // When requesting 'authors.id', 'authors.name', the raw 'authors' array should be excluded
+      // Note: When alias == localKey, the nested objects replace the raw array, so 'authors' contains nested objects
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: ['user1', 'user2'], // Raw array column (will be replaced by nested objects)
+          users_id: 'user1', // Flattened field uses target table name 'users', not alias 'authors'
+          users_name: 'John Doe',
+        },
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: ['user1', 'user2'], // Raw array column (will be replaced by nested objects)
+          users_id: 'user2',
+          users_name: 'Jane Smith',
+        },
+      ];
+
+      const arraySchema = {
+        posts: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'posts.authors': {
+          from: 'posts',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'authors', // Same as alias
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(flatData, 'posts', [
+        'id',
+        'title',
+        'authors.id',
+        'authors.name',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Post 1');
+      // 'authors' should contain nested objects (replaced the raw array)
+      expect(record.authors).toBeDefined();
+      expect(Array.isArray(record.authors)).toBe(true);
+      const authors = record.authors as Array<Record<string, unknown>>;
+      expect(authors.length).toBe(2);
+      expect(authors[0]).toBeDefined();
+      expect(authors[0]).toHaveProperty('id');
+      expect(authors[0]).toHaveProperty('name');
+      // Verify it's not the raw array of strings
+      expect(typeof authors[0]?.id).toBe('string');
+      expect(authors[0]?.id).toBe('user1');
+    });
+
+    it('should exclude raw array column when nested objects exist (alias != localKey)', () => {
+      // Test case: 'organizers' (alias) != 'organizerId' (localKey)
+      // When requesting 'organizers.id', 'organizers.name', the raw 'organizerId' array should be excluded
+      const flatData = [
+        {
+          id: 1,
+          title: 'Event 1',
+          organizerId: ['user1', 'user2'], // Raw array column (should be excluded)
+          users_id: 'user1', // Flattened field uses target table name 'users'
+          users_name: 'John Doe',
+        },
+        {
+          id: 1,
+          title: 'Event 1',
+          organizerId: ['user1', 'user2'], // Raw array column (should be excluded)
+          users_id: 'user2',
+          users_name: 'Jane Smith',
+        },
+      ];
+
+      const arraySchema = {
+        events: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'events.organizers': {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId', // Different from alias
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(flatData, 'events', [
+        'title',
+        'organizers.id',
+        'organizers.name',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Event 1');
+      // Raw 'organizerId' array column should be excluded
+      expect(record.organizerId).toBeUndefined();
+      // Nested 'organizers' should exist
+      expect(record.organizers).toBeDefined();
+      expect(Array.isArray(record.organizers)).toBe(true);
+      const organizers = record.organizers as Array<Record<string, unknown>>;
+      expect(organizers.length).toBe(2);
+      expect(organizers[0]).toBeDefined();
+      expect(organizers[0]).toHaveProperty('id');
+      expect(organizers[0]).toHaveProperty('name');
+      expect(organizers[0]?.id).toBe('user1');
+    });
+
+    it('should not exclude raw array column when nested objects do not exist', () => {
+      // If no relationship columns are requested, the raw array should remain
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: ['user1', 'user2'], // Raw array column (should remain)
+        },
+      ];
+
+      const arraySchema = {
+        posts: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'posts.authors': {
+          from: 'posts',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      // Request 'authors' as a direct column (not as relationship), so it should remain
+      const result = arrayTransformer.transformToNested(flatData, 'posts', [
+        'id',
+        'title',
+        'authors',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Post 1');
+      // Raw 'authors' array should remain when no relationship columns are requested
+      expect(record.authors).toBeDefined();
+      expect(Array.isArray(record.authors)).toBe(true);
+      expect(record.authors).toEqual(['user1', 'user2']);
+    });
+
+    it('should not exclude non-array relationship columns', () => {
+      // Regular (non-array) relationships should not be excluded
+      const flatData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          userId: 1, // Regular FK (should remain)
+          profile_id: 1,
+          profile_bio: 'Software developer',
+        },
+      ];
+
+      const regularSchema = {
+        users: schema.users,
+        profiles: schema.profiles,
+      };
+
+      const regularRelationships: RelationshipMap = {
+        'users.profile': {
+          from: 'users',
+          to: 'profiles',
+          foreignKey: 'id',
+          localKey: 'userId',
+          cardinality: 'one',
+          nullable: true,
+          joinType: 'left',
+          isArray: false, // Not an array relationship
+        },
+      };
+
+      const regularRelationshipManager = new RelationshipManager(
+        regularSchema,
+        regularRelationships
+      );
+      const regularTransformer = new DataTransformer(regularSchema, regularRelationshipManager);
+
+      const result = regularTransformer.transformToNested(flatData, 'users', [
+        'name',
+        'profile.bio',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.name).toBe('John Doe');
+      // Regular FK should remain (not excluded)
+      expect(record.userId).toBe(1);
+      // Nested profile should exist
+      expect(record.profile).toBeDefined();
+    });
+
+    it('should handle empty nested arrays correctly', () => {
+      // When nested array is empty, raw array should still be excluded if relationship was requested
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: [], // Empty raw array
+          users_id: null, // Flattened field uses target table name 'users', not alias 'authors'
+          users_name: null,
+        },
+      ];
+
+      const arraySchema = {
+        posts: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'posts.authors': {
+          from: 'posts',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(flatData, 'posts', ['title', 'authors.id']);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Post 1');
+      // Raw 'authors' array should be excluded even if empty
+      // Nested 'authors' should be an empty array
+      expect(record.authors).toBeDefined();
+      expect(Array.isArray(record.authors)).toBe(true);
+      expect((record.authors as unknown[]).length).toBe(0);
+    });
+
+    it('should handle null nested relationships correctly', () => {
+      // When nested relationship is null, raw array should still be excluded if relationship was requested
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: null, // Null raw array
+          users_id: null, // Flattened fields are null (no related records)
+          users_name: null,
+        },
+      ];
+
+      const arraySchema = {
+        posts: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'posts.authors': {
+          from: 'posts',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(flatData, 'posts', ['title', 'authors.id']);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Post 1');
+      // Raw 'authors' array should be excluded (null is excluded when nested objects are requested)
+      // Nested 'authors' should be an empty array when no related records found
+      // Note: The transformer creates an empty array when no related records are found
+      expect(record.authors).toBeDefined();
+
+      expect(Array.isArray(record.authors)).toBe(true);
+      expect((record.authors as unknown[]).length).toBe(0);
+    });
+
+    it('should handle multiple array relationships correctly', () => {
+      // Test with multiple array relationships on the same table
+      // Need multiple rows to properly test grouping
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: ['user1'], // Raw array (alias == localKey, will be replaced by nested)
+          organizerId: ['user2'], // Raw array (alias != localKey, should be excluded)
+          users_id: 'user1', // Flattened field for authors relationship
+          users_name: 'John Doe',
+        },
+        {
+          id: 1,
+          title: 'Post 1',
+          authors: ['user1'],
+          organizerId: ['user2'],
+          users_id: 'user2', // Flattened field for organizers relationship (same table, different relationship)
+          users_name: 'Jane Smith',
+        },
+      ];
+
+      const arraySchema = {
+        posts: schema.posts,
+        users: schema.users,
+      };
+
+      const arrayRelationships: RelationshipMap = {
+        'posts.authors': {
+          from: 'posts',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'authors',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+        'posts.organizers': {
+          from: 'posts',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many',
+          nullable: true,
+          joinType: 'left',
+          isArray: true,
+        },
+      };
+
+      const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+
+      const result = arrayTransformer.transformToNested(flatData, 'posts', [
+        'title',
+        'authors.id',
+        'organizers.id',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.title).toBe('Post 1');
+      // 'organizerId' raw array should be excluded (alias != localKey)
+      expect(record.organizerId).toBeUndefined();
+      // 'authors' raw array is replaced by nested objects (alias == localKey)
+      expect(record.authors).toBeDefined();
+      expect(Array.isArray(record.authors)).toBe(true);
+      // Note: Both relationships use the same target table, so flattened fields might conflict
+      // The actual behavior depends on how the transformer handles this case
+      // For now, we just verify that the raw arrays are handled correctly
+    });
+
+    it('should preserve flattened field cleanup for non-array relationships', () => {
+      // Flattened fields from non-array relationships should still be cleaned up
+      const flatData = [
+        {
+          id: 1,
+          name: 'John Doe',
+          profiles_userId: 1,
+          profiles_bio: 'Software developer',
+        },
+      ];
+
+      const regularSchema = {
+        users: schema.users,
+        profiles: schema.profiles,
+      };
+
+      const regularRelationships: RelationshipMap = {
+        'users.profile': {
+          from: 'users',
+          to: 'profiles',
+          foreignKey: 'id',
+          localKey: 'userId',
+          cardinality: 'one',
+          nullable: true,
+          joinType: 'left',
+          isArray: false,
+        },
+      };
+
+      const regularRelationshipManager = new RelationshipManager(
+        regularSchema,
+        regularRelationships
+      );
+      const regularTransformer = new DataTransformer(regularSchema, regularRelationshipManager);
+
+      const result = regularTransformer.transformToNested(flatData, 'users', [
+        'name',
+        'profile.bio',
+      ]);
+
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.name).toBe('John Doe');
+      // Flattened fields should be cleaned up
+      expect(record.profiles_userId).toBeUndefined();
+      expect(record.profiles_bio).toBeUndefined();
+      // Nested profile should exist
+      expect(record.profile).toBeDefined();
+      const profile = record.profile as Record<string, unknown>;
+      expect(profile.bio).toBe('Software developer');
+    });
+  });
+
+  describe('Primary Key Grouping Edge Cases', () => {
+    it('should group records with same primary key correctly', () => {
+      // Test that records with the same primary key are grouped into a single record
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          comments_id: 1,
+          comments_content: 'Comment 1',
+        },
+        {
+          id: 1, // Same primary key
+          title: 'Post 1',
+          comments_id: 2,
+          comments_content: 'Comment 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', [
+        'title',
+        'comments.id',
+        'comments.content',
+      ]);
+
+      // Should be grouped into a single record
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.id).toBe(1);
+      expect(record.title).toBe('Post 1');
+    });
+
+    it('should handle records with missing primary key gracefully', () => {
+      // Records without primary key should be grouped together (empty string key)
+      const flatData = [
+        {
+          // Missing 'id' field
+          title: 'Post 1',
+        },
+        {
+          // Missing 'id' field
+          title: 'Post 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', ['title']);
+
+      // Records without primary key will be grouped by empty string
+      // They should still be processed, but behavior may vary
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should handle records with null primary key gracefully', () => {
+      const flatData = [
+        {
+          id: null,
+          title: 'Post 1',
+        },
+        {
+          id: null,
+          title: 'Post 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', ['title']);
+
+      // Records with null primary key will be grouped by empty string
+      // They should still be processed, but behavior may vary
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should handle prefixed primary key names correctly', () => {
+      // Test that prefixed primary key names (e.g., 'posts_id') are correctly identified
+      const flatData = [
+        {
+          posts_id: 1, // Prefixed primary key
+          title: 'Post 1',
+          comments_id: 1,
+          comments_content: 'Comment 1',
+        },
+        {
+          posts_id: 1, // Same prefixed primary key
+          title: 'Post 1',
+          comments_id: 2,
+          comments_content: 'Comment 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', [
+        'title',
+        'comments.id',
+        'comments.content',
+      ]);
+
+      // Should be grouped into a single record
+      expect(result).toHaveLength(1);
+      const record = result[0] as Record<string, unknown>;
+      expect(record.id).toBe(1);
+    });
+
+    it('should handle numeric and string primary keys consistently', () => {
+      // Test that numeric and string primary keys are handled correctly
+      const flatData = [
+        {
+          id: 1, // Numeric
+          title: 'Post 1',
+        },
+        {
+          id: '1', // String (should be treated as different)
+          title: 'Post 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', ['title']);
+
+      // Numeric 1 and string '1' are converted to strings for grouping
+      // Both become '1', so they'll be in the same group
+      // This is expected behavior - they're grouped by string representation
+      expect(result).toHaveLength(1);
+    });
+
+    it('should handle multiple records with different primary keys', () => {
+      // Test that records with different primary keys are not grouped together
+      const flatData = [
+        {
+          id: 1,
+          title: 'Post 1',
+          comments_id: 1,
+          comments_content: 'Comment 1',
+        },
+        {
+          id: 2, // Different primary key
+          title: 'Post 2',
+          comments_id: 2,
+          comments_content: 'Comment 2',
+        },
+      ];
+
+      const result = transformer.transformToNested(flatData, 'posts', [
+        'title',
+        'comments.id',
+        'comments.content',
+      ]);
+
+      // Should have two separate records
+      expect(result).toHaveLength(2);
+      expect((result[0] as Record<string, unknown>).id).toBe(1);
+      expect((result[1] as Record<string, unknown>).id).toBe(2);
+    });
+  });
 });

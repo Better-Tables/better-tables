@@ -114,6 +114,8 @@ export class DataTransformer {
     const nestedData: TData[] = [];
 
     for (const [, records] of groupedData) {
+      // Process each group of records with the same primary key
+      // Records with the same primary key are grouped together by groupByMainTableKey
       const nestedRecord = this.buildNestedRecord(records, primaryTable, columns, columnMetadata);
       nestedData.push(nestedRecord as TData);
     }
@@ -122,8 +124,43 @@ export class DataTransformer {
   }
 
   /**
+   * Check if an array contains nested data structures (objects with 'id' field)
+   * @param value - Array to check
+   * @returns true if array contains objects with 'id' field (nested data), false otherwise
+   */
+  private isNestedArray(value: unknown): boolean {
+    if (!Array.isArray(value) || value.length === 0) {
+      return false;
+    }
+
+    const firstItem = value[0];
+    return (
+      typeof firstItem === 'object' &&
+      firstItem !== null &&
+      'id' in (firstItem as Record<string, unknown>)
+    );
+  }
+
+  /**
+   * Check if an object represents a nested data structure (has 'id' and other fields)
+   * @param value - Object to check
+   * @returns true if object has 'id' field and other fields (nested data), false otherwise
+   */
+  private isNestedObject(value: unknown): boolean {
+    if (!value || typeof value !== 'object' || value instanceof Date) {
+      return false;
+    }
+
+    const obj = value as Record<string, unknown>;
+    return 'id' in obj && Object.keys(obj).length > 1;
+  }
+
+  /**
    * Detect if data is already nested (from Drizzle relational queries)
    * Checks if the first record contains nested objects or arrays
+   * CRITICAL: Must distinguish between:
+   * 1. Raw array columns (e.g., ['user1', 'user2']) - these are FLAT data
+   * 2. Nested relationship objects (e.g., [{id: 'user1', name: 'John'}]) - these are NESTED data
    */
   private detectNestedData(
     record: Record<string, unknown> | undefined,
@@ -140,26 +177,26 @@ export class DataTransformer {
         // Check if this key is a known relationship alias
         const relationship = this.relationshipManager.getRelationshipByAlias(primaryTable, key);
         if (relationship) {
-          // This is a known relationship - data is nested
-          return true;
-        }
-
-        // Also check for relationship-like structures (arrays of objects with id, or objects with id)
-        if (Array.isArray(value)) {
-          // If array contains objects with 'id' field, it's likely a relationship
-          if (
-            value.length > 0 &&
-            typeof value[0] === 'object' &&
-            value[0] !== null &&
-            'id' in (value[0] as Record<string, unknown>)
-          ) {
+          // Check if this is actually nested data or just a raw array column
+          if (Array.isArray(value)) {
+            // If array contains objects with 'id' field, it's nested relationship data (NESTED)
+            // If array contains primitive values (strings, numbers), it's a raw array column (FLAT)
+            if (this.isNestedArray(value)) {
+              return true;
+            }
+            // Array of primitives (strings, numbers) - this is a raw array column, data is FLAT
+            // Continue checking other fields
+          } else if (this.isNestedObject(value)) {
+            // Has id and other fields - likely a relationship object (NESTED)
             return true;
           }
-        } else if (!(value instanceof Date)) {
-          // Check if it's an object with 'id' field (likely a relationship)
-          const obj = value as Record<string, unknown>;
-          if ('id' in obj && Object.keys(obj).length > 1) {
-            // Has id and other fields - likely a relationship object
+        } else {
+          // Not a known relationship alias - check for relationship-like structures
+          if (this.isNestedArray(value)) {
+            // Array contains objects with 'id' field - likely a relationship (NESTED)
+            return true;
+          } else if (this.isNestedObject(value)) {
+            // Has id and other fields - likely a relationship object (NESTED)
             return true;
           }
         }
@@ -291,12 +328,69 @@ export class DataTransformer {
   ): Map<string, Record<string, unknown>[]> {
     const grouped = new Map<string, Record<string, unknown>[]>();
 
+    // Get the primary key name once for efficiency
+    const tableSchema = this.schema[primaryTable];
+    if (!tableSchema) {
+      // If schema not found, return empty map or handle gracefully
+      return grouped;
+    }
+    const primaryKeyName = this.getPrimaryKeyName(tableSchema);
+    if (!primaryKeyName) {
+      return grouped;
+    }
+
     for (const record of flatData) {
-      // Get the primary key dynamically from the schema
-      const tableSchema = this.schema[primaryTable];
-      if (!tableSchema) continue;
-      const primaryKeyName = this.getPrimaryKeyName(tableSchema);
-      const mainKey = String(record[primaryKeyName] || record[`${primaryTable}_${primaryKeyName}`]);
+      // Try multiple ways to get the primary key value
+      // 1. Direct field name (e.g., 'id')
+      // 2. Prefixed field name (e.g., 'posts_id')
+      // 3. Fallback to 'id' if primary key name is 'id'
+      // CRITICAL: Must check all possible locations to ensure grouping works correctly
+      let mainKeyValue: unknown = record[primaryKeyName];
+      if (mainKeyValue === undefined || mainKeyValue === null) {
+        mainKeyValue = record[`${primaryTable}_${primaryKeyName}`];
+      }
+      // Additional fallback: try common primary key names
+      if ((mainKeyValue === undefined || mainKeyValue === null) && primaryKeyName === 'id') {
+        mainKeyValue = record['id'];
+      }
+      // Last resort: try to find any field that matches the primary key name
+      if (mainKeyValue === undefined || mainKeyValue === null) {
+        // Check all keys in the record for a match
+        for (const [key, value] of Object.entries(record)) {
+          if (key === primaryKeyName || key.endsWith(`_${primaryKeyName}`)) {
+            mainKeyValue = value;
+            break;
+          }
+        }
+      }
+
+      // Convert to string for grouping, handling null/undefined
+      // Use a consistent string representation for grouping (handles numbers, strings, etc.)
+      // CRITICAL: Use JSON.stringify for complex types to ensure consistent grouping
+      let mainKey = '';
+      if (mainKeyValue !== undefined && mainKeyValue !== null) {
+        // Convert to string, handling special cases
+        if (typeof mainKeyValue === 'number') {
+          mainKey = String(mainKeyValue);
+        } else if (typeof mainKeyValue === 'string') {
+          mainKey = mainKeyValue;
+        } else if (typeof mainKeyValue === 'boolean') {
+          mainKey = String(mainKeyValue);
+        } else {
+          // For complex types (objects, arrays), use JSON.stringify for consistent grouping
+          // This ensures records with the same primary key value are grouped together
+          try {
+            mainKey = JSON.stringify(mainKeyValue);
+          } catch {
+            mainKey = String(mainKeyValue);
+          }
+        }
+      }
+
+      // Skip records without a valid primary key
+      if (!mainKey || mainKey === 'undefined' || mainKey === 'null' || mainKey === '') {
+        continue;
+      }
 
       if (!grouped.has(mainKey)) {
         grouped.set(mainKey, []);
@@ -335,6 +429,9 @@ export class DataTransformer {
     const baseRecord = records[0];
     if (!baseRecord) return {};
 
+    // Copy base record to nested record
+    // CRITICAL: Preserve all fields from baseRecord, including direct columns that might also be relationships
+    // (e.g., 'authors' array column that can also be requested as 'authors.id')
     const nestedRecord: Record<string, unknown> = { ...baseRecord };
 
     // Process each column to build nested structure
@@ -342,7 +439,10 @@ export class DataTransformer {
       // Group columns by relationship to avoid processing the same relationship multiple times
       // But JSON accessor columns (e.g., survey.title) need to be processed individually
       const processedRelationships = new Set<string>();
+      // Collect all columns for each relationship to process them together
+      const relationshipColumns = new Map<string, string[]>();
 
+      // First pass: collect relationship columns
       for (const columnId of columns) {
         const parts = columnId.split('.');
         if (parts.length > 1) {
@@ -354,16 +454,33 @@ export class DataTransformer {
             // JSON accessors like survey.title and survey.description both need to be processed
             this.processColumn(nestedRecord, columnId, records, primaryTable);
           } else {
-            // This is a relationship column - use first part as relationship key
+            // This is a relationship column - collect all columns for this relationship
             const relationshipKey = parts[0];
             if (relationshipKey && !processedRelationships.has(relationshipKey)) {
-              this.processColumn(nestedRecord, columnId, records, primaryTable);
-              processedRelationships.add(relationshipKey);
+              if (!relationshipColumns.has(relationshipKey)) {
+                relationshipColumns.set(relationshipKey, []);
+              }
+              const cols = relationshipColumns.get(relationshipKey);
+              if (cols) {
+                cols.push(columnId);
+              }
             }
           }
         } else {
           // Direct column - process normally
           this.processColumn(nestedRecord, columnId, records, primaryTable);
+        }
+      }
+
+      // Second pass: process all columns for each relationship together
+      for (const [relationshipKey, cols] of relationshipColumns) {
+        if (!processedRelationships.has(relationshipKey)) {
+          // Process the first column to initialize the relationship
+          // This will extract all requested columns for the relationship
+          if (cols.length > 0 && cols[0]) {
+            this.processColumn(nestedRecord, cols[0], records, primaryTable, cols);
+            processedRelationships.add(relationshipKey);
+          }
         }
       }
     } else {
@@ -391,45 +508,184 @@ export class DataTransformer {
     const cleanedRecord: Record<string, unknown> = {};
     const flattenedFieldPattern = /^[a-zA-Z_][a-zA-Z0-9_]*_[a-zA-Z_][a-zA-Z0-9_]*$/;
 
-    // Collect all relationship target tables that have been processed (these are nested objects now)
+    // Collect all relationship aliases that have been processed (these are nested objects now)
+    const processedRelationshipAliases = new Set<string>();
+    // Map relationship aliases to their raw array column names (localKey)
+    // e.g., 'organizers' (alias) -> 'organizerId' (localKey), 'authors' (alias) -> 'authors' (localKey)
+    const relationshipAliasToLocalKey = new Map<string, string>();
+    // Map relationship aliases to their target tables for flattened field cleanup
+    const relationshipAliasToTargetTable = new Map<string, string>();
+    // Collect raw array column names that should be excluded when nested objects exist
+    const arrayColumnsToExclude = new Set<string>();
+    // Collect target tables that have been processed as relationships (for flattened field cleanup)
     const processedRelationshipTables = new Set<string>();
+
     if (columns && columns.length > 0) {
       for (const columnId of columns) {
+        // Skip invalid column IDs
+        if (!columnId || typeof columnId !== 'string') {
+          continue;
+        }
+
         const parts = columnId.split('.');
         if (parts.length > 1) {
-          const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-          const relationshipPath = columnPath.relationshipPath;
-          if (columnPath.isNested && relationshipPath && relationshipPath.length > 0) {
-            // Get the target table from the relationship
-            const relationship = relationshipPath[relationshipPath.length - 1];
-            if (relationship?.to) {
-              processedRelationshipTables.add(relationship.to);
+          // This is a relationship column (e.g., 'authors.id', 'authors.name')
+          try {
+            const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+            const relationshipPath = columnPath.relationshipPath;
+            if (columnPath.isNested && relationshipPath && relationshipPath.length > 0) {
+              // Get the relationship alias (e.g., 'authors', 'organizers')
+              const relationshipAlias = parts[0];
+              if (relationshipAlias && relationshipAlias.trim().length > 0) {
+                processedRelationshipAliases.add(relationshipAlias);
+
+                // Get the relationship to find the raw array column name and target table
+                const relationship = relationshipPath[relationshipPath.length - 1];
+                if (relationship) {
+                  // Map alias to localKey for array FK exclusion
+                  if (relationship.localKey) {
+                    relationshipAliasToLocalKey.set(relationshipAlias, relationship.localKey);
+                    // Only exclude if this is an array relationship
+                    if (relationship.isArray === true) {
+                      arrayColumnsToExclude.add(relationship.localKey);
+                    }
+                  }
+
+                  // Map alias to target table for flattened field cleanup
+                  if (relationship.to) {
+                    relationshipAliasToTargetTable.set(relationshipAlias, relationship.to);
+                    processedRelationshipTables.add(relationship.to);
+                  }
+                }
+              }
             }
+          } catch {
+            // Skip columns that fail to resolve - they may not be valid relationship paths
           }
+        } else {
+          // This is a direct column (e.g., 'id', 'title', 'authors')
+          // Direct columns are preserved as-is, even if they might also be relationships
+          // (e.g., 'authors' array column can be requested directly without 'authors.id')
+          // No special processing needed here - the column will be preserved from baseRecord
         }
       }
     }
 
+    // CRITICAL: Process all fields from nestedRecord, preserving direct columns
+    // even when they might also be relationships (e.g., 'authors' array column)
     for (const [key, value] of Object.entries(nestedRecord)) {
-      // Check if this is a flattened field
+      // Skip null/undefined keys (shouldn't happen, but defensive programming)
+      if (!key || typeof key !== 'string') {
+        continue;
+      }
+
+      // Exclude raw array columns when nested relationship objects are present
+      // This handles cases where:
+      // 1. Alias matches localKey (e.g., 'authors' -> 'authors')
+      // 2. Alias differs from localKey (e.g., 'organizers' -> 'organizerId')
+      // Only exclude if relationship columns were actually requested (not just the raw column)
+      if (arrayColumnsToExclude.has(key)) {
+        // Check if this column is the localKey for any processed relationship alias
+        // AND that relationship was actually requested (not just the raw column)
+        let shouldExclude = false;
+        for (const [alias, localKey] of relationshipAliasToLocalKey) {
+          if (localKey === key) {
+            // Only exclude if relationship columns were actually requested
+            // (alias is in processedRelationshipAliases, meaning we requested 'authors.id', not just 'authors')
+            if (processedRelationshipAliases.has(alias)) {
+              // This is a raw array column that has been converted to nested objects
+              // Verify that nested objects were successfully created
+              const nestedValue = nestedRecord[alias];
+              if (nestedValue !== null && nestedValue !== undefined) {
+                // Only exclude if nested value is a non-empty array or non-empty object
+                if (Array.isArray(nestedValue)) {
+                  // Exclude if array has items (nested objects were created)
+                  if (nestedValue.length > 0) {
+                    shouldExclude = true;
+                    break;
+                  }
+                } else if (typeof nestedValue === 'object') {
+                  // Exclude if object has properties (nested object was created)
+                  if (Object.keys(nestedValue).length > 0) {
+                    shouldExclude = true;
+                    break;
+                  }
+                }
+              }
+            }
+            // If relationship columns were NOT requested (alias not in processedRelationshipAliases),
+            // then this is a direct column request (e.g., 'authors' without 'authors.id'),
+            // so we should NOT exclude it - preserve the raw array column
+          }
+        }
+        if (shouldExclude) {
+          // Skip the raw array column - nested relationship objects are present
+          continue;
+        }
+        // If shouldExclude is false, the raw array column should be preserved
+        // This happens when the column is requested directly (e.g., 'authors' without 'authors.id')
+        // Fall through to preserve the column
+      }
+
+      // Check if this is a flattened field from a related table
       if (flattenedFieldPattern.test(key)) {
         // This is a flattened field - check if it belongs to a processed relationship table
         // Extract table name from flattened field (e.g., "usersTable_id" -> "usersTable")
         const parts = key.split('_');
         if (parts.length >= 2) {
           const tableName = parts[0];
-          if (tableName) {
-            // If this table was processed as a relationship, remove the flattened field
-            if (processedRelationshipTables.has(tableName)) {
-              // Skip this flattened field - it's been converted to a nested object
-              continue;
-            }
+          if (tableName && processedRelationshipTables.has(tableName)) {
+            // This flattened field belongs to a relationship that has been converted to nested objects
+            // Skip it - it's been converted to a nested object
+            continue;
           }
         }
       }
 
       // Keep this field (not a flattened field, or flattened field for unprocessed relationship)
       cleanedRecord[key] = value;
+    }
+
+    // CRITICAL: Ensure all processed relationship aliases are included in cleanedRecord
+    // This ensures that nested objects/arrays are preserved even if they're empty
+    // or if they weren't in the original nestedRecord iteration
+    for (const alias of processedRelationshipAliases) {
+      if (!(alias in cleanedRecord)) {
+        // Relationship alias not in cleanedRecord - check if it exists in nestedRecord
+        const nestedValue = nestedRecord[alias];
+        if (nestedValue !== undefined) {
+          cleanedRecord[alias] = nestedValue;
+        }
+      }
+    }
+
+    // Always ensure primary key is included (needed for grouping and identification)
+    // CRITICAL: Primary key must always be present, even if not explicitly requested in columns
+    // This ensures grouping works correctly and records can be identified
+    const primaryTableSchema = this.schema[primaryTable];
+    if (primaryTableSchema) {
+      const primaryKeyName = this.getPrimaryKeyName(primaryTableSchema);
+      if (primaryKeyName) {
+        // Always try to get primary key value, prioritizing direct field, then prefixed field
+        const pkValue =
+          baseRecord[primaryKeyName] ??
+          baseRecord[`${primaryTable}_${primaryKeyName}`] ??
+          nestedRecord[primaryKeyName] ??
+          cleanedRecord[primaryKeyName];
+
+        if (pkValue !== undefined && pkValue !== null) {
+          cleanedRecord[primaryKeyName] = pkValue;
+        } else {
+          // Last resort: try to find primary key in any of the records
+          for (const record of records) {
+            const value = record[primaryKeyName] || record[`${primaryTable}_${primaryKeyName}`];
+            if (value !== undefined && value !== null) {
+              cleanedRecord[primaryKeyName] = value;
+              break;
+            }
+          }
+        }
+      }
     }
 
     return cleanedRecord;
@@ -441,13 +697,23 @@ export class DataTransformer {
    * @param columnId - The column ID to process
    * @param records - Flat records to extract data from
    * @param primaryTable - The primary table for this query context
+   * @param allRelationshipColumns - Optional: all columns for this relationship (for one-to-many processing)
    */
   private processColumn(
     nestedRecord: Record<string, unknown>,
     columnId: string,
     records: Record<string, unknown>[],
-    primaryTable: string
+    primaryTable: string,
+    allRelationshipColumns?: string[]
   ): void {
+    // If columnId doesn't contain a dot, it's a direct column (not a relationship column)
+    // Even if it's also defined as a relationship, requesting it as a direct column means
+    // we want the raw value, not the nested relationship
+    if (!columnId.includes('.')) {
+      // Direct column - already in base record, no processing needed
+      return;
+    }
+
     const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
 
     if (!columnPath.isNested) {
@@ -492,7 +758,8 @@ export class DataTransformer {
         // Handle both regular many relationships and array foreign keys
         // Array relationships are processed the same way as regular many relationships
         // since the join already returns multiple rows (one per array element)
-        this.processOneToManyColumn(nestedRecord, columnPath, records);
+        // Pass all relationship columns so we can extract all requested fields at once
+        this.processOneToManyColumn(nestedRecord, columnPath, records, allRelationshipColumns);
       }
     }
   }
@@ -512,7 +779,12 @@ export class DataTransformer {
     if (!relationship) return;
 
     const realTableName = relationship.to;
-    const alias = columnPath.table; // Use the alias from columnPath (e.g., 'profile')
+    // CRITICAL: Extract relationship alias from column ID, not from columnPath.table
+    // columnPath.table contains the actual table name, not the alias
+    const columnId = columnPath.columnId || '';
+    const alias: string = columnId.includes('.')
+      ? columnId.split('.')[0] || ''
+      : columnPath.table || '';
 
     // Find the first record with data for this relationship
     // Use generateAlias utility to construct the correct alias based on relationship path
@@ -550,11 +822,13 @@ export class DataTransformer {
    * Process one-to-many relationship column
    * Also handles array foreign key relationships
    * Array relationships work the same way - the join returns multiple rows that get grouped
+   * @param allRelationshipColumns - Optional: all columns requested for this relationship (e.g., ['authors.id', 'authors.name'])
    */
   private processOneToManyColumn(
     nestedRecord: Record<string, unknown>,
     columnPath: ColumnPath,
-    records: Record<string, unknown>[]
+    records: Record<string, unknown>[],
+    allRelationshipColumns?: string[]
   ): void {
     const relationshipPath = columnPath.relationshipPath;
     if (!relationshipPath || relationshipPath.length === 0) return;
@@ -563,7 +837,19 @@ export class DataTransformer {
     if (!relationship) return;
 
     const realTableName = relationship.to;
-    const alias = columnPath.table; // Use the alias from columnPath (e.g., 'posts')
+    // CRITICAL: Extract relationship alias from column ID or allRelationshipColumns
+    // columnPath.table contains the actual table name (e.g., 'users'), not the alias (e.g., 'authors')
+    // For 'authors.id', the alias is 'authors', which is the first part of the column ID
+    let alias: string = columnPath.table || '';
+    if (allRelationshipColumns && allRelationshipColumns.length > 0) {
+      // Extract alias from first relationship column (e.g., 'authors.id' -> 'authors')
+      const firstColumn = allRelationshipColumns[0];
+      if (firstColumn?.includes('.')) {
+        alias = firstColumn.split('.')[0] as string;
+      }
+    } else if (columnPath.columnId?.includes('.')) {
+      alias = columnPath.columnId.split('.')[0] as string;
+    }
 
     // Check if this is an array relationship (PostgreSQL array column)
     const isArrayRelationship = this.relationshipManager.isArrayRelationship(relationshipPath);
@@ -577,9 +863,24 @@ export class DataTransformer {
       if (!relatedTableSchema) continue;
       const primaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
       // Use generateAlias utility for the primary key
-      const relatedKey = String(record[generateAlias(relationshipPath, primaryKeyName)] || '');
+      // CRITICAL: Try multiple ways to find the primary key value
+      const pkFlatKey = generateAlias(relationshipPath, primaryKeyName);
+      // CRITICAL: Only use the flattened field name from generateAlias
+      // Do NOT fallback to main table's primary key - that would be wrong!
+      const relatedKeyValue = record[pkFlatKey];
+      const relatedKey = String(relatedKeyValue ?? '');
 
-      if (relatedKey && relatedKey !== 'undefined' && relatedKey !== 'null') {
+      // Process record if we have a valid primary key
+      // Only process if primary key is not null/undefined/empty
+      // CRITICAL: Check both the string value and the original value to ensure we don't process null/empty keys
+      if (
+        relatedKey &&
+        relatedKey !== 'undefined' &&
+        relatedKey !== 'null' &&
+        relatedKey !== '' &&
+        relatedKeyValue !== null &&
+        relatedKeyValue !== undefined
+      ) {
         if (!relatedRecords.has(relatedKey)) {
           relatedRecords.set(relatedKey, {});
         }
@@ -587,17 +888,86 @@ export class DataTransformer {
         const relatedData = relatedRecords.get(relatedKey);
         if (!relatedData) continue;
 
-        // For array relationships, we need to extract data differently
-        // The join might return multiple rows per main record, one for each array element
-        // Extract only columns that are present in the record (requested columns)
-        // Instead of extracting all columns, only extract what's actually in the record
-        const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
-        for (const col of relatedColumns) {
-          const flatKey = generateAlias(relationshipPath, col);
-          // Only extract if the value is defined and not null
-          // This ensures we only get requested columns, not all columns
-          if (record[flatKey] !== undefined && record[flatKey] !== null) {
-            relatedData[col] = record[flatKey];
+        // Extract columns for this relationship
+        // If allRelationshipColumns is provided, extract only those columns
+        // Otherwise, extract all columns from the schema that are present in the record
+        if (allRelationshipColumns && allRelationshipColumns.length > 0) {
+          // Extract only requested columns for this relationship
+          // CRITICAL: Always include primary key for identification and grouping
+          const relatedPrimaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
+          if (relatedPrimaryKeyName) {
+            const pkFlatKeyForExtract = generateAlias(relationshipPath, relatedPrimaryKeyName);
+            // CRITICAL: Only use the flattened field name from generateAlias
+            // Do NOT fallback to main table's primary key - that would be wrong!
+            const pkValue = record[pkFlatKeyForExtract];
+            if (pkValue !== undefined && pkValue !== null) {
+              relatedData[relatedPrimaryKeyName] = pkValue;
+            }
+          }
+
+          // Extract requested columns
+          for (const relColumnId of allRelationshipColumns) {
+            const relParts = relColumnId.split('.');
+            if (relParts.length >= 2) {
+              const fieldName = relParts.slice(1).join('.'); // Get field name (e.g., 'id', 'name')
+              // Skip if already extracted as primary key
+              if (fieldName === relatedPrimaryKeyName) continue;
+
+              const flatKey = generateAlias(relationshipPath, fieldName);
+              // Only extract if the value is defined and not null
+              if (record[flatKey] !== undefined && record[flatKey] !== null) {
+                relatedData[fieldName] = record[flatKey];
+              }
+            }
+          }
+        } else {
+          // Fallback: extract all columns from schema that are present in the record
+          const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
+          for (const col of relatedColumns) {
+            const flatKey = generateAlias(relationshipPath, col);
+            // Only extract if the value is defined and not null
+            // This ensures we only get requested columns, not all columns
+            if (record[flatKey] !== undefined && record[flatKey] !== null) {
+              relatedData[col] = record[flatKey];
+            }
+          }
+        }
+      } else if (allRelationshipColumns && allRelationshipColumns.length > 0) {
+        // Even if primary key is missing, try to extract relationship columns
+        // This handles edge cases where primary key might not be in the record
+        // First, check if we have any non-null relationship column values
+        let hasNonNullValues = false;
+        for (const relColumnId of allRelationshipColumns) {
+          const relParts = relColumnId.split('.');
+          if (relParts.length >= 2) {
+            const fieldName = relParts.slice(1).join('.');
+            const flatKey = generateAlias(relationshipPath, fieldName);
+            if (record[flatKey] !== undefined && record[flatKey] !== null) {
+              hasNonNullValues = true;
+              break;
+            }
+          }
+        }
+
+        // Only create a temporary record if we have non-null values
+        if (hasNonNullValues) {
+          const tempKey = `__temp_${relatedRecords.size}`;
+          if (!relatedRecords.has(tempKey)) {
+            relatedRecords.set(tempKey, {});
+          }
+          const relatedData = relatedRecords.get(tempKey);
+          if (relatedData) {
+            // Extract requested columns
+            for (const relColumnId of allRelationshipColumns) {
+              const relParts = relColumnId.split('.');
+              if (relParts.length >= 2) {
+                const fieldName = relParts.slice(1).join('.');
+                const flatKey = generateAlias(relationshipPath, fieldName);
+                if (record[flatKey] !== undefined && record[flatKey] !== null) {
+                  relatedData[fieldName] = record[flatKey];
+                }
+              }
+            }
           }
         }
       }
@@ -615,13 +985,18 @@ export class DataTransformer {
     // For array relationships, ensure all items are included
     // Array relationships may have duplicate primary keys in the flat data (one per array element)
     // We need to preserve all of them, not just unique ones
-    if (isArrayRelationship && validRecords.length > 0) {
+    // Always create an empty array if no valid records exist (relationship columns were requested)
+    // CRITICAL: Always set nestedRecord[alias] even if validRecords is empty
+    // This ensures the relationship is present in the output (as empty array) when columns were requested
+    if (isArrayRelationship) {
       // For array relationships, we might have multiple records with the same primary key
       // representing different array elements. The Map already deduplicates by key,
       // but we need to ensure we're getting all the data.
-      nestedRecord[alias] = validRecords;
+      nestedRecord[alias] = validRecords.length > 0 ? validRecords : [];
     } else {
-      nestedRecord[alias] = validRecords.length > 0 ? validRecords : []; // Use alias as the key
+      // For one-to-many relationships, create empty array when relationship columns are requested
+      // but no data exists (indicates relationship columns were requested but all values are null)
+      nestedRecord[alias] = validRecords.length > 0 ? validRecords : [];
     }
   }
 
