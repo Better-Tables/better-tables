@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.15
+
+### Patch Changes
+
+- Adds checks to skip records when the primary key cannot be determined and ensures getPrimaryKeyName always returns a valid string. This aligns behavior with groupByMainTableKey and prevents issues with undefined or invalid primary key names.
+
 ## 0.5.14
 
 ### Patch Changes

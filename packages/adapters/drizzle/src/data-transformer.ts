@@ -862,6 +862,9 @@ export class DataTransformer {
       const relatedTableSchema = this.schema[realTableName];
       if (!relatedTableSchema) continue;
       const primaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
+      // CRITICAL: Skip record if primary key cannot be determined
+      // This matches the behavior in groupByMainTableKey() which also checks for null/undefined
+      if (!primaryKeyName) continue;
       // Use generateAlias utility for the primary key
       // CRITICAL: Try multiple ways to find the primary key value
       const pkFlatKey = generateAlias(relationshipPath, primaryKeyName);
@@ -1313,11 +1316,21 @@ export class DataTransformer {
 
   /**
    * Get primary key name from table schema using Drizzle utilities
+   * @returns The primary key column name, or 'id' as fallback if not found or invalid
    */
   private getPrimaryKeyName(tableSchema: AnyTableType): string {
     const primaryKeyColumns = getPrimaryKeyColumns(tableSchema);
     // Return the first primary key column name, or 'id' as fallback
-    return primaryKeyColumns.length > 0 && primaryKeyColumns[0] ? primaryKeyColumns[0].name : 'id';
+    // CRITICAL: Ensure we always return a string, even if name is undefined/null
+    if (
+      primaryKeyColumns.length > 0 &&
+      primaryKeyColumns[0] &&
+      primaryKeyColumns[0].name &&
+      typeof primaryKeyColumns[0].name === 'string'
+    ) {
+      return primaryKeyColumns[0].name;
+    }
+    return 'id';
   }
 
   /**
