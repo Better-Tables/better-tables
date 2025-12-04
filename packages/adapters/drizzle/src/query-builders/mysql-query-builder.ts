@@ -5,18 +5,21 @@
  * @description
  * MySQL query builder implementation with driver-specific optimizations.
  *
- * @since 1.0.0
+ * Supports all MySQL-compatible Drizzle drivers:
+ * - mysql2 (MySql2Database)
+ *
+ * @since 1.0.0 (expanded to support all MySQL drivers in 1.1.0)
  */
 
 import { count, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { MySqlColumn, MySqlTable } from 'drizzle-orm/mysql-core';
-import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
   MySQLQueryBuilderWithJoins,
+  MySqlDatabaseType,
   QueryContext,
 } from '../types';
 import { QueryError } from '../types';
@@ -26,15 +29,18 @@ import { BaseQueryBuilder } from './base-query-builder';
 /**
  * MySQL query builder implementation.
  *
+ * Supports all MySQL-compatible Drizzle drivers:
+ * - mysql2 (MySql2Database)
+ *
  * @class MySQLQueryBuilder
  * @extends {BaseQueryBuilder}
- * @since 1.0.0
+ * @since 1.0.0 (expanded to support all MySQL drivers in 1.1.0)
  */
 export class MySQLQueryBuilder extends BaseQueryBuilder {
-  private db: MySql2Database;
+  private db: MySqlDatabaseType;
 
   constructor(
-    db: MySql2Database,
+    db: MySqlDatabaseType,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager
   ) {

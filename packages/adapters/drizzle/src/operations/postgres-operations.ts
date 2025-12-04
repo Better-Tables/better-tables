@@ -5,8 +5,7 @@
 
 import { count, eq, inArray } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type { AnyTableType, DatabaseOperations, TableWithId } from '../types';
+import type { AnyTableType, DatabaseOperations, PostgresDatabaseType, TableWithId } from '../types';
 import { QueryError } from '../types';
 
 /**
@@ -15,29 +14,43 @@ import { QueryError } from '../types';
  * PostgreSQL supports the RETURNING clause for all operations, making it more
  * efficient than MySQL as we don't need separate fetch queries after mutations.
  *
+ * Supports all PostgreSQL-compatible Drizzle drivers:
+ * - postgres-js (PostgresJsDatabase)
+ * - node-postgres (NodePgDatabase)
+ * - neon-http (NeonHttpDatabase)
+ *
  * @template TRecord - The record type for the table
  * @implements {DatabaseOperations<TRecord>}
  *
  * @example
  * ```typescript
+ * // Works with any PostgreSQL driver
  * const operations = new PostgresOperations<User>(postgresDb);
  * const user = await operations.insert(usersTable, { name: 'John', email: 'john@example.com' });
  * ```
  *
- * @since 1.0.0
+ * @since 1.0.0 (expanded to support all PostgreSQL drivers in 1.1.0)
  */
 export class PostgresOperations<TRecord> implements DatabaseOperations<TRecord> {
   /**
    * Creates a new PostgreSQL operations instance.
    *
-   * @param {PostgresJsDatabase} db - The PostgreSQL database connection instance
+   * @param {PostgresDatabaseType} db - Any PostgreSQL-compatible database connection instance
+   *   (PostgresJsDatabase, NodePgDatabase, NeonHttpDatabase, etc.)
    *
    * @example
    * ```typescript
-   * const operations = new PostgresOperations<User>(postgresDb);
+   * // Using postgres-js
+   * const operations = new PostgresOperations<User>(postgresJsDb);
+   *
+   * // Using node-postgres
+   * const operations = new PostgresOperations<User>(nodePgDb);
+   *
+   * // Using Neon
+   * const operations = new PostgresOperations<User>(neonDb);
    * ```
    */
-  constructor(private readonly db: PostgresJsDatabase) {}
+  constructor(private readonly db: PostgresDatabaseType) {}
 
   /**
    * Inserts a new record into the table.

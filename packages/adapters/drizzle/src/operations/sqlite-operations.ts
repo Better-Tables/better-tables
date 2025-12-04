@@ -4,9 +4,8 @@
  */
 
 import { count, eq, inArray } from 'drizzle-orm';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import type { AnyTableType, DatabaseOperations, TableWithId } from '../types';
+import type { AnyTableType, DatabaseOperations, SQLiteDatabaseType, TableWithId } from '../types';
 import { QueryError } from '../types';
 
 /**
@@ -15,29 +14,39 @@ import { QueryError } from '../types';
  * SQLite supports the RETURNING clause for all operations, making it efficient
  * similar to PostgreSQL. This implementation works with both in-memory and file-based databases.
  *
+ * Supports all SQLite-compatible Drizzle drivers:
+ * - better-sqlite3 (BetterSQLite3Database)
+ * - libsql/Turso (LibSQLDatabase)
+ *
  * @template TRecord - The record type for the table
  * @implements {DatabaseOperations<TRecord>}
  *
  * @example
  * ```typescript
+ * // Works with any SQLite driver
  * const operations = new SQLiteOperations<User>(sqliteDb);
  * const user = await operations.insert(usersTable, { name: 'John', email: 'john@example.com' });
  * ```
  *
- * @since 1.0.0
+ * @since 1.0.0 (expanded to support all SQLite drivers in 1.1.0)
  */
 export class SQLiteOperations<TRecord> implements DatabaseOperations<TRecord> {
   /**
    * Creates a new SQLite operations instance.
    *
-   * @param {BetterSQLite3Database} db - The SQLite database connection instance
+   * @param {SQLiteDatabaseType} db - Any SQLite-compatible database connection instance
+   *   (BetterSQLite3Database, LibSQLDatabase, etc.)
    *
    * @example
    * ```typescript
-   * const operations = new SQLiteOperations<User>(sqliteDb);
+   * // Using better-sqlite3
+   * const operations = new SQLiteOperations<User>(betterSqliteDb);
+   *
+   * // Using libsql/Turso
+   * const operations = new SQLiteOperations<User>(libsqlDb);
    * ```
    */
-  constructor(private readonly db: BetterSQLite3Database) {}
+  constructor(private readonly db: SQLiteDatabaseType) {}
 
   /**
    * Inserts a new record into the table.

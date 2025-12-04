@@ -5,8 +5,7 @@
 
 import { count, eq, inArray } from 'drizzle-orm';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
-import type { MySql2Database } from 'drizzle-orm/mysql2';
-import type { AnyTableType, DatabaseOperations, TableWithId } from '../types';
+import type { AnyTableType, DatabaseOperations, MySqlDatabaseType, TableWithId } from '../types';
 import { QueryError } from '../types';
 
 /**
@@ -15,6 +14,9 @@ import { QueryError } from '../types';
  * MySQL does NOT support the RETURNING clause, so we need to fetch records separately
  * after insert/update/delete operations. This implementation handles both auto-increment
  * integer primary keys and UUID/string primary keys.
+ *
+ * Supports all MySQL-compatible Drizzle drivers:
+ * - mysql2 (MySql2Database)
  *
  * @template TRecord - The record type for the table
  * @implements {DatabaseOperations<TRecord>}
@@ -25,20 +27,20 @@ import { QueryError } from '../types';
  * const user = await operations.insert(usersTable, { name: 'John', email: 'john@example.com' });
  * ```
  *
- * @since 1.0.0
+ * @since 1.0.0 (expanded to support all MySQL drivers in 1.1.0)
  */
 export class MySQLOperations<TRecord> implements DatabaseOperations<TRecord> {
   /**
    * Creates a new MySQL operations instance.
    *
-   * @param {MySql2Database} db - The MySQL database connection instance
+   * @param {MySqlDatabaseType} db - Any MySQL-compatible database connection instance
    *
    * @example
    * ```typescript
    * const operations = new MySQLOperations<User>(mysqlDb);
    * ```
    */
-  constructor(private readonly db: MySql2Database) {}
+  constructor(private readonly db: MySqlDatabaseType) {}
 
   /**
    * Inserts a new record into the table.
