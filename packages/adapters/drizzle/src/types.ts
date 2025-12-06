@@ -20,11 +20,66 @@ import type { AnyColumn, InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
+import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { BaseQueryBuilder } from './query-builders';
 import type { RelationshipManager } from './relationship-manager';
+
+/**
+ * Union type for all PostgreSQL-compatible Drizzle database drivers.
+ * Supports postgres-js, node-postgres, neon-http, and other PostgreSQL drivers.
+ *
+ * @description All these drivers produce compatible SQL for PostgreSQL dialect.
+ * The adapter uses this union type to accept any PostgreSQL-compatible driver
+ * without requiring unsafe type casts.
+ *
+ * @since 1.1.0
+ */
+export type PostgresDatabaseType<
+  TSchema extends Record<string, unknown> = Record<string, unknown>,
+> = PostgresJsDatabase<TSchema> | NodePgDatabase<TSchema> | NeonHttpDatabase<TSchema>;
+
+/**
+ * Union type for all MySQL-compatible Drizzle database drivers.
+ * Currently supports mysql2 driver.
+ *
+ * @description The adapter uses this union type to accept any MySQL-compatible driver.
+ *
+ * @since 1.1.0
+ */
+export type MySqlDatabaseType<TSchema extends Record<string, unknown> = Record<string, unknown>> =
+  MySql2Database<TSchema>;
+
+/**
+ * Union type for all SQLite-compatible Drizzle database drivers.
+ * Currently supports better-sqlite3 driver.
+ *
+ * @description The adapter uses this type to accept SQLite-compatible drivers.
+ *
+ * Note: LibSQLDatabase (drizzle-orm/libsql) is NOT included in this union because
+ * its TypeScript type definitions have incompatible method signatures with
+ * BetterSQLite3Database (specifically for select() overloads). However, at runtime
+ * LibSQLDatabase is API-compatible, so users can cast their database instance:
+ *
+ * ```typescript
+ * import { drizzle } from 'drizzle-orm/libsql';
+ * const libsqlDb = drizzle(client);
+ *
+ * // Cast to SQLiteDatabaseType for use with the adapter
+ * const adapter = new DrizzleAdapter({
+ *   db: libsqlDb as unknown as SQLiteDatabaseType,
+ *   schema,
+ *   driver: 'sqlite',
+ * });
+ * ```
+ *
+ * @since 1.1.0
+ */
+export type SQLiteDatabaseType<TSchema extends Record<string, unknown> = Record<string, unknown>> =
+  BetterSQLite3Database<TSchema>;
 
 /**
  * Mapping of database drivers to their corresponding Drizzle database types.
@@ -33,11 +88,19 @@ import type { RelationshipManager } from './relationship-manager';
  * @description This type ensures that every database driver has a corresponding
  * database type. When you add a new driver, add it here and TypeScript will
  * ensure type safety throughout the codebase.
+ *
+ * Each driver maps to a union type that includes all compatible Drizzle database
+ * implementations for that SQL dialect:
+ * - postgres: PostgresJsDatabase, NodePgDatabase, NeonHttpDatabase
+ * - mysql: MySql2Database
+ * - sqlite: BetterSQLite3Database, LibSQLDatabase
+ *
+ * @since 1.0.0 (expanded in 1.1.0)
  */
 type DatabaseTypeMap = {
-  postgres: PostgresJsDatabase;
-  mysql: MySql2Database;
-  sqlite: BetterSQLite3Database;
+  postgres: PostgresDatabaseType;
+  mysql: MySqlDatabaseType;
+  sqlite: SQLiteDatabaseType;
 };
 
 /**
@@ -835,24 +898,36 @@ export interface QueryMetadata {
  * // Returns the schema type passed to drizzle(connection, { schema })
  * ```
  */
-export type ExtractSchemaFromDB<TDB> = TDB extends PostgresJsDatabase<infer S>
-  ? S extends Record<string, AnyTableType>
-    ? S
-    : Record<string, AnyTableType>
-  : TDB extends MySql2Database<infer S>
+export type ExtractSchemaFromDB<TDB> =
+  // PostgreSQL drivers
+  TDB extends PostgresJsDatabase<infer S>
     ? S extends Record<string, AnyTableType>
       ? S
       : Record<string, AnyTableType>
-    : TDB extends BetterSQLite3Database<infer S>
+    : TDB extends NodePgDatabase<infer S>
       ? S extends Record<string, AnyTableType>
         ? S
         : Record<string, AnyTableType>
-      : Record<string, AnyTableType>;
+      : TDB extends NeonHttpDatabase<infer S>
+        ? S extends Record<string, AnyTableType>
+          ? S
+          : Record<string, AnyTableType>
+        : // MySQL drivers
+          TDB extends MySql2Database<infer S>
+          ? S extends Record<string, AnyTableType>
+            ? S
+            : Record<string, AnyTableType>
+          : // SQLite drivers
+            TDB extends BetterSQLite3Database<infer S>
+            ? S extends Record<string, AnyTableType>
+              ? S
+              : Record<string, AnyTableType>
+            : Record<string, AnyTableType>;
 
 /**
  * Extract driver type from Drizzle database instance.
  *
- * @template {any} TDB - The Drizzle database instance type (e.g., PostgresJsDatabase, MySql2Database, BetterSQLite3Database)
+ * @template {any} TDB - The Drizzle database instance type
  *
  * @description
  * This conditional type automatically determines the database driver string from a Drizzle instance type
@@ -860,48 +935,62 @@ export type ExtractSchemaFromDB<TDB> = TDB extends PostgresJsDatabase<infer S>
  * It performs pattern matching on the database instance type and returns the corresponding driver identifier.
  *
  * Supported database types and their corresponding driver strings:
- * - `PostgresJsDatabase` → `'postgres'`
- * - `MySql2Database` → `'mysql'`
- * - `BetterSQLite3Database` → `'sqlite'`
- * - Other types → Falls back to `DatabaseDriver` union type
+ *
+ * PostgreSQL drivers (all return 'postgres'):
+ * - `PostgresJsDatabase` (drizzle-orm/postgres-js)
+ * - `NodePgDatabase` (drizzle-orm/node-postgres)
+ * - `NeonHttpDatabase` (drizzle-orm/neon-http)
+ *
+ * MySQL drivers (all return 'mysql'):
+ * - `MySql2Database` (drizzle-orm/mysql2)
+ *
+ * SQLite drivers (all return 'sqlite'):
+ * - `BetterSQLite3Database` (drizzle-orm/better-sqlite3)
+ *
+ * Other types → Falls back to `DatabaseDriver` union type
  *
  * @returns {DatabaseDriver} The driver type as a string literal or union type
  *
  * @example
  * ```typescript
  * import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
- * import type { MySql2Database } from 'drizzle-orm/mysql2';
+ * import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
  * import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
  *
- * // Extract driver from specific database types
+ * // All PostgreSQL drivers return 'postgres'
  * type PostgresDriver = ExtractDriverFromDB<PostgresJsDatabase<any>>;
  * // Result: 'postgres'
  *
- * type MySqlDriver = ExtractDriverFromDB<MySql2Database<any>>;
- * // Result: 'mysql'
+ * type NodePgDriver = ExtractDriverFromDB<NodePgDatabase<any>>;
+ * // Result: 'postgres'
  *
+ * // SQLite driver returns 'sqlite'
  * type SQLiteDriver = ExtractDriverFromDB<BetterSQLite3Database<any>>;
  * // Result: 'sqlite'
- *
- * // Usage in generic functions
- * function withDriver<TDB>() {
- *   type Driver = ExtractDriverFromDB<TDB>;
- *   // Driver is inferred based on TDB
- * }
  * ```
  *
  * @see {@link DatabaseDriver} The returned driver type
  * @see {@link DatabaseTypeMap} The mapping of drivers to database types
+ * @see {@link PostgresDatabaseType} Union of all PostgreSQL drivers
+ * @see {@link SQLiteDatabaseType} SQLite driver type
  *
- * @since 1.0.0
+ * @since 1.0.0 (expanded in 1.1.0)
  */
-export type ExtractDriverFromDB<TDB> = TDB extends PostgresJsDatabase<infer _>
-  ? 'postgres'
-  : TDB extends MySql2Database<infer _>
-    ? 'mysql'
-    : TDB extends BetterSQLite3Database<infer _>
-      ? 'sqlite'
-      : DatabaseDriver;
+export type ExtractDriverFromDB<TDB> =
+  // PostgreSQL drivers
+  TDB extends PostgresJsDatabase<infer _>
+    ? 'postgres'
+    : TDB extends NodePgDatabase<infer _>
+      ? 'postgres'
+      : TDB extends NeonHttpDatabase<infer _>
+        ? 'postgres'
+        : // MySQL drivers
+          TDB extends MySql2Database<infer _>
+          ? 'mysql'
+          : // SQLite drivers
+            TDB extends BetterSQLite3Database<infer _>
+            ? 'sqlite'
+            : DatabaseDriver;
 
 /**
  * Error types for the adapter

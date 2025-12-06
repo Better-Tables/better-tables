@@ -5,11 +5,14 @@
  * @description
  * SQLite query builder implementation with driver-specific optimizations.
  *
- * @since 1.0.0
+ * Supports all SQLite-compatible Drizzle drivers:
+ * - better-sqlite3 (BetterSQLite3Database)
+ * - libsql/Turso (LibSQLDatabase)
+ *
+ * @since 1.0.0 (expanded to support all SQLite drivers in 1.1.0)
  */
 
 import { count, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
@@ -17,6 +20,7 @@ import type {
   AnyColumnType,
   AnyTableType,
   QueryContext,
+  SQLiteDatabaseType,
   SQLiteQueryBuilderWithJoins,
 } from '../types';
 import { QueryError } from '../types';
@@ -26,15 +30,19 @@ import { BaseQueryBuilder } from './base-query-builder';
 /**
  * SQLite query builder implementation.
  *
+ * Supports all SQLite-compatible Drizzle drivers:
+ * - better-sqlite3 (BetterSQLite3Database)
+ * - libsql/Turso (LibSQLDatabase)
+ *
  * @class SQLiteQueryBuilder
  * @extends {BaseQueryBuilder}
- * @since 1.0.0
+ * @since 1.0.0 (expanded to support all SQLite drivers in 1.1.0)
  */
 export class SQLiteQueryBuilder extends BaseQueryBuilder {
-  private db: BetterSQLite3Database;
+  private db: SQLiteDatabaseType;
 
   constructor(
-    db: BetterSQLite3Database,
+    db: SQLiteDatabaseType,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager
   ) {

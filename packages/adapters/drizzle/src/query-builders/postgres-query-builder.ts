@@ -5,7 +5,12 @@
  * @description
  * PostgreSQL query builder implementation with driver-specific optimizations.
  *
- * @since 1.0.0
+ * Supports all PostgreSQL-compatible Drizzle drivers:
+ * - postgres-js (PostgresJsDatabase)
+ * - node-postgres (NodePgDatabase)
+ * - neon-http (NeonHttpDatabase)
+ *
+ * @since 1.0.0 (expanded to support all PostgreSQL drivers in 1.1.0)
  */
 
 import {
@@ -20,12 +25,12 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
+  PostgresDatabaseType,
   PostgresQueryBuilderWithJoins,
   QueryContext,
 } from '../types';
@@ -154,15 +159,20 @@ class RelationalQueryWrapper implements PostgresQueryBuilderWithJoins {
 /**
  * PostgreSQL query builder implementation.
  *
+ * Supports all PostgreSQL-compatible Drizzle drivers:
+ * - postgres-js (PostgresJsDatabase)
+ * - node-postgres (NodePgDatabase)
+ * - neon-http (NeonHttpDatabase)
+ *
  * @class PostgresQueryBuilder
  * @extends {BaseQueryBuilder}
- * @since 1.0.0
+ * @since 1.0.0 (expanded to support all PostgreSQL drivers in 1.1.0)
  */
 export class PostgresQueryBuilder extends BaseQueryBuilder {
-  private db: PostgresJsDatabase;
+  private db: PostgresDatabaseType;
 
   constructor(
-    db: PostgresJsDatabase,
+    db: PostgresDatabaseType,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager
   ) {
