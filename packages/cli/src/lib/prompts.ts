@@ -51,6 +51,9 @@ export async function select<T extends string>(
   message: string,
   options: { label: string; value: T }[]
 ): Promise<T> {
+  if (options.length === 0) {
+    throw new Error('select() requires at least one option');
+  }
   const rl = createInterface();
   console.log(`\n${message}`);
   options.forEach((option, index) => {
@@ -64,7 +67,7 @@ export async function select<T extends string>(
         resolve(options[index].value);
       } else {
         // Default to first option if invalid input
-        resolve(options[0]?.value ?? ('' as T));
+        resolve(options[0].value);
       }
     });
   });

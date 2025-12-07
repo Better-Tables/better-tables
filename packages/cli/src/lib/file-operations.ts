@@ -249,8 +249,18 @@ export function transformImports(
     }
     return match;
   });
-  // Fix any double slashes
-  transformed = transformed.replace(/\/\//g, '/');
+  // Fix any double slashes only in import path strings (not in comments or URLs)
+  // Match: from '...' or from "..."
+  transformed = transformed.replace(
+    /from ['"]([^'"]*)\/\/([^'"]*)['"]/g,
+    (match, before, after) => {
+      // Only fix double slashes in the path part, not in URLs (which contain ://)
+      if (before && after && !before.includes('://')) {
+        return `from '${before}/${after}'`;
+      }
+      return match;
+    }
+  );
   return transformed;
 }
 

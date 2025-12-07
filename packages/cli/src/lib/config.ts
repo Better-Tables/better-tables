@@ -73,12 +73,33 @@ export function resolveAliasPath(aliasPath: string, cwd: string): string {
     const relativePath = aliasPath.slice(2);
     const possibleBases = ['src', 'app', '.'];
     for (const base of possibleBases) {
-      const fullPath = resolve(cwd, base, relativePath);
-      const parentDir = dirname(fullPath);
-      if (existsSync(parentDir) || base === 'src') {
-        return fullPath;
+      const basePath = resolve(cwd, base);
+      if (existsSync(basePath)) {
+        const fullPath = resolve(cwd, base, relativePath);
+        const parentDir = dirname(fullPath);
+        if (existsSync(parentDir)) {
+          return fullPath;
+        }
       }
     }
+    // Default to src if none of the bases exist
+    return resolve(cwd, 'src', relativePath);
+  }
+  // Handle ~/ alias - typically maps to src/ or app/ (same as @/)
+  if (aliasPath.startsWith('~/')) {
+    const relativePath = aliasPath.slice(2);
+    const possibleBases = ['src', 'app', '.'];
+    for (const base of possibleBases) {
+      const basePath = resolve(cwd, base);
+      if (existsSync(basePath)) {
+        const fullPath = resolve(cwd, base, relativePath);
+        const parentDir = dirname(fullPath);
+        if (existsSync(parentDir)) {
+          return fullPath;
+        }
+      }
+    }
+    // Default to src if none of the bases exist
     return resolve(cwd, 'src', relativePath);
   }
   if (aliasPath.startsWith('./') || aliasPath.startsWith('../')) {
