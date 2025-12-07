@@ -1,7 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
-import { createRequire } from 'module';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import type { ResolvedPaths, ShadcnConfig } from './config';
 import { getAliasPrefix } from './config';
 import type { ConflictResolution } from './prompts';
@@ -27,140 +25,148 @@ export interface CopyResult {
 }
 
 /**
- * Get the path to the @better-tables/ui package source files
- * This resolves the path at runtime from the node_modules
+ * GitHub repository configuration
  */
-export function getUiPackagePath(): string {
+const GITHUB_REPO = 'Better-Tables/better-tables';
+const GITHUB_BRANCH = 'main'; // Could be made configurable or use package version
+const GITHUB_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}`;
+const GITHUB_UI_BASE_URL = `${GITHUB_BASE_URL}/packages/ui/src`;
+
+/**
+ * Download a file from GitHub
+ */
+async function downloadFromGitHub(filePath: string): Promise<string> {
+  const url = `${GITHUB_UI_BASE_URL}/${filePath}`;
   try {
-    // Try to resolve from node_modules using createRequire for ESM compatibility
-    const require = createRequire(import.meta.url);
-    const uiPackagePath = require.resolve('@better-tables/ui/package.json');
-    return dirname(uiPackagePath);
-  } catch {
-    // Fallback: resolve relative to this CLI package
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    // Go up from dist/lib to packages/cli, then to packages/ui
-    // In development: src/lib -> packages/cli -> packages/ui
-    // In built: dist/lib -> packages/cli -> packages/ui
-    const possiblePaths = [
-      join(__dirname, '..', '..', '..', 'ui'), // dist/lib -> packages/cli -> packages/ui
-      join(__dirname, '..', '..', '..', '..', 'ui'), // src/lib -> packages/cli -> packages/ui
-    ];
-    for (const path of possiblePaths) {
-      if (existsSync(join(path, 'src'))) {
-        return path;
+    const response = await fetch(url);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`File not found: ${filePath}`);
       }
+      throw new Error(`Failed to download ${filePath}: ${response.status} ${response.statusText}`);
     }
-    // Last resort: assume we're in dist/lib
-    return join(__dirname, '..', '..', '..', 'ui');
+    return await response.text();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to download ${filePath} from GitHub: ${error.message}`);
+    }
+    throw error;
   }
 }
 
 /**
- * Get source files from the UI package
+ * Known list of files to copy from the UI package
+ * This is a static list to avoid needing to fetch directory listings from GitHub
  */
-export function getSourceFiles(): {
-  components: { table: string[]; filters: string[] };
-  hooks: string[];
-  lib: string[];
-  stores: string[];
-  utils: string[];
-} {
-  const uiPath = getUiPackagePath();
-  const srcPath = join(uiPath, 'src');
-  const readDir = (dir: string): string[] => {
-    const fullPath = join(srcPath, dir);
-    if (!existsSync(fullPath)) return [];
-    return readdirSync(fullPath).filter((file) => {
-      const filePath = join(fullPath, file);
-      return statSync(filePath).isFile() && (file.endsWith('.ts') || file.endsWith('.tsx'));
-    });
-  };
-  const readDirRecursive = (dir: string): string[] => {
-    const fullPath = join(srcPath, dir);
-    if (!existsSync(fullPath)) return [];
-    const files: string[] = [];
-    const entries = readdirSync(fullPath);
-    for (const entry of entries) {
-      const entryPath = join(fullPath, entry);
-      if (statSync(entryPath).isDirectory()) {
-        // Skip __tests__ directories
-        if (entry === '__tests__') continue;
-        const subFiles = readDirRecursive(join(dir, entry));
-        files.push(...subFiles);
-      } else if (entry.endsWith('.ts') || entry.endsWith('.tsx')) {
-        files.push(join(dir, entry).replace(/\\/g, '/'));
-      }
-    }
-    return files;
-  };
-  return {
-    components: {
-      table: readDir('components/table'),
-      filters: readDirRecursive('components/filters').map((f) =>
-        f.replace('components/filters/', '')
-      ),
-    },
-    hooks: readDir('hooks'),
-    lib: readDir('lib').filter((f) => !f.includes('.test.')),
-    stores: readDir('stores'),
-    utils: readDir('utils').filter((f) => !f.includes('.test.')),
-  };
-}
+const UI_SOURCE_FILES = {
+  components: {
+    table: [
+      'action-confirmation-dialog.tsx',
+      'actions-toolbar.tsx',
+      'column-order-drop-indicator.tsx',
+      'column-order-list.tsx',
+      'column-visibility-toggle.tsx',
+      'drop-indicator.tsx',
+      'empty-state.tsx',
+      'error-state.tsx',
+      'index.ts',
+      'sort-order-drop-indicator.tsx',
+      'sort-order-list.tsx',
+      'table-dnd-provider.tsx',
+      'table-header-context-menu.tsx',
+      'table-pagination.tsx',
+      'table-providers.tsx',
+      'table.tsx',
+      'virtualized-table.tsx',
+    ],
+    filters: [
+      'active-filters.tsx',
+      'filter-bar.tsx',
+      'filter-button.tsx',
+      'filter-dropdown.tsx',
+      'filter-operator-select.tsx',
+      'filter-value-input.tsx',
+      'include-unknown-control.tsx',
+      'index.ts',
+      'inputs/boolean-filter-input.tsx',
+      'inputs/date-filter-input.tsx',
+      'inputs/multi-option-filter-input.tsx',
+      'inputs/number-filter-input.tsx',
+      'inputs/option-filter-input.tsx',
+      'inputs/text-filter-input.tsx',
+    ],
+  },
+  hooks: [
+    'index.ts',
+    'use-debounce.ts',
+    'use-filter-validation.ts',
+    'use-has-primary-touch.tsx',
+    'use-keyboard-navigation.ts',
+    'use-table-data.ts',
+    'use-table-store.ts',
+    'use-virtualization.ts',
+  ],
+  lib: [
+    'date-presets.ts',
+    'date-utils.ts',
+    'filter-value-utils.ts',
+    'format-utils.ts',
+    'number-format-utils.ts',
+    'utils.ts',
+  ],
+  stores: ['table-registry.ts', 'table-store.ts', 'url-sync-adapter.ts'],
+  utils: ['index.ts', 'server-url-params.ts', 'state-change-detection.ts', 'url-serialization.ts'],
+} as const;
 
 /**
  * Generate file mappings for all Better Tables files
  */
 export function generateFileMappings(resolvedPaths: ResolvedPaths): FileMapping[] {
-  const uiPath = getUiPackagePath();
-  const srcPath = join(uiPath, 'src');
-  const sourceFiles = getSourceFiles();
   const mappings: FileMapping[] = [];
   // Table components
-  for (const file of sourceFiles.components.table) {
+  for (const file of UI_SOURCE_FILES.components.table) {
     mappings.push({
-      sourcePath: join(srcPath, 'components', 'table', file),
+      sourcePath: `components/table/${file}`, // GitHub path, not filesystem path
       destPath: join(resolvedPaths.components, 'table', file),
       category: 'table',
     });
   }
   // Filter components (including subdirectories like inputs/)
-  for (const file of sourceFiles.components.filters) {
+  for (const file of UI_SOURCE_FILES.components.filters) {
     mappings.push({
-      sourcePath: join(srcPath, 'components', 'filters', file),
+      sourcePath: `components/filters/${file}`, // GitHub path
       destPath: join(resolvedPaths.components, 'filters', file),
       category: 'filters',
     });
   }
   // Hooks
-  for (const file of sourceFiles.hooks) {
+  for (const file of UI_SOURCE_FILES.hooks) {
     mappings.push({
-      sourcePath: join(srcPath, 'hooks', file),
+      sourcePath: `hooks/${file}`, // GitHub path
       destPath: join(resolvedPaths.hooks, file),
       category: 'hooks',
     });
   }
   // Lib files
-  for (const file of sourceFiles.lib) {
+  for (const file of UI_SOURCE_FILES.lib) {
     mappings.push({
-      sourcePath: join(srcPath, 'lib', file),
+      sourcePath: `lib/${file}`, // GitHub path
       destPath: join(resolvedPaths.lib, file),
       category: 'lib',
     });
   }
   // Stores
-  for (const file of sourceFiles.stores) {
+  for (const file of UI_SOURCE_FILES.stores) {
     mappings.push({
-      sourcePath: join(srcPath, 'stores', file),
+      sourcePath: `stores/${file}`, // GitHub path
       destPath: join(resolvedPaths.components, 'stores', file),
       category: 'stores',
     });
   }
   // Utils
-  for (const file of sourceFiles.utils) {
+  for (const file of UI_SOURCE_FILES.utils) {
     mappings.push({
-      sourcePath: join(srcPath, 'utils', file),
+      sourcePath: `utils/${file}`, // GitHub path
       destPath: join(resolvedPaths.lib, 'utils', file),
       category: 'utils',
     });
@@ -285,8 +291,8 @@ export async function copyFile(
     if (!existsSync(destDir)) {
       mkdirSync(destDir, { recursive: true });
     }
-    // Read source file
-    const content = readFileSync(mapping.sourcePath, 'utf-8');
+    // Download source file from GitHub (sourcePath is now a GitHub path, not filesystem)
+    const content = await downloadFromGitHub(mapping.sourcePath);
     // Transform imports
     const transformed = transformImports(content, config, resolvedPaths, mapping.destPath);
     // Write to destination

@@ -4,7 +4,7 @@ import pc from 'picocolors';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
 import { getConfig } from '../lib/config';
-import { copyAllFiles } from '../lib/file-operations';
+import { type CopyResult, copyAllFiles } from '../lib/file-operations';
 import { confirm } from '../lib/prompts';
 import { getComponentStatus, installShadcnComponents, isShadcnSetup } from '../lib/shadcn';
 
@@ -113,6 +113,7 @@ export function initCommand(): Command {
     }
     // Step 4: Copy Better Tables files
     console.log(pc.bold('Copying Better Tables files...\n'));
+    console.log(pc.dim('Downloading files from GitHub...\n'));
     let shouldCopy = true;
     if (!skipPrompts) {
       console.log(pc.dim('The following directories will be created/updated:'));
@@ -128,16 +129,36 @@ export function initCommand(): Command {
       console.log(pc.yellow('\nAborted.\n'));
       process.exit(0);
     }
-    const { results, categories } = await copyAllFiles(config, resolvedPaths, skipPrompts);
+    let results: CopyResult[];
+    let categories: Record<string, number>;
+    try {
+      const copyResult = await copyAllFiles(config, resolvedPaths, skipPrompts);
+      results = copyResult.results;
+      categories = copyResult.categories;
+    } catch (error) {
+      console.log(
+        pc.red(
+          `\n✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
+      process.exit(1);
+    }
     // Summary
     const successful = results.filter((r) => r.success && !r.skipped).length;
     const skipped = results.filter((r) => r.skipped).length;
     const failed = results.filter((r) => !r.success).length;
     console.log(pc.bold('\n📁 Files copied:\n'));
-    for (const [category, count] of Object.entries(categories)) {
-      console.log(`  • ${category}: ${pc.green(String(count))} files`);
+    if (Object.keys(categories).length === 0) {
+      console.log(pc.yellow('  ⚠️  No files were copied. This may indicate:'));
+      console.log(pc.dim('     • UI package source files not found'));
+      console.log(pc.dim('     • Path resolution issue'));
+      console.log(pc.dim('     • All files already exist\n'));
+    } else {
+      for (const [category, count] of Object.entries(categories)) {
+        console.log(`  • ${category}: ${pc.green(String(count))} files`);
+      }
+      console.log('');
     }
-    console.log('');
     if (skipped > 0) {
       console.log(pc.yellow(`  • ${skipped} files skipped (already exist)`));
     }
