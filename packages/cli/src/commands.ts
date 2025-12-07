@@ -29,6 +29,16 @@ export const commandsRegistry = {
     ] as const,
     options: [] as const,
   },
+  init: {
+    name: 'init',
+    description: 'Initialize Better Tables in your project',
+    arguments: [] as const,
+    options: [
+      { flags: '--cwd <path>', description: 'Working directory (default: current directory)' },
+      { flags: '--skip-shadcn', description: 'Skip shadcn component installation' },
+      { flags: '-y, --yes', description: 'Skip confirmation prompts' },
+    ] as const,
+  },
 } as const satisfies CommandRegistry;
 
 /**
