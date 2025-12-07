@@ -123,6 +123,20 @@ describe('config', () => {
       const result = resolveAliasPath('~/components/utils', testDir);
       expect(result).toBe(resolve(testDir, 'src', 'components/utils'));
     });
+
+    it('should default to src/ when neither src nor app exist for @/ alias', () => {
+      // Don't create src or app directories
+      const result = resolveAliasPath('@/components', testDir);
+      expect(result).toBe(resolve(testDir, 'src', 'components'));
+      expect(result).not.toBe(resolve(testDir, 'components'));
+    });
+
+    it('should default to src/ when neither src nor app exist for ~/ alias', () => {
+      // Don't create src or app directories
+      const result = resolveAliasPath('~/components', testDir);
+      expect(result).toBe(resolve(testDir, 'src', 'components'));
+      expect(result).not.toBe(resolve(testDir, 'components'));
+    });
   });
 
   describe('detectTypeScript', () => {

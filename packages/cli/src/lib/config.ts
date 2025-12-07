@@ -71,7 +71,7 @@ export function resolveAliasPath(aliasPath: string, cwd: string): string {
   // Handle @/ alias - typically maps to src/ or app/
   if (aliasPath.startsWith('@/')) {
     const relativePath = aliasPath.slice(2);
-    const possibleBases = ['src', 'app', '.'];
+    const possibleBases = ['src', 'app'];
     for (const base of possibleBases) {
       const basePath = resolve(cwd, base);
       if (existsSync(basePath)) {
@@ -88,7 +88,7 @@ export function resolveAliasPath(aliasPath: string, cwd: string): string {
   // Handle ~/ alias - typically maps to src/ or app/ (same as @/)
   if (aliasPath.startsWith('~/')) {
     const relativePath = aliasPath.slice(2);
-    const possibleBases = ['src', 'app', '.'];
+    const possibleBases = ['src', 'app'];
     for (const base of possibleBases) {
       const basePath = resolve(cwd, base);
       if (existsSync(basePath)) {
