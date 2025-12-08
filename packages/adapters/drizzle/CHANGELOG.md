@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.17
+
+### Patch Changes
+
+- This update introduces a new property `requiresColumn` in the `ComputedFieldConfig` interface, allowing computed fields to specify if they need the underlying database column to be fetched. The DrizzleAdapter has been modified to track and include these columns in the SELECT statement, ensuring proper handling of computed fields that depend on real column values. Additionally, the logic for filtering columns has been refined to accommodate this new functionality.
+
 ## 0.5.16
 
 ### Patch Changes

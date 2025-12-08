@@ -137,6 +137,22 @@ describe('ComputedFieldConfig Type', () => {
 
     expect(computedField.includeByDefault).toBe(true);
   });
+
+  it('should accept computed field with requiresColumn flag', () => {
+    const computedField: ComputedFieldConfig<{ age: number }> = {
+      field: 'ageDisplay',
+      type: 'text',
+      requiresColumn: true,
+      compute: (row) => {
+        // This computed field needs access to the underlying 'age' column
+        const age = row.age;
+        return age !== null && age !== undefined ? `Age: ${age}` : 'Unknown';
+      },
+    };
+
+    expect(computedField.requiresColumn).toBe(true);
+    expect(computedField.compute).toBeDefined();
+  });
 });
 
 describe('DrizzleAdapterConfig with ComputedFields', () => {

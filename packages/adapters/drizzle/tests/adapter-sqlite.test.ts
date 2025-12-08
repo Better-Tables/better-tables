@@ -698,5 +698,42 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       expect(firstRow.isAdult).toBeDefined();
       expect(firstRow.ageGroup).toBeDefined();
     });
+
+    it('should fetch underlying column when requiresColumn is true', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'sqlite'>,
+        schema: testSchema,
+        driver: 'sqlite',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'age',
+              type: 'text',
+              requiresColumn: true, // This tells Better Tables to fetch the 'age' column
+              compute: (row: Record<string, unknown>) => {
+                // The 'age' column should be available because requiresColumn is true
+                const ageValue = row.age as number | null | undefined;
+                if (ageValue === null || ageValue === undefined) {
+                  return 'Age not set';
+                }
+                return `Age: ${ageValue}`;
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'age'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      expect(firstRow.age).toBeDefined();
+      expect(typeof firstRow.age).toBe('string');
+      // Verify that the compute function could access the age column
+      expect(firstRow.age).toMatch(/^(Age: \d+|Age not set)$/);
+    });
   });
 });

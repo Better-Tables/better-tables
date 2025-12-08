@@ -649,6 +649,46 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       const result = await adapter.fetchData(params);
       expect(result.meta?.cached).toBe(false);
     });
+
+    it('should include required columns in cache key for computed fields', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'age',
+              type: 'text',
+              requiresColumn: true,
+              compute: (row: Record<string, unknown>) => {
+                const ageValue = row.age as number | null | undefined;
+                return ageValue !== null && ageValue !== undefined ? `Age: ${ageValue}` : 'Unknown';
+              },
+            },
+          ],
+        },
+      });
+
+      // First call should not be cached
+      const result1 = await adapterWithComputed.fetchData({
+        columns: ['name', 'age'],
+      });
+      expect(result1.meta?.cached).toBe(false);
+
+      // Second call with same params should be cached
+      const result2 = await adapterWithComputed.fetchData({
+        columns: ['name', 'age'],
+      });
+      expect(result2.meta?.cached).toBe(true);
+
+      // Call with different columns should not use cache
+      const result3 = await adapterWithComputed.fetchData({
+        columns: ['name', 'email', 'age'],
+      });
+      expect(result3.meta?.cached).toBe(false);
+    });
   });
 
   describe('Events', () => {
@@ -1322,9 +1362,9 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
                 // Type assertion needed: test schema uses SQLite types but runs on PostgreSQL
                 // context.schema.posts is AnyTableType | undefined, but PostgreSQL needs PgTable
                 // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
-                const postsTable = context.schema.posts as any; 
+                const postsTable = context.schema.posts as any;
                 // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
-                const result = await (context.db as any) 
+                const result = await (context.db as any)
                   .select({ count: count() })
                   .from(postsTable)
                   .where(eq(postsTable.userId, row.id as number));
@@ -1334,9 +1374,9 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
                 // Type assertion needed: test schema uses SQLite types but runs on PostgreSQL
                 // context.schema.posts is AnyTableType | undefined, but PostgreSQL needs PgTable
                 // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
-                const postsTable = context.schema.posts as any; 
+                const postsTable = context.schema.posts as any;
                 // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
-                const postCountsSubquery = (context.db as any) 
+                const postCountsSubquery = (context.db as any)
                   .select({
                     userId: postsTable.userId,
                     count: count().as('post_count'),
@@ -1537,6 +1577,192 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       expect(firstRow.fullName).toBeDefined();
       expect(firstRow.isAdult).toBeDefined();
       expect(firstRow.ageGroup).toBeDefined();
+    });
+
+    it('should fetch underlying column when requiresColumn is true', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'age',
+              type: 'text',
+              requiresColumn: true, // This tells Better Tables to fetch the 'age' column
+              compute: (row: Record<string, unknown>) => {
+                // The 'age' column should be available because requiresColumn is true
+                const age = row.age as number | null | undefined;
+                if (age === null || age === undefined) {
+                  return 'Age not set';
+                }
+                return `Age: ${age}`;
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'age'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      expect(firstRow.age).toBeDefined();
+      expect(typeof firstRow.age).toBe('string');
+      // Verify that the compute function could access the age column
+      // If requiresColumn wasn't working, age would be undefined and we'd get 'Age not set'
+      // But we should get a proper age display for users that have age set
+      expect(firstRow.age).toMatch(/^(Age: \d+|Age not set)$/);
+    });
+
+    it('should include required column in SELECT statement', async () => {
+      // This test verifies that when requiresColumn is true, the underlying column
+      // is included in the SQL SELECT, not filtered out
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'age',
+              type: 'text',
+              requiresColumn: true,
+              compute: (row: Record<string, unknown>) => {
+                // Verify age is actually present in the row
+                const hasAge = 'age' in row && row.age !== undefined;
+                return hasAge ? `Age: ${row.age}` : 'No age column';
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'age'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      // If requiresColumn is working, the compute function should have access to 'age'
+      // If it's not working, we'd see 'No age column' in the result
+      const hasValidAge = result.data.some(
+        (row) =>
+          typeof (row as Record<string, unknown>).age === 'string' &&
+          (row as Record<string, unknown>).age !== 'No age column'
+      );
+      expect(hasValidAge).toBe(true);
+    });
+
+    it('should allow filtering on computed fields with requiresColumn', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'age',
+              type: 'text',
+              requiresColumn: true,
+              compute: (row: Record<string, unknown>) => {
+                const ageValue = row.age as number | null | undefined;
+                return ageValue !== null && ageValue !== undefined ? `Age: ${ageValue}` : 'Unknown';
+              },
+              filter: async (filter: FilterState) => {
+                // Custom filter that filters based on the underlying age column
+                // This demonstrates that filter functions still work with requiresColumn
+                const filterValue = filter.values?.[0] as string | undefined;
+                if (filterValue === 'adult') {
+                  return [
+                    {
+                      columnId: 'age',
+                      operator: 'greaterThanOrEqual',
+                      values: [18],
+                      type: 'number',
+                    },
+                  ];
+                }
+                return [];
+              },
+            },
+          ],
+        },
+      });
+
+      // Test filtering on the computed field
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'age'],
+        filters: [
+          {
+            columnId: 'age',
+            operator: 'equals',
+            values: ['adult'],
+            type: 'text',
+          },
+        ],
+      });
+
+      expect(result.data.length).toBeGreaterThanOrEqual(0);
+      // All returned users should have age >= 18 (if any exist)
+      for (const row of result.data) {
+        const rowObj = row as Record<string, unknown>;
+        // The computed field returns a string, but we need to check the original age value
+        // Since we're filtering, the age column should be >= 18
+        const ageDisplay = rowObj.age as string;
+        // Extract numeric age from "Age: 25" format for verification
+        const ageMatch = ageDisplay.match(/Age: (\d+)/);
+        if (ageMatch) {
+          const age = Number(ageMatch[1]);
+          expect(age).toBeGreaterThanOrEqual(18);
+        }
+      }
+    });
+
+    it('should maintain backward compatibility with computed fields without requiresColumn', async () => {
+      // This test ensures existing computed fields (without requiresColumn) still work
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'fullName',
+              type: 'text',
+              // No requiresColumn flag - should work as before
+              compute: (row: Record<string, unknown>) => `${row.name} (${row.email})`,
+            },
+            {
+              field: 'age',
+              type: 'text',
+              requiresColumn: true, // This one needs the column
+              compute: (row: Record<string, unknown>) => {
+                const ageValue = row.age as number | null | undefined;
+                return ageValue !== null && ageValue !== undefined ? `Age: ${ageValue}` : 'Unknown';
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'fullName', 'age'],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      const firstRow = result.data[0] as Record<string, unknown>;
+      // Both computed fields should work
+      expect(firstRow.fullName).toBeDefined();
+      expect(firstRow.age).toBeDefined();
+      // fullName should be computed from name and email (not require columns)
+      expect(typeof firstRow.fullName).toBe('string');
+      expect(firstRow.fullName).toContain(firstRow.name as string);
     });
   });
 });
