@@ -127,6 +127,13 @@ export interface BetterTableProps<TData = unknown>
     /** Configuration for which state to sync to URL */
     config?: UrlSyncConfig;
   };
+
+  /** Automatically show/hide columns based on active filters.
+   * When a filter is applied to a column, that column becomes visible.
+   * When the filter is removed, the column is hidden if it's not in defaultVisibleColumns.
+   * @default false
+   */
+  autoShowFilteredColumns?: boolean;
 }
 
 export function BetterTable<TData = unknown>({
@@ -168,6 +175,7 @@ export function BetterTable<TData = unknown>({
 
   // URL sync props
   urlSync,
+  autoShowFilteredColumns = false,
   ...props
 }: BetterTableProps<TData>) {
   const {
@@ -235,7 +243,7 @@ export function BetterTable<TData = unknown>({
   const { pagination, setPage, setPageSize } = useTablePagination(id);
   const { sorting: sortingState, toggleSort, setSorting } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
-  const { columnVisibility, toggleColumnVisibility } = useTableColumnVisibility(id);
+  const { columnVisibility, toggleColumnVisibility, setColumnVisibility } = useTableColumnVisibility(id);
   const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
 
   // Set up URL synchronization if adapter is provided
@@ -301,6 +309,52 @@ export function BetterTable<TData = unknown>({
   useEffect(() => {
     onSelectionChange?.(selectedRows);
   }, [selectedRows, onSelectionChange]);
+
+  // Auto-show/hide columns based on filters
+  const previousFiltersRef = React.useRef<FilterState[]>([]);
+  useEffect(() => {
+    if (!autoShowFilteredColumns) {
+      return;
+    }
+
+    const previousFilters = previousFiltersRef.current;
+    const currentFilteredColumns = new Set(filters.map((f) => f.columnId));
+    const previousFilteredColumns = new Set(previousFilters.map((f) => f.columnId));
+
+    // Find columns that were just filtered (added to filters)
+    const newlyFilteredColumns = Array.from(currentFilteredColumns).filter(
+      (col) => !previousFilteredColumns.has(col)
+    );
+
+    // Find columns that had filters removed
+    const unfilteredColumns = Array.from(previousFilteredColumns).filter(
+      (col) => !currentFilteredColumns.has(col)
+    );
+
+    // Show newly filtered columns
+    if (newlyFilteredColumns.length > 0) {
+      const newVisibility = { ...columnVisibility };
+      for (const columnId of newlyFilteredColumns) {
+        newVisibility[columnId] = true;
+      }
+      setColumnVisibility(newVisibility);
+    }
+
+    // Hide columns that had filters removed (only if not in defaultVisibleColumns)
+    if (unfilteredColumns.length > 0 && defaultVisibleColumns) {
+      const newVisibility = { ...columnVisibility };
+      for (const columnId of unfilteredColumns) {
+        // Only hide if it's not in defaultVisibleColumns
+        if (!defaultVisibleColumns.includes(columnId)) {
+          newVisibility[columnId] = false;
+        }
+      }
+      setColumnVisibility(newVisibility);
+    }
+
+    // Update ref for next comparison
+    previousFiltersRef.current = filters;
+  }, [autoShowFilteredColumns, filters, columnVisibility, setColumnVisibility, defaultVisibleColumns]);
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
