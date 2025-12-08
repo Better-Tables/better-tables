@@ -408,17 +408,26 @@ export class DrizzleAdapter<
 
       // Filter out computed fields from columns and track which ones were requested
       const requestedComputedFields: ComputedFieldConfig[] = [];
+      const columnsToFetch: string[] = []; // Track columns that need to be fetched for computed fields
       const columnsWithoutComputed = (params.columns || []).filter((col) => {
         const isComputed = tableComputedFields.some((cf) => cf.field === col);
         if (isComputed) {
           const computedField = tableComputedFields.find((cf) => cf.field === col);
           if (computedField) {
             requestedComputedFields.push(computedField);
+            // If computed field requires the underlying column, include it in the SELECT
+            if (computedField.requiresColumn) {
+              columnsToFetch.push(col);
+            }
           }
-          return false; // Filter out computed fields
+          // Only filter out if it doesn't require the column
+          return computedField?.requiresColumn === true;
         }
         return true;
       });
+
+      // Merge columns that need to be fetched for computed fields
+      const finalColumns = [...columnsWithoutComputed, ...columnsToFetch];
 
       // Handle computed field filtering
       let processedFilters = [...(params.filters || [])];
@@ -433,11 +442,17 @@ export class DrizzleAdapter<
 
       // Build cache params early (needed for error handling)
       // Include computed fields in cache key to prevent cache collisions
-      const cacheParams: FetchDataParams & { computedFields?: string[] } = {
+      const cacheParams: FetchDataParams & {
+        computedFields?: string[];
+        computedFieldsRequiringColumns?: string[];
+      } = {
         ...params,
         columns: columnsWithoutComputed,
         filters: processedFilters,
         computedFields: requestedComputedFields.map((cf) => cf.field),
+        computedFieldsRequiringColumns: requestedComputedFields
+          .filter((cf) => cf.requiresColumn)
+          .map((cf) => cf.field),
       };
 
       // Process computed field filters
@@ -515,10 +530,11 @@ export class DrizzleAdapter<
         };
       }
 
-      // Build queries - pass primaryTable to query builder (without computed fields)
+      // Build queries - pass primaryTable to query builder
+      // Include columns that computed fields require (e.g., roles column for enum array filtering)
       const { dataQuery, countQuery, columnMetadata, isNested } =
         this.queryBuilder.buildCompleteQuery({
-          columns: columnsWithoutComputed,
+          columns: finalColumns,
           filters: processedFilters,
           sorting: params.sorting || [],
           pagination: params.pagination || { page: 1, limit: 10 },

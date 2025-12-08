@@ -699,6 +699,14 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
 
   /** Whether this field should be included by default when no columns specified */
   includeByDefault?: boolean;
+
+  /** Whether this computed field requires the underlying database column to be fetched.
+   * When true, the column will be included in the SELECT statement even though it's a computed field.
+   * This is useful when a real column needs custom filter logic but the compute function
+   * needs to access the actual column value.
+   * @default false
+   */
+  requiresColumn?: boolean;
 }
 
 /**
