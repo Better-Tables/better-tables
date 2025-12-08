@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { Command } from 'commander';
 import { commandsRegistry, type RegisteredCommandName } from '../src/commands';
-import { createCommand, registerCommandFactory } from '../src/lib/command-factory';
 import { docsCommand } from '../src/commands/docs';
 import { helpCommand } from '../src/commands/help';
+import { initCommand } from '../src/commands/init';
+import { createCommand, registerCommandFactory } from '../src/lib/command-factory';
 
 describe('CLI', () => {
   it('should have correct name and description', () => {
@@ -22,6 +23,7 @@ describe('CLI', () => {
     // Register all command factories
     registerCommandFactory('help', helpCommand);
     registerCommandFactory('docs', docsCommand);
+    registerCommandFactory('init', initCommand);
 
     const program = new Command();
     const commandNames = Object.keys(commandsRegistry) as RegisteredCommandName[];
@@ -43,6 +45,7 @@ describe('CLI', () => {
   it('should have all commands from registry accessible', () => {
     registerCommandFactory('help', helpCommand);
     registerCommandFactory('docs', docsCommand);
+    registerCommandFactory('init', initCommand);
 
     const program = new Command();
     const commandNames = Object.keys(commandsRegistry) as RegisteredCommandName[];

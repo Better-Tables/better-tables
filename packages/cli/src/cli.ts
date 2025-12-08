@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { commandsRegistry, type RegisteredCommandName } from './commands';
 import { docsCommand } from './commands/docs';
 import { helpCommand } from './commands/help';
+import { initCommand } from './commands/init';
 import { createCommand, registerCommandFactory } from './lib/command-factory';
 
 // Read version from package.json
@@ -24,6 +25,7 @@ program
 // This ensures type safety - only commands in commandsRegistry can be registered
 registerCommandFactory('help', helpCommand);
 registerCommandFactory('docs', docsCommand);
+registerCommandFactory('init', initCommand);
 
 // Add all registered commands to the program
 // TypeScript ensures we can only reference commands that exist in the registry
