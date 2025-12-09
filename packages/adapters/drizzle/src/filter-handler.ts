@@ -993,12 +993,46 @@ export class FilterHandler {
       case 'isAnyOf': {
         // Filter out undefined values before passing to inArray
         const validValues = values.filter((v) => v !== undefined);
-        return validValues.length > 0 ? inArray(column, validValues) : undefined;
+        if (validValues.length === 0) {
+          return undefined;
+        }
+        // For PostgreSQL, use array literal for very large arrays to avoid parameter binding issues
+        // PostgreSQL has a limit of 65535 parameters, but large arrays can cause performance issues
+        // When inArray is used with >1000 values, it can create too many parameter placeholders
+        // Use array literal with = ANY() for arrays larger than 1000 values
+        // Note: Values are assumed to be safe (from database queries), but we still escape them
+        if (this.databaseType === 'postgres' && validValues.length > 1000) {
+          // Build PostgreSQL array literal: column = ANY(ARRAY['value1', 'value2', ...])
+          // Escape single quotes and wrap values in quotes
+          // Since these values come from database queries (IDs), they should be safe
+          const escapedValues = validValues.map((v) => {
+            const str = String(v);
+            // Escape single quotes by doubling them (PostgreSQL escaping)
+            // Also escape backslashes
+            return `'${str.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
+          });
+          const arrayLiteral = `ARRAY[${escapedValues.join(', ')}]`;
+          return sql`${column} = ANY(${sql.raw(arrayLiteral)})`;
+        }
+        return inArray(column, validValues);
       }
       case 'isNoneOf': {
         // Filter out undefined values before passing to notInArray
         const validValuesForNone = values.filter((v) => v !== undefined);
-        return validValuesForNone.length > 0 ? notInArray(column, validValuesForNone) : undefined;
+        if (validValuesForNone.length === 0) {
+          return undefined;
+        }
+        // For PostgreSQL, use array literal for very large arrays to avoid parameter binding issues
+        if (this.databaseType === 'postgres' && validValuesForNone.length > 1000) {
+          // Build PostgreSQL array literal: column != ALL(ARRAY['value1', 'value2', ...])
+          const escapedValues = validValuesForNone.map((v) => {
+            const str = String(v);
+            return `'${str.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
+          });
+          const arrayLiteral = `ARRAY[${escapedValues.join(', ')}]`;
+          return sql`${column} != ALL(${sql.raw(arrayLiteral)})`;
+        }
+        return notInArray(column, validValuesForNone);
       }
       case 'equals':
         if (values[0] === undefined) {
