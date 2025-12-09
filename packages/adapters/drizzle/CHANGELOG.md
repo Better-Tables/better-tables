@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.19
+
+### Patch Changes
+
+- Add getPostgresColumnType method to FilterHandler for type inference. This update introduces a new private method, `getPostgresColumnType`, to the FilterHandler class. This method determines the PostgreSQL type name for a given column, enhancing type safety when building SQL conditions. The `buildLargeArrayAnyCondition` and `buildLargeArrayAllCondition` methods have been updated to utilize this new method, allowing for proper type casting of arrays in SQL expressions, thereby preventing type mismatch errors. This change improves the robustness and reliability of array handling in PostgreSQL.
+
 ## 0.5.18
 
 ### Patch Changes
