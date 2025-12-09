@@ -11,6 +11,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import { pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
 import type { DrizzleDatabase } from '../src/types';
@@ -103,12 +104,12 @@ describe('DrizzleAdapter - PostgreSQL Large Array Integration Tests', () => {
 
   describe('Large Array Filtering with isAnyOf', () => {
     it('should handle 1,000 values without errors', async () => {
-      // Insert test data
+      // Insert test data using parameterized queries
       const testIds = generateTestUUIDs(1000);
       for (const id of testIds.slice(0, 100)) {
-        // Insert a subset for testing
+        // Insert a subset for testing using parameterized query
         await testDb.execute(
-          `INSERT INTO test_users (id, email, name) VALUES ('${id}', 'test@example.com', 'Test User') ON CONFLICT DO NOTHING;`
+          sql`INSERT INTO test_users (id, email, name) VALUES (${id}::uuid, 'test@example.com', 'Test User') ON CONFLICT DO NOTHING`
         );
       }
 
@@ -197,11 +198,11 @@ describe('DrizzleAdapter - PostgreSQL Large Array Integration Tests', () => {
     });
 
     it('should handle text column with large array', async () => {
-      // Insert test data with known emails
+      // Insert test data with known emails using parameterized queries
       const testEmails = generateTestTexts(100);
       for (let i = 0; i < 100; i++) {
         await testDb.execute(
-          `INSERT INTO test_users (id, email, name) VALUES (gen_random_uuid(), '${testEmails[i]}', 'Test User') ON CONFLICT DO NOTHING;`
+          sql`INSERT INTO test_users (id, email, name) VALUES (gen_random_uuid(), ${testEmails[i]}, 'Test User') ON CONFLICT DO NOTHING`
         );
       }
 

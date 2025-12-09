@@ -218,6 +218,48 @@ describe('FilterHandler - Large Array Parameter Binding', () => {
       const condition = handler.buildFilterCondition(filter, 'users');
       expect(condition).toBeDefined();
     });
+
+    it('should handle exactly 50 values (new batch size)', () => {
+      const values = generateTestValues(50);
+      const filter: FilterState = {
+        columnId: 'id',
+        operator: 'isAnyOf',
+        values,
+        type: 'option',
+      };
+
+      const condition = handler.buildFilterCondition(filter, 'users');
+      expect(condition).toBeDefined();
+    });
+
+    it('should handle 51 values (just over new batch size)', () => {
+      const values = generateTestValues(51);
+      const filter: FilterState = {
+        columnId: 'id',
+        operator: 'isAnyOf',
+        values,
+        type: 'option',
+      };
+
+      const condition = handler.buildFilterCondition(filter, 'users');
+      expect(condition).toBeDefined();
+    });
+
+    it('should handle single batch case (50 values or less when over threshold)', () => {
+      // Test that single batch (50 values) works correctly when over 1000 threshold
+      const values = generateTestValues(50);
+      // Force it to use large array handler by using 1001 values total
+      const allValues = [...values, ...generateTestValues(951)];
+      const filter: FilterState = {
+        columnId: 'id',
+        operator: 'isAnyOf',
+        values: allValues,
+        type: 'option',
+      };
+
+      const condition = handler.buildFilterCondition(filter, 'users');
+      expect(condition).toBeDefined();
+    });
   });
 
   describe('Type Casting', () => {
