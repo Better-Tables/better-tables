@@ -1659,24 +1659,24 @@ export class FilterHandler {
   }
 
   /**
-   * Build a parameterized PostgreSQL array condition for large arrays using = ANY().
+   * Build a parameterized PostgreSQL condition for large arrays using batched VALUES clauses.
    *
    * @description
    * For very large arrays (>1000 values), inArray can cause parameter binding issues.
-   * This method uses a parameterized ARRAY literal with = ANY() to maintain security
-   * while avoiding the parameter limit issues.
+   * This method batches values into smaller chunks (1000 values each) and combines them
+   * with OR conditions to avoid parameter binding issues while maintaining security.
    *
    * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
    * This maintains the same security guarantees as inArray while supporting larger arrays.
    *
    * @param column - The column to compare against
    * @param values - Array of values to check
-   * @returns SQL expression: column = ANY(ARRAY[$1, $2, ...]::type[])
+   * @returns SQL expression: (column IN (...)) OR (column IN (...)) OR ...
    *
    * @example
    * ```typescript
    * const condition = this.buildLargeArrayAnyCondition(usersTable.id, [id1, id2, ...]);
-   * // Generates: usersTable.id = ANY(ARRAY[$1, $2, ...]::uuid[])
+   * // Generates: (usersTable.id IN (SELECT val::uuid FROM (VALUES ($1), ...) AS t(val))) OR ...
    * ```
    *
    * @since 1.0.0
@@ -1685,42 +1685,67 @@ export class FilterHandler {
     column: ColumnOrExpression,
     values: unknown[]
   ): SQL | SQLWrapper {
-    // Build parameterized PostgreSQL array: ARRAY[$1, $2, ...]
-    // Each value is properly parameterized through Drizzle's sql template tag
-    const parameterizedValues = values.map((v) => sql`${v}`);
-    const arrayLiteral = sql`ARRAY[${sql.join(parameterizedValues, sql`, `)}]`;
+    // Batch values into chunks of 1000 to avoid parameter binding issues
+    // Each batch will have proper parameter binding, then we combine with OR
+    const BATCH_SIZE = 1000;
+    const batches: unknown[][] = [];
 
-    // Cast array to match column type if we can determine it
-    // This prevents "operator does not exist: uuid = text" errors
-    const columnType = this.getPostgresColumnType(column);
-    if (columnType) {
-      // Cast the array to the column's type: ARRAY[...]::uuid[]
-      return sql`${column} = ANY(${arrayLiteral}::${sql.raw(columnType)}[])`;
+    for (let i = 0; i < values.length; i += BATCH_SIZE) {
+      batches.push(values.slice(i, i + BATCH_SIZE));
     }
 
-    // If we can't determine the type, let PostgreSQL infer it (may cause errors)
-    return sql`${column} = ANY(${arrayLiteral})`;
+    // If only one batch, use simple VALUES clause
+    if (batches.length === 1) {
+      const batch = batches[0];
+      if (!batch || batch.length === 0) {
+        return sql`FALSE`;
+      }
+      const valueTuples = batch.map((v) => sql`(${v})`);
+      const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
+      const columnType = this.getPostgresColumnType(column);
+
+      if (columnType) {
+        return sql`${column} IN (SELECT val::${sql.raw(columnType)} FROM ${valuesClause})`;
+      }
+      return sql`${column} IN (SELECT val FROM ${valuesClause})`;
+    }
+
+    // Multiple batches: combine with OR
+    const columnType = this.getPostgresColumnType(column);
+    const batchConditions = batches.map((batch) => {
+      const valueTuples = batch.map((v) => sql`(${v})`);
+      const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
+
+      if (columnType) {
+        return sql`${column} IN (SELECT val::${sql.raw(columnType)} FROM ${valuesClause})`;
+      }
+      return sql`${column} IN (SELECT val FROM ${valuesClause})`;
+    });
+
+    // Combine all batches with OR
+    const combinedCondition = or(...batchConditions);
+    return combinedCondition ?? sql`FALSE`;
   }
 
   /**
-   * Build a parameterized PostgreSQL array condition for large arrays using != ALL().
+   * Build a parameterized PostgreSQL condition for large arrays using batched VALUES clauses.
    *
    * @description
    * For very large arrays (>1000 values), notInArray can cause parameter binding issues.
-   * This method uses a parameterized ARRAY literal with != ALL() to maintain security
-   * while avoiding the parameter limit issues.
+   * This method batches values into smaller chunks (1000 values each) and combines them
+   * with AND conditions to avoid parameter binding issues while maintaining security.
    *
    * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
    * This maintains the same security guarantees as notInArray while supporting larger arrays.
    *
    * @param column - The column to compare against
    * @param values - Array of values to exclude
-   * @returns SQL expression: column != ALL(ARRAY[$1, $2, ...]::type[])
+   * @returns SQL expression: (column NOT IN (...)) AND (column NOT IN (...)) AND ...
    *
    * @example
    * ```typescript
    * const condition = this.buildLargeArrayAllCondition(usersTable.id, [id1, id2, ...]);
-   * // Generates: usersTable.id != ALL(ARRAY[$1, $2, ...]::uuid[])
+   * // Generates: (usersTable.id NOT IN (SELECT val::uuid FROM (VALUES ($1), ...) AS t(val))) AND ...
    * ```
    *
    * @since 1.0.0
@@ -1729,21 +1754,46 @@ export class FilterHandler {
     column: ColumnOrExpression,
     values: unknown[]
   ): SQL | SQLWrapper {
-    // Build parameterized PostgreSQL array: ARRAY[$1, $2, ...]
-    // Each value is properly parameterized through Drizzle's sql template tag
-    const parameterizedValues = values.map((v) => sql`${v}`);
-    const arrayLiteral = sql`ARRAY[${sql.join(parameterizedValues, sql`, `)}]`;
+    // Batch values into chunks of 1000 to avoid parameter binding issues
+    // Each batch will have proper parameter binding, then we combine with AND
+    const BATCH_SIZE = 1000;
+    const batches: unknown[][] = [];
 
-    // Cast array to match column type if we can determine it
-    // This prevents "operator does not exist: uuid = text" errors
-    const columnType = this.getPostgresColumnType(column);
-    if (columnType) {
-      // Cast the array to the column's type: ARRAY[...]::uuid[]
-      return sql`${column} != ALL(${arrayLiteral}::${sql.raw(columnType)}[])`;
+    for (let i = 0; i < values.length; i += BATCH_SIZE) {
+      batches.push(values.slice(i, i + BATCH_SIZE));
     }
 
-    // If we can't determine the type, let PostgreSQL infer it (may cause errors)
-    return sql`${column} != ALL(${arrayLiteral})`;
+    // If only one batch, use simple VALUES clause
+    if (batches.length === 1) {
+      const batch = batches[0];
+      if (!batch || batch.length === 0) {
+        return sql`TRUE`; // NOT IN with empty set matches everything
+      }
+      const valueTuples = batch.map((v) => sql`(${v})`);
+      const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
+      const columnType = this.getPostgresColumnType(column);
+
+      if (columnType) {
+        return sql`${column} NOT IN (SELECT val::${sql.raw(columnType)} FROM ${valuesClause})`;
+      }
+      return sql`${column} NOT IN (SELECT val FROM ${valuesClause})`;
+    }
+
+    // Multiple batches: combine with AND (NOT IN requires all conditions to be true)
+    const columnType = this.getPostgresColumnType(column);
+    const batchConditions = batches.map((batch) => {
+      const valueTuples = batch.map((v) => sql`(${v})`);
+      const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
+
+      if (columnType) {
+        return sql`${column} NOT IN (SELECT val::${sql.raw(columnType)} FROM ${valuesClause})`;
+      }
+      return sql`${column} NOT IN (SELECT val FROM ${valuesClause})`;
+    });
+
+    // Combine all batches with AND (all must be true for NOT IN)
+    const combinedCondition = and(...batchConditions);
+    return combinedCondition ?? sql`TRUE`;
   }
 
   /**
