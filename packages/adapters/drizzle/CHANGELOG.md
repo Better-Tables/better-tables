@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.21
+
+### Patch Changes
+
+- Enhance PostgreSQL integration tests to utilize parameterized queries for large arrays. Added tests for handling 50 and 51 values, ensuring proper functionality with new batch sizes. Updated existing tests to use parameterized queries for improved security and reliability.
+
 ## 0.5.20
 
 ### Patch Changes
