@@ -747,10 +747,16 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
  *
  * @example
  * ```typescript
+ * import { inArray } from 'drizzle-orm';
+ *
  * const hooks: FilterHandlerHooks = {
  *   buildLargeArrayCondition: (column, values, operator) => {
- *     // Custom implementation for very large arrays
- *     return sql`${column} = ANY(${sql.raw(`ARRAY[${values.join(',')}]`)})`;
+ *     // Custom implementation for very large arrays using parameterized queries
+ *     if (operator === 'isAnyOf') {
+ *       return inArray(column, values);
+ *     }
+ *     // Return null to use default behavior for other operators
+ *     return null;
  *   }
  * };
  * ```

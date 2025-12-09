@@ -128,6 +128,13 @@ export class FilterHandler {
    */
   private static readonly MAX_JSONB_FIELD_NAME_LENGTH = 255;
 
+  /**
+   * Maximum number of batches per group before using nested grouping.
+   * When combining too many batches with or()/and(), Drizzle can lose parameter bindings.
+   * Grouping batches into chunks creates a tree structure that preserves bindings.
+   */
+  private static readonly MAX_BATCHES_PER_GROUP = 200;
+
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
@@ -1750,40 +1757,15 @@ export class FilterHandler {
 
     // Combine all batches with OR
     if (batchConditions.length === 1) {
-      return batchConditions[0]!;
+      const singleCondition = batchConditions[0];
+      if (singleCondition) {
+        return singleCondition;
+      }
+      return sql`FALSE`;
     }
 
-    // Use nested OR grouping when there are too many batches to prevent parameter binding loss
-    // When combining 200+ batches with or(), Drizzle can lose parameter bindings
-    // Group batches into chunks and combine groups, creating a tree structure
-    const MAX_BATCHES_PER_GROUP = 200;
-    if (batchConditions.length > MAX_BATCHES_PER_GROUP) {
-      // Group batches into chunks
-      const groups: (SQL | SQLWrapper)[][] = [];
-      for (let i = 0; i < batchConditions.length; i += MAX_BATCHES_PER_GROUP) {
-        groups.push(batchConditions.slice(i, i + MAX_BATCHES_PER_GROUP));
-      }
-
-      // Combine each group with OR
-      const groupConditions = groups.map((group) => {
-        if (group.length === 1) {
-          return group[0]!;
-        }
-        const groupCondition = or(...group);
-        return groupCondition ?? sql`FALSE`;
-      });
-
-      // Combine groups with OR
-      if (groupConditions.length === 1) {
-        return groupConditions[0]!;
-      }
-      const combinedCondition = or(...groupConditions);
-      return combinedCondition ?? sql`FALSE`;
-    }
-
-    // For smaller numbers of batches, use flat OR (more efficient)
-    const combinedCondition = or(...batchConditions);
-    return combinedCondition ?? sql`FALSE`;
+    // Use nested grouping when there are too many batches to prevent parameter binding loss
+    return this.combineBatchConditions(batchConditions, or, sql`FALSE`);
   }
 
   /**
@@ -1853,40 +1835,75 @@ export class FilterHandler {
 
     // Combine all batches with AND (NOT IN requires all conditions to be true)
     if (batchConditions.length === 1) {
-      return batchConditions[0]!;
+      const singleCondition = batchConditions[0];
+      if (singleCondition) {
+        return singleCondition;
+      }
+      return sql`TRUE`;
     }
 
-    // Use nested AND grouping when there are too many batches to prevent parameter binding loss
-    // When combining 200+ batches with and(), Drizzle can lose parameter bindings
+    // Use nested grouping when there are too many batches to prevent parameter binding loss
+    return this.combineBatchConditions(batchConditions, and, sql`TRUE`);
+  }
+
+  /**
+   * Combine batch conditions using nested grouping when there are too many batches.
+   * This prevents parameter binding loss that can occur when combining 200+ conditions.
+   *
+   * @private
+   * @param batchConditions - Array of SQL conditions (one per batch)
+   * @param combiner - Function to combine conditions (or/and)
+   * @param fallback - Fallback value when combiner returns null
+   * @returns Combined SQL condition
+   */
+  private combineBatchConditions(
+    batchConditions: (SQL | SQLWrapper)[],
+    combiner: (...conditions: (SQL | SQLWrapper)[]) => SQL | SQLWrapper | undefined,
+    fallback: SQL | SQLWrapper
+  ): SQL | SQLWrapper {
+    // Single batch - no need to combine
+    if (batchConditions.length === 1) {
+      const singleCondition = batchConditions[0];
+      if (singleCondition) {
+        return singleCondition;
+      }
+      return fallback;
+    }
+
+    // Use nested grouping when there are too many batches to prevent parameter binding loss
+    // When combining 200+ batches, Drizzle can lose parameter bindings
     // Group batches into chunks and combine groups, creating a tree structure
-    const MAX_BATCHES_PER_GROUP = 200;
-    if (batchConditions.length > MAX_BATCHES_PER_GROUP) {
+    if (batchConditions.length > FilterHandler.MAX_BATCHES_PER_GROUP) {
       // Group batches into chunks
       const groups: (SQL | SQLWrapper)[][] = [];
-      for (let i = 0; i < batchConditions.length; i += MAX_BATCHES_PER_GROUP) {
-        groups.push(batchConditions.slice(i, i + MAX_BATCHES_PER_GROUP));
+      for (let i = 0; i < batchConditions.length; i += FilterHandler.MAX_BATCHES_PER_GROUP) {
+        groups.push(batchConditions.slice(i, i + FilterHandler.MAX_BATCHES_PER_GROUP));
       }
 
-      // Combine each group with AND
+      // Combine each group
       const groupConditions = groups.map((group) => {
         if (group.length === 1) {
-          return group[0]!;
+          const singleGroupCondition = group[0];
+          if (singleGroupCondition) {
+            return singleGroupCondition;
+          }
+          return fallback;
         }
-        const groupCondition = and(...group);
-        return groupCondition ?? sql`TRUE`;
+        const groupCondition = combiner(...group);
+        return groupCondition ?? fallback;
       });
 
-      // Combine groups with AND
+      // Combine groups
       if (groupConditions.length === 1) {
-        return groupConditions[0]!;
+        return groupConditions[0] ?? fallback;
       }
-      const combinedCondition = and(...groupConditions);
-      return combinedCondition ?? sql`TRUE`;
+      const combinedCondition = combiner(...groupConditions);
+      return combinedCondition ?? fallback;
     }
 
-    // For smaller numbers of batches, use flat AND (more efficient)
-    const combinedCondition = and(...batchConditions);
-    return combinedCondition ?? sql`TRUE`;
+    // For smaller numbers of batches, use flat combination (more efficient)
+    const combinedCondition = combiner(...batchConditions);
+    return combinedCondition ?? fallback;
   }
 
   /**

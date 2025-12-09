@@ -352,16 +352,16 @@ const adapter = new DrizzleAdapter({
             .where(eq(eventAttendeesTable.eventId, row.id));
           return result[0]?.count || 0;
         },
-      filter: async (filter, context) => {
-        // Transform attendeeCount filter into id filter
-        const matchingIds = await getEventIdsByAttendeeCount(filter, context);
-        return [{
-          columnId: 'id',
-          operator: 'isAnyOf',
-          values: matchingIds,
-          type: 'text',
-        }];
-      },
+        filter: async (filter, context) => {
+          // Transform attendeeCount filter into id filter
+          const matchingIds = await getEventIdsByAttendeeCount(filter, context);
+          return [{
+            columnId: 'id',
+            operator: 'isAnyOf',
+            values: matchingIds,
+            type: 'text',
+          }];
+        },
       // Alternative: Use filterSql for better performance (applied before pagination)
       // filterSql: async (filter, context) => {
       //   // Return SQL condition directly - more efficient for large result sets

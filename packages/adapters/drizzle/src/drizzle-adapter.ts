@@ -448,9 +448,13 @@ export class DrizzleAdapter<
 
       // Build cache params early (needed for error handling)
       // Include computed fields in cache key to prevent cache collisions
+      // IMPORTANT: Include original computed field filters in cache key before they're processed
+      // This ensures different filterSql conditions produce different cache keys
+      const originalComputedFieldFilters = computedFieldFilters.map(({ filter }) => filter);
       const cacheParams: FetchDataParams & {
         computedFields?: string[];
         computedFieldsRequiringColumns?: string[];
+        computedFieldFilters?: FilterState[]; // Include original filters for cache key
       } = {
         ...params,
         columns: columnsWithoutComputed,
@@ -459,6 +463,7 @@ export class DrizzleAdapter<
         computedFieldsRequiringColumns: requestedComputedFields
           .filter((cf) => cf.requiresColumn)
           .map((cf) => cf.field),
+        computedFieldFilters: originalComputedFieldFilters, // Include for cache key
       };
 
       // Process computed field filters
@@ -519,8 +524,8 @@ export class DrizzleAdapter<
 
         // Update cache params with processed filters
         cacheParams.filters = processedFilters;
-        // Note: additionalSqlConditions are not included in cache key as they're applied directly
-        // This is intentional - SQL conditions from filterSql are applied before pagination
+        // Note: computedFieldFilters are already in cache key (set above before processing)
+        // This ensures different filter values produce different cache keys even when using filterSql
       }
       const cacheKey = this.getCacheKey(cacheParams);
       const cached = this.getFromCache(cacheKey);
@@ -1063,7 +1068,12 @@ export class DrizzleAdapter<
   /**
    * Cache management
    */
-  private getCacheKey(params: FetchDataParams & { computedFields?: string[] }): string {
+  private getCacheKey(
+    params: FetchDataParams & {
+      computedFields?: string[];
+      computedFieldFilters?: FilterState[];
+    }
+  ): string {
     return JSON.stringify(params);
   }
 
