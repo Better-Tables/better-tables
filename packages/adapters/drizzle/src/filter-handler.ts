@@ -1659,12 +1659,13 @@ export class FilterHandler {
   }
 
   /**
-   * Build a parameterized PostgreSQL condition for large arrays using batched VALUES clauses.
+   * Build a parameterized PostgreSQL condition for large arrays using small-batch VALUES clauses.
    *
    * @description
    * For very large arrays (>1000 values), inArray can cause parameter binding issues.
-   * This method batches values into smaller chunks (1000 values each) and combines them
-   * with OR conditions to avoid parameter binding issues while maintaining security.
+   * This method uses very small batches (50 values) with VALUES clauses and sql.join()
+   * to preserve parameter bindings. Using sql.join() instead of manual combination
+   * ensures Drizzle's parameter tracking system correctly preserves all parameter bindings.
    *
    * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
    * This maintains the same security guarantees as inArray while supporting larger arrays.
@@ -1685,35 +1686,26 @@ export class FilterHandler {
     column: ColumnOrExpression,
     values: unknown[]
   ): SQL | SQLWrapper {
-    // Batch values into chunks of 1000 to avoid parameter binding issues
-    // Each batch will have proper parameter binding, then we combine with OR
-    const BATCH_SIZE = 1000;
+    if (values.length === 0) {
+      return sql`FALSE`;
+    }
+
+    // Use very small batches (50 values) to avoid parameter binding issues
+    // sql.join() preserves parameter bindings better than manual combination
+    // Smaller batches ensure Drizzle's parameter tracking system works correctly
+    const BATCH_SIZE = 50;
     const batches: unknown[][] = [];
 
     for (let i = 0; i < values.length; i += BATCH_SIZE) {
       batches.push(values.slice(i, i + BATCH_SIZE));
     }
 
-    // If only one batch, use simple VALUES clause
-    if (batches.length === 1) {
-      const batch = batches[0];
-      if (!batch || batch.length === 0) {
-        return sql`FALSE`;
-      }
-      const valueTuples = batch.map((v) => sql`(${v})`);
-      const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
-      const columnType = this.getPostgresColumnType(column);
-
-      if (columnType) {
-        return sql`${column} IN (SELECT val::${sql.raw(columnType)} FROM ${valuesClause})`;
-      }
-      return sql`${column} IN (SELECT val FROM ${valuesClause})`;
-    }
-
-    // Multiple batches: combine with OR
     const columnType = this.getPostgresColumnType(column);
+
+    // Build condition for each batch using sql.join() to preserve parameter bindings
     const batchConditions = batches.map((batch) => {
-      const valueTuples = batch.map((v) => sql`(${v})`);
+      // Build VALUES clause using sql.join() which properly preserves parameter bindings
+      const valueTuples = batch.map((value) => sql`(${value})`);
       const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
 
       if (columnType) {
@@ -1723,17 +1715,22 @@ export class FilterHandler {
     });
 
     // Combine all batches with OR
+    if (batchConditions.length === 1) {
+      return batchConditions[0]!;
+    }
+
     const combinedCondition = or(...batchConditions);
     return combinedCondition ?? sql`FALSE`;
   }
 
   /**
-   * Build a parameterized PostgreSQL condition for large arrays using batched VALUES clauses.
+   * Build a parameterized PostgreSQL condition for large arrays using small-batch VALUES clauses.
    *
    * @description
    * For very large arrays (>1000 values), notInArray can cause parameter binding issues.
-   * This method batches values into smaller chunks (1000 values each) and combines them
-   * with AND conditions to avoid parameter binding issues while maintaining security.
+   * This method uses very small batches (50 values) with VALUES clauses and sql.join()
+   * to preserve parameter bindings. Using sql.join() instead of manual combination
+   * ensures Drizzle's parameter tracking system correctly preserves all parameter bindings.
    *
    * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
    * This maintains the same security guarantees as notInArray while supporting larger arrays.
@@ -1754,35 +1751,26 @@ export class FilterHandler {
     column: ColumnOrExpression,
     values: unknown[]
   ): SQL | SQLWrapper {
-    // Batch values into chunks of 1000 to avoid parameter binding issues
-    // Each batch will have proper parameter binding, then we combine with AND
-    const BATCH_SIZE = 1000;
+    if (values.length === 0) {
+      return sql`TRUE`; // NOT IN with empty set matches everything
+    }
+
+    // Use very small batches (50 values) to avoid parameter binding issues
+    // sql.join() preserves parameter bindings better than manual combination
+    // Smaller batches ensure Drizzle's parameter tracking system works correctly
+    const BATCH_SIZE = 50;
     const batches: unknown[][] = [];
 
     for (let i = 0; i < values.length; i += BATCH_SIZE) {
       batches.push(values.slice(i, i + BATCH_SIZE));
     }
 
-    // If only one batch, use simple VALUES clause
-    if (batches.length === 1) {
-      const batch = batches[0];
-      if (!batch || batch.length === 0) {
-        return sql`TRUE`; // NOT IN with empty set matches everything
-      }
-      const valueTuples = batch.map((v) => sql`(${v})`);
-      const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
-      const columnType = this.getPostgresColumnType(column);
-
-      if (columnType) {
-        return sql`${column} NOT IN (SELECT val::${sql.raw(columnType)} FROM ${valuesClause})`;
-      }
-      return sql`${column} NOT IN (SELECT val FROM ${valuesClause})`;
-    }
-
-    // Multiple batches: combine with AND (NOT IN requires all conditions to be true)
     const columnType = this.getPostgresColumnType(column);
+
+    // Build condition for each batch using sql.join() to preserve parameter bindings
     const batchConditions = batches.map((batch) => {
-      const valueTuples = batch.map((v) => sql`(${v})`);
+      // Build VALUES clause using sql.join() which properly preserves parameter bindings
+      const valueTuples = batch.map((value) => sql`(${value})`);
       const valuesClause = sql`(VALUES ${sql.join(valueTuples, sql`, `)}) AS t(val)`;
 
       if (columnType) {
@@ -1791,7 +1779,11 @@ export class FilterHandler {
       return sql`${column} NOT IN (SELECT val FROM ${valuesClause})`;
     });
 
-    // Combine all batches with AND (all must be true for NOT IN)
+    // Combine all batches with AND (NOT IN requires all conditions to be true)
+    if (batchConditions.length === 1) {
+      return batchConditions[0]!;
+    }
+
     const combinedCondition = and(...batchConditions);
     return combinedCondition ?? sql`TRUE`;
   }
