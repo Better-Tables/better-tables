@@ -64,7 +64,7 @@ import type {
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
-import type { InferSelectModel, Relations } from 'drizzle-orm';
+import type { InferSelectModel, Relations, SQL, SQLWrapper } from 'drizzle-orm';
 
 import { DataTransformer } from './data-transformer';
 import { getOperationsFactory } from './operations';
@@ -80,6 +80,7 @@ import type {
   DatabaseOperations,
   DrizzleAdapterConfig,
   DrizzleDatabase,
+  FilterHandlerHooks,
   RelationshipMap,
   TableWithId,
 } from './types';
@@ -154,6 +155,7 @@ export class DrizzleAdapter<
   // Internal storage uses generic type for runtime flexibility
   // Type safety is enforced at config level via DrizzleAdapterConfig
   private computedFields: Record<string, ComputedFieldConfig[]> = {};
+  private hooks?: FilterHandlerHooks;
 
   public readonly meta: AdapterMeta;
 
@@ -196,6 +198,9 @@ export class DrizzleAdapter<
     this.db = config.db;
     this.schema = config.schema;
     this.options = config.options || {};
+    if (config.hooks !== undefined) {
+      this.hooks = config.hooks;
+    }
     // Type assertion is safe: config.computedFields is validated at compile time
     // Runtime structure matches Record<string, ComputedFieldConfig[]>
     this.computedFields =
@@ -282,7 +287,7 @@ export class DrizzleAdapter<
    */
   private createQueryBuilderStrategy(driver: TDriver): BaseQueryBuilder {
     const createQueryBuilder = getQueryBuilderFactory(driver);
-    return createQueryBuilder(this.db, this.schema, this.relationshipManager);
+    return createQueryBuilder(this.db, this.schema, this.relationshipManager, this.hooks);
   }
 
   /**
@@ -432,19 +437,24 @@ export class DrizzleAdapter<
       // Handle computed field filtering
       let processedFilters = [...(params.filters || [])];
       const computedFieldFilters: Array<{ filter: FilterState; config: ComputedFieldConfig }> = [];
+      const additionalSqlConditions: (SQL | SQLWrapper)[] = [];
 
       for (const filter of processedFilters) {
         const computedField = tableComputedFields.find((cf) => cf.field === filter.columnId);
-        if (computedField?.filter) {
+        if (computedField?.filter || computedField?.filterSql) {
           computedFieldFilters.push({ filter, config: computedField });
         }
       }
 
       // Build cache params early (needed for error handling)
       // Include computed fields in cache key to prevent cache collisions
+      // IMPORTANT: Include original computed field filters in cache key before they're processed
+      // This ensures different filterSql conditions produce different cache keys
+      const originalComputedFieldFilters = computedFieldFilters.map(({ filter }) => filter);
       const cacheParams: FetchDataParams & {
         computedFields?: string[];
         computedFieldsRequiringColumns?: string[];
+        computedFieldFilters?: FilterState[]; // Include original filters for cache key
       } = {
         ...params,
         columns: columnsWithoutComputed,
@@ -453,6 +463,7 @@ export class DrizzleAdapter<
         computedFieldsRequiringColumns: requestedComputedFields
           .filter((cf) => cf.requiresColumn)
           .map((cf) => cf.field),
+        computedFieldFilters: originalComputedFieldFilters, // Include for cache key
       };
 
       // Process computed field filters
@@ -467,7 +478,11 @@ export class DrizzleAdapter<
         const replacementFilters: FilterState[] = [];
         for (const { filter, config } of computedFieldFilters) {
           try {
-            if (config.filter) {
+            // Prefer filterSql over filter for better performance (applied before pagination)
+            if (config.filterSql) {
+              const sqlCondition = await Promise.resolve(config.filterSql(filter, context));
+              additionalSqlConditions.push(sqlCondition);
+            } else if (config.filter) {
               const replacements = await Promise.resolve(config.filter(filter, context));
               replacementFilters.push(...replacements);
             }
@@ -509,6 +524,8 @@ export class DrizzleAdapter<
 
         // Update cache params with processed filters
         cacheParams.filters = processedFilters;
+        // Note: computedFieldFilters are already in cache key (set above before processing)
+        // This ensures different filter values produce different cache keys even when using filterSql
       }
       const cacheKey = this.getCacheKey(cacheParams);
       const cached = this.getFromCache(cacheKey);
@@ -532,14 +549,19 @@ export class DrizzleAdapter<
 
       // Build queries - pass primaryTable to query builder
       // Include columns that computed fields require (e.g., roles column for enum array filtering)
+      // Pass additional SQL conditions from computed field filterSql (applied before pagination)
+      const queryParams: Parameters<typeof this.queryBuilder.buildCompleteQuery>[0] = {
+        columns: finalColumns,
+        filters: processedFilters,
+        sorting: params.sorting || [],
+        pagination: params.pagination || { page: 1, limit: 10 },
+        primaryTable,
+      };
+      if (additionalSqlConditions.length > 0) {
+        queryParams.additionalConditions = additionalSqlConditions;
+      }
       const { dataQuery, countQuery, columnMetadata, isNested } =
-        this.queryBuilder.buildCompleteQuery({
-          columns: finalColumns,
-          filters: processedFilters,
-          sorting: params.sorting || [],
-          pagination: params.pagination || { page: 1, limit: 10 },
-          primaryTable,
-        });
+        this.queryBuilder.buildCompleteQuery(queryParams);
 
       // Execute queries in parallel
       const [data, countResult] = await Promise.all([dataQuery.execute(), countQuery.execute()]);
@@ -1046,7 +1068,12 @@ export class DrizzleAdapter<
   /**
    * Cache management
    */
-  private getCacheKey(params: FetchDataParams & { computedFields?: string[] }): string {
+  private getCacheKey(
+    params: FetchDataParams & {
+      computedFields?: string[];
+      computedFieldFilters?: FilterState[];
+    }
+  ): string {
     return JSON.stringify(params);
   }
 

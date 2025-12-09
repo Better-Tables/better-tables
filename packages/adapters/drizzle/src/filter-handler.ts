@@ -63,6 +63,7 @@ import type {
   ColumnOrExpression,
   ColumnPath,
   DatabaseDriver,
+  FilterHandlerHooks,
 } from './types';
 import { QueryError } from './types';
 import { getArrayElementType, isArrayColumn } from './utils/drizzle-schema-utils';
@@ -111,6 +112,7 @@ export class FilterHandler {
   private schema: Record<string, AnyTableType>;
   private relationshipManager: RelationshipManager;
   private databaseType: DatabaseDriver;
+  private hooks?: FilterHandlerHooks;
 
   /**
    * Regular expression for validating JSONB field names.
@@ -126,14 +128,25 @@ export class FilterHandler {
    */
   private static readonly MAX_JSONB_FIELD_NAME_LENGTH = 255;
 
+  /**
+   * Maximum number of batches per group before using nested grouping.
+   * When combining too many batches with or()/and(), Drizzle can lose parameter bindings.
+   * Grouping batches into chunks creates a tree structure that preserves bindings.
+   */
+  private static readonly MAX_BATCHES_PER_GROUP = 200;
+
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    databaseType: DatabaseDriver
+    databaseType: DatabaseDriver,
+    hooks?: FilterHandlerHooks
   ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
     this.databaseType = databaseType;
+    if (hooks !== undefined) {
+      this.hooks = hooks;
+    }
   }
 
   /**
@@ -165,7 +178,21 @@ export class FilterHandler {
    * ```
    */
   buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper | undefined {
-    const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
+    // Apply beforeBuildFilterCondition hook if provided
+    let processedFilter = filter;
+    if (this.hooks?.beforeBuildFilterCondition) {
+      const hookResult = this.hooks.beforeBuildFilterCondition(filter, primaryTable);
+      if (hookResult === null) {
+        // Hook returned null, skip processing
+        return undefined;
+      }
+      processedFilter = hookResult;
+    }
+
+    const columnPath = this.relationshipManager.resolveColumnPath(
+      processedFilter.columnId,
+      primaryTable
+    );
 
     // Check if this is a JSONB accessor (columnId contains dot but is not a relationship)
     const isJsonbAccessor = this.isJsonbAccessor(columnPath);
@@ -179,8 +206,8 @@ export class FilterHandler {
       if (!column) {
         // Limit information disclosure: Don't expose full schema structure in production
         // Only include minimal debugging information
-        throw new QueryError(`Column not found: ${filter.columnId}`, {
-          columnId: filter.columnId,
+        throw new QueryError(`Column not found: ${processedFilter.columnId}`, {
+          columnId: processedFilter.columnId,
           table: columnPath.table,
           field: columnPath.field,
         });
@@ -190,16 +217,21 @@ export class FilterHandler {
 
     const condition = this.mapOperatorToCondition(
       columnOrExpression,
-      filter.operator,
-      filter.values,
-      filter.includeNull,
-      filter.type
+      processedFilter.operator,
+      processedFilter.values,
+      processedFilter.includeNull,
+      processedFilter.type
     );
 
     // Return undefined if no valid condition was generated (e.g., empty values)
     // This allows callers to handle empty filters gracefully
     if (!condition) {
       return undefined as unknown as SQL | SQLWrapper;
+    }
+
+    // Apply afterBuildFilterCondition hook if provided
+    if (this.hooks?.afterBuildFilterCondition) {
+      return this.hooks.afterBuildFilterCondition(condition, processedFilter);
     }
 
     return condition;
@@ -1690,6 +1722,15 @@ export class FilterHandler {
       return sql`FALSE`;
     }
 
+    // Check if hook provides custom implementation
+    if (this.hooks?.buildLargeArrayCondition) {
+      const customCondition = this.hooks.buildLargeArrayCondition(column, values, 'isAnyOf');
+      if (customCondition !== null) {
+        return customCondition;
+      }
+      // Hook returned null, continue with default implementation
+    }
+
     // Use very small batches (50 values) to avoid parameter binding issues
     // sql.join() preserves parameter bindings better than manual combination
     // Smaller batches ensure Drizzle's parameter tracking system works correctly
@@ -1716,11 +1757,15 @@ export class FilterHandler {
 
     // Combine all batches with OR
     if (batchConditions.length === 1) {
-      return batchConditions[0]!;
+      const singleCondition = batchConditions[0];
+      if (singleCondition) {
+        return singleCondition;
+      }
+      return sql`FALSE`;
     }
 
-    const combinedCondition = or(...batchConditions);
-    return combinedCondition ?? sql`FALSE`;
+    // Use nested grouping when there are too many batches to prevent parameter binding loss
+    return this.combineBatchConditions(batchConditions, or, sql`FALSE`);
   }
 
   /**
@@ -1755,6 +1800,15 @@ export class FilterHandler {
       return sql`TRUE`; // NOT IN with empty set matches everything
     }
 
+    // Check if hook provides custom implementation
+    if (this.hooks?.buildLargeArrayCondition) {
+      const customCondition = this.hooks.buildLargeArrayCondition(column, values, 'isNoneOf');
+      if (customCondition !== null) {
+        return customCondition;
+      }
+      // Hook returned null, continue with default implementation
+    }
+
     // Use very small batches (50 values) to avoid parameter binding issues
     // sql.join() preserves parameter bindings better than manual combination
     // Smaller batches ensure Drizzle's parameter tracking system works correctly
@@ -1781,11 +1835,75 @@ export class FilterHandler {
 
     // Combine all batches with AND (NOT IN requires all conditions to be true)
     if (batchConditions.length === 1) {
-      return batchConditions[0]!;
+      const singleCondition = batchConditions[0];
+      if (singleCondition) {
+        return singleCondition;
+      }
+      return sql`TRUE`;
     }
 
-    const combinedCondition = and(...batchConditions);
-    return combinedCondition ?? sql`TRUE`;
+    // Use nested grouping when there are too many batches to prevent parameter binding loss
+    return this.combineBatchConditions(batchConditions, and, sql`TRUE`);
+  }
+
+  /**
+   * Combine batch conditions using nested grouping when there are too many batches.
+   * This prevents parameter binding loss that can occur when combining 200+ conditions.
+   *
+   * @private
+   * @param batchConditions - Array of SQL conditions (one per batch)
+   * @param combiner - Function to combine conditions (or/and)
+   * @param fallback - Fallback value when combiner returns null
+   * @returns Combined SQL condition
+   */
+  private combineBatchConditions(
+    batchConditions: (SQL | SQLWrapper)[],
+    combiner: (...conditions: (SQL | SQLWrapper)[]) => SQL | SQLWrapper | undefined,
+    fallback: SQL | SQLWrapper
+  ): SQL | SQLWrapper {
+    // Single batch - no need to combine
+    if (batchConditions.length === 1) {
+      const singleCondition = batchConditions[0];
+      if (singleCondition) {
+        return singleCondition;
+      }
+      return fallback;
+    }
+
+    // Use nested grouping when there are too many batches to prevent parameter binding loss
+    // When combining 200+ batches, Drizzle can lose parameter bindings
+    // Group batches into chunks and combine groups, creating a tree structure
+    if (batchConditions.length > FilterHandler.MAX_BATCHES_PER_GROUP) {
+      // Group batches into chunks
+      const groups: (SQL | SQLWrapper)[][] = [];
+      for (let i = 0; i < batchConditions.length; i += FilterHandler.MAX_BATCHES_PER_GROUP) {
+        groups.push(batchConditions.slice(i, i + FilterHandler.MAX_BATCHES_PER_GROUP));
+      }
+
+      // Combine each group
+      const groupConditions = groups.map((group) => {
+        if (group.length === 1) {
+          const singleGroupCondition = group[0];
+          if (singleGroupCondition) {
+            return singleGroupCondition;
+          }
+          return fallback;
+        }
+        const groupCondition = combiner(...group);
+        return groupCondition ?? fallback;
+      });
+
+      // Combine groups
+      if (groupConditions.length === 1) {
+        return groupConditions[0] ?? fallback;
+      }
+      const combinedCondition = combiner(...groupConditions);
+      return combinedCondition ?? fallback;
+    }
+
+    // For smaller numbers of batches, use flat combination (more efficient)
+    const combinedCondition = combiner(...batchConditions);
+    return combinedCondition ?? fallback;
   }
 
   /**

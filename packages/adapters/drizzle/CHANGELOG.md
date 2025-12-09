@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.22
+
+### Patch Changes
+
+- Adds filterSql to computed fields to push conditions into the WHERE clause (before pagination) for faster queries on large datasets. Also adds filter handler hooks and safer batching for huge arrays to improve flexibility and reliability. New FeaturesComputed fields: filterSql returns SQL directly; preferred over filter; applied before pagination.Extensibility hooks: beforeBuildFilterCondition, afterBuildFilterCondition, buildLargeArrayCondition. Batching options: batchSize, maxBatchesPerGroup, enableNestedGrouping for large arrays.
+
 ## 0.5.21
 
 ### Patch Changes

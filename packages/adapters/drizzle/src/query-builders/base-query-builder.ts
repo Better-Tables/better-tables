@@ -20,6 +20,7 @@ import type {
   AnyTableType,
   ColumnPath,
   DatabaseDriver,
+  FilterHandlerHooks,
   MySQLQueryBuilderWithJoins,
   PostgresQueryBuilderWithJoins,
   QueryBuilderWithJoins,
@@ -50,11 +51,12 @@ export abstract class BaseQueryBuilder {
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    databaseType: DatabaseDriver
+    databaseType: DatabaseDriver,
+    hooks?: FilterHandlerHooks
   ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
-    this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType);
+    this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType, hooks);
     // Primary keys are auto-detected from the schema
     this.primaryKeyMap = getPrimaryKeyMap(schema);
   }
@@ -138,26 +140,30 @@ export abstract class BaseQueryBuilder {
   applyFilters(
     query: QueryBuilderWithJoins,
     filters: FilterState[],
-    primaryTable: string
+    primaryTable: string,
+    additionalConditions?: (SQL | SQLWrapper)[]
   ): QueryBuilderWithJoins {
-    if (!filters || filters.length === 0) {
+    const allConditions: (SQL | SQLWrapper)[] = [];
+
+    // Add conditions from regular filters
+    if (filters && filters.length > 0) {
+      const { conditions } = this.filterHandler.handleCrossTableFilters(filters, primaryTable);
+      const validConditions = conditions.filter(
+        (condition): condition is SQL | SQLWrapper => condition !== undefined
+      );
+      allConditions.push(...validConditions);
+    }
+
+    // Add additional SQL conditions (e.g., from computed field filterSql)
+    if (additionalConditions && additionalConditions.length > 0) {
+      allConditions.push(...additionalConditions);
+    }
+
+    if (allConditions.length === 0) {
       return query;
     }
 
-    const { conditions } = this.filterHandler.handleCrossTableFilters(filters, primaryTable);
-
-    if (conditions.length === 0) {
-      return query;
-    }
-
-    const validConditions = conditions.filter(
-      (condition): condition is SQL | SQLWrapper => condition !== undefined
-    );
-    if (validConditions.length === 0) {
-      return query;
-    }
-
-    return query.where(and(...validConditions) as SQL | SQLWrapper);
+    return query.where(and(...allConditions) as SQL | SQLWrapper);
   }
 
   /**
@@ -417,6 +423,7 @@ export abstract class BaseQueryBuilder {
     sorting?: SortingParams[];
     pagination?: PaginationParams;
     primaryTable: string;
+    additionalConditions?: (SQL | SQLWrapper)[]; // Additional SQL conditions to apply (e.g., from computed field filterSql)
   }): {
     dataQuery: QueryBuilderWithJoins;
     countQuery: QueryBuilderWithJoins;
@@ -437,14 +444,24 @@ export abstract class BaseQueryBuilder {
 
     const selectResult = this.buildSelectQuery(context, params.primaryTable, params.columns);
     const { query: dataQuery, columnMetadata, isNested } = selectResult;
-    let finalDataQuery = this.applyFilters(dataQuery, params.filters || [], params.primaryTable);
+    let finalDataQuery = this.applyFilters(
+      dataQuery,
+      params.filters || [],
+      params.primaryTable,
+      params.additionalConditions
+    );
     finalDataQuery = this.applySorting(finalDataQuery, params.sorting || [], params.primaryTable);
     if (params.pagination) {
       finalDataQuery = this.applyPagination(finalDataQuery, params.pagination);
     }
 
     let countQuery = this.buildCountQuery(context, params.primaryTable);
-    countQuery = this.applyFilters(countQuery, params.filters || [], params.primaryTable);
+    countQuery = this.applyFilters(
+      countQuery,
+      params.filters || [],
+      params.primaryTable,
+      params.additionalConditions
+    );
 
     return {
       dataQuery: finalDataQuery,

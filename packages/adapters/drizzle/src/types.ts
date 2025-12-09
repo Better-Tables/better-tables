@@ -458,7 +458,8 @@ export type OperationsFactory<TDriver extends DatabaseDriver> = <TRecord>(
 export type QueryBuilderFactory<TDriver extends DatabaseDriver> = (
   db: DrizzleDatabase<TDriver>,
   schema: Record<string, AnyTableType>,
-  relationshipManager: RelationshipManager
+  relationshipManager: RelationshipManager,
+  hooks?: FilterHandlerHooks
 ) => BaseQueryBuilder;
 
 /**
@@ -588,6 +589,9 @@ export interface DrizzleAdapterConfig<
   /** Adapter options */
   options?: DrizzleAdapterOptions;
 
+  /** Filter handler hooks for customizing filter behavior */
+  hooks?: FilterHandlerHooks;
+
   /** Adapter metadata */
   meta?: Partial<AdapterMeta>;
 }
@@ -694,6 +698,27 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
     context: ComputedFieldContext
   ) => Promise<FilterState[]> | FilterState[];
 
+  /**
+   * Function to handle filtering on this computed field by returning a SQL condition directly.
+   * This is more efficient than `filter` for large result sets because the SQL condition
+   * is applied in the WHERE clause before pagination, rather than querying all matching IDs first.
+   *
+   * If both `filter` and `filterSql` are provided, `filterSql` takes precedence.
+   *
+   * @example
+   * ```typescript
+   * filterSql: async (filter, context) => {
+   *   const languageCode = filter.values?.[0];
+   *   const languageArrayJson = JSON.stringify([{ code: languageCode }]);
+   *   return sql`(${usersTable.demographics}->'language') @> ${languageArrayJson}`;
+   * }
+   * ```
+   */
+  filterSql?: (
+    filter: FilterState,
+    context: ComputedFieldContext
+  ) => Promise<SQL | SQLWrapper> | SQL | SQLWrapper;
+
   /** Type of the computed field (for validation) */
   type?: ColumnType;
 
@@ -712,6 +737,70 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
 /**
  * Adapter options
  */
+/**
+ * Hooks for customizing filter handler behavior
+ *
+ * @description
+ * Allows overriding or extending filter processing behavior for edge cases.
+ * Hooks are called at specific points in the filter processing pipeline,
+ * allowing custom implementations when the default behavior doesn't work.
+ *
+ * @example
+ * ```typescript
+ * import { inArray } from 'drizzle-orm';
+ *
+ * const hooks: FilterHandlerHooks = {
+ *   buildLargeArrayCondition: (column, values, operator) => {
+ *     // Custom implementation for very large arrays using parameterized queries
+ *     if (operator === 'isAnyOf') {
+ *       return inArray(column, values);
+ *     }
+ *     // Return null to use default behavior for other operators
+ *     return null;
+ *   }
+ * };
+ * ```
+ */
+export interface FilterHandlerHooks {
+  /**
+   * Called before building a filter condition.
+   * Can modify the filter or return null to skip processing.
+   *
+   * @param filter - The filter state to process
+   * @param primaryTable - The primary table name
+   * @returns Modified filter, or null to skip processing
+   */
+  beforeBuildFilterCondition?: (filter: FilterState, primaryTable: string) => FilterState | null;
+
+  /**
+   * Called after building a filter condition.
+   * Can modify the resulting SQL condition.
+   *
+   * @param condition - The SQL condition that was built
+   * @param filter - The original filter state
+   * @returns Modified SQL condition
+   */
+  afterBuildFilterCondition?: (
+    condition: SQL | SQLWrapper,
+    filter: FilterState
+  ) => SQL | SQLWrapper;
+
+  /**
+   * Called when building conditions for very large arrays.
+   * Can provide a custom implementation or return null to use default behavior.
+   *
+   * @param column - The column to compare against
+   * @param values - Array of values
+   * @param operator - The operator ('isAnyOf' or 'isNoneOf')
+   * @returns Custom SQL condition, or null to use default behavior
+   */
+  buildLargeArrayCondition?: (
+    column: ColumnOrExpression,
+    values: unknown[],
+    operator: 'isAnyOf' | 'isNoneOf'
+  ) => SQL | SQLWrapper | null;
+}
+
 export interface DrizzleAdapterOptions {
   /** Query caching configuration */
   cache?: {
@@ -746,6 +835,18 @@ export interface DrizzleAdapterOptions {
 
     /** Maximum query execution time before warning */
     maxQueryTime?: number;
+  };
+
+  /** Batching configuration for large arrays */
+  batching?: {
+    /** Batch size for large array conditions (default: 50) */
+    batchSize?: number;
+
+    /** Maximum batches per group before using nested grouping (default: 200) */
+    maxBatchesPerGroup?: number;
+
+    /** Enable nested OR/AND grouping for very large arrays (default: true) */
+    enableNestedGrouping?: boolean;
   };
 }
 

@@ -18,6 +18,7 @@ import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
+  FilterHandlerHooks,
   MySQLQueryBuilderWithJoins,
   MySqlDatabaseType,
   QueryContext,
@@ -42,9 +43,10 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
   constructor(
     db: MySqlDatabaseType,
     schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager
+    relationshipManager: RelationshipManager,
+    hooks?: FilterHandlerHooks
   ) {
-    super(schema, relationshipManager, 'mysql');
+    super(schema, relationshipManager, 'mysql', hooks);
     this.db = db;
   }
 
