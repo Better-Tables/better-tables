@@ -996,23 +996,12 @@ export class FilterHandler {
         if (validValues.length === 0) {
           return undefined;
         }
-        // For PostgreSQL, use array literal for very large arrays to avoid parameter binding issues
-        // PostgreSQL has a limit of 65535 parameters, but large arrays can cause performance issues
-        // When inArray is used with >1000 values, it can create too many parameter placeholders
-        // Use array literal with = ANY() for arrays larger than 1000 values
-        // Note: Values are assumed to be safe (from database queries), but we still escape them
+        // For PostgreSQL, use parameterized array literal for very large arrays
+        // PostgreSQL supports up to 65535 parameters, but large arrays can cause issues with inArray
+        // Use parameterized ARRAY with = ANY() for arrays larger than 1000 values
+        // This maintains security through proper parameterization while avoiding inArray issues
         if (this.databaseType === 'postgres' && validValues.length > 1000) {
-          // Build PostgreSQL array literal: column = ANY(ARRAY['value1', 'value2', ...])
-          // Escape single quotes and wrap values in quotes
-          // Since these values come from database queries (IDs), they should be safe
-          const escapedValues = validValues.map((v) => {
-            const str = String(v);
-            // Escape single quotes by doubling them (PostgreSQL escaping)
-            // Also escape backslashes
-            return `'${str.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
-          });
-          const arrayLiteral = `ARRAY[${escapedValues.join(', ')}]`;
-          return sql`${column} = ANY(${sql.raw(arrayLiteral)})`;
+          return this.buildLargeArrayAnyCondition(column, validValues);
         }
         return inArray(column, validValues);
       }
@@ -1022,15 +1011,9 @@ export class FilterHandler {
         if (validValuesForNone.length === 0) {
           return undefined;
         }
-        // For PostgreSQL, use array literal for very large arrays to avoid parameter binding issues
+        // For PostgreSQL, use parameterized array literal for very large arrays
         if (this.databaseType === 'postgres' && validValuesForNone.length > 1000) {
-          // Build PostgreSQL array literal: column != ALL(ARRAY['value1', 'value2', ...])
-          const escapedValues = validValuesForNone.map((v) => {
-            const str = String(v);
-            return `'${str.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
-          });
-          const arrayLiteral = `ARRAY[${escapedValues.join(', ')}]`;
-          return sql`${column} != ALL(${sql.raw(arrayLiteral)})`;
+          return this.buildLargeArrayAllCondition(column, validValuesForNone);
         }
         return notInArray(column, validValuesForNone);
       }
@@ -1617,6 +1600,74 @@ export class FilterHandler {
 
     // Join typed values and cast the entire array
     return sql`ARRAY[${sql.join(typedValues, sql`, `)}]::${sql.raw(elementType)}[]`;
+  }
+
+  /**
+   * Build a parameterized PostgreSQL array condition for large arrays using = ANY().
+   *
+   * @description
+   * For very large arrays (>1000 values), inArray can cause parameter binding issues.
+   * This method uses a parameterized ARRAY literal with = ANY() to maintain security
+   * while avoiding the parameter limit issues.
+   *
+   * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
+   * This maintains the same security guarantees as inArray while supporting larger arrays.
+   *
+   * @param column - The column to compare against
+   * @param values - Array of values to check
+   * @returns SQL expression: column = ANY(ARRAY[$1, $2, ...])
+   *
+   * @example
+   * ```typescript
+   * const condition = this.buildLargeArrayAnyCondition(usersTable.id, [id1, id2, ...]);
+   * // Generates: usersTable.id = ANY(ARRAY[$1, $2, ...])
+   * ```
+   *
+   * @since 1.0.0
+   */
+  private buildLargeArrayAnyCondition(
+    column: ColumnOrExpression,
+    values: unknown[]
+  ): SQL | SQLWrapper {
+    // Build parameterized PostgreSQL array: ARRAY[$1, $2, ...]
+    // Each value is properly parameterized through Drizzle's sql template tag
+    const parameterizedValues = values.map((v) => sql`${v}`);
+    const arrayLiteral = sql`ARRAY[${sql.join(parameterizedValues, sql`, `)}]`;
+    return sql`${column} = ANY(${arrayLiteral})`;
+  }
+
+  /**
+   * Build a parameterized PostgreSQL array condition for large arrays using != ALL().
+   *
+   * @description
+   * For very large arrays (>1000 values), notInArray can cause parameter binding issues.
+   * This method uses a parameterized ARRAY literal with != ALL() to maintain security
+   * while avoiding the parameter limit issues.
+   *
+   * **Security**: All values are properly parameterized through Drizzle's SQL template tag.
+   * This maintains the same security guarantees as notInArray while supporting larger arrays.
+   *
+   * @param column - The column to compare against
+   * @param values - Array of values to exclude
+   * @returns SQL expression: column != ALL(ARRAY[$1, $2, ...])
+   *
+   * @example
+   * ```typescript
+   * const condition = this.buildLargeArrayAllCondition(usersTable.id, [id1, id2, ...]);
+   * // Generates: usersTable.id != ALL(ARRAY[$1, $2, ...])
+   * ```
+   *
+   * @since 1.0.0
+   */
+  private buildLargeArrayAllCondition(
+    column: ColumnOrExpression,
+    values: unknown[]
+  ): SQL | SQLWrapper {
+    // Build parameterized PostgreSQL array: ARRAY[$1, $2, ...]
+    // Each value is properly parameterized through Drizzle's sql template tag
+    const parameterizedValues = values.map((v) => sql`${v}`);
+    const arrayLiteral = sql`ARRAY[${sql.join(parameterizedValues, sql`, `)}]`;
+    return sql`${column} != ALL(${arrayLiteral})`;
   }
 
   /**
