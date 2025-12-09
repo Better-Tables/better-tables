@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.18
+
+### Patch Changes
+
+- This update introduces the autoShowFilteredColumns property to the BetterTable component, allowing columns to automatically show or hide based on active filters. When a filter is applied, the corresponding column becomes visible, and it hides again if the filter is removed, provided it is not in the defaultVisibleColumns. The implementation includes a useEffect hook to manage column visibility state based on filter changes.
+
 ## 0.5.17
 
 ### Patch Changes
