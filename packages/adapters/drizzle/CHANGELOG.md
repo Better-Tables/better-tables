@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.20
+
+### Patch Changes
+
+- This update modifies the `buildLargeArrayAnyCondition` and `buildLargeArrayAllCondition` methods in the FilterHandler class to handle large arrays more efficiently. Instead of using parameterized array literals, the methods now batch values into smaller chunks (1000 values each) and utilize batched VALUES clauses combined with OR and AND conditions. This change addresses parameter binding issues while maintaining security through proper parameterization, enhancing the robustness of SQL condition generation for large arrays.
+
 ## 0.5.19
 
 ### Patch Changes
