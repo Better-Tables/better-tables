@@ -1603,6 +1603,62 @@ export class FilterHandler {
   }
 
   /**
+   * Get PostgreSQL type name for a column (for casting purposes).
+   *
+   * @param column - The column to get the type for
+   * @returns PostgreSQL type name (e.g., 'uuid', 'text', 'integer') or null if unknown
+   */
+  private getPostgresColumnType(column: ColumnOrExpression): string | null {
+    // If it's a SQL expression, we can't determine the type
+    if (this.isSqlExpression(column)) {
+      return null;
+    }
+
+    const col = column as AnyColumnType;
+
+    // Check columnType first (more specific than dataType)
+    // For example, UUID has dataType: "string" but columnType: "PgUUID"
+    const columnType = (col as unknown as { columnType?: string }).columnType;
+    if (columnType) {
+      // Map common Drizzle column types to PostgreSQL type names
+      const columnTypeMap: Record<string, string> = {
+        PgUUID: 'uuid',
+        PgText: 'text',
+        PgInteger: 'integer',
+        PgBigInt: 'bigint',
+        PgBigInt53: 'bigint',
+        PgBoolean: 'boolean',
+        PgNumeric: 'numeric',
+        PgVarchar: 'varchar',
+      };
+
+      if (columnType in columnTypeMap) {
+        return columnTypeMap[columnType] ?? null;
+      }
+    }
+
+    // Fallback: try to infer from dataType
+    const dataType = col.dataType;
+    if (dataType) {
+      const typeMap: Record<string, string> = {
+        uuid: 'uuid',
+        string: 'text', // Note: UUIDs have dataType "string" but columnType "PgUUID"
+        number: 'integer',
+        bigint: 'bigint',
+        boolean: 'boolean',
+        numeric: 'numeric',
+        varchar: 'varchar',
+      };
+
+      if (dataType in typeMap) {
+        return typeMap[dataType] ?? null;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Build a parameterized PostgreSQL array condition for large arrays using = ANY().
    *
    * @description
@@ -1615,12 +1671,12 @@ export class FilterHandler {
    *
    * @param column - The column to compare against
    * @param values - Array of values to check
-   * @returns SQL expression: column = ANY(ARRAY[$1, $2, ...])
+   * @returns SQL expression: column = ANY(ARRAY[$1, $2, ...]::type[])
    *
    * @example
    * ```typescript
    * const condition = this.buildLargeArrayAnyCondition(usersTable.id, [id1, id2, ...]);
-   * // Generates: usersTable.id = ANY(ARRAY[$1, $2, ...])
+   * // Generates: usersTable.id = ANY(ARRAY[$1, $2, ...]::uuid[])
    * ```
    *
    * @since 1.0.0
@@ -1633,6 +1689,16 @@ export class FilterHandler {
     // Each value is properly parameterized through Drizzle's sql template tag
     const parameterizedValues = values.map((v) => sql`${v}`);
     const arrayLiteral = sql`ARRAY[${sql.join(parameterizedValues, sql`, `)}]`;
+
+    // Cast array to match column type if we can determine it
+    // This prevents "operator does not exist: uuid = text" errors
+    const columnType = this.getPostgresColumnType(column);
+    if (columnType) {
+      // Cast the array to the column's type: ARRAY[...]::uuid[]
+      return sql`${column} = ANY(${arrayLiteral}::${sql.raw(columnType)}[])`;
+    }
+
+    // If we can't determine the type, let PostgreSQL infer it (may cause errors)
     return sql`${column} = ANY(${arrayLiteral})`;
   }
 
@@ -1649,12 +1715,12 @@ export class FilterHandler {
    *
    * @param column - The column to compare against
    * @param values - Array of values to exclude
-   * @returns SQL expression: column != ALL(ARRAY[$1, $2, ...])
+   * @returns SQL expression: column != ALL(ARRAY[$1, $2, ...]::type[])
    *
    * @example
    * ```typescript
    * const condition = this.buildLargeArrayAllCondition(usersTable.id, [id1, id2, ...]);
-   * // Generates: usersTable.id != ALL(ARRAY[$1, $2, ...])
+   * // Generates: usersTable.id != ALL(ARRAY[$1, $2, ...]::uuid[])
    * ```
    *
    * @since 1.0.0
@@ -1667,6 +1733,16 @@ export class FilterHandler {
     // Each value is properly parameterized through Drizzle's sql template tag
     const parameterizedValues = values.map((v) => sql`${v}`);
     const arrayLiteral = sql`ARRAY[${sql.join(parameterizedValues, sql`, `)}]`;
+
+    // Cast array to match column type if we can determine it
+    // This prevents "operator does not exist: uuid = text" errors
+    const columnType = this.getPostgresColumnType(column);
+    if (columnType) {
+      // Cast the array to the column's type: ARRAY[...]::uuid[]
+      return sql`${column} != ALL(${arrayLiteral}::${sql.raw(columnType)}[])`;
+    }
+
+    // If we can't determine the type, let PostgreSQL infer it (may cause errors)
     return sql`${column} != ALL(${arrayLiteral})`;
   }
 
