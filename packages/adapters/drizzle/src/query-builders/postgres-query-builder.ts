@@ -30,6 +30,7 @@ import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
+  FilterHandlerHooks,
   PostgresDatabaseType,
   PostgresQueryBuilderWithJoins,
   QueryContext,
@@ -174,9 +175,10 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
   constructor(
     db: PostgresDatabaseType,
     schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager
+    relationshipManager: RelationshipManager,
+    hooks?: FilterHandlerHooks
   ) {
-    super(schema, relationshipManager, 'postgres');
+    super(schema, relationshipManager, 'postgres', hooks);
     this.db = db;
   }
 

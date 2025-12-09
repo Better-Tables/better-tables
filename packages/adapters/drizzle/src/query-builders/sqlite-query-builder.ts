@@ -19,6 +19,7 @@ import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
+  FilterHandlerHooks,
   QueryContext,
   SQLiteDatabaseType,
   SQLiteQueryBuilderWithJoins,
@@ -44,9 +45,10 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
   constructor(
     db: SQLiteDatabaseType,
     schema: Record<string, AnyTableType>,
-    relationshipManager: RelationshipManager
+    relationshipManager: RelationshipManager,
+    hooks?: FilterHandlerHooks
   ) {
-    super(schema, relationshipManager, 'sqlite');
+    super(schema, relationshipManager, 'sqlite', hooks);
     this.db = db;
   }
 

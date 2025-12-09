@@ -352,16 +352,26 @@ const adapter = new DrizzleAdapter({
             .where(eq(eventAttendeesTable.eventId, row.id));
           return result[0]?.count || 0;
         },
-        filter: async (filter, context) => {
-          // Transform attendeeCount filter into id filter
-          const matchingIds = await getEventIdsByAttendeeCount(filter, context);
-          return [{
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: matchingIds,
-            type: 'text',
-          }];
-        },
+      filter: async (filter, context) => {
+        // Transform attendeeCount filter into id filter
+        const matchingIds = await getEventIdsByAttendeeCount(filter, context);
+        return [{
+          columnId: 'id',
+          operator: 'isAnyOf',
+          values: matchingIds,
+          type: 'text',
+        }];
+      },
+      // Alternative: Use filterSql for better performance (applied before pagination)
+      // filterSql: async (filter, context) => {
+      //   // Return SQL condition directly - more efficient for large result sets
+      //   return sql`EXISTS (
+      //     SELECT 1 FROM event_attendees 
+      //     WHERE event_id = ${eventsTable.id}
+      //     GROUP BY event_id 
+      //     HAVING COUNT(*) > ${filter.values[0]}
+      //   )`;
+      // },
       },
     ],
   },
@@ -402,7 +412,7 @@ computedFields: {
 **With Filtering Support:**
 
 ```typescript
-import { count, eq, gt } from 'drizzle-orm';
+import { count, eq, gt, sql } from 'drizzle-orm';
 
 computedFields: {
   eventsTable: [
@@ -417,6 +427,7 @@ computedFields: {
           .where(eq(eventAttendeesTable.eventId, row.id));
         return result[0]?.count || 0;
       },
+      // Option 1: Use filter to return FilterState[] (queries all matching IDs first)
       filter: async (filter, context) => {
         // Transform computed field filter into database filter
         const eventAttendeeCounts = context.db
@@ -442,13 +453,47 @@ computedFields: {
 },
 ```
 
+**Using `filterSql` for Better Performance:**
+
+For large result sets, use `filterSql` instead of `filter` to return SQL conditions directly. This applies the filter in the WHERE clause before pagination, making it much more efficient:
+
+```typescript
+import { sql } from 'drizzle-orm';
+
+computedFields: {
+  usersTable: [
+    {
+      field: 'demographics.language',
+      type: 'text',
+      compute: async (row) => {
+        // Extract language from JSONB
+        const demographics = row.demographics as { language?: Array<{ code: string }> };
+        return demographics?.language?.[0]?.code || null;
+      },
+      // Use filterSql for direct SQL condition (applied before pagination)
+      filterSql: async (filter, context) => {
+        const languageCode = filter.values?.[0];
+        const languageArrayJson = JSON.stringify([{ code: languageCode }]);
+        // Return SQL condition directly - more efficient than querying all IDs first
+        return sql`(${usersTable.demographics}->'language') @> ${languageArrayJson}`;
+      },
+    },
+  ],
+},
+```
+
 **Key Features:**
 
 - **Runtime Computation**: Fields are computed after data is fetched
 - **Database Queries**: Can query related tables using `context.db`
 - **Filtering Support**: Optional `filter` function to transform computed field filters into database queries
+- **Direct SQL Conditions**: Optional `filterSql` function for better performance (applied before pagination)
 - **Batch Processing**: `context.allRows` provides all rows for batch computation
 - **Type Safety**: Full TypeScript support with proper types
+
+**When to use `filter` vs `filterSql`:**
+- Use `filter` when you need to query all matching IDs first (e.g., complex joins)
+- Use `filterSql` when you can express the filter as a direct SQL condition (better performance)
 
 See [Advanced Usage Guide](./docs/ADVANCED_USAGE.md#computed-fields) for more examples.
 
@@ -650,7 +695,11 @@ interface DrizzleAdapterConfig<TSchema, TDriver> {
   relations?: Record<string, Relations>; // Drizzle relations for auto-detection
   autoDetectRelationships?: boolean; // Enable auto-detection (default: true)
   relationships?: RelationshipMap;   // Manual relationship mappings
+  computedFields?: {                 // Computed/virtual fields
+    [K in keyof TSchema]?: ComputedFieldConfig[];
+  };
   options?: DrizzleAdapterOptions;    // Adapter options
+  hooks?: FilterHandlerHooks;        // Filter handler hooks for customization
   meta?: Partial<AdapterMeta>;       // Custom metadata
 }
 ```
@@ -986,6 +1035,77 @@ Contributions are welcome! This is an open-source project, and we appreciate any
 See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for detailed guidelines.
 
 ## License
+
+### Extensibility Hooks
+
+Better Tables provides hooks for customizing filter behavior when the default implementation doesn't work for your use case:
+
+```typescript
+import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+import { sql } from 'drizzle-orm';
+
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  hooks: {
+    // Modify filter before processing
+    beforeBuildFilterCondition: (filter, primaryTable) => {
+      // Custom logic to modify filter
+      if (filter.columnId === 'customField') {
+        return {
+          ...filter,
+          columnId: 'actualColumn',
+        };
+      }
+      return filter;
+    },
+    
+    // Modify SQL condition after building
+    afterBuildFilterCondition: (condition, filter) => {
+      // Custom logic to modify condition
+      if (filter.columnId === 'specialCase') {
+        return sql`${condition} AND additional_condition = true`;
+      }
+      return condition;
+    },
+    
+    // Custom implementation for large arrays
+    buildLargeArrayCondition: (column, values, operator) => {
+      // Return custom SQL condition, or null to use default behavior
+      if (values.length > 10000) {
+        // Use temporary table for very large arrays
+        return sql`${column} IN (SELECT id FROM temp_filter_table)`;
+      }
+      return null; // Use default batching behavior
+    },
+  },
+});
+```
+
+### Batching Configuration
+
+Configure how large arrays are batched to optimize performance:
+
+```typescript
+const adapter = new DrizzleAdapter({
+  db,
+  schema,
+  driver: 'postgres',
+  options: {
+    batching: {
+      batchSize: 50,              // Batch size for large arrays (default: 50)
+      maxBatchesPerGroup: 200,   // Max batches per group before nested grouping (default: 200)
+      enableNestedGrouping: true, // Enable nested OR/AND grouping (default: true)
+    },
+  },
+});
+```
+
+**Batching Behavior:**
+- Arrays with >50 values are automatically batched into chunks
+- When there are >200 batches, nested grouping is used to prevent parameter binding issues
+- This ensures queries work correctly even with 50,000+ values
 
 MIT License - see [LICENSE](../../LICENSE) for details.
 

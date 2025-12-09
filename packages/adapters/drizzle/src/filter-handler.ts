@@ -63,6 +63,7 @@ import type {
   ColumnOrExpression,
   ColumnPath,
   DatabaseDriver,
+  FilterHandlerHooks,
 } from './types';
 import { QueryError } from './types';
 import { getArrayElementType, isArrayColumn } from './utils/drizzle-schema-utils';
@@ -111,6 +112,7 @@ export class FilterHandler {
   private schema: Record<string, AnyTableType>;
   private relationshipManager: RelationshipManager;
   private databaseType: DatabaseDriver;
+  private hooks?: FilterHandlerHooks;
 
   /**
    * Regular expression for validating JSONB field names.
@@ -129,11 +131,15 @@ export class FilterHandler {
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    databaseType: DatabaseDriver
+    databaseType: DatabaseDriver,
+    hooks?: FilterHandlerHooks
   ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
     this.databaseType = databaseType;
+    if (hooks !== undefined) {
+      this.hooks = hooks;
+    }
   }
 
   /**
@@ -165,7 +171,21 @@ export class FilterHandler {
    * ```
    */
   buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper | undefined {
-    const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
+    // Apply beforeBuildFilterCondition hook if provided
+    let processedFilter = filter;
+    if (this.hooks?.beforeBuildFilterCondition) {
+      const hookResult = this.hooks.beforeBuildFilterCondition(filter, primaryTable);
+      if (hookResult === null) {
+        // Hook returned null, skip processing
+        return undefined;
+      }
+      processedFilter = hookResult;
+    }
+
+    const columnPath = this.relationshipManager.resolveColumnPath(
+      processedFilter.columnId,
+      primaryTable
+    );
 
     // Check if this is a JSONB accessor (columnId contains dot but is not a relationship)
     const isJsonbAccessor = this.isJsonbAccessor(columnPath);
@@ -179,8 +199,8 @@ export class FilterHandler {
       if (!column) {
         // Limit information disclosure: Don't expose full schema structure in production
         // Only include minimal debugging information
-        throw new QueryError(`Column not found: ${filter.columnId}`, {
-          columnId: filter.columnId,
+        throw new QueryError(`Column not found: ${processedFilter.columnId}`, {
+          columnId: processedFilter.columnId,
           table: columnPath.table,
           field: columnPath.field,
         });
@@ -190,16 +210,21 @@ export class FilterHandler {
 
     const condition = this.mapOperatorToCondition(
       columnOrExpression,
-      filter.operator,
-      filter.values,
-      filter.includeNull,
-      filter.type
+      processedFilter.operator,
+      processedFilter.values,
+      processedFilter.includeNull,
+      processedFilter.type
     );
 
     // Return undefined if no valid condition was generated (e.g., empty values)
     // This allows callers to handle empty filters gracefully
     if (!condition) {
       return undefined as unknown as SQL | SQLWrapper;
+    }
+
+    // Apply afterBuildFilterCondition hook if provided
+    if (this.hooks?.afterBuildFilterCondition) {
+      return this.hooks.afterBuildFilterCondition(condition, processedFilter);
     }
 
     return condition;
@@ -1690,6 +1715,15 @@ export class FilterHandler {
       return sql`FALSE`;
     }
 
+    // Check if hook provides custom implementation
+    if (this.hooks?.buildLargeArrayCondition) {
+      const customCondition = this.hooks.buildLargeArrayCondition(column, values, 'isAnyOf');
+      if (customCondition !== null) {
+        return customCondition;
+      }
+      // Hook returned null, continue with default implementation
+    }
+
     // Use very small batches (50 values) to avoid parameter binding issues
     // sql.join() preserves parameter bindings better than manual combination
     // Smaller batches ensure Drizzle's parameter tracking system works correctly
@@ -1719,6 +1753,35 @@ export class FilterHandler {
       return batchConditions[0]!;
     }
 
+    // Use nested OR grouping when there are too many batches to prevent parameter binding loss
+    // When combining 200+ batches with or(), Drizzle can lose parameter bindings
+    // Group batches into chunks and combine groups, creating a tree structure
+    const MAX_BATCHES_PER_GROUP = 200;
+    if (batchConditions.length > MAX_BATCHES_PER_GROUP) {
+      // Group batches into chunks
+      const groups: (SQL | SQLWrapper)[][] = [];
+      for (let i = 0; i < batchConditions.length; i += MAX_BATCHES_PER_GROUP) {
+        groups.push(batchConditions.slice(i, i + MAX_BATCHES_PER_GROUP));
+      }
+
+      // Combine each group with OR
+      const groupConditions = groups.map((group) => {
+        if (group.length === 1) {
+          return group[0]!;
+        }
+        const groupCondition = or(...group);
+        return groupCondition ?? sql`FALSE`;
+      });
+
+      // Combine groups with OR
+      if (groupConditions.length === 1) {
+        return groupConditions[0]!;
+      }
+      const combinedCondition = or(...groupConditions);
+      return combinedCondition ?? sql`FALSE`;
+    }
+
+    // For smaller numbers of batches, use flat OR (more efficient)
     const combinedCondition = or(...batchConditions);
     return combinedCondition ?? sql`FALSE`;
   }
@@ -1755,6 +1818,15 @@ export class FilterHandler {
       return sql`TRUE`; // NOT IN with empty set matches everything
     }
 
+    // Check if hook provides custom implementation
+    if (this.hooks?.buildLargeArrayCondition) {
+      const customCondition = this.hooks.buildLargeArrayCondition(column, values, 'isNoneOf');
+      if (customCondition !== null) {
+        return customCondition;
+      }
+      // Hook returned null, continue with default implementation
+    }
+
     // Use very small batches (50 values) to avoid parameter binding issues
     // sql.join() preserves parameter bindings better than manual combination
     // Smaller batches ensure Drizzle's parameter tracking system works correctly
@@ -1784,6 +1856,35 @@ export class FilterHandler {
       return batchConditions[0]!;
     }
 
+    // Use nested AND grouping when there are too many batches to prevent parameter binding loss
+    // When combining 200+ batches with and(), Drizzle can lose parameter bindings
+    // Group batches into chunks and combine groups, creating a tree structure
+    const MAX_BATCHES_PER_GROUP = 200;
+    if (batchConditions.length > MAX_BATCHES_PER_GROUP) {
+      // Group batches into chunks
+      const groups: (SQL | SQLWrapper)[][] = [];
+      for (let i = 0; i < batchConditions.length; i += MAX_BATCHES_PER_GROUP) {
+        groups.push(batchConditions.slice(i, i + MAX_BATCHES_PER_GROUP));
+      }
+
+      // Combine each group with AND
+      const groupConditions = groups.map((group) => {
+        if (group.length === 1) {
+          return group[0]!;
+        }
+        const groupCondition = and(...group);
+        return groupCondition ?? sql`TRUE`;
+      });
+
+      // Combine groups with AND
+      if (groupConditions.length === 1) {
+        return groupConditions[0]!;
+      }
+      const combinedCondition = and(...groupConditions);
+      return combinedCondition ?? sql`TRUE`;
+    }
+
+    // For smaller numbers of batches, use flat AND (more efficient)
     const combinedCondition = and(...batchConditions);
     return combinedCondition ?? sql`TRUE`;
   }
