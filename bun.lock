@@ -42,7 +42,7 @@
     },
     "packages/adapters/drizzle": {
       "name": "@better-tables/adapters-drizzle",
-      "version": "0.5.25",
+      "version": "0.5.26",
       "dependencies": {
         "better-sqlite3": "^12.4.6",
         "drizzle-orm": "^0.44.7",

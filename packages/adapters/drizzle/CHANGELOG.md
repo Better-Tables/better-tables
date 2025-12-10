@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.26
+
+### Patch Changes
+
+- Skip relational queries when computed fields require SQL expressions in PostgresQueryBuilder. This change ensures compatibility by avoiding raw SQL in SELECT for relational queries, enhancing the handling of computed fields during query construction.
+
 ## 0.5.25
 
 ### Patch Changes
