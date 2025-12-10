@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.24
+
+### Patch Changes
+
+- Enhance FilterHandler date comparison logic to support full-day range matching for 'is' and 'isNot' operators. Update 'before' and 'after' operators to consider start and end of day in UTC, improving accuracy in date filtering.
+
 ## 0.5.23
 
 ### Patch Changes
