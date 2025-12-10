@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { DataEvent, FilterOperator, FilterState } from '@better-tables/core';
-import { count, eq, gt, gte, lt, lte } from 'drizzle-orm';
+import { count, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
 import { boolean, integer, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -414,13 +414,13 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
 
   describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
-      // Get current timestamp for exact match
-      const now = new Date();
+      // Use a past date that won't match any records
+      const pastDate = new Date('2020-01-01');
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [now] }],
+        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [pastDate] }],
       });
-      // This might be flaky due to exact timestamp matching
-      expect(result.data).toHaveLength(0); // No exact matches likely
+      // No records should match a date in 2020 (all records are created today)
+      expect(result.data).toHaveLength(0);
     });
 
     it('should filter by date isNot', async () => {
@@ -1440,6 +1440,65 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
         if (rowObj.postCount !== undefined) {
           expect(Number(rowObj.postCount)).toBeGreaterThan(0);
         }
+      }
+    });
+
+    it('should sort by computed field with sortSql', async () => {
+      const adapterWithComputed = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+        relations: testRelations,
+        computedFields: {
+          users: [
+            {
+              field: 'postCount',
+              type: 'number',
+              compute: async (row: Record<string, unknown>, context) => {
+                // Type assertion needed: test schema uses SQLite types but runs on PostgreSQL
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
+                const postsTable = context.schema.posts as any;
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
+                const result = await (context.db as any)
+                  .select({ count: count() })
+                  .from(postsTable)
+                  .where(eq(postsTable.userId, row.id as number));
+                return Number(result[0]?.count || 0);
+              },
+              sortSql: async (context) => {
+                // Return a SQL expression that counts posts for each user
+                // This will be used in ORDER BY clause
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
+                const postsTable = context.schema.posts as any;
+                // biome-ignore lint/suspicious/noExplicitAny: Test schema uses SQLite types but runs on PostgreSQL
+                const usersTable = context.schema.users as any;
+                return sql`(
+                  SELECT COUNT(*)
+                  FROM ${postsTable}
+                  WHERE ${postsTable.userId} = ${usersTable.id}
+                )`;
+              },
+            },
+          ],
+        },
+      });
+
+      // Sort by computed field (postCount) in descending order
+      const result = await adapterWithComputed.fetchData({
+        columns: ['name', 'postCount'],
+        sorting: [{ columnId: 'postCount', direction: 'desc' }],
+      });
+
+      expect(result.data.length).toBeGreaterThan(0);
+      // Verify sorting worked - users with more posts should come first
+      // Note: This test verifies that sortSql is being used for sorting
+      const postCounts = result.data.map((row) => {
+        const rowObj = row as Record<string, unknown>;
+        return typeof rowObj.postCount === 'number' ? rowObj.postCount : 0;
+      });
+      // Verify descending order (each count should be <= previous)
+      for (let i = 1; i < postCounts.length; i++) {
+        expect(postCounts[i] as number).toBeLessThanOrEqual(postCounts[i - 1] as number);
       }
     });
 

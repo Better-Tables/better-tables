@@ -719,6 +719,37 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
     context: ComputedFieldContext
   ) => Promise<SQL | SQLWrapper> | SQL | SQLWrapper;
 
+  /**
+   * Function to handle sorting on this computed field by returning a SQL expression directly.
+   * This is more efficient than in-memory sorting because the SQL expression is used in the
+   * ORDER BY clause, allowing the database to handle sorting efficiently.
+   *
+   * The SQL expression will be added to the SELECT clause with an alias matching the field name,
+   * and then used in the ORDER BY clause. This allows sorting by computed values without fetching
+   * all data into memory.
+   *
+   * @example
+   * ```typescript
+   * sortSql: async (context) => {
+   *   return sql`(
+   *     SELECT COUNT(*)
+   *     FROM user_segment_mappings
+   *     WHERE segment_id = ${userSegmentsTable.id}
+   *   )`;
+   * }
+   * ```
+   *
+   * This will generate SQL like:
+   * ```sql
+   * SELECT
+   *   "userSegmentsTable".*,
+   *   (SELECT COUNT(*) FROM user_segment_mappings WHERE segment_id = "userSegmentsTable".id) AS "userCount"
+   * FROM user_segments "userSegmentsTable"
+   * ORDER BY "userCount" DESC
+   * ```
+   */
+  sortSql?: (context: ComputedFieldContext) => Promise<SQL | SQLWrapper> | SQL | SQLWrapper;
+
   /** Type of the computed field (for validation) */
   type?: ColumnType;
 
@@ -732,6 +763,18 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
    * @default false
    */
   requiresColumn?: boolean;
+}
+
+/**
+ * Computed field configuration with resolved SQL expression for sorting.
+ * This is an internal type used by the query builder after resolving sortSql expressions.
+ *
+ * @template TData - The type of data items
+ */
+export interface ComputedFieldWithResolvedSortSql<TData = Record<string, unknown>>
+  extends ComputedFieldConfig<TData> {
+  /** Resolved SQL expression from sortSql function (pre-resolved in adapter) */
+  __resolvedSortSql: SQL | SQLWrapper;
 }
 
 /**

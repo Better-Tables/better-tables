@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.25
+
+### Patch Changes
+
+- Add `sortSql` support for computed fields, enabling efficient database-level sorting. Computed field SQL expressions are now injected into SELECT and ORDER BY clauses with proper identifier escaping to prevent SQL injection. The adapter filters out computed fields from query context building and includes database-specific SQL identifier quoting. Also fixes date handling by converting Date objects to ISO strings for PostgreSQL and MySQL, and refines the 'isNot' operator using De Morgan's law for better cross-database compatibility.
+
 ## 0.5.24
 
 ### Patch Changes

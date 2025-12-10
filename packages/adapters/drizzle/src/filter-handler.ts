@@ -618,8 +618,17 @@ export class FilterHandler {
       return sql`${column} ${sql.raw(operator)} ${value}`;
     }
 
+    // Convert Date objects to ISO strings for PostgreSQL and MySQL
+    // The postgres driver expects strings, not Date objects
+    const dateValue =
+      value instanceof Date
+        ? this.databaseType === 'sqlite'
+          ? value.getTime()
+          : value.toISOString()
+        : value;
+
     // For PostgreSQL and MySQL, ensure proper casting
-    const castValue = this.castToDateSQL(value);
+    const castValue = this.castToDateSQL(dateValue);
     return sql`${column} ${sql.raw(operator)} ${castValue}`;
   }
 
@@ -952,6 +961,7 @@ export class FilterHandler {
       case 'isNot':
         if (shouldUseDateComparison) {
           // For date 'isNot' operator, exclude the entire day
+          // Use De Morgan's law: NOT (date >= start AND date <= end) = (date < start OR date > end)
           const dateValue = this.parseFilterDate(values[0]);
           const date =
             typeof dateValue === 'string'
@@ -970,8 +980,12 @@ export class FilterHandler {
             Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)
           );
 
-          // Return NOT (date >= startOfDay AND date <= endOfDay)
-          return not(this.createDateRangeCondition(column, startOfDay, endOfDay));
+          // Use OR with < and > instead of NOT with AND for better compatibility
+          // This is equivalent to: NOT (date >= startOfDay AND date <= endOfDay)
+          return or(
+            this.createDateComparisonCondition(column, '<', startOfDay),
+            this.createDateComparisonCondition(column, '>', endOfDay)
+          );
         }
         return not(eq(column, values[0]));
       case 'before':

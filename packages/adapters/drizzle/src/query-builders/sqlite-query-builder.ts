@@ -19,6 +19,7 @@ import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
+  ComputedFieldWithResolvedSortSql,
   FilterHandlerHooks,
   QueryContext,
   SQLiteDatabaseType,
@@ -92,7 +93,8 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
   buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
-    columns?: string[]
+    columns?: string[],
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
   ): {
     query: SQLiteQueryBuilderWithJoins;
     columnMetadata: {
@@ -127,6 +129,30 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
       Object.assign(selections, this.buildFlatSelectionsForRelationships(primaryTable));
       for (const key of Object.keys(selections)) {
         columnMapping[key] = key;
+      }
+    }
+
+    // Add computed field SQL expressions for sorting
+    // These need to be in SELECT so they can be referenced in ORDER BY
+    // Note: sortSql expressions are pre-resolved in DrizzleAdapter.fetchData before calling buildSelectQuery
+    // The double type assertion (as unknown as AnyColumnType) is necessary because Drizzle's type system
+    // doesn't recognize SQL expressions as valid column types, but at runtime they work correctly.
+    if (computedFields) {
+      for (const [fieldName, computedField] of Object.entries(computedFields)) {
+        // Check that the SQL expression was resolved (should always be true at this point)
+        if (computedField.__resolvedSortSql !== undefined) {
+          // Use pre-resolved SQL expression (resolved in adapter)
+          // Explicitly alias the SQL expression with the field name so it can be referenced in ORDER BY
+          // According to Drizzle docs: sql`expression`.as('alias') adds an alias to the SQL expression
+          // All SQL expressions from Drizzle support .as() method
+          // Type assertion needed: Drizzle's type system doesn't accept SQL expressions as column types,
+          // but they work correctly at runtime when used in SELECT clauses
+          const aliasedSql = (
+            computedField.__resolvedSortSql as SQL & { as: (alias: string) => SQL }
+          ).as(fieldName);
+          selections[fieldName] = aliasedSql as unknown as AnyColumnType;
+          columnMapping[fieldName] = fieldName;
+        }
       }
     }
 
@@ -380,6 +406,13 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
   /**
    * Build min/max values query
    */
+  /**
+   * Quote SQL identifier for SQLite (uses double quotes)
+   */
+  protected quoteIdentifier(identifier: string): SQL {
+    return sql.raw(`"${identifier}"`);
+  }
+
   buildMinMaxQuery<TColumnId extends string>(
     columnId: TColumnId,
     primaryTable: string

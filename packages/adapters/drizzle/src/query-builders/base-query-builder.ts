@@ -19,6 +19,7 @@ import type {
   AnyColumnType,
   AnyTableType,
   ColumnPath,
+  ComputedFieldWithResolvedSortSql,
   DatabaseDriver,
   FilterHandlerHooks,
   MySQLQueryBuilderWithJoins,
@@ -33,6 +34,7 @@ import { generateAlias, generatePathKey } from '../utils/alias-generator';
 import { getColumnNames } from '../utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from '../utils/levenshtein';
 import { getPrimaryKeyMap } from '../utils/schema-introspection';
+import { escapeSqlIdentifier } from '../utils/sql-utils';
 
 /**
  * Abstract base class for query builders.
@@ -97,7 +99,8 @@ export abstract class BaseQueryBuilder {
   abstract buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
-    columns?: string[]
+    columns?: string[],
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
   ): {
     query: QueryBuilderWithJoins;
     columnMetadata: {
@@ -133,6 +136,18 @@ export abstract class BaseQueryBuilder {
     columnId: TColumnId,
     primaryTable: string
   ): QueryBuilderWithJoins;
+
+  /**
+   * Abstract method to quote SQL identifier - must be implemented by subclasses
+   * Each database uses different quote characters for identifiers:
+   * - PostgreSQL: double quotes (")
+   * - MySQL: backticks (`)
+   * - SQLite: double quotes (") or square brackets ([])
+   *
+   * @param identifier - The identifier to quote (already escaped)
+   * @returns SQL expression with quoted identifier
+   */
+  protected abstract quoteIdentifier(identifier: string): SQL | SQLWrapper;
 
   /**
    * Apply filters to query
@@ -172,13 +187,29 @@ export abstract class BaseQueryBuilder {
   applySorting(
     query: QueryBuilderWithJoins,
     sorting: SortingParams[],
-    primaryTable: string
+    primaryTable: string,
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
   ): QueryBuilderWithJoins {
     if (!sorting || sorting.length === 0) {
       return query;
     }
 
     const orderByClauses = sorting.map((sort) => {
+      // Check if this is a computed field with sortSql (check for resolved SQL expression)
+      const computedField = computedFields?.[sort.columnId];
+      if (computedField?.__resolvedSortSql !== undefined) {
+        // The SQL expression is already in SELECT with an alias matching the field name
+        // We reference it by the field name (which matches the alias)
+        // Use database-specific identifier quoting (delegated to subclasses)
+        // Note: The alias comes from a validated computed field name, not user input.
+        // The escaping prevents issues if the field name contains quote characters.
+        const alias = sort.columnId;
+        const escapedAlias = escapeSqlIdentifier(alias);
+        const orderByExpression = this.quoteIdentifier(escapedAlias);
+        return sort.direction === 'desc' ? desc(orderByExpression) : asc(orderByExpression);
+      }
+
+      // Fall back to regular column resolution
       const columnPath = this.relationshipManager.resolveColumnPath(sort.columnId, primaryTable);
       const column = this.getColumn(columnPath);
 
@@ -424,6 +455,7 @@ export abstract class BaseQueryBuilder {
     pagination?: PaginationParams;
     primaryTable: string;
     additionalConditions?: (SQL | SQLWrapper)[]; // Additional SQL conditions to apply (e.g., from computed field filterSql)
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>; // Computed fields with sortSql for sorting (pre-resolved)
   }): {
     dataQuery: QueryBuilderWithJoins;
     countQuery: QueryBuilderWithJoins;
@@ -433,16 +465,28 @@ export abstract class BaseQueryBuilder {
     };
     isNested?: boolean; // Flag to indicate if data is already nested from relational query
   } {
+    // Filter out computed fields from sorts before building query context
+    // Computed fields are handled separately in applySorting
+    const computedFieldNames = params.computedFields ? Object.keys(params.computedFields) : [];
+    const sortsForContext = params.sorting
+      ?.filter((sort) => !computedFieldNames.includes(sort.columnId))
+      .map((sort) => ({ columnId: sort.columnId })) || [];
+
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],
         filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
-        sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
+        sorts: sortsForContext,
       },
       params.primaryTable
     );
 
-    const selectResult = this.buildSelectQuery(context, params.primaryTable, params.columns);
+    const selectResult = this.buildSelectQuery(
+      context,
+      params.primaryTable,
+      params.columns,
+      params.computedFields
+    );
     const { query: dataQuery, columnMetadata, isNested } = selectResult;
     let finalDataQuery = this.applyFilters(
       dataQuery,
@@ -450,7 +494,12 @@ export abstract class BaseQueryBuilder {
       params.primaryTable,
       params.additionalConditions
     );
-    finalDataQuery = this.applySorting(finalDataQuery, params.sorting || [], params.primaryTable);
+    finalDataQuery = this.applySorting(
+      finalDataQuery,
+      params.sorting || [],
+      params.primaryTable,
+      params.computedFields
+    );
     if (params.pagination) {
       finalDataQuery = this.applyPagination(finalDataQuery, params.pagination);
     }
