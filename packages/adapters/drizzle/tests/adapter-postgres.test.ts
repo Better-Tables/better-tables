@@ -414,13 +414,13 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
 
   describe('Date Filter Operators', () => {
     it('should filter by date is', async () => {
-      // Get current timestamp for exact match
-      const now = new Date();
+      // Use a past date that won't match any records
+      const pastDate = new Date('2020-01-01');
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [now] }],
+        filters: [{ columnId: 'createdAt', type: 'date', operator: 'is', values: [pastDate] }],
       });
-      // This might be flaky due to exact timestamp matching
-      expect(result.data).toHaveLength(0); // No exact matches likely
+      // No records should match a date in 2020 (all records are created today)
+      expect(result.data).toHaveLength(0);
     });
 
     it('should filter by date isNot', async () => {
