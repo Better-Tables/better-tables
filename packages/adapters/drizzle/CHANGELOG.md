@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.23
+
+### Patch Changes
+
+- Introduced a new method to identify timestamp columns, allowing for correct date comparisons in filter conditions even when the column type is not explicitly set to 'date'. Added comprehensive tests for PostgreSQL, MySQL, and SQLite to validate the new functionality.
+
 ## 0.5.22
 
 ### Patch Changes
