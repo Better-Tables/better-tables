@@ -925,16 +925,92 @@ export class FilterHandler {
 
     switch (operator) {
       case 'is':
-        return shouldUseDateComparison
-          ? this.createDateComparisonCondition(column, '=', this.parseFilterDate(values[0]))
-          : eq(column, values[0]);
+        if (shouldUseDateComparison) {
+          // For date 'is' operator, use a date range (start of day to end of day)
+          // This ensures we match all records on that date, regardless of time
+          const dateValue = this.parseFilterDate(values[0]);
+          const date =
+            typeof dateValue === 'string'
+              ? new Date(dateValue)
+              : typeof dateValue === 'number'
+                ? new Date(dateValue)
+                : dateValue;
+
+          // Create start of day (00:00:00.000) in UTC to avoid timezone issues
+          const startOfDay = new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0)
+          );
+
+          // Create end of day (23:59:59.999) in UTC
+          const endOfDay = new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)
+          );
+
+          return this.createDateRangeCondition(column, startOfDay, endOfDay);
+        }
+        return eq(column, values[0]);
       case 'isNot':
-        return shouldUseDateComparison
-          ? this.createDateComparisonCondition(column, '!=', this.parseFilterDate(values[0]))
-          : not(eq(column, values[0]));
+        if (shouldUseDateComparison) {
+          // For date 'isNot' operator, exclude the entire day
+          const dateValue = this.parseFilterDate(values[0]);
+          const date =
+            typeof dateValue === 'string'
+              ? new Date(dateValue)
+              : typeof dateValue === 'number'
+                ? new Date(dateValue)
+                : dateValue;
+
+          // Create start of day (00:00:00.000) in UTC
+          const startOfDay = new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0)
+          );
+
+          // Create end of day (23:59:59.999) in UTC
+          const endOfDay = new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)
+          );
+
+          // Return NOT (date >= startOfDay AND date <= endOfDay)
+          return not(this.createDateRangeCondition(column, startOfDay, endOfDay));
+        }
+        return not(eq(column, values[0]));
       case 'before':
+        if (shouldUseDateComparison) {
+          // For date 'before' operator, match records before the start of the specified day
+          const dateValue = this.parseFilterDate(values[0]);
+          const date =
+            typeof dateValue === 'string'
+              ? new Date(dateValue)
+              : typeof dateValue === 'number'
+                ? new Date(dateValue)
+                : dateValue;
+
+          // Create start of day (00:00:00.000) in UTC - records before this
+          const startOfDay = new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0)
+          );
+
+          return this.createDateComparisonCondition(column, '<', startOfDay);
+        }
         return this.createDateComparisonCondition(column, '<', this.parseFilterDate(values[0]));
       case 'after':
+        if (shouldUseDateComparison) {
+          // For date 'after' operator, match records after the end of the specified day
+          const dateValue = this.parseFilterDate(values[0]);
+          const date =
+            typeof dateValue === 'string'
+              ? new Date(dateValue)
+              : typeof dateValue === 'number'
+                ? new Date(dateValue)
+                : dateValue;
+
+          // Create end of day (23:59:59.999) in UTC - records after this
+          const endOfDay = new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)
+          );
+
+          return this.createDateComparisonCondition(column, '>', endOfDay);
+        }
         return this.createDateComparisonCondition(column, '>', this.parseFilterDate(values[0]));
       case 'isToday':
         return this.buildDateCondition(column, 'today');
