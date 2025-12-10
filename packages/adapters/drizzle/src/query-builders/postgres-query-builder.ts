@@ -431,8 +431,16 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
       });
     }
 
+    // Skip relational queries if we have computed fields with sortSql
+    // Relational queries don't support raw SQL expressions in SELECT
+    // We need to use manual joins to add computed field SQL expressions
+    const hasComputedFieldsForSorting = computedFields && Object.keys(computedFields).length > 0;
+
     // Try to use Drizzle relational queries first (for non-array relationships)
-    const relationalQuery = this.buildRelationalQuery(primaryTable, columns, context);
+    // But skip if we have computed fields that need SQL expressions
+    const relationalQuery = hasComputedFieldsForSorting
+      ? null
+      : this.buildRelationalQuery(primaryTable, columns, context);
     if (relationalQuery) {
       return {
         query: relationalQuery.query,
