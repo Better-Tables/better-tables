@@ -919,13 +919,17 @@ export class FilterHandler {
       return undefined;
     }
 
+    // Check if this is a timestamp column (even if columnType from frontend isn't 'date')
+    const isTimestamp = this.isTimestampColumn(column);
+    const shouldUseDateComparison = columnType === 'date' || isTimestamp;
+
     switch (operator) {
       case 'is':
-        return columnType === 'date'
+        return shouldUseDateComparison
           ? this.createDateComparisonCondition(column, '=', this.parseFilterDate(values[0]))
           : eq(column, values[0]);
       case 'isNot':
-        return columnType === 'date'
+        return shouldUseDateComparison
           ? this.createDateComparisonCondition(column, '!=', this.parseFilterDate(values[0]))
           : not(eq(column, values[0]));
       case 'before':
@@ -1640,6 +1644,71 @@ export class FilterHandler {
    * @param column - The column to get the type for
    * @returns PostgreSQL type name (e.g., 'uuid', 'text', 'integer') or null if unknown
    */
+  /**
+   * Check if a column is a timestamp/date column.
+   *
+   * @param column - The column to check
+   * @returns True if the column is a timestamp or date column
+   */
+  private isTimestampColumn(column: ColumnOrExpression): boolean {
+    // If it's a SQL expression, we can't determine the type
+    if (this.isSqlExpression(column)) {
+      return false;
+    }
+
+    const col = column as AnyColumnType;
+
+    // Check columnType first (more specific than dataType)
+    const columnType = (col as unknown as { columnType?: string }).columnType;
+    if (columnType) {
+      // Check for PostgreSQL timestamp column types
+      if (
+        columnType === 'PgTimestamp' ||
+        columnType === 'PgTimestampString' ||
+        columnType === 'PgTimestampNumber'
+      ) {
+        return true;
+      }
+
+      // Check for MySQL datetime/timestamp column types
+      if (
+        columnType === 'MySqlDateTime' ||
+        columnType === 'MySqlTimestamp' ||
+        columnType === 'MySqlDate'
+      ) {
+        return true;
+      }
+
+      // Check for SQLite timestamp column types
+      // SQLite uses integer with mode: 'timestamp' or text with mode: 'date'
+      if (
+        columnType === 'SQLiteTimestamp' ||
+        columnType === 'SQLiteDate' ||
+        // SQLite integer columns with timestamp mode
+        (columnType === 'SQLiteInteger' &&
+          (col as unknown as { mode?: string }).mode === 'timestamp')
+      ) {
+        return true;
+      }
+    }
+
+    // Check dataType as fallback (date is a valid dataType)
+    const dataType = col.dataType;
+    if (dataType === 'date') {
+      return true;
+    }
+
+    // For SQLite, also check if it's an integer with timestamp mode
+    if (this.databaseType === 'sqlite' && dataType === 'number') {
+      const mode = (col as unknown as { mode?: string }).mode;
+      if (mode === 'timestamp' || mode === 'date') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private getPostgresColumnType(column: ColumnOrExpression): string | null {
     // If it's a SQL expression, we can't determine the type
     if (this.isSqlExpression(column)) {
@@ -1662,6 +1731,9 @@ export class FilterHandler {
         PgBoolean: 'boolean',
         PgNumeric: 'numeric',
         PgVarchar: 'varchar',
+        PgTimestamp: 'timestamp',
+        PgTimestampString: 'timestamp',
+        PgTimestampNumber: 'timestamp',
       };
 
       if (columnType in columnTypeMap) {

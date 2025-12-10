@@ -208,4 +208,115 @@ describe('FilterHandler - Date Logic', () => {
       expect(condition).toBeDefined();
     });
   });
+
+  describe('Automatic Timestamp Detection (without type: date)', () => {
+    describe('PostgreSQL - Auto-detect timestamp columns', () => {
+      const schema = { users: mockPgTable };
+      const relationshipManager = new RelationshipManager(schema, {});
+      const handler = new FilterHandler(schema, relationshipManager, 'postgres');
+
+      it('should auto-detect timestamp column and use date comparison for "is" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'is' as const,
+          values: ['2023-01-01'],
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition) not eq()
+      });
+
+      it('should auto-detect timestamp column and use date comparison for "before" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'before' as const,
+          values: ['2023-01-01'],
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition)
+      });
+
+      it('should auto-detect timestamp column and use date comparison for "after" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'after' as const,
+          values: ['2023-01-01'],
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition)
+      });
+    });
+
+    describe('MySQL - Auto-detect datetime columns', () => {
+      const schema = { users: mockMysqlTable };
+      const relationshipManager = new RelationshipManager(schema, {});
+      const handler = new FilterHandler(schema, relationshipManager, 'mysql');
+
+      it('should auto-detect datetime column and use date comparison for "is" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'is' as const,
+          values: ['2023-01-01'],
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition) not eq()
+      });
+
+      it('should auto-detect datetime column and use date comparison for "before" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'before' as const,
+          values: ['2023-01-01'],
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition)
+      });
+    });
+
+    describe('SQLite - Auto-detect timestamp integer columns', () => {
+      const schema = { users: mockSqliteTable };
+      const relationshipManager = new RelationshipManager(schema, {});
+      const handler = new FilterHandler(schema, relationshipManager, 'sqlite');
+
+      it('should auto-detect timestamp integer column and use date comparison for "is" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'is' as const,
+          values: [1672531200000], // 2023-01-01 timestamp
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition) not eq()
+      });
+
+      it('should auto-detect timestamp integer column and use date comparison for "before" operator', () => {
+        const filter = {
+          columnId: 'created_at',
+          operator: 'before' as const,
+          values: [1672531200000], // 2023-01-01 timestamp
+          // Note: type is NOT 'date' - should auto-detect from column type
+        } as FilterState;
+
+        const condition = handler.buildFilterCondition(filter, 'users');
+        expect(condition).toBeDefined();
+        // Should use date comparison (createDateComparisonCondition)
+      });
+    });
+  });
 });
