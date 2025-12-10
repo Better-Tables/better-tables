@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.4.6",
-    "drizzle-orm": "^0.44.7"
+    "drizzle-orm": "^0.45.1"
   },
   "peerDependencies": {
     "@better-tables/core": "workspace:*",
