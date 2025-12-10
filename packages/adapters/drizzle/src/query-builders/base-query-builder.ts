@@ -11,7 +11,7 @@
 
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
-import { and, asc, avg, count, countDistinct, desc, eq, max, min, sum } from 'drizzle-orm';
+import { and, asc, avg, count, countDistinct, desc, eq, max, min, sql, sum } from 'drizzle-orm';
 import { FilterHandler } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
@@ -19,6 +19,7 @@ import type {
   AnyColumnType,
   AnyTableType,
   ColumnPath,
+  ComputedFieldWithResolvedSortSql,
   DatabaseDriver,
   FilterHandlerHooks,
   MySQLQueryBuilderWithJoins,
@@ -33,6 +34,7 @@ import { generateAlias, generatePathKey } from '../utils/alias-generator';
 import { getColumnNames } from '../utils/drizzle-schema-utils';
 import { calculateLevenshteinDistance } from '../utils/levenshtein';
 import { getPrimaryKeyMap } from '../utils/schema-introspection';
+import { escapeSqlIdentifier } from '../utils/sql-utils';
 
 /**
  * Abstract base class for query builders.
@@ -97,7 +99,8 @@ export abstract class BaseQueryBuilder {
   abstract buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
-    columns?: string[]
+    columns?: string[],
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
   ): {
     query: QueryBuilderWithJoins;
     columnMetadata: {
@@ -172,13 +175,29 @@ export abstract class BaseQueryBuilder {
   applySorting(
     query: QueryBuilderWithJoins,
     sorting: SortingParams[],
-    primaryTable: string
+    primaryTable: string,
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
   ): QueryBuilderWithJoins {
     if (!sorting || sorting.length === 0) {
       return query;
     }
 
     const orderByClauses = sorting.map((sort) => {
+      // Check if this is a computed field with sortSql (check for resolved SQL expression)
+      const computedField = computedFields?.[sort.columnId];
+      if (computedField?.__resolvedSortSql !== undefined) {
+        // The SQL expression is already in SELECT with an alias matching the field name
+        // We reference it by the field name (which matches the alias)
+        // Use sql.raw() to reference the alias directly in ORDER BY clause
+        // Note: sql.raw() is safe here because the alias comes from a validated computed field name,
+        // not user input. The escaping prevents issues if the field name contains quote characters.
+        const alias = sort.columnId;
+        const escapedAlias = escapeSqlIdentifier(alias);
+        const orderByExpression = sql.raw(`"${escapedAlias}"`);
+        return sort.direction === 'desc' ? desc(orderByExpression) : asc(orderByExpression);
+      }
+
+      // Fall back to regular column resolution
       const columnPath = this.relationshipManager.resolveColumnPath(sort.columnId, primaryTable);
       const column = this.getColumn(columnPath);
 
@@ -424,6 +443,7 @@ export abstract class BaseQueryBuilder {
     pagination?: PaginationParams;
     primaryTable: string;
     additionalConditions?: (SQL | SQLWrapper)[]; // Additional SQL conditions to apply (e.g., from computed field filterSql)
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>; // Computed fields with sortSql for sorting (pre-resolved)
   }): {
     dataQuery: QueryBuilderWithJoins;
     countQuery: QueryBuilderWithJoins;
@@ -442,7 +462,12 @@ export abstract class BaseQueryBuilder {
       params.primaryTable
     );
 
-    const selectResult = this.buildSelectQuery(context, params.primaryTable, params.columns);
+    const selectResult = this.buildSelectQuery(
+      context,
+      params.primaryTable,
+      params.columns,
+      params.computedFields
+    );
     const { query: dataQuery, columnMetadata, isNested } = selectResult;
     let finalDataQuery = this.applyFilters(
       dataQuery,
@@ -450,7 +475,12 @@ export abstract class BaseQueryBuilder {
       params.primaryTable,
       params.additionalConditions
     );
-    finalDataQuery = this.applySorting(finalDataQuery, params.sorting || [], params.primaryTable);
+    finalDataQuery = this.applySorting(
+      finalDataQuery,
+      params.sorting || [],
+      params.primaryTable,
+      params.computedFields
+    );
     if (params.pagination) {
       finalDataQuery = this.applyPagination(finalDataQuery, params.pagination);
     }

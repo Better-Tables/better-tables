@@ -18,6 +18,7 @@ import type {
   AggregateFunction,
   AnyColumnType,
   AnyTableType,
+  ComputedFieldWithResolvedSortSql,
   FilterHandlerHooks,
   MySQLQueryBuilderWithJoins,
   MySqlDatabaseType,
@@ -94,7 +95,8 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
   buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
-    columns?: string[]
+    columns?: string[],
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
   ): {
     query: MySQLQueryBuilderWithJoins;
     columnMetadata: {
@@ -129,6 +131,24 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
       Object.assign(selections, this.buildFlatSelectionsForRelationships(primaryTable));
       for (const key of Object.keys(selections)) {
         columnMapping[key] = key;
+      }
+    }
+
+    // Add computed field SQL expressions for sorting
+    // These need to be in SELECT so they can be referenced in ORDER BY
+    // Note: sortSql expressions are pre-resolved in DrizzleAdapter.fetchData before calling buildSelectQuery
+    // The double type assertion (as unknown as AnyColumnType) is necessary because Drizzle's type system
+    // doesn't recognize SQL expressions as valid column types, but at runtime they work correctly.
+    if (computedFields) {
+      for (const [fieldName, computedField] of Object.entries(computedFields)) {
+        // Check that the SQL expression was resolved (should always be true at this point)
+        if (computedField.__resolvedSortSql !== undefined) {
+          // Use pre-resolved SQL expression (resolved in adapter)
+          // Type assertion needed: Drizzle's type system doesn't accept SQL expressions as column types,
+          // but they work correctly at runtime when used in SELECT clauses
+          selections[fieldName] = computedField.__resolvedSortSql as unknown as AnyColumnType;
+          columnMapping[fieldName] = fieldName;
+        }
       }
     }
 

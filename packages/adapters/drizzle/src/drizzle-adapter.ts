@@ -76,6 +76,7 @@ import type {
   AnyTableType,
   ComputedFieldConfig,
   ComputedFieldContext,
+  ComputedFieldWithResolvedSortSql,
   DatabaseDriver,
   DatabaseOperations,
   DrizzleAdapterConfig,
@@ -414,7 +415,26 @@ export class DrizzleAdapter<
       // Filter out computed fields from columns and track which ones were requested
       const requestedComputedFields: ComputedFieldConfig[] = [];
       const columnsToFetch: string[] = []; // Track columns that need to be fetched for computed fields
-      const columnsWithoutComputed = (params.columns || []).filter((col) => {
+
+      // If no columns specified (undefined or empty array), include computed fields with includeByDefault: true
+      // Flow: columnsToProcess -> columnsWithoutComputed -> finalColumns
+      // This ensures computed fields marked with includeByDefault are automatically included
+      // when the frontend doesn't explicitly request specific columns.
+      // Note: Both undefined and [] (empty array) are treated as "no columns specified"
+      const columnsToProcess = params.columns || [];
+      if (columnsToProcess.length === 0) {
+        // Include computed fields that should be included by default
+        // These will be processed like regular columns and added to finalColumns
+        for (const computedField of tableComputedFields) {
+          if (computedField.includeByDefault === true) {
+            columnsToProcess.push(computedField.field);
+          }
+        }
+      }
+
+      // Filter out computed fields from the column list (they're handled separately)
+      // But keep columns that computed fields require (requiresColumn: true)
+      const columnsWithoutComputed = columnsToProcess.filter((col) => {
         const isComputed = tableComputedFields.some((cf) => cf.field === col);
         if (isComputed) {
           const computedField = tableComputedFields.find((cf) => cf.field === col);
@@ -547,6 +567,56 @@ export class DrizzleAdapter<
         };
       }
 
+      // Resolve sortSql expressions for computed fields that are being sorted
+      const computedFieldsForSorting: Record<string, ComputedFieldWithResolvedSortSql> = {};
+      if (params.sorting && params.sorting.length > 0) {
+        const context: ComputedFieldContext<TSchema, TDriver> = {
+          primaryTable,
+          allRows: [],
+          db: this.db,
+          schema: this.schema,
+        };
+
+        for (const sort of params.sorting) {
+          const computedField = tableComputedFields.find((cf) => cf.field === sort.columnId);
+          if (computedField?.sortSql) {
+            try {
+              // Resolve sortSql expression (handle both sync and async)
+              const sqlExpression = computedField.sortSql(context);
+              const resolvedExpression =
+                sqlExpression instanceof Promise ? await sqlExpression : sqlExpression;
+
+              // Validate that sortSql returned a valid SQL expression
+              if (!resolvedExpression) {
+                throw new QueryError(
+                  `sortSql returned null or undefined for computed field: ${sort.columnId}`,
+                  { columnId: sort.columnId, field: computedField.field }
+                );
+              }
+
+              computedFieldsForSorting[sort.columnId] = {
+                ...computedField,
+                __resolvedSortSql: resolvedExpression,
+              };
+            } catch (error) {
+              // Re-throw QueryError as-is (already has proper context)
+              if (error instanceof QueryError) {
+                throw error;
+              }
+              // Wrap other errors with context
+              throw new QueryError(
+                `Failed to resolve sortSql for computed field: ${sort.columnId}`,
+                {
+                  columnId: sort.columnId,
+                  field: computedField.field,
+                  originalError: error instanceof Error ? error.message : String(error),
+                }
+              );
+            }
+          }
+        }
+      }
+
       // Build queries - pass primaryTable to query builder
       // Include columns that computed fields require (e.g., roles column for enum array filtering)
       // Pass additional SQL conditions from computed field filterSql (applied before pagination)
@@ -559,6 +629,9 @@ export class DrizzleAdapter<
       };
       if (additionalSqlConditions.length > 0) {
         queryParams.additionalConditions = additionalSqlConditions;
+      }
+      if (Object.keys(computedFieldsForSorting).length > 0) {
+        queryParams.computedFields = computedFieldsForSorting;
       }
       const { dataQuery, countQuery, columnMetadata, isNested } =
         this.queryBuilder.buildCompleteQuery(queryParams);
