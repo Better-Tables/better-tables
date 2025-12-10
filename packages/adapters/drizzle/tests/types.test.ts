@@ -153,6 +153,40 @@ describe('ComputedFieldConfig Type', () => {
     expect(computedField.requiresColumn).toBe(true);
     expect(computedField.compute).toBeDefined();
   });
+
+  it('should accept computed field with sortSql function', () => {
+    const computedField: ComputedFieldConfig = {
+      field: 'userCount',
+      type: 'number',
+      compute: () => 0,
+      sortSql: async () => {
+        // Return a SQL expression for sorting
+        // Using a simple SQL expression that doesn't reference schema properties
+        // In real usage, you would access context.schema with proper typing
+        return sql`(SELECT COUNT(*) FROM user_segment_mappings)`;
+      },
+    };
+
+    expect(computedField.sortSql).toBeDefined();
+    expect(typeof computedField.sortSql).toBe('function');
+  });
+
+  it('should accept computed field with synchronous sortSql function', () => {
+    const computedField: ComputedFieldConfig = {
+      field: 'displayName',
+      type: 'text',
+      compute: () => '',
+      sortSql: () => {
+        // Synchronous SQL expression
+        // Using a simple SQL expression that doesn't reference schema properties
+        // In real usage, you would access context.schema with proper typing
+        return sql`LOWER('test')`;
+      },
+    };
+
+    expect(computedField.sortSql).toBeDefined();
+    expect(typeof computedField.sortSql).toBe('function');
+  });
 });
 
 describe('DrizzleAdapterConfig with ComputedFields', () => {

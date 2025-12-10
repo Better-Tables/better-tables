@@ -570,6 +570,39 @@ describe('SQLiteQueryBuilder', () => {
         expect(Array.isArray(dataResult)).toBe(true);
         expect(Array.isArray(countResult)).toBe(true);
       });
+
+      it('should handle computed fields with sortSql in buildSelectQuery', () => {
+        const computedFields = {
+          postCount: {
+            field: 'postCount',
+            type: 'number' as const,
+            compute: () => 0,
+            __resolvedSortSql: sql`(SELECT COUNT(*) FROM posts WHERE user_id = ${schema.users.id})`,
+          },
+        };
+
+        // Filter out computed fields from sorts before building query context
+        // Computed fields are handled separately in applySorting
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name'],
+            sorts: [], // Don't include computed fields in sorts for buildQueryContext
+          },
+          'users'
+        );
+
+        const { query, columnMetadata } = queryBuilder.buildSelectQuery(
+          context,
+          'users',
+          ['name'],
+          computedFields
+        );
+
+        expect(query).toBeDefined();
+        expect(columnMetadata.selections).toHaveProperty('postCount');
+        expect(columnMetadata.columnMapping).toHaveProperty('postCount');
+        expect(queryBuilder.validateQuery(query)).toBe(true);
+      });
     });
   });
 });

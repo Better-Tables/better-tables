@@ -11,7 +11,7 @@
 
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
-import { and, asc, avg, count, countDistinct, desc, eq, max, min, sql, sum } from 'drizzle-orm';
+import { and, asc, avg, count, countDistinct, desc, eq, max, min, sum } from 'drizzle-orm';
 import { FilterHandler } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
@@ -138,6 +138,18 @@ export abstract class BaseQueryBuilder {
   ): QueryBuilderWithJoins;
 
   /**
+   * Abstract method to quote SQL identifier - must be implemented by subclasses
+   * Each database uses different quote characters for identifiers:
+   * - PostgreSQL: double quotes (")
+   * - MySQL: backticks (`)
+   * - SQLite: double quotes (") or square brackets ([])
+   *
+   * @param identifier - The identifier to quote (already escaped)
+   * @returns SQL expression with quoted identifier
+   */
+  protected abstract quoteIdentifier(identifier: string): SQL | SQLWrapper;
+
+  /**
    * Apply filters to query
    */
   applyFilters(
@@ -188,12 +200,12 @@ export abstract class BaseQueryBuilder {
       if (computedField?.__resolvedSortSql !== undefined) {
         // The SQL expression is already in SELECT with an alias matching the field name
         // We reference it by the field name (which matches the alias)
-        // Use sql.raw() to reference the alias directly in ORDER BY clause
-        // Note: sql.raw() is safe here because the alias comes from a validated computed field name,
-        // not user input. The escaping prevents issues if the field name contains quote characters.
+        // Use database-specific identifier quoting (delegated to subclasses)
+        // Note: The alias comes from a validated computed field name, not user input.
+        // The escaping prevents issues if the field name contains quote characters.
         const alias = sort.columnId;
         const escapedAlias = escapeSqlIdentifier(alias);
-        const orderByExpression = sql.raw(`"${escapedAlias}"`);
+        const orderByExpression = this.quoteIdentifier(escapedAlias);
         return sort.direction === 'desc' ? desc(orderByExpression) : asc(orderByExpression);
       }
 
@@ -453,11 +465,18 @@ export abstract class BaseQueryBuilder {
     };
     isNested?: boolean; // Flag to indicate if data is already nested from relational query
   } {
+    // Filter out computed fields from sorts before building query context
+    // Computed fields are handled separately in applySorting
+    const computedFieldNames = params.computedFields ? Object.keys(params.computedFields) : [];
+    const sortsForContext = params.sorting
+      ?.filter((sort) => !computedFieldNames.includes(sort.columnId))
+      .map((sort) => ({ columnId: sort.columnId })) || [];
+
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],
         filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
-        sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
+        sorts: sortsForContext,
       },
       params.primaryTable
     );

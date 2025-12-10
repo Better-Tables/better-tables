@@ -7,6 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import { SQLiteQueryBuilder } from '../src/query-builders/sqlite-query-builder';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
@@ -318,6 +319,96 @@ describe('BaseQueryBuilder', () => {
           'users'
         );
       }).toThrow(RelationshipError);
+    });
+
+    it('should apply sorting with computed field sortSql', () => {
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+
+      // Create computed field with resolved sortSql
+      const computedFields = {
+        postCount: {
+          field: 'postCount',
+          type: 'number' as const,
+          compute: () => 0,
+          __resolvedSortSql: sql`(SELECT COUNT(*) FROM posts WHERE user_id = ${schema.users.id})`,
+        },
+      };
+
+      const sortedQuery = queryBuilder.applySorting(
+        query,
+        [
+          {
+            columnId: 'postCount',
+            direction: 'desc',
+          },
+        ],
+        'users',
+        computedFields
+      );
+
+      expect(sortedQuery).toBeDefined();
+      expect(queryBuilder.validateQuery(sortedQuery)).toBe(true);
+    });
+
+    it('should apply sorting with computed field sortSql ascending', () => {
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+
+      // Create computed field with resolved sortSql
+      const computedFields = {
+        postCount: {
+          field: 'postCount',
+          type: 'number' as const,
+          compute: () => 0,
+          __resolvedSortSql: sql`(SELECT COUNT(*) FROM posts WHERE user_id = ${schema.users.id})`,
+        },
+      };
+
+      const sortedQuery = queryBuilder.applySorting(
+        query,
+        [
+          {
+            columnId: 'postCount',
+            direction: 'asc',
+          },
+        ],
+        'users',
+        computedFields
+      );
+
+      expect(sortedQuery).toBeDefined();
+      expect(queryBuilder.validateQuery(sortedQuery)).toBe(true);
+    });
+
+    it('should handle computed field with escaped identifier in sortSql', () => {
+      const context = relationshipManager.buildQueryContext({}, 'users');
+      const { query } = queryBuilder.buildSelectQuery(context, 'users');
+
+      // Create computed field with identifier containing quotes
+      const computedFields = {
+        'user"name': {
+          field: 'user"name',
+          type: 'text' as const,
+          compute: () => '',
+          __resolvedSortSql: sql`LOWER(${schema.users.name})`,
+        },
+      };
+
+      const sortedQuery = queryBuilder.applySorting(
+        query,
+        [
+          {
+            columnId: 'user"name',
+            direction: 'asc',
+          },
+        ],
+        'users',
+        computedFields
+      );
+
+      expect(sortedQuery).toBeDefined();
+      expect(queryBuilder.validateQuery(sortedQuery)).toBe(true);
     });
   });
 

@@ -421,7 +421,8 @@ export class DrizzleAdapter<
       // This ensures computed fields marked with includeByDefault are automatically included
       // when the frontend doesn't explicitly request specific columns.
       // Note: Both undefined and [] (empty array) are treated as "no columns specified"
-      const columnsToProcess = params.columns || [];
+      // Use spread operator to avoid mutating the input parameter
+      const columnsToProcess = params.columns ? [...params.columns] : [];
       if (columnsToProcess.length === 0) {
         // Include computed fields that should be included by default
         // These will be processed like regular columns and added to finalColumns
@@ -1239,14 +1240,31 @@ export class DrizzleAdapter<
   /**
    * Utility methods
    */
-  private getJoinCount(params: FetchDataParams): number {
+  private getJoinCount(
+    params: FetchDataParams & {
+      computedFields?: string[];
+      computedFieldsRequiringColumns?: string[];
+      computedFieldFilters?: FilterState[];
+    }
+  ): number {
     // Determine primary table from params - use explicit if provided
     const primaryTable = this.primaryTableResolver.resolve(params.columns, params.primaryTable);
+
+    // Filter out computed fields from columns and sorts before building query context
+    // Computed fields are handled separately and shouldn't be resolved as column paths
+    const computedFieldNames = params.computedFields || [];
+    const columnsForContext = (params.columns || []).filter(
+      (col) => !computedFieldNames.includes(col)
+    );
+    const sortsForContext = (params.sorting || [])
+      .filter((sort) => !computedFieldNames.includes(sort.columnId))
+      .map((sort) => ({ columnId: sort.columnId }));
+
     const context = this.relationshipManager.buildQueryContext(
       {
-        columns: params.columns || [],
+        columns: columnsForContext,
         filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
-        sorts: params.sorting?.map((sort) => ({ columnId: sort.columnId })) || [],
+        sorts: sortsForContext,
       },
       primaryTable
     );

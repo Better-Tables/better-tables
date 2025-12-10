@@ -144,9 +144,15 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
         // Check that the SQL expression was resolved (should always be true at this point)
         if (computedField.__resolvedSortSql !== undefined) {
           // Use pre-resolved SQL expression (resolved in adapter)
+          // Explicitly alias the SQL expression with the field name so it can be referenced in ORDER BY
+          // According to Drizzle docs: sql`expression`.as('alias') adds an alias to the SQL expression
+          // All SQL expressions from Drizzle support .as() method
           // Type assertion needed: Drizzle's type system doesn't accept SQL expressions as column types,
           // but they work correctly at runtime when used in SELECT clauses
-          selections[fieldName] = computedField.__resolvedSortSql as unknown as AnyColumnType;
+          const aliasedSql = (
+            computedField.__resolvedSortSql as SQL & { as: (alias: string) => SQL }
+          ).as(fieldName);
+          selections[fieldName] = aliasedSql as unknown as AnyColumnType;
           columnMapping[fieldName] = fieldName;
         }
       }
@@ -360,6 +366,13 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
   /**
    * Build min/max values query
    */
+  /**
+   * Quote SQL identifier for MySQL (uses backticks)
+   */
+  protected quoteIdentifier(identifier: string): SQL {
+    return sql.raw(`\`${identifier}\``);
+  }
+
   buildMinMaxQuery<TColumnId extends string>(
     columnId: TColumnId,
     primaryTable: string

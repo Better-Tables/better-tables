@@ -22,7 +22,7 @@
  * ```typescript
  * escapeSqlIdentifier('user_name') // Returns: 'user_name'
  * escapeSqlIdentifier('user"name') // Returns: 'user""name'
- * escapeSqlIdentifier('my-table', '`') // Returns: 'my``table' (for MySQL backticks)
+ * escapeSqlIdentifier('my`table', '`') // Returns: 'my``table' (for MySQL backticks)
  * ```
  *
  * @remarks
@@ -36,5 +36,7 @@ export function escapeSqlIdentifier(identifier: string, quoteChar: string = '"')
   // Escape special regex characters in quoteChar to use it safely in RegExp
   const escapedQuoteChar = quoteChar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Replace each occurrence of quoteChar with quoteChar + quoteChar (SQL standard)
-  return identifier.replace(new RegExp(escapedQuoteChar, 'g'), quoteChar + quoteChar);
+  // Use a function replacement to avoid issues with special characters in replacement strings
+  // (e.g., $ in replacement strings has special meaning: $$ = literal $, $& = matched text, etc.)
+  return identifier.replace(new RegExp(escapedQuoteChar, 'g'), () => quoteChar + quoteChar);
 }
