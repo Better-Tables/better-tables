@@ -1,5 +1,6 @@
 'use client';
 
+import type { TableStateEvent } from '@better-tables/core';
 import {
   getColumnOrderModifications,
   getColumnVisibilityModifications,
@@ -9,6 +10,25 @@ import {
 import { useEffect, useRef } from 'react';
 import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../utils/url-serialization';
 import { getTableStore } from './table-registry';
+
+/**
+ * Debounce utility to batch rapid updates
+ */
+function debounce<T extends (args: Record<string, string | null>) => void>(
+  func: T,
+  wait: number
+): (args: Record<string, string | null>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return function debounced(args: Record<string, string | null>) {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      func(args);
+    }, wait);
+  };
+}
 
 /**
  * Framework-agnostic URL sync adapter interface
@@ -74,10 +94,11 @@ export function useTableUrlSync(
   adapter: UrlSyncAdapter
 ): void {
   const hasHydratedFromUrl = useRef(false);
+  const pendingUrlUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hydrate from URL on mount
   useEffect(() => {
-    if (hasHydratedFromUrl.current) return;
+    if (hasHydratedFromUrl.current) return undefined;
 
     const store = getTableStore(tableId);
     if (!store) {
@@ -155,7 +176,10 @@ export function useTableUrlSync(
       manager.updateState(updates);
     }
 
+    // Mark as hydrated immediately after applying updates
     hasHydratedFromUrl.current = true;
+
+    return undefined;
   }, [tableId, config, adapter]);
 
   // Subscribe to state changes and sync to URL
@@ -165,8 +189,13 @@ export function useTableUrlSync(
 
     const manager = store.getState().manager;
 
+    // Create debounced URL update function (150ms debounce to batch rapid changes)
+    const debouncedUrlUpdate = debounce((urlParams: Record<string, string | null>) => {
+      adapter.setParams(urlParams);
+    }, 150);
+
     // Subscribe to manager state changes
-    const unsubscribe = manager.subscribe((event) => {
+    const unsubscribe = manager.subscribe((event: TableStateEvent) => {
       // Only sync to URL after initial hydration to avoid loops
       if (!hasHydratedFromUrl.current) return;
 
@@ -203,11 +232,24 @@ export function useTableUrlSync(
 
         // Serialize table state to URL params using utility function
         const urlParams = serializeTableStateToUrl(tableState);
-        adapter.setParams(urlParams);
+
+        // Clear any pending update and schedule new one
+        if (pendingUrlUpdateRef.current) {
+          clearTimeout(pendingUrlUpdateRef.current);
+        }
+
+        // Use debounced update to batch rapid changes
+        debouncedUrlUpdate(urlParams);
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      // Clean up pending updates on unmount
+      if (pendingUrlUpdateRef.current) {
+        clearTimeout(pendingUrlUpdateRef.current);
+      }
+    };
   }, [tableId, config, adapter]);
 }
 

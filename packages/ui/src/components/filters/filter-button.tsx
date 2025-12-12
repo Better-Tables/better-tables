@@ -17,6 +17,13 @@ export interface FilterButtonProps extends React.ButtonHTMLAttributes<HTMLButton
 
 export const FilterButton = React.forwardRef<HTMLButtonElement, FilterButtonProps>(
   ({ hasFilters = false, label = 'Filter', disabled = false, className, ...props }, ref) => {
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    // Only render Badge after mount to avoid hydration mismatch
+    React.useEffect(() => {
+      setIsMounted(true);
+    }, []);
+
     return (
       <Button
         ref={ref}
@@ -28,7 +35,7 @@ export const FilterButton = React.forwardRef<HTMLButtonElement, FilterButtonProp
       >
         <Filter className="mr-1 h-4 w-4" />
         {label}
-        {hasFilters && (
+        {isMounted && hasFilters && (
           <Badge variant="secondary" className="ml-1 rounded-sm px-1 font-normal">
             Active
           </Badge>
