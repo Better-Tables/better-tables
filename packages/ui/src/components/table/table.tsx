@@ -190,6 +190,9 @@ export function BetterTable<TData = unknown>({
   // Get actions from props
   const actions = props.actions || [];
 
+  // Get groups from props
+  const groups = props.groups;
+
   // Enable row selection automatically if actions are provided
   const shouldShowRowSelection = actions.length > 0 || rowSelection;
 
@@ -243,7 +246,8 @@ export function BetterTable<TData = unknown>({
   const { pagination, setPage, setPageSize } = useTablePagination(id);
   const { sorting: sortingState, toggleSort, setSorting } = useTableSorting(id);
   const { selectedRows, toggleRow, selectAll, clearSelection } = useTableSelection(id);
-  const { columnVisibility, toggleColumnVisibility, setColumnVisibility } = useTableColumnVisibility(id);
+  const { columnVisibility, toggleColumnVisibility, setColumnVisibility } =
+    useTableColumnVisibility(id);
   const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
 
   // Set up URL synchronization if adapter is provided
@@ -253,7 +257,7 @@ export function BetterTable<TData = unknown>({
     () =>
       urlSync?.adapter || {
         getParam: () => null,
-        setParams: () => { },
+        setParams: () => {},
       },
     [urlSync?.adapter]
   );
@@ -354,7 +358,13 @@ export function BetterTable<TData = unknown>({
 
     // Update ref for next comparison
     previousFiltersRef.current = filters;
-  }, [autoShowFilteredColumns, filters, columnVisibility, setColumnVisibility, defaultVisibleColumns]);
+  }, [
+    autoShowFilteredColumns,
+    filters,
+    columnVisibility,
+    setColumnVisibility,
+    defaultVisibleColumns,
+  ]);
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
@@ -606,6 +616,7 @@ export function BetterTable<TData = unknown>({
             columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}
+            groups={groups}
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}
@@ -712,11 +723,11 @@ export function BetterTable<TData = unknown>({
                       onKeyDown={
                         isSortable
                           ? (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleSortingChange(column.id);
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleSortingChange(column.id);
+                              }
                             }
-                          }
                           : undefined
                       }
                       tabIndex={isSortable ? 0 : undefined}
@@ -745,11 +756,11 @@ export function BetterTable<TData = unknown>({
                     onKeyDown={
                       isSortable
                         ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleSortingChange(column.id);
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSortingChange(column.id);
+                            }
                           }
-                        }
                         : undefined
                     }
                     tabIndex={isSortable ? 0 : undefined}
@@ -814,47 +825,47 @@ export function BetterTable<TData = unknown>({
                       >
                         {column.cellRenderer
                           ? column.cellRenderer({
-                            value,
-                            row,
-                            column,
-                            rowIndex: index,
-                          })
-                          : (() => {
-                            const formatted = getFormatterForType(
-                              column.type,
                               value,
-                              column.meta
-                            );
-                            const truncateConfig = column.meta?.truncate as
-                              | { maxLength?: number; suffix?: string; showTooltip?: boolean }
-                              | undefined;
+                              row,
+                              column,
+                              rowIndex: index,
+                            })
+                          : (() => {
+                              const formatted = getFormatterForType(
+                                column.type,
+                                value,
+                                column.meta
+                              );
+                              const truncateConfig = column.meta?.truncate as
+                                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                                | undefined;
 
-                            // Show tooltip for truncated text if showTooltip is enabled
-                            if (truncateConfig?.showTooltip && value != null) {
-                              const originalValue = String(value);
-                              const maxLen = truncateConfig.maxLength || 50;
-                              const isTruncated = originalValue.length > maxLen;
+                              // Show tooltip for truncated text if showTooltip is enabled
+                              if (truncateConfig?.showTooltip && value != null) {
+                                const originalValue = String(value);
+                                const maxLen = truncateConfig.maxLength || 50;
+                                const isTruncated = originalValue.length > maxLen;
 
-                              if (isTruncated) {
-                                return (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="cursor-help truncate max-w-full inline-block">
-                                        {formatted}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs" showArrow>
-                                      <div className="wrap-break-word whitespace-pre-wrap text-pretty">
-                                        {originalValue}
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                );
+                                if (isTruncated) {
+                                  return (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-help truncate max-w-full inline-block">
+                                          {formatted}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-xs" showArrow>
+                                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
+                                          {originalValue}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  );
+                                }
                               }
-                            }
 
-                            return <span>{formatted}</span>;
-                          })()}
+                              return <span>{formatted}</span>;
+                            })()}
                       </TableCell>
                     );
                   })}
