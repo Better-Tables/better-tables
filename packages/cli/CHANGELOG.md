@@ -1,5 +1,11 @@
 # @better-tables/cli
 
+## 0.1.4
+
+### Patch Changes
+
+- This update introduces a new `--components-path` flag for the CLI, allowing users to specify the output path for components relative to the components directory. Additionally, the initialization command now detects if the project is a Next.js application and checks for required dependencies, prompting the user to install any missing packages. The file operations have been updated to accommodate the new components path in file mappings and import transformations.
+
 ## 0.1.3
 
 ### Patch Changes
