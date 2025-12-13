@@ -121,13 +121,17 @@ const UI_SOURCE_FILES = {
 /**
  * Generate file mappings for all Better Tables files
  */
-export function generateFileMappings(resolvedPaths: ResolvedPaths): FileMapping[] {
+export function generateFileMappings(
+  resolvedPaths: ResolvedPaths,
+  componentsOutputPath: string = 'better-tables-ui'
+): FileMapping[] {
   const mappings: FileMapping[] = [];
+  const componentsBasePath = join(resolvedPaths.components, componentsOutputPath);
   // Table components
   for (const file of UI_SOURCE_FILES.components.table) {
     mappings.push({
       sourcePath: `components/table/${file}`, // GitHub path, not filesystem path
-      destPath: join(resolvedPaths.components, 'table', file),
+      destPath: join(componentsBasePath, 'table', file),
       category: 'table',
     });
   }
@@ -135,7 +139,7 @@ export function generateFileMappings(resolvedPaths: ResolvedPaths): FileMapping[
   for (const file of UI_SOURCE_FILES.components.filters) {
     mappings.push({
       sourcePath: `components/filters/${file}`, // GitHub path
-      destPath: join(resolvedPaths.components, 'filters', file),
+      destPath: join(componentsBasePath, 'filters', file),
       category: 'filters',
     });
   }
@@ -159,7 +163,7 @@ export function generateFileMappings(resolvedPaths: ResolvedPaths): FileMapping[
   for (const file of UI_SOURCE_FILES.stores) {
     mappings.push({
       sourcePath: `stores/${file}`, // GitHub path
-      destPath: join(resolvedPaths.components, 'stores', file),
+      destPath: join(componentsBasePath, 'stores', file),
       category: 'stores',
     });
   }
@@ -180,8 +184,8 @@ export function generateFileMappings(resolvedPaths: ResolvedPaths): FileMapping[
 export function transformImports(
   content: string,
   config: ShadcnConfig,
-  resolvedPaths: ResolvedPaths,
-  destPath: string
+  destPath: string,
+  componentsOutputPath: string = 'better-tables-ui'
 ): string {
   const aliasPrefix = getAliasPrefix(config);
   let transformed = content;
@@ -217,8 +221,8 @@ export function transformImports(
     /from ['"]\.\.\/\.\.\/hooks\/([^'"]+)['"]/g,
     `from '${hooksAlias}/$1'`
   );
-  // Stores
-  const storesAlias = `${aliasPrefix}components/stores`;
+  // Stores - use componentsOutputPath
+  const storesAlias = `${aliasPrefix}components/${componentsOutputPath}/stores`;
   transformed = transformed.replace(
     /from ['"]\.\.\/stores\/([^'"]+)['"]/g,
     `from '${storesAlias}/$1'`
@@ -227,14 +231,15 @@ export function transformImports(
     /from ['"]\.\.\/\.\.\/stores\/([^'"]+)['"]/g,
     `from '${storesAlias}/$1'`
   );
-  // Filters (relative within components)
-  const filtersAlias = `${aliasPrefix}components/filters`;
+  // Filters (relative within components) - use componentsOutputPath
+  const filtersAlias = `${aliasPrefix}components/${componentsOutputPath}/filters`;
   transformed = transformed.replace(
     /from ['"]\.\.\/filters\/([^'"]+)['"]/g,
     `from '${filtersAlias}/$1'`
   );
   // Table components (relative within components) - keep same-directory imports
   // Only transform if it's not a same-directory import
+  const tableAlias = `${aliasPrefix}components/${componentsOutputPath}/table`;
   transformed = transformed.replace(/from ['"]\.\/([^'"]+)['"]/g, (match, p1) => {
     // Keep relative imports within the same directory (no slash in filename)
     if (!p1.includes('/') && (destPath.includes('table') || destPath.includes('filters'))) {
@@ -242,7 +247,7 @@ export function transformImports(
     }
     // Transform other relative imports
     if (destPath.includes('table')) {
-      return `from '${aliasPrefix}components/table/${p1}'`;
+      return `from '${tableAlias}/${p1}'`;
     }
     if (destPath.includes('filters')) {
       return `from '${filtersAlias}/${p1}'`;
@@ -270,9 +275,9 @@ export function transformImports(
 export async function copyFile(
   mapping: FileMapping,
   config: ShadcnConfig,
-  resolvedPaths: ResolvedPaths,
   skipPrompts: boolean,
-  conflictResolution: ConflictResolution | null
+  conflictResolution: ConflictResolution | null,
+  componentsOutputPath: string = 'better-tables-ui'
 ): Promise<{ result: CopyResult; newResolution: ConflictResolution | null }> {
   try {
     // Check if destination file exists
@@ -304,7 +309,7 @@ export async function copyFile(
     // Download source file from GitHub (sourcePath is now a GitHub path, not filesystem)
     const content = await downloadFromGitHub(mapping.sourcePath);
     // Transform imports
-    const transformed = transformImports(content, config, resolvedPaths, mapping.destPath);
+    const transformed = transformImports(content, config, mapping.destPath, componentsOutputPath);
     // Write to destination
     writeFileSync(mapping.destPath, transformed, 'utf-8');
     return {
@@ -330,9 +335,10 @@ export async function copyFile(
 export async function copyAllFiles(
   config: ShadcnConfig,
   resolvedPaths: ResolvedPaths,
-  skipPrompts: boolean
+  skipPrompts: boolean,
+  componentsOutputPath: string = 'better-tables-ui'
 ): Promise<{ results: CopyResult[]; categories: Record<string, number> }> {
-  const mappings = generateFileMappings(resolvedPaths);
+  const mappings = generateFileMappings(resolvedPaths, componentsOutputPath);
   const results: CopyResult[] = [];
   const categories: Record<string, number> = {};
   let conflictResolution: ConflictResolution | null = null;
@@ -340,9 +346,9 @@ export async function copyAllFiles(
     const { result, newResolution } = await copyFile(
       mapping,
       config,
-      resolvedPaths,
       skipPrompts,
-      conflictResolution
+      conflictResolution,
+      componentsOutputPath
     );
     conflictResolution = newResolution;
     results.push(result);

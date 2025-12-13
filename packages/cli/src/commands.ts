@@ -37,6 +37,11 @@ export const commandsRegistry = {
       { flags: '--cwd <path>', description: 'Working directory (default: current directory)' },
       { flags: '--skip-shadcn', description: 'Skip shadcn component installation' },
       { flags: '-y, --yes', description: 'Skip confirmation prompts' },
+      {
+        flags: '--components-path <path>',
+        description:
+          'Output path for components relative to components directory (default: better-tables-ui)',
+      },
     ] as const,
   },
 } as const satisfies CommandRegistry;

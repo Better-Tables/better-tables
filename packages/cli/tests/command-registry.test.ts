@@ -156,4 +156,110 @@ describe('Command Registry Pattern', () => {
       }
     });
   });
+
+  describe('init command options', () => {
+    it('should have --components-path option registered', () => {
+      const initCommand = commandsRegistry.init;
+      expect(initCommand.options).toBeDefined();
+      const options = initCommand.options as unknown as Array<{
+        flags: string;
+        description: string;
+      }>;
+      const componentsPathOption = options.find((opt) => opt.flags.includes('components-path'));
+      expect(componentsPathOption).toBeDefined();
+      expect(componentsPathOption?.flags).toBe('--components-path <path>');
+      expect(componentsPathOption?.description).toContain('Output path for components');
+      expect(componentsPathOption?.description).toContain('default: better-tables-ui');
+    });
+
+    it('should have all expected init command options', () => {
+      const initCommand = commandsRegistry.init;
+      expect(initCommand.options).toBeDefined();
+      const options = initCommand.options as unknown as Array<{
+        flags: string;
+        description: string;
+      }>;
+      const optionFlags = options.map((opt) => opt.flags);
+      expect(optionFlags).toContain('--cwd <path>');
+      expect(optionFlags).toContain('--skip-shadcn');
+      expect(optionFlags).toContain('-y, --yes');
+      expect(optionFlags).toContain('--components-path <path>');
+    });
+
+    it('should have --components-path option with correct description format', () => {
+      const initCommand = commandsRegistry.init;
+      const options = initCommand.options as unknown as Array<{
+        flags: string;
+        description: string;
+      }>;
+      const componentsPathOption = options.find((opt) => opt.flags.includes('components-path'));
+      expect(componentsPathOption).toBeDefined();
+      expect(componentsPathOption?.description).toBe(
+        'Output path for components relative to components directory (default: better-tables-ui)'
+      );
+    });
+  });
+
+  describe('init command option parsing integration', () => {
+    it('should parse --components-path option correctly when command is created', () => {
+      const { Command } = require('commander');
+      const initCommand = commandsRegistry.init;
+      const command = new Command(initCommand.name);
+      command.description(initCommand.description);
+
+      // Add options from registry
+      if (initCommand.options && initCommand.options.length > 0) {
+        const options = initCommand.options as unknown as Array<{
+          flags: string;
+          description: string;
+          defaultValue?: string | boolean | number;
+        }>;
+        for (const option of options) {
+          const defaultValue =
+            option.defaultValue !== undefined
+              ? typeof option.defaultValue === 'number'
+                ? String(option.defaultValue)
+                : option.defaultValue
+              : undefined;
+          command.option(option.flags, option.description, defaultValue);
+        }
+      }
+
+      // Test parsing with custom path
+      command.parse(['init', '--components-path', 'custom-path'], { from: 'user' });
+      const options = command.opts();
+      expect(options.componentsPath).toBe('custom-path');
+    });
+
+    it('should handle --components-path option without value (should be undefined, default handled in code)', () => {
+      const { Command } = require('commander');
+      const initCommand = commandsRegistry.init;
+      const command = new Command(initCommand.name);
+      command.description(initCommand.description);
+
+      // Add options from registry
+      if (initCommand.options && initCommand.options.length > 0) {
+        const options = initCommand.options as unknown as Array<{
+          flags: string;
+          description: string;
+          defaultValue?: string | boolean | number;
+        }>;
+        for (const option of options) {
+          const defaultValue =
+            option.defaultValue !== undefined
+              ? typeof option.defaultValue === 'number'
+                ? String(option.defaultValue)
+                : option.defaultValue
+              : undefined;
+          command.option(option.flags, option.description, defaultValue);
+        }
+      }
+
+      // Test parsing without the option (default handled in init command code)
+      command.parse(['init'], { from: 'user' });
+      const options = command.opts();
+      // The option won't be set, default is handled in init command action
+      expect(options.componentsPath).toBeUndefined();
+    });
+  });
 });
