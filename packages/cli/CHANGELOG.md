@@ -1,5 +1,11 @@
 # @better-tables/cli
 
+## 0.1.5
+
+### Patch Changes
+
+- This update modifies the `installPackage` function to utilize `npx` for executing `pnpm` and `yarn`, ensuring that these package managers are found even when not in the user's PATH. Additionally, the tests have been updated to reflect these changes, confirming that the correct commands are called with the appropriate arguments and environment settings.
+
 ## 0.1.4
 
 ### Patch Changes

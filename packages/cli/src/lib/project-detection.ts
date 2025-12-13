@@ -94,6 +94,7 @@ export function detectPackageManager(cwd: string): PackageManager {
 
 /**
  * Install a package using the detected package manager
+ * Uses npx for npm-based package managers to ensure executables are found
  */
 export function installPackage(
   cwd: string,
@@ -104,19 +105,23 @@ export function installPackage(
   let args: string[];
   switch (packageManager) {
     case 'pnpm':
-      executable = 'pnpm';
-      args = ['add', packageName];
+      // Use npx to ensure pnpm is found even when not in PATH
+      executable = 'npx';
+      args = ['-y', 'pnpm', 'add', packageName];
       break;
     case 'yarn':
-      executable = 'yarn';
-      args = ['add', packageName];
+      // Use npx to ensure yarn is found even when not in PATH
+      executable = 'npx';
+      args = ['-y', 'yarn', 'add', packageName];
       break;
     case 'bun':
+      // bun should be in PATH if bun.lockb exists
       executable = 'bun';
       args = ['add', packageName];
       break;
     case 'npm':
     default:
+      // npm should always be available with Node.js
       executable = 'npm';
       args = ['install', packageName];
       break;
@@ -125,6 +130,7 @@ export function installPackage(
     execFileSync(executable, args, {
       cwd,
       stdio: 'inherit',
+      env: { ...process.env },
     });
     return { success: true };
   } catch (error) {

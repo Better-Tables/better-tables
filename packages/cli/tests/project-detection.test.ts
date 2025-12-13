@@ -281,32 +281,34 @@ describe('project-detection', () => {
   });
 
   describe('installPackage', () => {
-    it('should use pnpm when pnpm-lock.yaml exists', async () => {
+    it('should use npx pnpm when pnpm-lock.yaml exists', async () => {
       await writeFile(join(testDir, 'pnpm-lock.yaml'), '');
       execFileSyncMock.mockImplementation(() => {});
       const result = installPackage(testDir, 'react');
       expect(result.success).toBe(true);
       expect(execFileSyncMock).toHaveBeenCalledWith(
-        'pnpm',
-        ['add', 'react'],
+        'npx',
+        ['-y', 'pnpm', 'add', 'react'],
         expect.objectContaining({
           cwd: testDir,
           stdio: 'inherit',
+          env: expect.any(Object),
         })
       );
     });
 
-    it('should use yarn when yarn.lock exists', async () => {
+    it('should use npx yarn when yarn.lock exists', async () => {
       await writeFile(join(testDir, 'yarn.lock'), '');
       execFileSyncMock.mockImplementation(() => {});
       const result = installPackage(testDir, 'react');
       expect(result.success).toBe(true);
       expect(execFileSyncMock).toHaveBeenCalledWith(
-        'yarn',
-        ['add', 'react'],
+        'npx',
+        ['-y', 'yarn', 'add', 'react'],
         expect.objectContaining({
           cwd: testDir,
           stdio: 'inherit',
+          env: expect.any(Object),
         })
       );
     });
@@ -322,6 +324,7 @@ describe('project-detection', () => {
         expect.objectContaining({
           cwd: testDir,
           stdio: 'inherit',
+          env: expect.any(Object),
         })
       );
     });
@@ -337,6 +340,7 @@ describe('project-detection', () => {
         expect.objectContaining({
           cwd: testDir,
           stdio: 'inherit',
+          env: expect.any(Object),
         })
       );
     });
@@ -351,6 +355,7 @@ describe('project-detection', () => {
         expect.objectContaining({
           cwd: testDir,
           stdio: 'inherit',
+          env: expect.any(Object),
         })
       );
     });
@@ -386,6 +391,7 @@ describe('project-detection', () => {
         expect.objectContaining({
           cwd: testDir,
           stdio: 'inherit',
+          env: expect.any(Object),
         })
       );
     });
