@@ -37,59 +37,59 @@ export default async function DemoPage({ searchParams }: PageProps) {
   });
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Better Tables Demo</h1>
-          <p className="text-lg text-gray-600">
+          <h1 className="text-4xl font-bold text-foreground mb-2">Better Tables Demo</h1>
+          <p className="text-lg text-muted-foreground">
             Comprehensive showcase of Better Tables with Drizzle adapter
           </p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-xs border p-4">
+          <div className="bg-card rounded-lg shadow-sm border p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{result.total}</p>
+                <p className="text-sm text-muted-foreground">Total Users</p>
+                <p className="text-2xl font-bold text-card-foreground">{result.total}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-xs border p-4">
+          <div className="bg-card rounded-lg shadow-sm border p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Filters Applied</p>
-                <p className="text-2xl font-bold text-gray-900">{filters.length}</p>
+                <p className="text-sm text-muted-foreground">Filters Applied</p>
+                <p className="text-2xl font-bold text-card-foreground">{filters.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-xs border p-4">
+          <div className="bg-card rounded-lg shadow-sm border p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Current Page</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-muted-foreground">Current Page</p>
+                <p className="text-2xl font-bold text-card-foreground">
                   {result.pagination?.page || page} / {result.pagination?.totalPages || 1}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-xs border p-4">
+          <div className="bg-card rounded-lg shadow-sm border p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Page Size</p>
-                <p className="text-2xl font-bold text-gray-900">{limit}</p>
+                <p className="text-sm text-muted-foreground">Page Size</p>
+                <p className="text-2xl font-bold text-card-foreground">{limit}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white p-4 rounded-lg shadow-xs">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
           <UsersTableClient
             data={result.data as UserWithRelations[]}
             totalCount={result.total}
@@ -108,12 +108,12 @@ export default async function DemoPage({ searchParams }: PageProps) {
         </div>
 
         {/* Features Info */}
-        <div className="mt-8 bg-white rounded-lg shadow-xs border p-6">
-          <h2 className="text-2xl font-bold mb-4">Features Demonstrated</h2>
+        <div className="mt-8 bg-card rounded-lg shadow-sm border p-6">
+          <h2 className="text-2xl font-bold mb-4 text-card-foreground">Features Demonstrated</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Column Types</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
+              <h3 className="font-semibold text-card-foreground mb-2">Column Types</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Text columns (name, email, bio)</li>
                 <li>• Number columns (age)</li>
                 <li>• Date columns (joined date)</li>
@@ -122,8 +122,8 @@ export default async function DemoPage({ searchParams }: PageProps) {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Relationships</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
+              <h3 className="font-semibold text-card-foreground mb-2">Relationships</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• One-to-one (user → profile)</li>
                 <li>• One-to-many (user → posts)</li>
                 <li>• Cross-table filtering</li>
@@ -132,8 +132,8 @@ export default async function DemoPage({ searchParams }: PageProps) {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Operations</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
+              <h3 className="font-semibold text-card-foreground mb-2">Operations</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Advanced filtering</li>
                 <li>• Multi-column sorting</li>
                 <li>• Pagination</li>

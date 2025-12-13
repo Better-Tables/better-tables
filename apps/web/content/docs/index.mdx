@@ -1,0 +1,98 @@
+---
+title: Better Tables Documentation
+description: Type-safe tables for React with advanced filtering, sorting, and pagination
+---
+
+**Better Tables** is a type-safe, database-agnostic table library for React with advanced filtering, sorting, and virtual scrolling. Stop writing boilerplate. Start shipping features.
+
+## The Problem
+
+Building complex data tables shouldn't be a soul-crushing mix of useState hooks, prop drilling, and scattered utility functions. Most table libraries ask you to:
+
+- Wire up filtering logic across multiple files
+- Manually handle joins and relationships in your queries
+- Write the same filter UI components over and over
+- Manually sync URL state for shareable views
+- Give up type safety between your database and UI
+- Rebuild pagination and sorting logic for every project
+
+## The Solution
+
+Better Tables revolutionizes how you work with relational data:
+
+- **Automatic Relationships**: Filter across joined tables without writing JOIN queries yourself
+- **Database Adapters**: Define your schema once—filters automatically work across relationships
+- **Type-Safe End-to-End**: From your database query to your UI component, full type inference
+- **Zero Boilerplate**: Declarative column definitions give you filtering, sorting, and pagination automatically
+
+## Key Features
+
+<Cards>
+  <Card
+    title="Automatic Relationship Filtering"
+    description="Filter across relationships without writing SQL JOINs. The adapter automatically detects relationships, builds JOIN queries, and applies filters across tables."
+  />
+  <Card
+    title="Advanced Filtering System"
+    description="Six filter types with 20+ operators. Filters persist in the URL, making every view shareable."
+  />
+  <Card
+    title="Database Adapters"
+    description="Connect to any backend with a consistent API. Currently supports Drizzle ORM with more adapters coming."
+  />
+  <Card
+    title="Virtual Scrolling"
+    description="Render millions of rows efficiently with built-in virtualization for large datasets."
+  />
+  <Card
+    title="URL State Persistence"
+    description="Every filter, sort, and pagination state syncs to the URL. Users can bookmark and share filtered views."
+  />
+  <Card
+    title="Beautiful UI Components"
+    description="Production-ready React components built with shadcn/ui, fully accessible and customizable."
+  />
+</Cards>
+
+## What We're Building
+
+Better Tables is an open-source project actively being developed. The goal is to make building complex data tables in React applications as simple as possible, without sacrificing type safety or performance.
+
+The library is built as a monorepo with clear separation of concerns:
+
+- **@better-tables/core** - Type-safe builders, managers, and utilities
+- **@better-tables/ui** - Production-ready React components with shadcn/ui
+- **@better-tables/adapters-drizzle** - Automatic relationship detection and JOIN generation
+- **@better-tables/cli** - CLI tool for easy project setup
+
+## Current Status
+
+Better Tables is in active development (v0.5). Current features include:
+
+- ✅ Complete filter manager with 6 filter types
+- ✅ Drizzle adapter with automatic relationship detection
+- ✅ UI components with shadcn/ui
+- ✅ Virtual scrolling support
+- ✅ URL state persistence
+- ✅ Server-side rendering support (Next.js)
+- ✅ CLI tool for project initialization
+
+## Get Started
+
+Install the core package and choose an adapter:
+
+<InstallBlock packages={['@better-tables/core', '@better-tables/adapters-drizzle', '@better-tables/ui']} />
+
+Or use the CLI to initialize Better Tables in your project:
+
+<InstallBlock packages={['@better-tables/cli']} />
+
+```bash
+pnpm dlx @better-tables/cli init
+```
+
+## Next Steps
+
+- Check out the [Installation Guide](/docs/installation) to get started with your framework
+- Explore the [API Reference](/docs) for detailed documentation
+- Visit the [GitHub repository](https://github.com/Better-Tables/better-tables) to see the code and contribute

@@ -1,0 +1,425 @@
+---
+title: Next.js Installation
+description: Complete installation guide for Next.js App Router with URL sync, server components, and more
+---
+
+A comprehensive guide to installing and setting up Better Tables in your Next.js application.
+
+## Installation
+
+Install the core package and Drizzle Adapter:
+
+<InstallBlock packages={['@better-tables/core', '@better-tables/drizzle-adapter']} />
+
+### Peer Dependencies
+
+Better Tables requires the following peer dependencies (install if not already present):
+
+<InstallBlock packages={['react', 'react-dom', 'tailwindcss']} />
+
+## Quick Start
+
+### 1. Create a URL Adapter (Next.js App Router)
+
+Create a custom hook to sync table state with URL parameters:
+
+```typescript
+// lib/adapters/nextjs-url-adapter.ts
+'use client';
+
+import type { UrlSyncAdapter } from '@better-tables/ui';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useMemo, useRef } from 'react';
+
+export function useNextjsUrlAdapter(): UrlSyncAdapter {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUpdatesRef = useRef<Record<string, string | null>>({});
+
+  const getParam = useCallback(
+    (key: string) => {
+      return searchParams.get(key);
+    },
+    [searchParams]
+  );
+
+  const setParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      Object.assign(pendingUpdatesRef.current, updates);
+
+      if (pendingUpdateRef.current) {
+        clearTimeout(pendingUpdateRef.current);
+      }
+
+      pendingUpdateRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams);
+
+        for (const [key, value] of Object.entries(pendingUpdatesRef.current)) {
+          if (value === null) {
+            params.delete(key);
+          } else {
+            params.set(key, value);
+          }
+        }
+
+        pendingUpdatesRef.current = {};
+        const queryString = params.toString();
+        const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
+        router.replace(newUrl, { scroll: false });
+      }, 50);
+    },
+    [router, pathname, searchParams]
+  );
+
+  return useMemo(
+    () => ({
+      getParam,
+      setParams,
+    }),
+    [getParam, setParams]
+  );
+}
+```
+
+### 2. Define Your Columns
+
+Create column definitions using the column builder:
+
+```typescript
+// components/data-table/user-columns.tsx
+'use client';
+
+import { createColumnBuilder } from '@better-tables/core';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  status: 'active' | 'inactive';
+}
+
+const cb = createColumnBuilder<User>();
+
+export const userColumns = [
+  cb
+    .text()
+    .id('name')
+    .displayName('Name')
+    .accessor((user) => user.name)
+    .filterable()
+    .sortable()
+    .build(),
+
+  cb
+    .text()
+    .id('email')
+    .displayName('Email')
+    .accessor((user) => user.email)
+    .filterable()
+    .sortable()
+    .build(),
+
+  cb
+    .option()
+    .id('status')
+    .displayName('Status')
+    .accessor((user) => user.status)
+    .options([
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+    ])
+    .filterable()
+    .sortable()
+    .build(),
+
+  cb
+    .date()
+    .id('createdAt')
+    .displayName('Created')
+    .accessor((user) => user.createdAt)
+    .filterable()
+    .sortable()
+    .build(),
+];
+
+export const defaultVisibleColumns = ['name', 'email', 'status', 'createdAt'];
+```
+
+### 3. Create Table Configuration
+
+Define table features, sorting, and filter groups:
+
+```typescript
+// components/data-table/user-table-config.ts
+import type { FilterGroup } from '@better-tables/core';
+import type { UrlSyncConfig } from '@better-tables/ui';
+import { Calendar, Search, Tag } from 'lucide-react';
+
+export const USER_TABLE_ID = 'users-table';
+
+export const userTableFeatures = {
+  filtering: true,
+  sorting: true,
+  pagination: true,
+  rowSelection: true,
+  columnReordering: true,
+  headerContextMenu: {
+    enabled: true,
+    showSortToggle: true,
+    allowSortReorder: true,
+    showColumnVisibility: true,
+  },
+} as const;
+
+export const userTableSorting = {
+  enabled: true,
+  multiSort: true,
+  maxSortColumns: 3,
+} as const;
+
+export const userUrlSyncConfig: UrlSyncConfig = {
+  filters: true,
+  pagination: true,
+  sorting: true,
+  columnVisibility: true,
+  columnOrder: true,
+} as const;
+
+export const userFilterGroups: FilterGroup[] = [
+  {
+    id: 'search',
+    label: 'Search',
+    icon: Search,
+    columns: ['name', 'email'],
+    defaultCollapsed: false,
+  },
+  {
+    id: 'status',
+    label: 'Status',
+    icon: Tag,
+    columns: ['status'],
+    defaultCollapsed: false,
+  },
+  {
+    id: 'dates',
+    label: 'Dates',
+    icon: Calendar,
+    columns: ['createdAt'],
+    defaultCollapsed: false,
+  },
+];
+```
+
+### 4. Create the Table Component
+
+Create a client component that renders the table:
+
+```typescript
+// components/data-table/user-table.tsx
+'use client';
+
+import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { useNextjsUrlAdapter } from '@/lib/adapters/nextjs-url-adapter';
+import { userColumns, defaultVisibleColumns } from './user-columns';
+import {
+  USER_TABLE_ID,
+  userTableFeatures,
+  userTableSorting,
+  userUrlSyncConfig,
+  userFilterGroups,
+} from './user-table-config';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  status: 'active' | 'inactive';
+}
+
+interface UserTableProps {
+  data: User[];
+  totalCount: number;
+  initialPagination: PaginationState;
+  initialSorting: SortingState;
+  initialFilters: FilterState[];
+}
+
+export function UserTable({
+  data,
+  totalCount,
+  initialPagination,
+  initialSorting,
+  initialFilters,
+}: UserTableProps) {
+  const urlAdapter = useNextjsUrlAdapter();
+
+  useTableUrlSync(USER_TABLE_ID, userUrlSyncConfig, urlAdapter);
+
+  return (
+    <BetterTable
+      id={USER_TABLE_ID}
+      name="Users"
+      columns={userColumns}
+      data={data}
+      totalCount={totalCount}
+      initialPagination={initialPagination}
+      initialSorting={initialSorting}
+      initialFilters={initialFilters}
+      defaultVisibleColumns={defaultVisibleColumns}
+      features={userTableFeatures}
+      sorting={userTableSorting}
+      groups={userFilterGroups}
+      urlSync={{
+        adapter: urlAdapter,
+        config: userUrlSyncConfig,
+      }}
+    />
+  );
+}
+```
+
+### 5. Create the Page Component (Next.js App Router)
+
+Create a server component that fetches data and parses URL parameters:
+
+```typescript
+// app/users/page.tsx
+import type { PaginationState } from '@better-tables/core';
+import { parseTableSearchParams } from '@better-tables/ui/server';
+import { UserTable } from '@/components/data-table/user-table';
+import { defaultVisibleColumns } from '@/components/data-table/user-columns';
+
+interface PageProps {
+  searchParams: Promise<Record<string, string | undefined>>;
+}
+
+// Replace this with your actual data fetching function
+async function fetchUsers(params: {
+  page: number;
+  limit: number;
+  filters: any[];
+  sorting: any[];
+}) {
+  // Your API call here
+  return {
+    data: [],
+    total: 0,
+    pagination: {
+      page: params.page,
+      limit: params.limit,
+      totalPages: 0,
+      hasNext: false,
+      hasPrev: false,
+    },
+  };
+}
+
+export default async function UsersPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+
+  // Parse URL parameters (handles compression automatically)
+  const tableParams = parseTableSearchParams(params, { page: 1, limit: 20 });
+
+  // Fetch data from your API
+  const result = await fetchUsers({
+    page: tableParams.page,
+    limit: tableParams.limit,
+    filters: tableParams.filters,
+    sorting: tableParams.sorting,
+  });
+
+  const pagination: PaginationState = {
+    page: result.pagination.page,
+    limit: result.pagination.limit,
+    totalPages: result.pagination.totalPages,
+    hasNext: result.pagination.hasNext,
+    hasPrev: result.pagination.hasPrev,
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      <h1 className="text-2xl font-semibold">Users</h1>
+      <UserTable
+        data={result.data}
+        totalCount={result.total}
+        initialPagination={pagination}
+        initialSorting={tableParams.sorting}
+        initialFilters={tableParams.filters}
+      />
+    </div>
+  );
+}
+```
+
+## Minimal Setup Checklist
+
+- [ ] Install `@better-tables/core` and `@better-tables/ui`
+- [ ] Install peer dependencies (`react`, `react-dom`, `tailwindcss`)
+- [ ] Create URL adapter hook (Next.js example above)
+- [ ] Define columns using `createColumnBuilder`
+- [ ] Create table configuration (features, sorting, filter groups)
+- [ ] Create table component (client component)
+- [ ] Create page component (server component) with `parseTableSearchParams`
+- [ ] Connect to your data source/API
+
+## Styling
+
+Better Tables uses Tailwind CSS and requires your Tailwind configuration to include the package's styles. Make sure your `tailwind.config.js` includes:
+
+```javascript
+module.exports = {
+  content: [
+    './app/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
+    './node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}', // Add this
+  ],
+  // ... rest of your config
+};
+```
+
+## Framework-Specific Notes
+
+### Next.js App Router (Recommended)
+
+- Use `parseTableSearchParams` from `@better-tables/ui/server` in server components
+- Use `useNextjsUrlAdapter` hook in client components
+- `searchParams` is a Promise in Next.js 15+ (await it)
+
+### Next.js Pages Router
+
+- Use `parseTableSearchParams` with `router.query` converted to a record
+- Create a similar URL adapter using `useRouter` from `next/router`
+
+### Other Frameworks
+
+- `parseTableSearchParams` works with any `Record<string, string | undefined>`
+- Create a custom URL adapter implementing the `UrlSyncAdapter` interface
+- See `@better-tables/ui` types for the adapter interface
+
+## You're Ready!
+
+With these minimal steps, you have a fully functional data table with:
+
+- ✅ Filtering (grouped by categories)
+- ✅ Sorting (multi-column support)
+- ✅ Pagination
+- ✅ Column visibility toggling
+- ✅ Column reordering
+- ✅ URL state synchronization
+- ✅ Row selection
+- ✅ Responsive design
+
+## Next Steps
+
+- Customize filter groups and icons
+- Add custom cell renderers
+- Implement row actions
+- Add custom filter input components
+- Configure column-specific options
+
+For more advanced usage, see the [Better Tables documentation](https://github.com/Better-Tables/better-tables).
