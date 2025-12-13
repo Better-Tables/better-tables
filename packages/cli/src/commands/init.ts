@@ -1,9 +1,9 @@
 import { Command } from 'commander';
-import { join, resolve } from 'path';
+import { join, normalize, resolve } from 'path';
 import pc from 'picocolors';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
-import { getConfig } from '../lib/config';
+import { getAliasPrefix, getConfig } from '../lib/config';
 import { type CopyResult, copyAllFiles } from '../lib/file-operations';
 import {
   detectNextJS,
@@ -22,6 +22,36 @@ interface InitOptions {
   skipShadcn?: boolean;
   yes?: boolean;
   componentsPath?: string;
+}
+
+/**
+ * Validate that a path is a safe relative subpath (no path traversal)
+ *
+ * @param path - The path to validate
+ * @returns True if the path is safe, false otherwise
+ */
+function isValidRelativeSubpath(path: string): boolean {
+  if (!path || path.length === 0) {
+    return false;
+  }
+  // Check for null bytes
+  if (path.includes('\0')) {
+    return false;
+  }
+  // Check for absolute paths (Unix: starts with /, Windows: starts with drive letter)
+  if (path.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(path)) {
+    return false;
+  }
+  // Normalize the path and check for path traversal sequences
+  const normalized = normalize(path);
+  // Check for any occurrence of .. (parent directory traversal)
+  if (normalized.includes('..')) {
+    return false;
+  }
+  // Check for backslashes on Windows (should use forward slashes for cross-platform compatibility)
+  // But we'll allow them since path.join handles them
+  // Ensure it's a valid relative path
+  return !normalized.startsWith('..') && normalized !== '.';
 }
 
 /**
@@ -59,6 +89,15 @@ export function initCommand(): Command {
     const cwd = resolve(options.cwd || process.cwd());
     const skipPrompts = options.yes ?? false;
     const componentsPath = options.componentsPath || 'better-tables-ui';
+    // Validate componentsPath to prevent path traversal attacks
+    if (!isValidRelativeSubpath(componentsPath)) {
+      console.log(
+        pc.red(
+          `✗ Invalid components path: "${componentsPath}". Path must be a safe relative subpath without path traversal sequences.`
+        )
+      );
+      process.exit(1);
+    }
     console.log(pc.bold('\n🚀 Better Tables Initialization\n'));
     console.log(`Working directory: ${pc.cyan(cwd)}\n`);
     // Step 1: Detect project type
@@ -224,12 +263,8 @@ export function initCommand(): Command {
     // Final message
     console.log(pc.bold(pc.green('\n✓ Better Tables initialized successfully!\n')));
     console.log(pc.dim('Next steps:'));
-    const aliasPrefix = config.aliases.components.startsWith('@/')
-      ? '@/'
-      : config.aliases.components.startsWith('~/')
-        ? '~/'
-        : './';
     console.log(pc.dim('\n  1. Import and use BetterTable in your components:'));
+    const aliasPrefix = getAliasPrefix(config);
     console.log(
       pc.cyan(
         `     import { BetterTable } from '${aliasPrefix}components/${componentsPath}/table/table';`

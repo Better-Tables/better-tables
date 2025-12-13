@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -100,24 +100,29 @@ export function installPackage(
   packageName: string
 ): { success: boolean; error?: string } {
   const packageManager = detectPackageManager(cwd);
-  let command: string;
+  let executable: string;
+  let args: string[];
   switch (packageManager) {
     case 'pnpm':
-      command = `pnpm add ${packageName}`;
+      executable = 'pnpm';
+      args = ['add', packageName];
       break;
     case 'yarn':
-      command = `yarn add ${packageName}`;
+      executable = 'yarn';
+      args = ['add', packageName];
       break;
     case 'bun':
-      command = `bun add ${packageName}`;
+      executable = 'bun';
+      args = ['add', packageName];
       break;
     case 'npm':
     default:
-      command = `npm install ${packageName}`;
+      executable = 'npm';
+      args = ['install', packageName];
       break;
   }
   try {
-    execSync(command, {
+    execFileSync(executable, args, {
       cwd,
       stdio: 'inherit',
     });
