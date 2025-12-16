@@ -1,6 +1,6 @@
 {
   "name": "@better-tables/core",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Core functionality for Better Tables - A comprehensive React table library",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

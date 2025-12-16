@@ -54,7 +54,7 @@
  *   shallowEqualArrays,
  *   serializeFiltersToURL,
  *   deserializeFiltersFromURL
- * } from '@/index';
+ * } from '@better-tables/core';
  *
  * // Create a table with comprehensive functionality
  * const columns = [

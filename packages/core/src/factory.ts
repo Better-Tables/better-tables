@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { betterTables } from '@/factory';
+ * import { betterTables } from '@better-tables/core';
  * import { drizzleAdapter } from '@better-tables/adapters-drizzle';
  *
  * const tables = betterTables({
