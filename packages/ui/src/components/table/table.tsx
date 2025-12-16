@@ -619,6 +619,7 @@ export function BetterTable<TData = unknown>({
             filters={filters}
             onFiltersChange={handleFiltersChange}
             groups={groups}
+            autoGroupFilters={autoGroupFilters}
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}

@@ -218,12 +218,13 @@ function normalizeColumnId(id: string): string {
 }
 
 /**
- * Check if a column ID matches a pattern (exact match or suffix match)
+ * Check if a column ID matches a pattern (exact match, suffix match, or substring match)
  */
 function matchesPattern(
   normalizedId: string,
   patterns: readonly string[],
-  suffixes?: readonly string[]
+  suffixes?: readonly string[],
+  allowSubstring?: boolean
 ): boolean {
   // Check exact matches
   if (patterns.includes(normalizedId)) {
@@ -233,6 +234,11 @@ function matchesPattern(
   // Check suffix matches
   if (suffixes) {
     return suffixes.some((suffix) => normalizedId.endsWith(suffix));
+  }
+
+  // Check substring matches (for cases like "profile.github" matching "github")
+  if (allowSubstring) {
+    return patterns.some((pattern) => normalizedId.includes(pattern));
   }
 
   return false;
@@ -262,25 +268,10 @@ function getColumnGroup<TData = unknown>(
 
   // Links Group: text, url columns that match link/social media patterns
   // Check this BEFORE Search group to prioritize links
+  // Use substring matching for URL columns to catch nested paths like "profile.github"
   if (
     (columnType === 'text' || columnType === 'url') &&
-    matchesPattern(normalizedId, LINKS_FIELD_PATTERNS)
-  ) {
-    return labels.links;
-  }
-
-  // Also catch url columns that contain link/social patterns
-  if (
-    columnType === 'url' &&
-    (normalizedId.includes('website') ||
-      normalizedId.includes('github') ||
-      normalizedId.includes('linkedin') ||
-      normalizedId.includes('twitter') ||
-      normalizedId.includes('facebook') ||
-      normalizedId.includes('instagram') ||
-      normalizedId.includes('social') ||
-      normalizedId.includes('link') ||
-      normalizedId.includes('url'))
+    matchesPattern(normalizedId, LINKS_FIELD_PATTERNS, undefined, columnType === 'url')
   ) {
     return labels.links;
   }

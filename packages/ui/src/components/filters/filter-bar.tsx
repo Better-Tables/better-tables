@@ -154,9 +154,6 @@ export function FilterBar<TData = unknown>({
         ...autoGroupConfig?.groupIcons,
       },
     };
-    if (config.autoGroup === false) {
-      return [];
-    }
     return autoGroupFilters(columns, config);
   }, [groups, columns, autoGroupConfig]);
 
