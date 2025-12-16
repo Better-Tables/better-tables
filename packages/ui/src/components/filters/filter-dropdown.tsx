@@ -107,16 +107,9 @@ export function FilterDropdown<TData = unknown>({
 
   // Group columns if groups are provided - enhanced for slide navigation
   const groupedColumns = React.useMemo(() => {
+    // If no groups, return empty array - columns will be shown directly
     if (!groups || groups.length === 0) {
-      return [
-        {
-          id: 'all',
-          label: 'All Columns',
-          columns: filteredColumns,
-          description: undefined,
-          icon: undefined,
-        },
-      ];
+      return [];
     }
 
     const grouped: Array<{
@@ -212,6 +205,15 @@ export function FilterDropdown<TData = unknown>({
     () => onOpenChange?.(true),
     () => onOpenChange?.(false),
     (index) => {
+      // If no groups, navigate directly to columns
+      if (!groups || groups.length === 0) {
+        const column = filteredColumns[index];
+        if (column) {
+          handleSelect(column.id);
+        }
+        return;
+      }
+
       if (currentView.type === 'groups') {
         // Navigate to group
         const group = groupedColumns[index];
@@ -263,6 +265,33 @@ export function FilterDropdown<TData = unknown>({
 
   // Render groups overview
   const groupsOverview = React.useMemo(() => {
+    // If no groups, show columns directly
+    if (!groups || groups.length === 0) {
+      return (
+        <CommandList>
+          <CommandEmpty>{emptyMessage}</CommandEmpty>
+          <CommandGroup>
+            {filteredColumns.map((column) => {
+              const Icon = column.icon;
+              return (
+                <CommandItem
+                  key={column.id}
+                  value={column.id}
+                  onSelect={() => handleSelect(column.id)}
+                  disabled={disabled}
+                  className="flex items-center pl-4 hover:bg-accent/50 transition-colors"
+                >
+                  <Check className={cn('mr-2 h-4 w-4', 'opacity-0')} />
+                  {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+                  <span>{column.displayName}</span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        </CommandList>
+      );
+    }
+
     // If there's a search term, show filtered columns directly
     if (searchable && search && search.trim() !== '') {
       return (
@@ -327,6 +356,7 @@ export function FilterDropdown<TData = unknown>({
       </CommandList>
     );
   }, [
+    groups,
     groupedColumns,
     filteredColumns,
     disabled,
