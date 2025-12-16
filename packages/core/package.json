@@ -19,6 +19,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "lint": "biome check .",

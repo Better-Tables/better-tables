@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import type { DatePreset } from '../date-presets';
+import type { DatePreset } from '../../src/lib/date-presets';
 import {
   createCustomPreset,
   DEFAULT_DATE_PRESETS,
   getGroupedPresets,
   getPresetById,
-} from '../date-presets';
+} from '../../src/lib/date-presets';
 
 describe('date-presets', () => {
   describe('getGroupedPresets', () => {

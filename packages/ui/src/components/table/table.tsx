@@ -1,12 +1,13 @@
 'use client';
 
-import type {
-  ColumnDefinition,
-  ColumnVisibility,
-  FilterState,
-  PaginationState,
-  SortingState,
-  TableConfig,
+import {
+  getFormatterForType,
+  type ColumnDefinition,
+  type ColumnVisibility,
+  type FilterState,
+  type PaginationState,
+  type SortingState,
+  type TableConfig,
 } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
@@ -20,7 +21,6 @@ import {
   useTableSelection,
   useTableSorting,
 } from '../../hooks/use-table-store';
-import { getFormatterForType } from '../../lib/format-utils';
 import { cn } from '../../lib/utils';
 import {
   destroyTableStore,

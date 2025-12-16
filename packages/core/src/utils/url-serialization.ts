@@ -6,7 +6,7 @@
  * are compressed and encoded to keep URLs short, while simple params (page, limit)
  * remain as plain strings.
  *
- * Uses serialization utilities from @better-tables/core for filter serialization.
+ * Uses serialization utilities from ./filter-serialization for filter serialization.
  * Other complex data structures (sorting, columnVisibility, columnOrder) use
  * compression utilities directly.
  *
@@ -19,13 +19,12 @@
  * @module utils/url-serialization
  */
 
-import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import type { FilterState, PaginationState, SortingState } from '@/types';
 import {
   compressAndEncode,
   decompressAndDecode,
-  deserializeFiltersFromURL,
-  serializeFiltersToURL,
-} from '@better-tables/core';
+} from './compression';
+import { deserializeFiltersFromURL, serializeFiltersToURL } from './filter-serialization';
 
 /**
  * Table state that can be serialized to URL parameters

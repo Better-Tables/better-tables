@@ -7,7 +7,7 @@
  * @module utils/state-change-detection
  */
 
-import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import { FilterState, PaginationState, SortingState } from '@/types';
 
 /**
  * Table state snapshot for change detection

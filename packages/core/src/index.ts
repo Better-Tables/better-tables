@@ -54,7 +54,7 @@
  *   shallowEqualArrays,
  *   serializeFiltersToURL,
  *   deserializeFiltersFromURL
- * } from '@better-tables/core';
+ * } from '@/index';
  *
  * // Create a table with comprehensive functionality
  * const columns = [
@@ -100,10 +100,11 @@
 export * from './builders';
 // Factory
 export * from './factory';
+// Lib utilities
+export * from './lib';
 // Managers
 export * from './managers';
 // Types
 export * from './types';
-
 // Utils
 export * from './utils';

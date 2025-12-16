@@ -1,15 +1,17 @@
 'use client';
 
-import type { TableStateEvent } from '@better-tables/core';
+
+import { useEffect, useRef } from 'react';
+import { getTableStore } from './table-registry';
 import {
+  deserializeTableStateFromUrl,
   getColumnOrderModifications,
   getColumnVisibilityModifications,
   mergeColumnOrder,
   mergeColumnVisibility,
+  serializeTableStateToUrl,
+  TableStateEvent,
 } from '@better-tables/core';
-import { useEffect, useRef } from 'react';
-import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../utils/url-serialization';
-import { getTableStore } from './table-registry';
 
 /**
  * Debounce utility to batch rapid updates

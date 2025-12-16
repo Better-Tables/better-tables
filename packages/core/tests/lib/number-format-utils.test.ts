@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { getNumberInputConfig } from '../number-format-utils';
+import { getNumberInputConfig } from '../../src/lib/number-format-utils';
 
 describe('getNumberInputConfig', () => {
   describe('basic number type', () => {

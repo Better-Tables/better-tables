@@ -1,21 +1,8 @@
 'use client';
 
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { getNumberFormat, getOperatorDefinition } from '@better-tables/core';
 import { Lock, X } from 'lucide-react';
 import * as React from 'react';
-import { formatDateRange, formatDateWithConfig } from '../../lib/date-utils';
-import { getFilterValueAsDate, getFilterValueAsNumber } from '../../lib/filter-value-utils';
-import {
-  formatCurrency,
-  formatEmail,
-  formatNumber,
-  formatPercentage,
-  formatPhone,
-  formatUrl,
-  getFormatterForType,
-  truncateText,
-} from '../../lib/format-utils';
+
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
@@ -23,6 +10,24 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Separator } from '../ui/separator';
 import { FilterOperatorSelect } from './filter-operator-select';
 import { FilterValueInput } from './filter-value-input';
+import {
+  ColumnDefinition,
+  FilterState,
+  formatCurrency,
+  formatDateRange,
+  formatDateWithConfig,
+  formatEmail,
+  formatNumber,
+  formatPercentage,
+  formatPhone,
+  formatUrl,
+  getFilterValueAsDate,
+  getFilterValueAsNumber,
+  getFormatterForType,
+  getNumberFormat,
+  getOperatorDefinition,
+  truncateText,
+} from '@better-tables/core';
 
 export interface ActiveFiltersProps<TData = unknown> {
   /** Column definitions */

@@ -47,13 +47,9 @@ export * from './components/ui/switch';
 export * from './components/ui/tooltip';
 // Export hooks
 export * from './hooks';
-export * from './lib/filter-value-utils';
 export * from './lib/utils';
 
 // Export stores and state management
 export * from './stores/table-registry';
 export type { TableState, TableStoreInitialState } from './stores/table-store';
 export * from './stores/url-sync-adapter';
-// Export framework-agnostic utilities (opt-in)
-// Complex data structures (filters, sorting, etc.) are compressed to keep URLs short
-export * from './utils';

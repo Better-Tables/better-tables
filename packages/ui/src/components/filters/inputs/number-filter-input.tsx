@@ -1,17 +1,9 @@
 'use client';
 
-import type { ColumnDefinition, FilterState } from '@better-tables/core';
+import { formatNumber, getFilterValueAsNumber, getFormattedPlaceholder, getNumberInputConfig, getNumberInputStep, parseFormattedNumber, validateNumberInput, type ColumnDefinition, type FilterState } from '@better-tables/core';
 import * as React from 'react';
 import { useFilterValidation } from '../../../hooks';
-import { getFilterValueAsNumber } from '../../../lib/filter-value-utils';
-import {
-  formatNumber,
-  getFormattedPlaceholder,
-  getNumberInputConfig,
-  getNumberInputStep,
-  parseFormattedNumber,
-  validateNumberInput,
-} from '../../../lib/number-format-utils';
+
 import { cn } from '../../../lib/utils';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
