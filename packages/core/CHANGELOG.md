@@ -1,5 +1,11 @@
 # @better-tables/core
 
+## 0.5.5
+
+### Patch Changes
+
+- Introduces the autoGroupFilters utility to automatically group filterable columns based on common patterns. Updates TableConfig and FilterBar to support autoGroupFilters configuration, and integrates the feature into the filter bar and table components for improved filter organization.
+
 ## 0.5.4
 
 ### Patch Changes

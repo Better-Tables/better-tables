@@ -1,13 +1,14 @@
 'use client';
 
 import type {
+  AutoGroupConfig,
   ColumnDefinition,
   ColumnVisibility,
   FilterGroup,
   FilterState,
 } from '@better-tables/core';
-import { getDefaultOperatorsForType } from '@better-tables/core';
-import { Search, X } from 'lucide-react';
+import { autoGroupFilters, getDefaultOperatorsForType } from '@better-tables/core';
+import { BarChart3, Calendar, Link as LinkIcon, Search, Tag, X } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 import { ColumnVisibilityToggle } from '../table/column-visibility-toggle';
@@ -49,6 +50,8 @@ export interface FilterBarProps<TData = unknown> {
   onFiltersChange: (filters: FilterState[]) => void;
   /** Optional filter groups for organization */
   groups?: FilterGroup[];
+  /** Automatic filter grouping configuration */
+  autoGroupFilters?: AutoGroupConfig;
   /** Theme configuration */
   theme?: FilterBarTheme;
   /** Whether the filter bar is disabled */
@@ -94,6 +97,7 @@ export function FilterBar<TData = unknown>({
   filters,
   onFiltersChange,
   groups,
+  autoGroupFilters: autoGroupConfig,
   theme,
   disabled = false,
   maxFilters,
@@ -128,6 +132,30 @@ export function FilterBar<TData = unknown>({
     () => columns.filter((col) => col.filterable !== false),
     [columns]
   );
+
+  // Auto-generate groups if not provided
+  const effectiveGroups = React.useMemo(() => {
+    if (groups !== undefined) {
+      return groups;
+    }
+    // Auto-generate groups when groups prop is undefined
+    // Only auto-group if autoGroup flag is true (default: true)
+    const config: AutoGroupConfig = {
+      enabled: true,
+      autoGroup: true,
+      ...autoGroupConfig,
+      // Provide default icons if not specified
+      groupIcons: {
+        search: Search,
+        links: LinkIcon,
+        dates: Calendar,
+        status: Tag,
+        metrics: BarChart3,
+        ...autoGroupConfig?.groupIcons,
+      },
+    };
+    return autoGroupFilters(columns, config);
+  }, [groups, columns, autoGroupConfig]);
 
   // Get columns that don't already have a filter
   const availableColumns = React.useMemo(() => {
@@ -180,7 +208,9 @@ export function FilterBar<TData = unknown>({
 
   const handleUpdateFilter = React.useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      const newFilters = filters.map((f) => (f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f));
+      const newFilters = filters.map((f) =>
+        f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f
+      );
       onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
@@ -266,7 +296,7 @@ export function FilterBar<TData = unknown>({
             <div className="shrink-0">
               <FilterDropdown
                 columns={availableColumns}
-                groups={showGroups ? groups : undefined}
+                groups={showGroups ? effectiveGroups : undefined}
                 onSelect={handleAddFilter}
                 open={isDropdownOpen}
                 onOpenChange={setIsDropdownOpen}
