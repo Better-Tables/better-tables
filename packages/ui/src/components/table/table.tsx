@@ -189,8 +189,9 @@ export function BetterTable<TData = unknown>({
   // Get actions from props
   const actions = props.actions || [];
 
-  // Get groups from props
+  // Get groups and autoGroupFilters from props
   const groups = props.groups;
+  const autoGroupFilters = props.autoGroupFilters;
 
   // Enable row selection automatically if actions are provided
   const shouldShowRowSelection = actions.length > 0 || rowSelection;
@@ -551,6 +552,8 @@ export function BetterTable<TData = unknown>({
             columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}
+            groups={groups}
+            autoGroupFilters={autoGroupFilters}
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}

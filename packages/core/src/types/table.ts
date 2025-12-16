@@ -8,6 +8,7 @@
  */
 
 import type { ComponentType } from 'react';
+import type { AutoGroupConfig } from '../utils/auto-group-filters';
 import type { ActionsConfig, TableAction } from './action';
 import type { TableAdapter } from './adapter';
 import type { ColumnDefinition } from './column';
@@ -54,6 +55,9 @@ export interface TableConfig<TData = unknown> {
 
   /** Filter group definitions for organized filtering */
   groups?: FilterGroup[];
+
+  /** Automatic filter grouping configuration */
+  autoGroupFilters?: AutoGroupConfig;
 
   /** Default filters to apply on initialization */
   defaultFilters?: FilterState[];
