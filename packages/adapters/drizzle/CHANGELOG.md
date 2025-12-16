@@ -1,5 +1,12 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.28
+
+### Patch Changes
+
+- Updated dependencies
+  - @better-tables/core@0.5.5
+
 ## 0.5.27
 
 ### Patch Changes
