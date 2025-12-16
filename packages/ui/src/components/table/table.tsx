@@ -1,12 +1,18 @@
 'use client';
 
-import type {
-  ColumnDefinition,
-  ColumnVisibility,
-  FilterState,
-  PaginationState,
-  SortingState,
-  TableConfig,
+import {
+  type ColumnDefinition,
+  type ColumnVisibility,
+  destroyTableStore,
+  type FilterState,
+  getFormatterForType,
+  getOrCreateTableStore,
+  getTableStore,
+  type PaginationState,
+  type SortingState,
+  type TableConfig,
+  type UrlSyncAdapter,
+  type UrlSyncConfig,
 } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
@@ -20,15 +26,8 @@ import {
   useTableSelection,
   useTableSorting,
 } from '../../hooks/use-table-store';
-import { getFormatterForType } from '../../lib/format-utils';
+import { useTableUrlSync } from '../../hooks/use-table-url-sync';
 import { cn } from '../../lib/utils';
-import {
-  destroyTableStore,
-  getOrCreateTableStore,
-  getTableStore,
-} from '../../stores/table-registry';
-import type { UrlSyncAdapter, UrlSyncConfig } from '../../stores/url-sync-adapter';
-import { useTableUrlSync } from '../../stores/url-sync-adapter';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';

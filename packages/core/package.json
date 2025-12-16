@@ -19,6 +19,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "lint": "biome check .",
@@ -28,8 +29,9 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
-    "date-fns": "^2.30.0",
-    "lz-string": "^1.5.0"
+    "date-fns": "4.1.0",
+    "lz-string": "^1.5.0",
+    "zustand": "^5.0.2"
   },
   "peerDependencies": {
     "react": "catalog:",

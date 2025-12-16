@@ -1,4 +1,4 @@
-import { parseTableSearchParams } from '@better-tables/ui/server';
+import { parseTableSearchParams } from '@better-tables/core';
 import { type NextRequest, NextResponse } from 'next/server';
 import { getAdapter } from '@/lib/adapter';
 

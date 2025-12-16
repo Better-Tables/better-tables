@@ -1,4 +1,4 @@
-import { parseTableSearchParams } from '@better-tables/ui/server';
+import { parseTableSearchParams } from '@better-tables/core';
 import { UsersTableClient } from '@/components/users-table-client';
 import { getAdapter } from '@/lib/adapter';
 import { defaultVisibleColumns } from '@/lib/columns/user-columns';

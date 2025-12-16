@@ -1,6 +1,6 @@
 /**
  * @fileoverview Main factory function for creating Better Tables instances
- * @module @better-tables/core/factory
+ * @module factory
  *
  * @description
  * Provides the primary API for creating Better Tables instances with any adapter.
@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { betterTables } from '@better-tables/core';
+ * import { betterTables } from '@/factory';
  * import { drizzleAdapter } from '@better-tables/adapters-drizzle';
  *
  * const tables = betterTables({

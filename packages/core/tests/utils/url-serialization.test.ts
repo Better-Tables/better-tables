@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
-import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../url-serialization';
+import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../../src/utils/url-serialization';
+import { FilterState, PaginationState, SortingState } from '@/types';
 
 describe('serializeTableStateToUrl', () => {
   it('should serialize filters to compressed URL parameter', () => {

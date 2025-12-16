@@ -1,7 +1,6 @@
+import { getTableStore, type TableStoreState } from '@better-tables/core';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { getTableStore } from '../stores/table-registry';
-import type { TableState } from '../stores/table-store';
 
 /**
  * Hook to access the complete table store
@@ -17,7 +16,7 @@ import type { TableState } from '../stores/table-store';
  * tableState.setFilters([...]);
  * ```
  */
-export function useTableStore(tableId: string): TableState {
+export function useTableStore(tableId: string): TableStoreState {
   const store = getTableStore(tableId);
   if (!store) {
     throw new Error(

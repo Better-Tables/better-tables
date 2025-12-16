@@ -1,10 +1,6 @@
-import type { FilterState } from '@better-tables/core';
-import {
-  isDateFilterState,
-  isNumberFilterState,
-  isTextFilterState,
-  isValidDate,
-} from '@better-tables/core';
+import type { FilterState } from '@/types';
+import { isDateFilterState, isNumberFilterState, isTextFilterState, isValidDate } from '@/utils';
+
 
 /**
  * Safely get filter value as string

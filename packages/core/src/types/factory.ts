@@ -1,6 +1,6 @@
 /**
  * @fileoverview Factory types for Better Tables
- * @module @better-tables/core/types/factory
+ * @module types/factory
  *
  * @description
  * Type definitions for the betterTables() factory function and related configuration.

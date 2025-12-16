@@ -11,11 +11,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
-    },
-    "./server": {
-      "types": "./dist/server.d.ts",
-      "import": "./dist/server.mjs",
-      "require": "./dist/server.js"
     }
   },
   "files": [
@@ -25,6 +20,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",

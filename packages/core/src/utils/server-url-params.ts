@@ -8,7 +8,7 @@
  * @module utils/server-url-params
  */
 
-import type { FilterState, SortingState } from '@better-tables/core';
+import { FilterState, SortingState } from '@/types';
 import { deserializeTableStateFromUrl } from './url-serialization';
 
 /**

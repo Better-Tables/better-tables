@@ -82,7 +82,7 @@ export function TablePagination({
       return (
         <Button
           key={page}
-          variant={currentPage === page ? 'default' : 'outline-solid'}
+          variant={currentPage === page ? 'default' : 'outline'}
           size="sm"
           onClick={() => onPageChange(page)}
           className="w-8 h-8 p-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

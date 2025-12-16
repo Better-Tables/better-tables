@@ -24,6 +24,7 @@
     "build": "turbo run build",
     "dev": "turbo watch dev",
     "dev:run": "turbo run dev",
+    "typecheck": "tsc --noEmit",
     "test": "turbo run test",
     "clean": "bun run --filter '*' clean",
     "format": "biome format --write .",

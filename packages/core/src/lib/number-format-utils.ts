@@ -48,7 +48,7 @@ export interface NumberInputConfig {
 /**
  * Format a number value using existing format utilities
  */
-export function formatNumber(
+export function formatNumberInput(
   value: number | string | null | undefined,
   config: NumberInputConfig = {}
 ): string {

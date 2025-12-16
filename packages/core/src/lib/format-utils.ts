@@ -2,7 +2,7 @@
  * Format utilities for different data types
  */
 
-import type { ColumnType } from '@better-tables/core';
+import type { ColumnType } from '@/types';
 import { formatDateWithConfig } from './date-utils';
 
 export interface NumberFormatConfig {
