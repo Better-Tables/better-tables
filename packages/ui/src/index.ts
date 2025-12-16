@@ -48,8 +48,3 @@ export * from './components/ui/tooltip';
 // Export hooks
 export * from './hooks';
 export * from './lib/utils';
-
-// Export stores and state management
-export * from './stores/table-registry';
-export type { TableState, TableStoreInitialState } from './stores/table-store';
-export * from './stores/url-sync-adapter';

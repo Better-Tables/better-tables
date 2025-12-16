@@ -1,6 +1,6 @@
 'use client';
 
-import type { UrlSyncAdapter } from '@better-tables/ui';
+import { UrlSyncAdapter } from '@better-tables/core';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 

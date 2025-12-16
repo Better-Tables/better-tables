@@ -104,6 +104,8 @@ export * from './factory';
 export * from './lib';
 // Managers
 export * from './managers';
+// Stores
+export * from './stores';
 // Types
 export * from './types';
 // Utils

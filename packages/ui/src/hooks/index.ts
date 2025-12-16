@@ -5,4 +5,5 @@ export * from './use-keyboard-navigation';
 export * from './use-table-data';
 export * from './use-table-store';
 export { useTableColumnOrder } from './use-table-store';
+export * from './use-table-url-sync';
 export * from './use-virtualization';
