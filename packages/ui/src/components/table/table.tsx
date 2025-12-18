@@ -133,6 +133,11 @@ export interface BetterTableProps<TData = unknown>
    * @default false
    */
   autoShowFilteredColumns?: boolean;
+
+  /** Callback to check if a filter is protected (can't be removed/modified)
+   * Protected filters will be shown with a lock icon and cannot be removed.
+   */
+  isFilterProtected?: (filter: FilterState) => boolean;
 }
 
 export function BetterTable<TData = unknown>({
@@ -175,6 +180,9 @@ export function BetterTable<TData = unknown>({
   // URL sync props
   urlSync,
   autoShowFilteredColumns = false,
+
+  // Filter protection
+  isFilterProtected,
   ...props
 }: BetterTableProps<TData>) {
   const {
@@ -565,6 +573,7 @@ export function BetterTable<TData = unknown>({
             enableColumnReordering={columnReordering}
             onReset={handleReset}
             searchable={false}
+            isFilterProtected={isFilterProtected}
           />
         )}
         <EmptyState
@@ -631,6 +640,7 @@ export function BetterTable<TData = unknown>({
             enableColumnReordering={columnReordering}
             onReset={handleReset}
             searchable={false}
+            isFilterProtected={isFilterProtected}
           />
         )}
       </div>
