@@ -748,7 +748,9 @@ export class FilterHandler {
       return condition;
     }
 
-    const combinedCondition = and(...conditions);
+    // When includeNull is true, we want: (main_condition OR column IS NULL)
+    // For other cases (shouldn't happen, but defensive), use AND
+    const combinedCondition = includeNull ? or(...conditions) : and(...conditions);
     if (!combinedCondition) {
       throw new QueryError('Failed to combine conditions', { operator, values });
     }

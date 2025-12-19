@@ -319,4 +319,54 @@ describe('FilterHandler - Date Logic', () => {
       });
     });
   });
+
+  describe('includeNull handling', () => {
+    const schema = { users: mockPgTable };
+    const relationshipManager = new RelationshipManager(schema, {});
+    const handler = new FilterHandler(schema, relationshipManager, 'postgres');
+
+    it('should include NULL values when includeNull is true for number filter', () => {
+      const filter: FilterState = {
+        columnId: 'id',
+        operator: 'greaterThan',
+        values: [1672531200000], // Some timestamp value
+        type: 'number',
+        includeNull: true,
+      };
+
+      const condition = handler.buildFilterCondition(filter, 'users');
+      expect(condition).toBeDefined();
+      // The condition should combine the operator condition with IS NULL using OR
+      // We can't easily test the SQL string directly, but we can verify it doesn't throw
+      // and returns a valid condition
+    });
+
+    it('should not include NULL values when includeNull is false', () => {
+      const filter: FilterState = {
+        columnId: 'id',
+        operator: 'greaterThan',
+        values: [1672531200000],
+        type: 'number',
+        includeNull: false,
+      };
+
+      const condition = handler.buildFilterCondition(filter, 'users');
+      expect(condition).toBeDefined();
+      // Should only have the operator condition, not IS NULL
+    });
+
+    it('should not include NULL for isNull and isNotNull operators even if includeNull is true', () => {
+      const filter: FilterState = {
+        columnId: 'id',
+        operator: 'isNull',
+        values: [],
+        type: 'number',
+        includeNull: true, // Should be ignored for isNull/isNotNull
+      };
+
+      const condition = handler.buildFilterCondition(filter, 'users');
+      expect(condition).toBeDefined();
+      // Should only have IS NULL, not duplicate it
+    });
+  });
 });

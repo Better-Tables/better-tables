@@ -28,8 +28,8 @@ export const userColumns = [
     .number()
     .id('age')
     .displayName('Age')
-    .nullableAccessor((user) => user.age, 0)
-    .range(18, 100)
+    .accessorWithDefault((user) => user.age, 0)
+    .range(18, 100, { includeNull: true })
     .filterable()
     .sortable()
     .build(),
@@ -104,7 +104,8 @@ export const userColumns = [
     .text()
     .id('profile.bio')
     .displayName('Bio')
-    .nullableAccessor((user) => user.profile?.bio)
+    .accessorWithDefault((user) => user.profile?.bio)
+    .searchable({ includeNull: true })
     .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
     .filterable()
     .build(),
@@ -113,7 +114,7 @@ export const userColumns = [
     .text()
     .id('profile.website')
     .displayName('Website')
-    .nullableAccessor((user) => user.profile?.website)
+    .accessorWithDefault((user) => user.profile?.website)
     .filterable()
     .cellRenderer(({ value }) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
@@ -150,7 +151,8 @@ export const userColumns = [
     .text()
     .id('profile.location')
     .displayName('Location')
-    .nullableAccessor((user) => user.profile?.location)
+    .accessorWithDefault((user) => user.profile?.location)
+    .searchable({ includeNull: true })
     .filterable()
     .build(),
 
@@ -158,7 +160,7 @@ export const userColumns = [
     .text()
     .id('profile.github')
     .displayName('GitHub')
-    .nullableAccessor((user) => user.profile?.github)
+    .accessorWithDefault((user) => user.profile?.github)
     .filterable()
     .cellRenderer(({ value }) => {
       if (!value) return <span className="text-muted-foreground">-</span>;

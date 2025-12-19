@@ -1,7 +1,6 @@
 'use client';
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
-import { getOperatorDefinition } from '@better-tables/core';
 import { HelpCircle } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
@@ -28,11 +27,6 @@ export function IncludeUnknownControl<TData = unknown>({
   disabled = false,
   className,
 }: IncludeUnknownControlProps<TData>) {
-  // Get operator definition to check if it supports null values
-  const operatorDef = React.useMemo(() => {
-    return getOperatorDefinition(filter.operator);
-  }, [filter.operator]);
-
   // Get appropriate label and description based on column type
   const { label, description } = React.useMemo(() => {
     switch (column.type) {
@@ -42,24 +36,24 @@ export function IncludeUnknownControl<TData = unknown>({
       case 'phone':
         return {
           label: 'Include empty values',
-          description: 'Include records where this field is empty or not provided',
+          description: 'Include records where this field is empty',
         };
       case 'number':
       case 'currency':
       case 'percentage':
         return {
           label: 'Include missing values',
-          description: 'Include records where this field has no numeric value',
+          description: 'Include records where this field has no value',
         };
       case 'date':
         return {
           label: 'Include missing dates',
-          description: 'Include records where this date field is not set',
+          description: 'Include records where this field is not set',
         };
       case 'boolean':
         return {
           label: 'Include unknown values',
-          description: 'Include records where this field is neither true nor false',
+          description: 'Include records where this field is not true or false',
         };
       case 'option':
         return {
@@ -91,19 +85,19 @@ export function IncludeUnknownControl<TData = unknown>({
     [onChange]
   );
 
-  // Check if the current operator supports null values
-  const supportsNull = operatorDef?.supportsNull ?? false;
-
   // Check if the column/filter is configured to include null values
   const columnAllowsNull = column.filter?.includeNull ?? false;
 
-  // Don't render if the operator doesn't support null or column doesn't allow it
-  if (!supportsNull || !columnAllowsNull) {
+  // Don't show checkbox for isNull/isNotNull operators (they already handle null)
+  const isNullOperator = filter.operator === 'isNull' || filter.operator === 'isNotNull';
+
+  // Don't render if column doesn't allow it or if operator already handles null
+  if (!columnAllowsNull || isNullOperator) {
     return null;
   }
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1', className)}>
       <div className="flex items-center space-x-2">
         <Checkbox
           id={`include-null-${filter.columnId}`}
@@ -120,7 +114,7 @@ export function IncludeUnknownControl<TData = unknown>({
         <HelpCircle className="h-4 w-4 text-muted-foreground" />
       </div>
 
-      <p className="text-xs text-muted-foreground pl-6">{description}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -133,14 +127,13 @@ export function useIncludeUnknownControl<TData = unknown>(
   column: ColumnDefinition<TData>
 ): boolean {
   return React.useMemo(() => {
-    // Check if the operator supports null values
-    const operatorDef = getOperatorDefinition(filter.operator);
-    const supportsNull = operatorDef?.supportsNull ?? false;
-
     // Check if the column/filter is configured to include null values
     const columnAllowsNull = column.filter?.includeNull ?? false;
 
-    return supportsNull && columnAllowsNull;
+    // Don't show checkbox for isNull/isNotNull operators (they already handle null)
+    const isNullOperator = filter.operator === 'isNull' || filter.operator === 'isNotNull';
+
+    return columnAllowsNull && !isNullOperator;
   }, [filter.operator, column.filter?.includeNull]);
 }
 
@@ -182,15 +175,15 @@ export function getIncludeUnknownDescription(columnType: string): string {
     case 'email':
     case 'url':
     case 'phone':
-      return 'Include records where this field is empty or not provided';
+      return 'Include records where this field is empty';
     case 'number':
     case 'currency':
     case 'percentage':
-      return 'Include records where this field has no numeric value';
+      return 'Include records where this field has no value';
     case 'date':
-      return 'Include records where this date field is not set';
+      return 'Include records where this field is not set';
     case 'boolean':
-      return 'Include records where this field is neither true nor false';
+      return 'Include records where this field is not true or false';
     case 'option':
       return 'Include records where no option has been selected';
     case 'multiOption':

@@ -202,9 +202,25 @@ cb.text()
   .build();
 ```
 
+**Enable "Include Unknown" checkbox for nullable columns:**
+
+```typescript
+cb.text()
+  .id('email')
+  .displayName('Email')
+  .nullableAccessor((user) => user.email)
+  .searchable({ includeNull: true })  // Shows checkbox to include NULL/empty values
+  .build();
+```
+
+When `includeNull: true` is set, a checkbox will appear in the filter popover allowing users to include rows where the column value is NULL or empty in addition to matching the filter criteria.
+
 **Methods:**
 
-- `searchable(options?)` - Enable text search with debouncing
+- `searchable(options?)` - Enable text search with debouncing. Options:
+  - `debounce?: number` - Debounce delay in milliseconds (default: 300)
+  - `includeNull?: boolean` - Enable checkbox to include NULL/empty values (default: false)
+  - `validation?: (value: string) => boolean | string` - Custom validation
 - `textOperators(operators)` - Set specific text operators
 - `asEmail()` - Configure as email column
 - `asUrl()` - Configure as URL column
@@ -229,9 +245,26 @@ cb.number()
   .build();
 ```
 
+**Enable "Include Unknown" checkbox for nullable columns:**
+
+```typescript
+cb.number()
+  .id('age')
+  .displayName('Age')
+  .nullableAccessor((user) => user.age, 0)
+  .range(18, 100, { includeNull: true })  // Shows checkbox to include NULL values
+  .filterable()
+  .build();
+```
+
+When `includeNull: true` is set, a checkbox will appear in the filter popover allowing users to include rows where the column value is NULL in addition to matching the filter criteria. For example, with `age > 18` and the checkbox checked, it will return rows where age is greater than 18 OR age is NULL.
+
 **Methods:**
 
-- `range(min, max, options?)` - Set numeric range for filtering
+- `range(min, max, options?)` - Set numeric range for filtering. Options:
+  - `includeNull?: boolean` - Enable checkbox to include NULL values (default: false)
+  - `step?: number` - Step size for range inputs (default: 1)
+  - `validation?: (value: number) => boolean | string` - Custom validation
 - `numberOperators(operators)` - Set specific number operators
 - `currency(options)` - Configure as currency column
 - `percentage(options)` - Configure as percentage column

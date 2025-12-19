@@ -141,8 +141,35 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
 
   /**
    * Set a nullable accessor that handles null/undefined values gracefully
+   * @deprecated Use `.accessorWithDefault()` instead
    */
   nullableAccessor(
+    accessor: (data: TData) => TValue | null | undefined,
+    defaultValue?: TValue
+  ): this {
+    return this.accessorWithDefault(accessor, defaultValue);
+  }
+
+  /**
+   * Set an accessor with a default value for null/undefined results.
+   *
+   * Automatically sets the column as nullable and provides a default value
+   * that will be used when the accessor returns null or undefined.
+   *
+   * @param accessor - Function that extracts the column value (may return null/undefined)
+   * @param defaultValue - Value to use when accessor returns null/undefined
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const column = new ColumnBuilder<User, number>('number')
+   *   .id('age')
+   *   .displayName('Age')
+   *   .accessorWithDefault((user) => user.age, 0)  // Use 0 if age is null/undefined
+   *   .build();
+   * ```
+   */
+  accessorWithDefault(
     accessor: (data: TData) => TValue | null | undefined,
     defaultValue?: TValue
   ): this {
@@ -269,9 +296,34 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
 
   /**
    * Set whether column supports null/undefined values
+   * @deprecated Use `.normalizeEmptyToNull()` instead for clearer intent
    */
   nullable(nullable = true): this {
-    this.config.nullable = nullable;
+    return this.normalizeEmptyToNull(nullable);
+  }
+
+  /**
+   * Configure column to normalize empty values to null.
+   *
+   * When enabled, the accessor will convert empty strings ('') and undefined
+   * values to null during the build process. This is useful for columns where
+   * you want to treat "no value" consistently as null rather than empty string.
+   *
+   * @param normalize - Whether to normalize empty values to null (default: true)
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * const column = new ColumnBuilder<User, string>('text')
+   *   .id('bio')
+   *   .displayName('Bio')
+   *   .accessor(user => user.bio || '')
+   *   .normalizeEmptyToNull(true)  // Converts '' and undefined to null
+   *   .build();
+   * ```
+   */
+  normalizeEmptyToNull(normalize = true): this {
+    this.config.nullable = normalize;
     return this;
   }
 
