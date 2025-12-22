@@ -1,0 +1,289 @@
+---
+title: React Installation
+description: Minimal setup guide for React applications
+---
+
+A streamlined guide to installing and setting up Better Tables in your React application.
+
+## Installation
+
+Install the core package and Drizzle Adapter:
+
+<InstallBlock packages={['@better-tables/core', '@better-tables/drizzle-adapter']} />
+
+### Peer Dependencies
+
+Better Tables requires the following peer dependencies (install if not already present):
+
+<InstallBlock packages={['react', 'react-dom', 'tailwindcss']} />
+
+## Quick Start
+
+### 1. Define Your Columns
+
+Create column definitions using the column builder:
+
+```typescript
+// components/data-table/user-columns.tsx
+import { createColumnBuilder } from '@better-tables/core';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  status: 'active' | 'inactive';
+}
+
+const cb = createColumnBuilder<User>();
+
+export const userColumns = [
+  cb
+    .text()
+    .id('name')
+    .displayName('Name')
+    .accessor((user) => user.name)
+    .filterable()
+    .sortable()
+    .build(),
+
+  cb
+    .text()
+    .id('email')
+    .displayName('Email')
+    .accessor((user) => user.email)
+    .filterable()
+    .sortable()
+    .build(),
+
+  cb
+    .option()
+    .id('status')
+    .displayName('Status')
+    .accessor((user) => user.status)
+    .options([
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+    ])
+    .filterable()
+    .sortable()
+    .build(),
+
+  cb
+    .date()
+    .id('createdAt')
+    .displayName('Created')
+    .accessor((user) => user.createdAt)
+    .filterable()
+    .sortable()
+    .build(),
+];
+
+export const defaultVisibleColumns = ['name', 'email', 'status', 'createdAt'];
+```
+
+### 2. Create Table Configuration
+
+Define table features, sorting, and filter groups:
+
+```typescript
+// components/data-table/user-table-config.ts
+import type { FilterGroup } from '@better-tables/core';
+import { Calendar, Search, Tag } from 'lucide-react';
+
+export const USER_TABLE_ID = 'users-table';
+
+export const userTableFeatures = {
+  filtering: true,
+  sorting: true,
+  pagination: true,
+  rowSelection: true,
+  columnReordering: true,
+  headerContextMenu: {
+    enabled: true,
+    showSortToggle: true,
+    allowSortReorder: true,
+    showColumnVisibility: true,
+  },
+} as const;
+
+export const userTableSorting = {
+  enabled: true,
+  multiSort: true,
+  maxSortColumns: 3,
+} as const;
+
+export const userFilterGroups: FilterGroup[] = [
+  {
+    id: 'search',
+    label: 'Search',
+    icon: Search,
+    columns: ['name', 'email'],
+    defaultCollapsed: false,
+  },
+  {
+    id: 'status',
+    label: 'Status',
+    icon: Tag,
+    columns: ['status'],
+    defaultCollapsed: false,
+  },
+  {
+    id: 'dates',
+    label: 'Dates',
+    icon: Calendar,
+    columns: ['createdAt'],
+    defaultCollapsed: false,
+  },
+];
+```
+
+### 3. Create the Table Component
+
+Create a component that renders the table:
+
+```typescript
+// components/data-table/user-table.tsx
+import { useState } from 'react';
+import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import { BetterTable } from '@better-tables/ui';
+import { userColumns, defaultVisibleColumns } from './user-columns';
+import {
+  USER_TABLE_ID,
+  userTableFeatures,
+  userTableSorting,
+  userFilterGroups,
+} from './user-table-config';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  status: 'active' | 'inactive';
+}
+
+interface UserTableProps {
+  data: User[];
+  totalCount: number;
+}
+
+export function UserTable({ data, totalCount }: UserTableProps) {
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    limit: 20,
+    totalPages: Math.ceil(totalCount / 20),
+    hasNext: totalCount > 20,
+    hasPrev: false,
+  });
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [filters, setFilters] = useState<FilterState[]>([]);
+
+  // Handle data fetching based on state changes
+  // This is a simplified example - implement your own data fetching logic
+
+  return (
+    <BetterTable
+      id={USER_TABLE_ID}
+      name="Users"
+      columns={userColumns}
+      data={data}
+      totalCount={totalCount}
+      initialPagination={pagination}
+      initialSorting={sorting}
+      initialFilters={filters}
+      defaultVisibleColumns={defaultVisibleColumns}
+      features={userTableFeatures}
+      sorting={userTableSorting}
+      groups={userFilterGroups}
+      onPaginationChange={setPagination}
+      onSortingChange={setSorting}
+      onFiltersChange={setFilters}
+    />
+  );
+}
+```
+
+### 4. Use the Table in Your App
+
+```typescript
+// App.tsx or your page component
+import { UserTable } from './components/data-table/user-table';
+
+function App() {
+  // Fetch your data (replace with your actual data fetching)
+  const users = [
+    {
+      id: '1',
+      name: 'John Doe',
+      email: 'john@example.com',
+      createdAt: new Date(),
+      status: 'active' as const,
+    },
+    // ... more users
+  ];
+
+  return (
+    <div className="space-y-4 p-4">
+      <h1 className="text-2xl font-semibold">Users</h1>
+      <UserTable data={users} totalCount={users.length} />
+    </div>
+  );
+}
+
+export default App;
+```
+
+## Minimal Setup Checklist
+
+- [ ] Install `@better-tables/core` and `@better-tables/ui`
+- [ ] Install peer dependencies (`react`, `react-dom`, `tailwindcss`)
+- [ ] Define columns using `createColumnBuilder`
+- [ ] Create table configuration (features, sorting, filter groups)
+- [ ] Create table component
+- [ ] Connect to your data source/API
+
+## Styling
+
+Better Tables uses Tailwind CSS and requires your Tailwind configuration to include the package's styles. Make sure your `tailwind.config.js` includes:
+
+```javascript
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
+    './node_modules/@better-tables/ui/**/*.{js,ts,jsx,tsx}', // Add this
+  ],
+  // ... rest of your config
+};
+```
+
+## URL State Synchronization (Optional)
+
+While this minimal setup doesn't include URL synchronization, Better Tables supports URL state sync for React applications. You can implement a custom URL adapter by implementing the `UrlSyncAdapter` interface from `@better-tables/ui`. This allows users to bookmark and share filtered views.
+
+For a complete example with URL sync, see the [Next.js installation guide](/docs/installation/next) which includes a URL adapter implementation that can be adapted for React Router or other routing libraries.
+
+## You're Ready!
+
+With these minimal steps, you have a fully functional data table with:
+
+- ✅ Filtering (grouped by categories)
+- ✅ Sorting (multi-column support)
+- ✅ Pagination
+- ✅ Column visibility toggling
+- ✅ Column reordering
+- ✅ Row selection
+- ✅ Responsive design
+
+## Next Steps
+
+- Customize filter groups and icons
+- Add custom cell renderers
+- Implement row actions
+- Add custom filter input components
+- Configure column-specific options
+- Implement URL state synchronization for shareable views
+
+For more advanced usage, see the [Better Tables documentation](https://github.com/Better-Tables/better-tables).

@@ -1,0 +1,45 @@
+---
+title: Installation
+description: Choose your framework to get started with Better Tables
+---
+
+Get started with Better Tables by selecting your framework. Each guide includes step-by-step instructions tailored to your setup.
+
+<Cards>
+  <Card 
+    title={
+      <div className="flex items-center gap-2">
+        <NextIcon />
+        <span>Next.js</span>
+      </div>
+    }
+    description="Full installation guide for Next.js App Router with URL sync, server components, and more"
+    href="/docs/installation/next"
+  />
+  <Card 
+    title={
+      <div className="flex items-center gap-2">
+        <ReactIcon />
+        <span>React</span>
+      </div>
+    }
+    description="Minimal setup guide for React applications"
+    href="/docs/installation/react"
+  />
+</Cards>
+
+## Quick Install
+
+Install the core package and Drizzle Adapter:
+
+<InstallBlock packages={['@better-tables/core', '@better-tables/drizzle-adapter']} />
+
+## Peer Dependencies
+
+Better Tables requires the following peer dependencies:
+
+<InstallBlock packages={['react', 'react-dom', 'tailwindcss']} />
+
+## Next Steps
+
+Choose your framework above to see detailed installation and setup instructions tailored to your needs.
