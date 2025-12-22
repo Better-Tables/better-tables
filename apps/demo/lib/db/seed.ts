@@ -10,7 +10,7 @@ export async function seedDatabase(db: BetterSQLite3Database<any>) {
   const threeMonths = 90 * oneDay;
   const sixMonths = 180 * oneDay;
 
-  // Seed users with varied data
+  // Seed users with varied data (some with NULL ages for testing includeNull feature)
   await db.run(sql`INSERT INTO users (id, name, email, age, role, status, created_at) VALUES 
     (1, 'Alice Johnson', 'alice@example.com', 28, 'admin', 'active', ${now - sixMonths}),
     (2, 'Bob Smith', 'bob@example.com', 34, 'editor', 'active', ${now - sixMonths}),
@@ -36,7 +36,10 @@ export async function seedDatabase(db: BetterSQLite3Database<any>) {
     (22, 'Victor Lewis', 'victor@example.com', 44, 'editor', 'active', ${now - oneDay}),
     (23, 'Wendy Lee', 'wendy@example.com', 26, 'viewer', 'pending', ${now}),
     (24, 'Xavier Walker', 'xavier@example.com', 33, 'contributor', 'active', ${now}),
-    (25, 'Yara Hall', 'yara@example.com', 28, 'editor', 'active', ${now})`);
+    (25, 'Yara Hall', 'yara@example.com', 28, 'editor', 'active', ${now}),
+    (26, 'Zoe Young', 'zoe@example.com', ${null}, 'viewer', 'active', ${now - oneWeek}),
+    (27, 'Adam King', 'adam@example.com', ${null}, 'contributor', 'active', ${now - oneDay}),
+    (28, 'Bella Wright', 'bella@example.com', ${null}, 'editor', 'pending', ${now})`);
 
   // Seed profiles (not all users have profiles)
   await db.run(sql`INSERT INTO profiles (id, user_id, bio, avatar, website, location, github) VALUES 

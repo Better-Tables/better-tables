@@ -109,6 +109,38 @@ function FilterBadge<TData = unknown>({
   const Icon = icon;
   const [isMobile, setIsMobile] = React.useState(false);
 
+  // Check if filter has no values (newly added filter)
+  const hasNoValues = React.useMemo(() => {
+    return !filter.values || filter.values.length === 0;
+  }, [filter.values]);
+
+  // Auto-open popover/dialog when filter is newly added (has no values)
+  // Track if user has manually closed the panel to avoid re-opening
+  const [hasUserClosed, setHasUserClosed] = React.useState(false);
+  const [isValuePanelOpen, setIsValuePanelOpen] = React.useState(() => hasNoValues);
+
+  // Auto-open when filter has no values (unless user manually closed it)
+  React.useEffect(() => {
+    if (hasNoValues && !hasUserClosed) {
+      setIsValuePanelOpen(true);
+    }
+  }, [hasNoValues, hasUserClosed]);
+
+  // Track when user manually closes the panel
+  const handleValuePanelOpenChange = React.useCallback((open: boolean) => {
+    setIsValuePanelOpen(open);
+    if (!open) {
+      setHasUserClosed(true);
+    }
+  }, []);
+
+  // Reset the "user closed" flag when filter gets values (allows auto-open again if cleared)
+  React.useEffect(() => {
+    if (!hasNoValues) {
+      setHasUserClosed(false);
+    }
+  }, [hasNoValues]);
+
   // Check if mobile viewport
   React.useEffect(() => {
     const checkMobile = () => {
@@ -192,7 +224,7 @@ function FilterBadge<TData = unknown>({
       {/* Value - show if operator needs values OR supports null (for include-null toggle) */}
       {shouldShowValuePanel &&
         (isMobile ? (
-          <Dialog>
+          <Dialog open={isValuePanelOpen} onOpenChange={handleValuePanelOpenChange}>
             <DialogTrigger asChild>
               <Button
                 variant="ghost"
@@ -225,7 +257,7 @@ function FilterBadge<TData = unknown>({
             </DialogContent>
           </Dialog>
         ) : (
-          <Popover>
+          <Popover open={isValuePanelOpen} onOpenChange={handleValuePanelOpenChange}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
@@ -486,7 +518,7 @@ function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisp
       if (selectedOptions.length === 1) {
         return (
           <span>
-            {truncateText(selectedOptions[0].label, 20)}
+            {truncateText(selectedOptions[0]?.label ?? '', 20)}
             {nullIndicator}
           </span>
         );
@@ -518,7 +550,7 @@ function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisp
       if (selectedOptions.length === 1) {
         return (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-            {truncateText(selectedOptions[0].label, 20)}
+            {truncateText(selectedOptions[0]?.label ?? '', 20)}
           </span>
         );
       }

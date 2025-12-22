@@ -49,8 +49,27 @@ export function MultiOptionFilterInput<TData = unknown>({
   const selectedValues = (filter.values || []) as string[];
 
   // UI-only state for popover and search
-  const [open, setOpen] = React.useState(false);
+  // Auto-open popover when filter is empty (newly added filter)
+  const [open, setOpen] = React.useState(() => {
+    return !needsNoValues && selectedValues.length === 0;
+  });
   const [search, setSearch] = React.useState('');
+
+  // Auto-focus search input when popover opens and filter is empty
+  React.useEffect(() => {
+    if (open && selectedValues.length === 0 && !disabled) {
+      // Use setTimeout to ensure the input is visible
+      // CommandInput doesn't forward refs, so we need to query for the input element
+      const timeoutId = setTimeout(() => {
+        const input = document.querySelector<HTMLInputElement>(
+          '[data-slot="command-input"]'
+        );
+        input?.focus();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+    return undefined;
+  }, [open, selectedValues.length, disabled]);
 
   // Validate the current values
   const validation = useFilterValidation({
@@ -190,7 +209,7 @@ export function MultiOptionFilterInput<TData = unknown>({
                     >
                       <Checkbox
                         checked={isSelected}
-                        onChange={() => {}} // Handled by CommandItem onSelect
+                        onChange={() => { }} // Handled by CommandItem onSelect
                       />
                       <div className="flex items-center gap-2 flex-1">
                         {OptionIcon && (

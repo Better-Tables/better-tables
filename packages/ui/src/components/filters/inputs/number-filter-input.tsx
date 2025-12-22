@@ -34,6 +34,11 @@ export function NumberFilterInput<TData = unknown>({
   onChange,
   disabled = false,
 }: NumberFilterInputProps<TData>) {
+  // Refs for input elements to enable auto-focus
+  const singleInputRef = React.useRef<HTMLInputElement>(null);
+  const minInputRef = React.useRef<HTMLInputElement>(null);
+  const maxInputRef = React.useRef<HTMLInputElement>(null);
+
   // Get number input configuration from column
   const numberConfig = React.useMemo(
     () => getNumberInputConfig(column.type, column.meta),
@@ -56,6 +61,28 @@ export function NumberFilterInput<TData = unknown>({
 
   const needsTwoValues = filter.operator === 'between' || filter.operator === 'notBetween';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
+
+  // Auto-focus when filter is empty (newly added filter)
+  React.useEffect(() => {
+    if (disabled || needsNoValues) return undefined;
+
+    const hasNoValues = needsTwoValues
+      ? !values.min && !values.max
+      : !values.single;
+
+    if (hasNoValues) {
+      // Use setTimeout to ensure the input is visible (e.g., in a Popover/Dialog)
+      const timeoutId = setTimeout(() => {
+        if (needsTwoValues) {
+          minInputRef.current?.focus();
+        } else {
+          singleInputRef.current?.focus();
+        }
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+    return undefined;
+  }, [disabled, needsNoValues, needsTwoValues, values.min, values.max, values.single]);
 
   // Store onChange in ref to prevent effect dependencies
   const onChangeRef = React.useRef(onChange);
@@ -209,6 +236,7 @@ export function NumberFilterInput<TData = unknown>({
               Minimum {column.displayName}
             </Label>
             <Input
+              ref={minInputRef}
               id={`min-${filter.columnId}`}
               type="number"
               value={values.min}
@@ -222,8 +250,8 @@ export function NumberFilterInput<TData = unknown>({
               disabled={disabled}
               className={cn(
                 !finalValidation.isValid &&
-                  values.min &&
-                  'border-destructive focus-visible:ring-destructive'
+                values.min &&
+                'border-destructive focus-visible:ring-destructive'
               )}
             />
           </div>
@@ -232,6 +260,7 @@ export function NumberFilterInput<TData = unknown>({
               Maximum {column.displayName}
             </Label>
             <Input
+              ref={maxInputRef}
               id={`max-${filter.columnId}`}
               type="number"
               value={values.max}
@@ -245,8 +274,8 @@ export function NumberFilterInput<TData = unknown>({
               disabled={disabled}
               className={cn(
                 !finalValidation.isValid &&
-                  values.max &&
-                  'border-destructive focus-visible:ring-destructive'
+                values.max &&
+                'border-destructive focus-visible:ring-destructive'
               )}
             />
           </div>
@@ -262,6 +291,7 @@ export function NumberFilterInput<TData = unknown>({
     <div className="space-y-2">
       <Label className="text-sm font-medium">Value</Label>
       <Input
+        ref={singleInputRef}
         type="number"
         value={values.single}
         onChange={handleSingleChange}
@@ -274,8 +304,8 @@ export function NumberFilterInput<TData = unknown>({
         disabled={disabled}
         className={cn(
           !finalValidation.isValid &&
-            values.single &&
-            'border-destructive focus-visible:ring-destructive'
+          values.single &&
+          'border-destructive focus-visible:ring-destructive'
         )}
       />
       {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (

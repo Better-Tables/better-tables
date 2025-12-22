@@ -24,7 +24,7 @@ The filter system consists of several interconnected components:
 - **FilterDropdown**: Column selection dropdown with search and grouping
 - **FilterValueInput**: Type-specific input components for different data types
 - **FilterOperatorSelect**: Operator selection dropdown
-- **IncludeUnknownControl**: Toggle for including null/undefined values
+- **IncludeUnknownControl**: Toggle for including null/undefined values. This checkbox automatically appears in filter popovers when a column has `includeNull: true` configured in its filter options.
 
 ### Component Hierarchy
 
@@ -273,6 +273,7 @@ interface TextFilterInputProps<TData = any> {
 - Dynamic placeholder based on operator
 - Validation with error display
 - Support for empty/not-empty operators
+- Optional "Include Unknown" checkbox when `column.filter.includeNull` is enabled
 
 ### NumberFilterInput
 
@@ -292,6 +293,7 @@ interface NumberFilterInputProps<TData = any> {
 - Number formatting (currency, percentage, etc.)
 - Min/max validation
 - Step controls for precision
+- Optional "Include Unknown" checkbox when `column.filter.includeNull` is enabled
 
 ### DateFilterInput
 
