@@ -1,5 +1,13 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.29
+
+### Patch Changes
+
+- Updated the filtering system to support an "Include Unknown" checkbox for nullable columns, allowing users to include rows with null values in their filter results. Refactored column builders to replace nullableAccessor with accessorWithDefault for better handling of default values. Updated documentation and examples to reflect these changes, ensuring clarity on the new filtering behavior.
+- Updated dependencies
+  - @better-tables/core@0.5.6
+
 ## 0.5.28
 
 ### Patch Changes
