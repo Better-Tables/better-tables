@@ -54,17 +54,22 @@ export function MultiOptionFilterInput<TData = unknown>({
     return !needsNoValues && selectedValues.length === 0;
   });
   const [search, setSearch] = React.useState('');
+  const popoverContentRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-focus search input when popover opens and filter is empty
   React.useEffect(() => {
     if (open && selectedValues.length === 0 && !disabled) {
       // Use setTimeout to ensure the input is visible
       // CommandInput doesn't forward refs, so we need to query for the input element
+      // Scope the query to the popover content to avoid selecting wrong element when multiple components exist
       const timeoutId = setTimeout(() => {
-        const input = document.querySelector<HTMLInputElement>(
-          '[data-slot="command-input"]'
-        );
-        input?.focus();
+        const popoverContent = popoverContentRef.current;
+        if (popoverContent) {
+          const input = popoverContent.querySelector<HTMLInputElement>(
+            '[data-slot="command-input"]'
+          );
+          input?.focus();
+        }
       }, 0);
       return () => clearTimeout(timeoutId);
     }
@@ -188,7 +193,7 @@ export function MultiOptionFilterInput<TData = unknown>({
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
+        <PopoverContent ref={popoverContentRef} className="w-full p-0" align="start">
           <Command>
             <CommandInput
               placeholder="Search options..."
