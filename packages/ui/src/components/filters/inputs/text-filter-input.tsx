@@ -32,6 +32,9 @@ export function TextFilterInput<TData = unknown>({
   onChange,
   disabled = false,
 }: TextFilterInputProps<TData>) {
+  // Ref for the input element to enable auto-focus
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
   // UI-only state: what user sees while typing
   const [localValue, setLocalValue] = React.useState(() => {
     return getFilterValueAsString(filter, 0) || '';
@@ -39,6 +42,18 @@ export function TextFilterInput<TData = unknown>({
 
   // Track if user is actively typing (prevents external sync during interaction)
   const [isUserTyping, setIsUserTyping] = React.useState(false);
+
+  // Auto-focus when filter is empty (newly added filter)
+  React.useEffect(() => {
+    if (!localValue && inputRef.current && !disabled) {
+      // Use setTimeout to ensure the input is visible (e.g., in a Popover/Dialog)
+      const timeoutId = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+    return undefined;
+  }, [localValue, disabled]);
 
   // Store onChange in ref to prevent effect dependencies
   const onChangeRef = React.useRef(onChange);
@@ -117,6 +132,7 @@ export function TextFilterInput<TData = unknown>({
         Value
       </label>
       <Input
+        ref={inputRef}
         id={`value-${filter.columnId}`}
         type="text"
         value={localValue}

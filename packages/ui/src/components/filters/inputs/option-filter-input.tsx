@@ -35,11 +35,26 @@ export function OptionFilterInput<TData = unknown>({
   onChange,
   disabled = false,
 }: OptionFilterInputProps<TData>) {
+  // Ref for the select trigger to enable auto-focus
+  const selectTriggerRef = React.useRef<HTMLButtonElement>(null);
+
   const options = column.filter?.options || [];
   const allowsMultiple = filter.operator === 'isAnyOf' || filter.operator === 'isNoneOf';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
 
   const selectedValues = (filter.values || []) as string[];
+
+  // Auto-focus select trigger when filter is empty (newly added filter)
+  React.useEffect(() => {
+    if (!needsNoValues && selectedValues.length === 0 && selectTriggerRef.current && !disabled) {
+      // Use setTimeout to ensure the select is visible (e.g., in a Popover/Dialog)
+      const timeoutId = setTimeout(() => {
+        selectTriggerRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+    return undefined;
+  }, [needsNoValues, selectedValues.length, disabled]);
 
   // Validate the current values
   const validation = useFilterValidation({
@@ -117,10 +132,11 @@ export function OptionFilterInput<TData = unknown>({
         {/* Option Selection */}
         <Select onValueChange={handleMultipleToggle} disabled={disabled}>
           <SelectTrigger
+            ref={selectTriggerRef}
             className={cn(
               !validation.isValid &&
-                selectedValues.length > 0 &&
-                'border-destructive focus:ring-destructive'
+              selectedValues.length > 0 &&
+              'border-destructive focus:ring-destructive'
             )}
           >
             <SelectValue placeholder="Add option..." />
@@ -164,10 +180,11 @@ export function OptionFilterInput<TData = unknown>({
         disabled={disabled}
       >
         <SelectTrigger
+          ref={selectTriggerRef}
           className={cn(
             !validation.isValid &&
-              selectedValues.length > 0 &&
-              'border-destructive focus:ring-destructive'
+            selectedValues.length > 0 &&
+            'border-destructive focus:ring-destructive'
           )}
         >
           <SelectValue placeholder="Choose an option..." />
