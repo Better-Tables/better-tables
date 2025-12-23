@@ -1,0 +1,172 @@
+---
+title: Integrated Demo Issues & Testing Notes
+description: Known issues and testing checklist for the integrated virtualized table demo
+---
+
+This document outlines known issues and a testing checklist for the integrated virtualized table demo.
+
+## Current Issues
+
+The `integrated-virtualized-table-demo.tsx` file has several API mismatches that need to be resolved before it can be properly tested. The main issues are:
+
+### 1. FilterState API Mismatch
+- **Issue**: Code uses `filter.value` but `FilterState` type uses `values` array
+- **Error**: `Property 'value' does not exist on type 'FilterState'. Did you mean 'values'?`
+- **Location**: Lines 193, 195, 197, 199 in filtering logic
+
+### 2. PaginationManager API Mismatch
+- **Issue**: Code calls `updateTotalItems()` method that doesn't exist
+- **Error**: `Property 'updateTotalItems' does not exist on type 'PaginationManager'`
+- **Expected**: Should use `setTotal()` method instead
+
+### 3. Column Property Names
+- **Issue**: Code references `column.label` but should use `column.displayName`
+- **Error**: `Property 'label' does not exist on type 'ColumnDefinition'`
+- **Location**: Line 387 in sorting display
+
+### 4. UI Component API Mismatches
+- **FilterBar**: Expects different props than provided
+- **ActiveFilters**: Different prop interface than expected
+- **Issue**: Components may not exist or have different APIs than assumed
+
+### 5. HTML Entity Issue
+- **Issue**: Unescaped `>` symbol in JSX
+- **Error**: `Unexpected token. Did you mean '{'>'}' or '&gt;'?`
+- **Location**: Line 450
+
+## Todo List for Testing
+
+### Phase 1: Core API Fixes
+- [ ] **Fix FilterState usage**
+  - [ ] Update filtering logic to use `filter.values[0]` instead of `filter.value`
+  - [ ] Handle array-based filter values properly
+  - [ ] Test with single-value filters first
+
+- [ ] **Fix PaginationManager API**
+  - [ ] Replace `updateTotalItems()` with `setTotal()`
+  - [ ] Verify pagination manager initialization
+  - [ ] Test pagination state updates
+
+- [ ] **Fix Column Properties**
+  - [ ] Replace `column.label` with `column.displayName`
+  - [ ] Verify all column property references
+  - [ ] Test sorting display with correct property names
+
+- [ ] **Fix HTML Entity**
+  - [ ] Replace `>` with `&gt;` in JSX content
+  - [ ] Test rendering without syntax errors
+
+### Phase 2: UI Component Investigation
+- [ ] **Investigate FilterBar Component**
+  - [ ] Check actual FilterBar props interface
+  - [ ] Verify if FilterBar component exists in UI package
+  - [ ] Update props to match actual API or create placeholder
+
+- [ ] **Investigate ActiveFilters Component**
+  - [ ] Check actual ActiveFilters props interface
+  - [ ] Verify component existence and API
+  - [ ] Fix prop mismatches or create placeholder
+
+- [ ] **VirtualizedTable Component**
+  - [ ] Replace placeholder with actual VirtualizedTable component
+  - [ ] Verify component exists in UI package exports
+  - [ ] Test integration with proper component
+
+### Phase 3: Data Flow Testing
+- [ ] **Test Column Building**
+  - [ ] Verify column builder creates proper ColumnDefinition objects
+  - [ ] Test with different column types (text, number, date)
+  - [ ] Validate column configuration options
+
+- [ ] **Test Manager Integration**
+  - [ ] Test FilterManager with proper column definitions
+  - [ ] Test SortingManager with multi-sort configuration
+  - [ ] Test PaginationManager with large datasets
+
+- [ ] **Test Data Processing**
+  - [ ] Test filtering with various operators
+  - [ ] Test sorting with multiple columns
+  - [ ] Test performance with large datasets (50k+ rows)
+
+### Phase 4: Functionality Testing
+- [ ] **Test Filtering Features**
+  - [ ] Text filtering (contains, equals)
+  - [ ] Number filtering (greater than, less than)
+  - [ ] Date filtering
+  - [ ] Multiple simultaneous filters
+
+- [ ] **Test Sorting Features**
+  - [ ] Single column sorting
+  - [ ] Multi-column sorting
+  - [ ] Sort direction toggling
+  - [ ] Sort removal
+
+- [ ] **Test Virtualization**
+  - [ ] Verify virtual scrolling works with processed data
+  - [ ] Test with different dataset sizes
+  - [ ] Test scroll performance
+  - [ ] Test row height handling
+
+### Phase 5: UI/UX Testing
+- [ ] **Test Interactive Elements**
+  - [ ] Column header click handling
+  - [ ] Filter UI interaction
+  - [ ] Dataset size selector
+  - [ ] Performance metrics display
+
+- [ ] **Test Responsive Design**
+  - [ ] Mobile layout testing
+  - [ ] Tablet layout testing
+  - [ ] Desktop layout testing
+  - [ ] Component overflow handling
+
+- [ ] **Test Accessibility**
+  - [ ] Screen reader compatibility
+  - [ ] Keyboard navigation
+  - [ ] ARIA attributes
+  - [ ] Focus management
+
+### Phase 6: Performance Testing
+- [ ] **Test Large Datasets**
+  - [ ] 10k rows performance
+  - [ ] 50k rows performance
+  - [ ] 100k rows performance
+  - [ ] 250k rows performance
+
+- [ ] **Test Memory Usage**
+  - [ ] Monitor memory consumption
+  - [ ] Test for memory leaks
+  - [ ] Verify garbage collection
+  - [ ] Test with prolonged usage
+
+- [ ] **Test Render Performance**
+  - [ ] Measure initial render time
+  - [ ] Test scroll performance (60 FPS)
+  - [ ] Test filter application speed
+  - [ ] Test sort performance
+
+## Testing Strategy
+
+1. **Start with Core Fixes**: Fix all TypeScript errors first
+2. **Progressive Testing**: Test each component in isolation
+3. **Integration Testing**: Test component interactions
+4. **Performance Testing**: Verify virtualization benefits
+5. **User Experience Testing**: Ensure smooth interactions
+
+## Expected Outcomes
+
+After completing these fixes and tests:
+- [ ] Demo runs without TypeScript errors
+- [ ] All table functionality works correctly
+- [ ] Virtualization provides performance benefits
+- [ ] User interactions are smooth and responsive
+- [ ] Component demonstrates enterprise-scale capabilities
+
+## Notes
+
+- The column builder pattern is now correctly implemented
+- The core virtualization and manager systems are functional
+- The main blockers are UI component API mismatches
+- Consider creating simplified versions of missing UI components for testing
+- Focus on core functionality first, then enhance UI components
+
