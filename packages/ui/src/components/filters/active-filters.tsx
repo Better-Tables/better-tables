@@ -114,30 +114,75 @@ function FilterBadge<TData = unknown>({
     return !filter.values || filter.values.length === 0;
   }, [filter.values]);
 
-  // Auto-open popover/dialog when filter is newly added (has no values)
-  // Track if user has manually closed the panel to avoid re-opening
-  const [hasUserClosed, setHasUserClosed] = React.useState(false);
-  const [isValuePanelOpen, setIsValuePanelOpen] = React.useState(() => hasNoValues);
+  // Constants for auto-open behavior
+  const AUTO_OPEN_DELAY_MS = 150; // Delay before opening to let click events complete
+  const STABILIZATION_PERIOD_MS = 600; // Period during which we prevent closing
 
-  // Auto-open when filter has no values (unless user manually closed it)
+  // Track filter lifecycle state
+  const isInitialMountRef = React.useRef(true);
+  const stabilizationEndTimeRef = React.useRef<number | null>(null);
+
+  // Track popover/dialog open state
+  const [hasUserClosed, setHasUserClosed] = React.useState(false);
+  const [isValuePanelOpen, setIsValuePanelOpen] = React.useState(false);
+
+  // Auto-open popover when filter is newly added (has no values)
+  // Uses a delay to prevent immediate closing due to event bubbling from filter addition
   React.useEffect(() => {
-    if (hasNoValues && !hasUserClosed) {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+
+      if (hasNoValues) {
+        // Set stabilization period to prevent immediate closing
+        stabilizationEndTimeRef.current = Date.now() + STABILIZATION_PERIOD_MS;
+
+        const timeoutId = setTimeout(() => {
+          setIsValuePanelOpen(true);
+        }, AUTO_OPEN_DELAY_MS);
+
+        return () => clearTimeout(timeoutId);
+      }
+      return undefined;
+    } else if (hasNoValues && !hasUserClosed && !isValuePanelOpen) {
+      // Auto-open if filter transitions to having no values (was cleared)
       setIsValuePanelOpen(true);
     }
-  }, [hasNoValues, hasUserClosed]);
+    return undefined;
+  }, [hasNoValues, hasUserClosed, isValuePanelOpen]);
 
-  // Track when user manually closes the panel
-  const handleValuePanelOpenChange = React.useCallback((open: boolean) => {
-    setIsValuePanelOpen(open);
-    if (!open) {
-      setHasUserClosed(true);
-    }
-  }, []);
+  // Handle popover/dialog open state changes
+  // Prevents closing during stabilization period for newly added filters
+  const handleValuePanelOpenChange = React.useCallback(
+    (open: boolean) => {
+      const now = Date.now();
+      const isInStabilizationPeriod =
+        stabilizationEndTimeRef.current !== null && now < stabilizationEndTimeRef.current;
 
-  // Reset the "user closed" flag when filter gets values (allows auto-open again if cleared)
+      // Prevent closing during stabilization period for filters with no values
+      if (!open && isInStabilizationPeriod && hasNoValues) {
+        // Force open state back to true after current execution completes
+        // This prevents the popover from closing immediately after opening
+        setTimeout(() => {
+          setIsValuePanelOpen(true);
+        }, 0);
+        return;
+      }
+
+      setIsValuePanelOpen(open);
+
+      if (!open) {
+        setHasUserClosed(true);
+        stabilizationEndTimeRef.current = null;
+      }
+    },
+    [hasNoValues]
+  );
+
+  // Reset state when filter gets values (allows auto-open again if cleared)
   React.useEffect(() => {
     if (!hasNoValues) {
       setHasUserClosed(false);
+      stabilizationEndTimeRef.current = null;
     }
   }, [hasNoValues]);
 

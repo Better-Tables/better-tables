@@ -3,7 +3,7 @@
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
 import { userActions } from '@/lib/actions/user-actions';
-import { userColumns } from '@/lib/columns/user-columns';
+import { defaultVisibleColumns, userColumns } from '@/lib/columns/user-columns';
 import type { UserWithRelations } from '@/lib/db/schema';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
@@ -50,6 +50,8 @@ export function UsersTableClient({
       initialPagination={initialPagination}
       initialSorting={initialSorting}
       initialFilters={initialFilters}
+      defaultVisibleColumns={defaultVisibleColumns}
+      autoShowFilteredColumns
       features={{
         filtering: true,
         sorting: true,
