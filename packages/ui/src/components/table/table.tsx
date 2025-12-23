@@ -179,7 +179,7 @@ export function BetterTable<TData = unknown>({
 
   // URL sync props
   urlSync,
-  autoShowFilteredColumns = false,
+  autoShowFilteredColumns = true,
 
   // Filter protection
   isFilterProtected,
