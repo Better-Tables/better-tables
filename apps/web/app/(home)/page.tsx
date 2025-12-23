@@ -14,6 +14,7 @@ import { CodeBlock } from "@/components/code-block";
 import { InstallBlock } from "@/components/install-block";
 import { Logo } from "@/components/logo";
 import { ThemeImage } from "@/components/theme-image";
+import InteractiveComponent from "@/components/hero/interactive-component";
 
 export default function HomePage() {
   return (
@@ -21,6 +22,13 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b bg-gradient-to-b from-background to-muted/20 py-20 md:py-32">
         <div className="container mx-auto px-4">
+          <div>
+            <InteractiveComponent
+              hoverIntensity={0.2}
+              rotateOnHover={true}
+              forceHoverState={false}
+            />
+          </div>
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-8 flex justify-center">
               <Logo size="xl" className="h-16 w-auto" />
