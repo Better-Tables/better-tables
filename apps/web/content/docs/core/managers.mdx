@@ -1,0 +1,1038 @@
+---
+title: Managers API Reference
+description: API reference for state managers in Better Tables
+---
+
+## Overview
+
+The Better Tables manager system provides state management for all table functionality including filtering, sorting, pagination, selection, and virtualization. Each manager follows a consistent pattern with event-driven updates, validation, and subscription-based state management.
+
+## Table of Contents
+
+- [Manager Architecture](#manager-architecture)
+- [FilterManager](#filtermanager)
+- [SortingManager](#sortingmanager)
+- [PaginationManager](#paginationmanager)
+- [SelectionManager](#selectionmanager)
+- [VirtualizationManager](#virtualizationmanager)
+- [Integration Patterns](#integration-patterns)
+- [Best Practices](#best-practices)
+
+## Manager Architecture
+
+All managers follow a consistent architecture pattern:
+
+### Common Features
+
+- **Event-driven updates** with subscription pattern
+- **State validation** with error handling
+- **Type-safe operations** with TypeScript support
+- **Immutable state** with defensive copying
+- **Configuration-driven** behavior
+- **Performance optimized** for large datasets
+
+### Event System
+
+Each manager emits events for state changes:
+
+```typescript
+// Subscribe to manager events
+const unsubscribe = manager.subscribe(event => {
+  switch (event.type) {
+    case 'filter_added':
+      console.log('Filter added:', event.filter);
+      break;
+    case 'page_changed':
+      console.log('Page changed:', event.page);
+      break;
+    // ... handle other events
+  }
+});
+
+// Unsubscribe when done
+unsubscribe();
+```
+
+### State Management Pattern
+
+```typescript
+// Get current state (immutable copy)
+const state = manager.getState();
+
+// Update state through methods
+manager.addFilter(filter);
+manager.setPage(2);
+manager.selectRow('row-1');
+
+// Subscribe to changes
+manager.subscribe(event => {
+  // React to state changes
+});
+```
+
+## FilterManager
+
+Manages filter state and operations with validation and operator support.
+
+### API
+
+```typescript
+class FilterManager<TData = any> {
+  constructor(columns: ColumnDefinition<TData>[], initialFilters?: FilterState[]);
+
+  // State management
+  getFilters(): FilterState[];
+  setFilters(filters: FilterState[]): void;
+  addFilter(filter: FilterState): void;
+  removeFilter(columnId: string): void;
+  updateFilter(columnId: string, updates: Partial<FilterState>): void;
+  clearFilters(): void;
+  getFilter(columnId: string): FilterState | undefined;
+
+  // Validation and utilities
+  validateFilter(filter: FilterState): FilterValidationResult;
+  getOperatorsForColumn(columnId: string): FilterOperator[];
+  getDefaultOperatorForColumn(columnId: string): FilterOperator;
+
+  // Serialization
+  serialize(options?: FilterSerializationOptions): string;
+  deserialize(data: string): FilterState[];
+
+  // Event subscription
+  subscribe(subscriber: FilterManagerSubscriber): () => void;
+}
+```
+
+### Events
+
+```typescript
+type FilterManagerEvent =
+  | { type: 'filter_added'; filter: FilterState }
+  | { type: 'filter_updated'; columnId: string; filter: FilterState }
+  | { type: 'filter_removed'; columnId: string }
+  | { type: 'filters_cleared' }
+  | { type: 'filters_replaced'; filters: FilterState[] };
+```
+
+### Usage Example
+
+```typescript
+import { FilterManager } from '@better-tables/core';
+
+// Create filter manager
+const filterManager = new FilterManager(columns);
+
+// Subscribe to changes
+const unsubscribe = filterManager.subscribe(event => {
+  switch (event.type) {
+    case 'filter_added':
+      console.log('New filter:', event.filter);
+      break;
+    case 'filters_cleared':
+      console.log('All filters cleared');
+      break;
+  }
+});
+
+// Add filters
+filterManager.addFilter({
+  columnId: 'name',
+  type: 'text',
+  operator: 'contains',
+  values: ['john'],
+});
+
+filterManager.addFilter({
+  columnId: 'age',
+  type: 'number',
+  operator: 'greaterThan',
+  values: [18],
+});
+
+// Get current filters
+const filters = filterManager.getFilters();
+console.log('Active filters:', filters);
+
+// Update filter
+filterManager.updateFilter('name', {
+  operator: 'equals',
+  values: ['John Doe'],
+});
+
+// Remove filter
+filterManager.removeFilter('age');
+
+// Clear all filters
+filterManager.clearFilters();
+
+// Serialize for URL persistence
+const serialized = filterManager.serialize();
+const url = `?filters=${encodeURIComponent(serialized)}`;
+
+// Deserialize from URL
+const urlParams = new URLSearchParams(window.location.search);
+const filtersParam = urlParams.get('filters');
+if (filtersParam) {
+  const filters = filterManager.deserialize(filtersParam);
+  filterManager.setFilters(filters);
+}
+```
+
+### Advanced Features
+
+#### Filter Validation
+
+```typescript
+// Validate filter before adding
+const filter = {
+  columnId: 'age',
+  type: 'number',
+  operator: 'greaterThan',
+  values: [18],
+};
+
+const validation = filterManager.validateFilter(filter);
+if (!validation.valid) {
+  console.error('Invalid filter:', validation.error);
+} else {
+  filterManager.addFilter(filter);
+}
+```
+
+#### Operator Management
+
+```typescript
+// Get available operators for a column
+const operators = filterManager.getOperatorsForColumn('name');
+// Returns: ['contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty']
+
+// Get default operator
+const defaultOp = filterManager.getDefaultOperatorForColumn('age');
+// Returns: 'equals'
+```
+
+## SortingManager
+
+Manages sorting state with support for single and multi-column sorting.
+
+### API
+
+```typescript
+class SortingManager<TData = any> {
+  constructor(
+    columns: ColumnDefinition<TData>[],
+    config?: SortingConfig,
+    initialSort?: SortingState,
+  );
+
+  // State management
+  getSorting(): SortingState;
+  setSorting(sorts: SortingState): void;
+  addSort(columnId: string, direction: SortDirection): void;
+  removeSort(columnId: string): void;
+  updateSort(columnId: string, direction: SortDirection): void;
+  toggleSort(columnId: string): void;
+  clearSorting(): void;
+  getSort(columnId: string): SortingParams | undefined;
+
+  // Utilities
+  validateSort(sort: SortingParams): SortingValidationResult;
+  canSort(columnId: string): boolean;
+  getSortDirection(columnId: string): SortDirection | null;
+
+  // Event subscription
+  subscribe(subscriber: SortingManagerSubscriber): () => void;
+}
+```
+
+### Events
+
+```typescript
+type SortingManagerEvent =
+  | { type: 'sort_added'; sort: SortingParams }
+  | { type: 'sort_updated'; columnId: string; sort: SortingParams }
+  | { type: 'sort_removed'; columnId: string }
+  | { type: 'sorts_cleared' }
+  | { type: 'sorts_replaced'; sorts: SortingState }
+  | { type: 'direction_toggled'; columnId: string; direction: SortDirection };
+```
+
+### Usage Example
+
+```typescript
+import { SortingManager } from '@better-tables/core';
+
+// Create sorting manager with multi-sort enabled
+const sortingManager = new SortingManager(columns, {
+  enabled: true,
+  multiSort: true,
+  maxSortColumns: 3,
+  resetOnClick: false,
+});
+
+// Subscribe to changes
+const unsubscribe = sortingManager.subscribe(event => {
+  switch (event.type) {
+    case 'sort_added':
+      console.log('Sort added:', event.sort);
+      break;
+    case 'direction_toggled':
+      console.log('Direction toggled:', event.columnId, event.direction);
+      break;
+  }
+});
+
+// Add sorts
+sortingManager.addSort('name', 'asc');
+sortingManager.addSort('age', 'desc');
+sortingManager.addSort('createdAt', 'desc');
+
+// Get current sorting
+const sorting = sortingManager.getSorting();
+console.log('Current sorts:', sorting);
+// Returns: [
+//   { columnId: 'name', direction: 'asc' },
+//   { columnId: 'age', direction: 'desc' },
+//   { columnId: 'createdAt', direction: 'desc' }
+// ]
+
+// Toggle sort (asc -> desc -> remove)
+sortingManager.toggleSort('name'); // Changes to desc
+sortingManager.toggleSort('name'); // Changes to asc
+sortingManager.toggleSort('name'); // Removes sort
+
+// Update sort direction
+sortingManager.updateSort('age', 'asc');
+
+// Remove specific sort
+sortingManager.removeSort('createdAt');
+
+// Clear all sorting
+sortingManager.clearSorting();
+
+// Check if column can be sorted
+const canSort = sortingManager.canSort('name'); // true/false
+
+// Get current sort direction
+const direction = sortingManager.getSortDirection('name'); // 'asc' | 'desc' | null
+```
+
+### Configuration Options
+
+```typescript
+interface SortingConfig {
+  enabled?: boolean; // Enable/disable sorting
+  multiSort?: boolean; // Allow multiple column sorting
+  maxSortColumns?: number; // Maximum columns to sort by
+  defaultSort?: SortingParams[]; // Default sort order
+  resetOnClick?: boolean; // Reset sort on column click
+  comparator?: <T>(a: T, b: T, columnId: string, direction: SortDirection) => number;
+}
+```
+
+## PaginationManager
+
+Manages pagination state with configurable page sizes and navigation.
+
+### API
+
+```typescript
+class PaginationManager {
+  constructor(config?: PaginationConfig, initialState?: Partial<PaginationState>);
+
+  // State management
+  getPagination(): PaginationState;
+  getPaginationParams(): PaginationParams;
+  setTotal(total: number): void;
+  getTotal(): number;
+
+  // Navigation
+  goToPage(page: number): void;
+  nextPage(): void;
+  prevPage(): void;
+  firstPage(): void;
+  lastPage(): void;
+
+  // Page size
+  setPageSize(pageSize: number): void;
+  getPageSize(): number;
+
+  // Utilities
+  validatePage(page: number): PaginationValidationResult;
+  validatePageSize(pageSize: number): PaginationValidationResult;
+  canGoToPage(page: number): boolean;
+
+  // Event subscription
+  subscribe(subscriber: PaginationManagerSubscriber): () => void;
+}
+```
+
+### Events
+
+```typescript
+type PaginationManagerEvent =
+  | { type: 'page_changed'; page: number; previousPage: number }
+  | { type: 'page_size_changed'; pageSize: number; previousPageSize: number }
+  | { type: 'total_updated'; total: number; previousTotal: number }
+  | { type: 'pagination_reset' };
+```
+
+### Usage Example
+
+```typescript
+import { PaginationManager } from '@better-tables/core';
+
+// Create pagination manager
+const paginationManager = new PaginationManager({
+  defaultPageSize: 20,
+  pageSizeOptions: [10, 20, 50, 100],
+  maxPageSize: 1000,
+  showPageSizeSelector: true,
+  showPageNumbers: true,
+  pageNumbersToShow: 7,
+  showFirstLastButtons: true,
+});
+
+// Subscribe to changes
+const unsubscribe = paginationManager.subscribe(event => {
+  switch (event.type) {
+    case 'page_changed':
+      console.log('Page changed to:', event.page);
+      break;
+    case 'page_size_changed':
+      console.log('Page size changed to:', event.pageSize);
+      break;
+    case 'total_updated':
+      console.log('Total items:', event.total);
+      break;
+  }
+});
+
+// Set total items (updates pagination state)
+paginationManager.setTotal(1000);
+
+// Get current pagination state
+const pagination = paginationManager.getPagination();
+console.log('Pagination state:', pagination);
+// Returns: {
+//   page: 1,
+//   limit: 20,
+//   totalPages: 50,
+//   hasNext: true,
+//   hasPrev: false
+// }
+
+// Get pagination params for API
+const params = paginationManager.getPaginationParams();
+console.log('API params:', params);
+// Returns: { page: 1, limit: 20 }
+
+// Navigation
+paginationManager.nextPage(); // Go to page 2
+paginationManager.prevPage(); // Go back to page 1
+paginationManager.goToPage(5); // Go to page 5
+paginationManager.firstPage(); // Go to page 1
+paginationManager.lastPage(); // Go to page 50
+
+// Change page size
+paginationManager.setPageSize(50);
+
+// Validation
+const canGo = paginationManager.canGoToPage(100); // false (only 50 pages)
+const isValid = paginationManager.validatePage(5); // { valid: true }
+```
+
+### Configuration Options
+
+```typescript
+interface PaginationConfig {
+  defaultPageSize?: number; // Default items per page
+  pageSizeOptions?: number[]; // Available page size options
+  maxPageSize?: number; // Maximum page size
+  showPageSizeSelector?: boolean; // Show page size selector
+  showPageNumbers?: boolean; // Show page numbers
+  pageNumbersToShow?: number; // Number of page numbers to show
+  showFirstLastButtons?: boolean; // Show first/last buttons
+}
+```
+
+## SelectionManager
+
+Manages row selection state with support for single, multiple, and no selection modes.
+
+### API
+
+```typescript
+class SelectionManager<TData = any> {
+  constructor(config?: SelectionConfig, availableRows?: TData[]);
+
+  // State management
+  getSelection(): SelectionState;
+  getSelectedIds(): string[];
+  getSelectedRows(): TData[];
+  setAvailableRows(rows: TData[]): void;
+
+  // Selection operations
+  selectRow(rowId: string): void;
+  deselectRow(rowId: string): void;
+  toggleRow(rowId: string): void;
+  selectRows(rowIds: string[]): void;
+  deselectRows(rowIds: string[]): void;
+  selectAll(): void;
+  deselectAll(): void;
+  clearSelection(): void;
+
+  // Utilities
+  isSelected(rowId: string): boolean;
+  getSelectionStats(): SelectionStats;
+  validateSelection(rowId: string, selected: boolean): SelectionValidationResult;
+
+  // Event subscription
+  subscribe(subscriber: SelectionManagerSubscriber): () => void;
+}
+```
+
+### Events
+
+```typescript
+type SelectionManagerEvent =
+  | { type: 'row_selected'; rowId: string; selected: boolean }
+  | { type: 'rows_selected'; rowIds: string[]; selected: boolean }
+  | { type: 'all_selected'; selected: boolean }
+  | { type: 'selection_cleared' }
+  | { type: 'selection_replaced'; selectedIds: Set<string> }
+  | { type: 'selection_toggled'; rowId: string; selected: boolean };
+```
+
+### Usage Example
+
+```typescript
+import { SelectionManager } from '@better-tables/core';
+
+// Create selection manager
+const selectionManager = new SelectionManager(
+  {
+    mode: 'multiple',
+    maxSelections: 100,
+    preserveSelection: false,
+    showSelectAll: true,
+    getRowId: row => row.id,
+    isSelectable: row => !row.disabled,
+  },
+  initialRows,
+);
+
+// Subscribe to changes
+const unsubscribe = selectionManager.subscribe(event => {
+  switch (event.type) {
+    case 'row_selected':
+      console.log('Row selected:', event.rowId);
+      break;
+    case 'all_selected':
+      console.log('All rows selected:', event.selected);
+      break;
+    case 'selection_cleared':
+      console.log('Selection cleared');
+      break;
+  }
+});
+
+// Update available rows
+selectionManager.setAvailableRows(newRows);
+
+// Selection operations
+selectionManager.selectRow('row-1');
+selectionManager.selectRow('row-2');
+selectionManager.toggleRow('row-3');
+
+// Bulk operations
+selectionManager.selectRows(['row-4', 'row-5', 'row-6']);
+selectionManager.selectAll();
+selectionManager.deselectAll();
+
+// Get selection state
+const selection = selectionManager.getSelection();
+console.log('Selection state:', selection);
+// Returns: {
+//   selectedIds: Set(['row-1', 'row-2', 'row-3']),
+//   allSelected: false,
+//   someSelected: true,
+//   mode: 'multiple'
+// }
+
+// Get selected data
+const selectedIds = selectionManager.getSelectedIds();
+const selectedRows = selectionManager.getSelectedRows();
+
+// Check selection status
+const isSelected = selectionManager.isSelected('row-1'); // true/false
+
+// Get selection statistics
+const stats = selectionManager.getSelectionStats();
+console.log('Selection stats:', stats);
+// Returns: {
+//   selectedCount: 3,
+//   totalCount: 100,
+//   allSelected: false,
+//   someSelected: true,
+//   selectionPercentage: 3
+// }
+```
+
+### Configuration Options
+
+```typescript
+interface SelectionConfig {
+  mode?: 'single' | 'multiple' | 'none'; // Selection mode
+  maxSelections?: number; // Maximum selections (multiple mode)
+  preserveSelection?: boolean; // Preserve selection across data changes
+  showSelectAll?: boolean; // Show select all checkbox
+  getRowId?: (row: any) => string; // Custom row ID function
+  isSelectable?: (row: any) => boolean; // Custom selectable function
+}
+```
+
+## VirtualizationManager
+
+Manages virtual scrolling for large datasets with performance optimization.
+
+### API
+
+```typescript
+class VirtualizationManager {
+  constructor(config?: Partial<VirtualizationConfig>, totalRows?: number, totalColumns?: number);
+
+  // State management
+  getState(): VirtualizationState;
+  getVirtualRows(): VirtualRowItem[];
+  getVirtualColumns(): VirtualColumnItem[];
+
+  // Updates
+  updateScroll(scrollInfo: Partial<ScrollInfo>): void;
+  updateItemCounts(totalRows: number, totalColumns?: number): void;
+  measureRow(rowIndex: number, height: number): void;
+  updateConfiguration(config: Partial<VirtualizationConfig>): void;
+
+  // Navigation
+  scrollTo(options: ScrollToOptions): void;
+  scrollToRow(rowIndex: number, align?: 'start' | 'center' | 'end'): void;
+  scrollToColumn(columnIndex: number, align?: 'start' | 'center' | 'end'): void;
+
+  // Utilities
+  getRowHeight(rowIndex: number): number;
+  getColumnWidth(columnIndex: number): number;
+  getTotalHeight(): number;
+  getTotalWidth(): number;
+  getPerformanceMetrics(): VirtualizationMetrics;
+  validateConfiguration(config: VirtualizationConfig): VirtualizationValidationResult;
+
+  // Event subscription
+  subscribe(subscriber: VirtualizationManagerSubscriber): () => void;
+}
+```
+
+### Events
+
+```typescript
+type VirtualizationManagerEvent =
+  | { type: 'scroll'; scrollInfo: ScrollInfo }
+  | {
+      type: 'virtual_items_changed';
+      virtualRows: VirtualRowItem[];
+      virtualColumns: VirtualColumnItem[];
+    }
+  | { type: 'row_measured'; rowIndex: number; height: number }
+  | { type: 'viewport_changed'; startIndex: number; endIndex: number }
+  | { type: 'total_size_changed'; totalHeight: number; totalWidth: number }
+  | { type: 'configuration_updated'; config: VirtualizationConfig };
+```
+
+### Usage Example
+
+```typescript
+import { VirtualizationManager } from '@better-tables/core';
+
+// Create virtualization manager
+const virtualizationManager = new VirtualizationManager(
+  {
+    containerHeight: 400,
+    defaultRowHeight: 50,
+    overscan: 5,
+    smoothScrolling: true,
+    dynamicRowHeight: false,
+    horizontalVirtualization: true,
+    defaultColumnWidth: 150,
+    containerWidth: 800,
+  },
+  10000,
+  20,
+); // 10k rows, 20 columns
+
+// Subscribe to changes
+const unsubscribe = virtualizationManager.subscribe(event => {
+  switch (event.type) {
+    case 'virtual_items_changed':
+      console.log('Virtual items updated:', event.virtualRows.length);
+      break;
+    case 'viewport_changed':
+      console.log('Viewport:', event.startIndex, 'to', event.endIndex);
+      break;
+    case 'scroll':
+      console.log('Scroll position:', event.scrollInfo.scrollTop);
+      break;
+  }
+});
+
+// Update scroll position
+virtualizationManager.updateScroll({
+  scrollTop: 1000,
+  scrollLeft: 200,
+  clientHeight: 400,
+  clientWidth: 800,
+});
+
+// Update item counts
+virtualizationManager.updateItemCounts(15000, 25);
+
+// Measure row height (for dynamic heights)
+virtualizationManager.measureRow(5, 75);
+
+// Get virtual items to render
+const virtualRows = virtualizationManager.getVirtualRows();
+const virtualColumns = virtualizationManager.getVirtualColumns();
+
+console.log(
+  'Render rows:',
+  virtualRows.map(row => row.index),
+);
+// Returns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] (with overscan)
+
+// Navigation
+virtualizationManager.scrollToRow(5000, 'center');
+virtualizationManager.scrollToColumn(10, 'start');
+
+// Get performance metrics
+const metrics = virtualizationManager.getPerformanceMetrics();
+console.log('Performance:', metrics);
+// Returns: {
+//   renderedRows: 11,
+//   renderedColumns: 8,
+//   totalRows: 15000,
+//   totalColumns: 25,
+//   efficiency: 99.9,
+//   averageRenderTime: 2.5,
+//   memoryUsage: { domNodes: 88, estimatedKB: 15 }
+// }
+```
+
+### Configuration Options
+
+```typescript
+interface VirtualizationConfig {
+  containerHeight: number; // Container height in pixels
+  defaultRowHeight: number; // Default row height
+  overscan?: number; // Extra rows to render
+  smoothScrolling?: boolean; // Enable smooth scrolling
+  scrollBehavior?: 'auto' | 'smooth';
+  dynamicRowHeight?: boolean; // Use dynamic row heights
+  getRowHeight?: (index: number) => number;
+  minRowHeight?: number; // Minimum row height
+  maxRowHeight?: number; // Maximum row height
+  horizontalVirtualization?: boolean; // Enable horizontal virtualization
+  defaultColumnWidth?: number; // Default column width
+  containerWidth?: number; // Container width
+}
+```
+
+## Integration Patterns
+
+### Manager Coordination
+
+```typescript
+import {
+  FilterManager,
+  SortingManager,
+  PaginationManager,
+  SelectionManager,
+} from '@better-tables/core';
+
+class TableManager {
+  private filterManager: FilterManager;
+  private sortingManager: SortingManager;
+  private paginationManager: PaginationManager;
+  private selectionManager: SelectionManager;
+
+  constructor(columns: ColumnDefinition[], data: any[]) {
+    // Initialize managers
+    this.filterManager = new FilterManager(columns);
+    this.sortingManager = new SortingManager(columns, { multiSort: true });
+    this.paginationManager = new PaginationManager({ defaultPageSize: 20 });
+    this.selectionManager = new SelectionManager({ mode: 'multiple' }, data);
+
+    // Coordinate state changes
+    this.setupCoordination();
+  }
+
+  private setupCoordination() {
+    // Reset pagination when filters change
+    this.filterManager.subscribe(event => {
+      if (event.type === 'filter_added' || event.type === 'filter_removed') {
+        this.paginationManager.goToPage(1);
+      }
+    });
+
+    // Clear selection when data changes
+    this.paginationManager.subscribe(event => {
+      if (event.type === 'page_changed') {
+        this.selectionManager.clearSelection();
+      }
+    });
+  }
+
+  // Public API
+  getFilterManager() {
+    return this.filterManager;
+  }
+  getSortingManager() {
+    return this.sortingManager;
+  }
+  getPaginationManager() {
+    return this.paginationManager;
+  }
+  getSelectionManager() {
+    return this.selectionManager;
+  }
+
+  // Coordinated operations
+  resetAll() {
+    this.filterManager.clearFilters();
+    this.sortingManager.clearSorting();
+    this.paginationManager.goToPage(1);
+    this.selectionManager.clearSelection();
+  }
+
+  getTableState() {
+    return {
+      filters: this.filterManager.getFilters(),
+      sorting: this.sortingManager.getSorting(),
+      pagination: this.paginationManager.getPagination(),
+      selection: this.selectionManager.getSelection(),
+    };
+  }
+}
+```
+
+### URL State Persistence
+
+```typescript
+class URLStateManager {
+  private filterManager: FilterManager;
+  private sortingManager: SortingManager;
+  private paginationManager: PaginationManager;
+
+  constructor(managers: {
+    filter: FilterManager;
+    sorting: SortingManager;
+    pagination: PaginationManager;
+  }) {
+    this.filterManager = managers.filter;
+    this.sortingManager = managers.sorting;
+    this.paginationManager = managers.pagination;
+
+    this.loadFromURL();
+    this.setupURLUpdates();
+  }
+
+  private loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    // Load filters
+    const filtersParam = params.get('filters');
+    if (filtersParam) {
+      try {
+        const filters = this.filterManager.deserialize(filtersParam);
+        this.filterManager.setFilters(filters);
+      } catch (error) {
+        console.warn('Failed to load filters from URL:', error);
+      }
+    }
+
+    // Load sorting
+    const sortParam = params.get('sort');
+    if (sortParam) {
+      try {
+        const sorting = JSON.parse(sortParam);
+        this.sortingManager.setSorting(sorting);
+      } catch (error) {
+        console.warn('Failed to load sorting from URL:', error);
+      }
+    }
+
+    // Load pagination
+    const pageParam = params.get('page');
+    if (pageParam) {
+      const page = parseInt(pageParam, 10);
+      if (!isNaN(page)) {
+        this.paginationManager.goToPage(page);
+      }
+    }
+  }
+
+  private setupURLUpdates() {
+    // Update URL when filters change
+    this.filterManager.subscribe(() => {
+      this.updateURL();
+    });
+
+    // Update URL when sorting changes
+    this.sortingManager.subscribe(() => {
+      this.updateURL();
+    });
+
+    // Update URL when pagination changes
+    this.paginationManager.subscribe(() => {
+      this.updateURL();
+    });
+  }
+
+  private updateURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    // Update filters
+    const filters = this.filterManager.getFilters();
+    if (filters.length > 0) {
+      params.set('filters', this.filterManager.serialize());
+    } else {
+      params.delete('filters');
+    }
+
+    // Update sorting
+    const sorting = this.sortingManager.getSorting();
+    if (sorting.length > 0) {
+      params.set('sort', JSON.stringify(sorting));
+    } else {
+      params.delete('sort');
+    }
+
+    // Update pagination
+    const pagination = this.paginationManager.getPagination();
+    if (pagination.page > 1) {
+      params.set('page', pagination.page.toString());
+    } else {
+      params.delete('page');
+    }
+
+    // Update URL without page reload
+    const newURL = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newURL);
+  }
+}
+```
+
+## Best Practices
+
+### 1. Manager Lifecycle
+
+```typescript
+// Good: Proper cleanup
+class TableComponent {
+  private managers: {
+    filter: FilterManager;
+    sorting: SortingManager;
+    pagination: PaginationManager;
+  };
+  private unsubscribers: (() => void)[] = [];
+
+  componentDidMount() {
+    this.managers = {
+      filter: new FilterManager(columns),
+      sorting: new SortingManager(columns),
+      pagination: new PaginationManager(),
+    };
+
+    // Subscribe to all managers
+    this.unsubscribers = [
+      this.managers.filter.subscribe(this.handleFilterChange),
+      this.managers.sorting.subscribe(this.handleSortingChange),
+      this.managers.pagination.subscribe(this.handlePaginationChange),
+    ];
+  }
+
+  componentWillUnmount() {
+    // Clean up subscriptions
+    this.unsubscribers.forEach(unsubscribe => unsubscribe());
+  }
+}
+```
+
+### 2. Error Handling
+
+```typescript
+// Good: Proper error handling
+try {
+  filterManager.addFilter(filter);
+} catch (error) {
+  console.error('Failed to add filter:', error.message);
+  // Show user-friendly error message
+  showError('Invalid filter configuration');
+}
+
+// Good: Validation before operations
+const validation = filterManager.validateFilter(filter);
+if (!validation.valid) {
+  showError(validation.error);
+  return;
+}
+filterManager.addFilter(filter);
+```
+
+### 3. Performance Optimization
+
+```typescript
+// Good: Debounced updates
+const debouncedUpdate = debounce(() => {
+  // Update UI or make API calls
+  updateTable();
+}, 300);
+
+filterManager.subscribe(() => {
+  debouncedUpdate();
+});
+
+// Good: Batch operations
+const batchUpdate = () => {
+  filterManager.addFilter(filter1);
+  filterManager.addFilter(filter2);
+  sortingManager.addSort('name', 'asc');
+  paginationManager.goToPage(1);
+};
+```
+
+### 4. Type Safety
+
+```typescript
+// Good: Type-safe manager usage
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+const filterManager = new FilterManager<User>(userColumns);
+const sortingManager = new SortingManager<User>(userColumns);
+
+// TypeScript knows the data type
+filterManager.addFilter({
+  columnId: 'name', // Must be a valid column ID
+  type: 'text',
+  operator: 'contains',
+  values: ['john'],
+});
+```
+
+## Related Documentation
+
+- [Types API Reference](./TYPES_API_REFERENCE.md)
+- [Column Builders Guide](./COLUMN_BUILDERS_GUIDE.md)
+- [Adapter Development](./ADAPTER_DEVELOPMENT.md)
+- [UI Integration](./UI_INTEGRATION.md)
