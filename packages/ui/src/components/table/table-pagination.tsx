@@ -102,7 +102,7 @@ export function TablePagination({
             <span className="text-sm text-muted-foreground">Show</span>
             <Select
               value={pageSize.toString()}
-              onValueChange={(value) => onPageSizeChange(parseInt(value))}
+              onValueChange={(value) => onPageSizeChange(parseInt(value, 10))}
             >
               <SelectTrigger className="w-20">
                 <SelectValue />

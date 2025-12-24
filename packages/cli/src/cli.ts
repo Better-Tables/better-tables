@@ -1,7 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { commandsRegistry, type RegisteredCommandName } from './commands';
 import { docsCommand } from './commands/docs';
 import { helpCommand } from './commands/help';

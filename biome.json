@@ -2,15 +2,16 @@
   "$schema": "https://biomejs.dev/schemas/2.3.7/schema.json",
   "files": {
     "ignoreUnknown": false,
-    "experimentalScannerIgnores": [
-      ".turbo/**",
-      "**/dist/**",
-      "**/node_modules/**",
-      "**/.next/**",
-      "**/build/**",
-      "coverage/**",
-      "bun.lock",
-      ".git/**"
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!**/node_modules",
+      "!!**/.next",
+      "!!**/build",
+      "!!coverage",
+      "!!bun.lock",
+      "!!.git",
+      "!!.turbo"
     ]
   },
   "linter": {

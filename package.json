@@ -27,9 +27,7 @@
     "typecheck": "tsc --noEmit",
     "test": "turbo run test",
     "clean": "turbo run clean",
-    "format": "biome format --write .",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
+    "lint": "biome check --write --unsafe .",
     "changeset": "changeset",
     "changeset:version": "changeset version && bun install",
     "release": "bun i && bun run build && changeset publish"

@@ -3,8 +3,11 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { deserializeTableStateFromUrl, serializeTableStateToUrl } from '../../src/utils/url-serialization';
-import { FilterState, PaginationState, SortingState } from '@/types';
+import type { FilterState, PaginationState, SortingState } from '@/types';
+import {
+  deserializeTableStateFromUrl,
+  serializeTableStateToUrl,
+} from '../../src/utils/url-serialization';
 
 describe('serializeTableStateToUrl', () => {
   it('should serialize filters to compressed URL parameter', () => {

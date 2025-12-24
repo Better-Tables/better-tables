@@ -1,5 +1,5 @@
-import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { Logo } from "@/components/logo";
+import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import { Logo } from '@/components/logo';
 
 export function baseOptions(): BaseLayoutProps {
   return {
@@ -13,16 +13,16 @@ export function baseOptions(): BaseLayoutProps {
     },
     links: [
       {
-        text: "Docs",
-        url: "/docs",
-        active: "nested-url",
+        text: 'Docs',
+        url: '/docs',
+        active: 'nested-url',
       },
       {
-        text: "GitHub",
-        url: "https://github.com/Better-Tables/better-tables",
+        text: 'GitHub',
+        url: 'https://github.com/Better-Tables/better-tables',
         external: true,
       },
     ],
-    githubUrl: "https://github.com/Better-Tables/better-tables",
+    githubUrl: 'https://github.com/Better-Tables/better-tables',
   };
 }

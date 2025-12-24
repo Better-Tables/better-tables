@@ -51,8 +51,7 @@ export function formatDateWithConfig(
     }
 
     return formattedDate;
-  } catch (error) {
-    console.warn('Error formatting date:', error);
+  } catch (_error) {
     return date.toLocaleDateString();
   }
 }
@@ -114,8 +113,7 @@ export function formatDateRange(
     return `${format(from, formatString, { locale: enUS })} - ${format(to, formatString, {
       locale: enUS,
     })}`;
-  } catch (error) {
-    console.warn('Error formatting date range:', error);
+  } catch (_error) {
     return `${from.toLocaleDateString()}${to ? ` - ${to.toLocaleDateString()}` : ''}`;
   }
 }

@@ -1,18 +1,8 @@
 'use client';
 
-import { Lock, X } from 'lucide-react';
-import * as React from 'react';
-
-import { cn } from '../../lib/utils';
-import { Button } from '../ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Separator } from '../ui/separator';
-import { FilterOperatorSelect } from './filter-operator-select';
-import { FilterValueInput } from './filter-value-input';
 import {
-  ColumnDefinition,
-  FilterState,
+  type ColumnDefinition,
+  type FilterState,
   formatCurrency,
   formatDateRange,
   formatDateWithConfig,
@@ -28,6 +18,15 @@ import {
   getOperatorDefinition,
   truncateText,
 } from '@better-tables/core';
+import { Lock, X } from 'lucide-react';
+import * as React from 'react';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Separator } from '../ui/separator';
+import { FilterOperatorSelect } from './filter-operator-select';
+import { FilterValueInput } from './filter-value-input';
 
 export interface ActiveFiltersProps<TData = unknown> {
   /** Column definitions */

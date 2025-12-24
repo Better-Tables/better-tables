@@ -1,5 +1,5 @@
 import { createActionBuilder } from '@better-tables/core';
-import { Archive, Edit, Trash2 } from 'lucide-react';
+import { Archive, Trash2 } from 'lucide-react';
 import type { UserWithRelations } from '../db/schema';
 
 /**

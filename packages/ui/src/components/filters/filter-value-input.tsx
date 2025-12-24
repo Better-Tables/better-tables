@@ -41,9 +41,10 @@ export function FilterValueInput<TData = unknown>({
       const handleCustomChange = (value: unknown[]) => {
         // Flatten nested arrays - if value is string[][], flatten to string[]
         // This handles the case where custom components pass nested arrays due to type inference
-        const flattenedValue = Array.isArray(value) && value.length > 0 && Array.isArray(value[0])
-          ? (value as unknown as string[][]).flat()
-          : value;
+        const flattenedValue =
+          Array.isArray(value) && value.length > 0 && Array.isArray(value[0])
+            ? (value as unknown as string[][]).flat()
+            : value;
         onChange(flattenedValue);
       };
       return (

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { ResolvedPaths, ShadcnConfig } from './config';
 import { getAliasPrefix } from './config';
 import type { ConflictResolution } from './prompts';

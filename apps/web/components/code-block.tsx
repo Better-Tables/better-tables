@@ -1,12 +1,9 @@
-"use client";
+'use client';
 
-import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import {
-  oneDark,
-  oneLight,
-} from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Check, Copy } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface CodeBlockProps {
   code: string;
@@ -20,10 +17,10 @@ interface CodeBlockProps {
 export function CodeBlock({
   code,
   filename,
-  language = "typescript",
+  language = 'typescript',
   showLineNumbers = true,
   highlightedLines = [],
-  className = "",
+  className = '',
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -31,16 +28,14 @@ export function CodeBlock({
   useEffect(() => {
     function checkTheme() {
       const html = document.documentElement;
-      setIsDark(
-        html.classList.contains("dark") || html.style.colorScheme === "dark",
-      );
+      setIsDark(html.classList.contains('dark') || html.style.colorScheme === 'dark');
     }
 
     checkTheme();
     const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "style"],
+      attributeFilter: ['class', 'style'],
     });
 
     return () => observer.disconnect();
@@ -57,27 +52,23 @@ export function CodeBlock({
     ...baseTheme,
     'pre[class*="language-"]': {
       ...baseTheme['pre[class*="language-"]'],
-      background: "transparent !important",
+      background: 'transparent !important',
       margin: 0,
       padding: 0,
     },
     'code[class*="language-"]': {
       ...baseTheme['code[class*="language-"]'],
-      background: "transparent !important",
+      background: 'transparent !important',
     },
   };
 
   return (
-    <div
-      className={`overflow-hidden rounded-lg border bg-background ${className}`}
-    >
+    <div className={`overflow-hidden rounded-lg border bg-background ${className}`}>
       {(filename || language) && (
         <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
           <div className="flex items-center gap-2 text-sm font-medium">
             {filename && <span>{filename}</span>}
-            {language && !filename && (
-              <span className="text-muted-foreground">{language}</span>
-            )}
+            {language && !filename && <span className="text-muted-foreground">{language}</span>}
           </div>
           <button
             type="button"
@@ -105,35 +96,33 @@ export function CodeBlock({
           style={syntaxTheme}
           showLineNumbers={showLineNumbers}
           lineNumberStyle={{
-            minWidth: "3em",
-            paddingRight: "1em",
-            textAlign: "right",
-            userSelect: "none",
-            backgroundColor: "transparent",
+            minWidth: '3em',
+            paddingRight: '1em',
+            textAlign: 'right',
+            userSelect: 'none',
+            backgroundColor: 'transparent',
           }}
           customStyle={{
             margin: 0,
-            padding: "1rem",
-            background: "transparent",
-            fontSize: "0.875rem",
-            lineHeight: "1.625",
+            padding: '1rem',
+            background: 'transparent',
+            fontSize: '0.875rem',
+            lineHeight: '1.625',
             fontFamily:
               'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-            WebkitFontSmoothing: "antialiased",
-            MozOsxFontSmoothing: "grayscale",
-            userSelect: "text",
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+            userSelect: 'text',
           }}
           PreTag="div"
           CodeTag="code"
           lineProps={(lineNumber) => {
             const style: React.CSSProperties = {
-              display: "block",
-              backgroundColor: "transparent",
+              display: 'block',
+              backgroundColor: 'transparent',
             };
             if (highlightedLines.includes(lineNumber)) {
-              style.backgroundColor = isDark
-                ? "rgba(255, 255, 255, 0.1)"
-                : "rgba(0, 0, 0, 0.05)";
+              style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
             }
             return { style };
           }}

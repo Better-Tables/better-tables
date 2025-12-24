@@ -8,12 +8,12 @@ import {
   Palette,
   Server,
   Zap,
-} from "lucide-react";
-import Link from "next/link";
-import { CodeBlock } from "@/components/code-block";
-import { InstallBlock } from "@/components/install-block";
-import { Logo } from "@/components/logo";
-import { ThemeImage } from "@/components/theme-image";
+} from 'lucide-react';
+import Link from 'next/link';
+import { CodeBlock } from '@/components/code-block';
+import { InstallBlock } from '@/components/install-block';
+import { Logo } from '@/components/logo';
+import { ThemeImage } from '@/components/theme-image';
 
 export default function HomePage() {
   return (
@@ -33,9 +33,9 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mb-8 text-xl text-muted-foreground md:text-2xl">
-              Stop writing boilerplate. Start shipping features. Better Tables
-              gives you powerful filtering, sorting, and pagination—all with
-              automatic relationship handling and end-to-end type safety.
+              Stop writing boilerplate. Start shipping features. Better Tables gives you powerful
+              filtering, sorting, and pagination—all with automatic relationship handling and
+              end-to-end type safety.
             </p>
             <div className="mb-8">
               <InstallBlock />
@@ -86,8 +86,7 @@ export default function HomePage() {
               Why Better Tables?
             </h2>
             <p className="text-lg text-muted-foreground">
-              The React table library that handles the complexity so you don't
-              have to
+              The React table library that handles the complexity so you don't have to
             </p>
           </div>
           <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
@@ -95,25 +94,20 @@ export default function HomePage() {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                 <Database className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="mb-2 text-xl font-semibold">
-                Automatic Relationships
-              </h3>
+              <h3 className="mb-2 text-xl font-semibold">Automatic Relationships</h3>
               <p className="text-muted-foreground">
-                Filter across joined tables without writing JOIN queries. The
-                adapter automatically detects relationships, builds queries, and
-                maintains type safety.
+                Filter across joined tables without writing JOIN queries. The adapter automatically
+                detects relationships, builds queries, and maintains type safety.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6 shadow-sm">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                 <Code className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="mb-2 text-xl font-semibold">
-                Type-Safe End-to-End
-              </h3>
+              <h3 className="mb-2 text-xl font-semibold">Type-Safe End-to-End</h3>
               <p className="text-muted-foreground">
-                Full TypeScript inference from your database schema to your UI
-                components. Catch errors at compile time, not runtime.
+                Full TypeScript inference from your database schema to your UI components. Catch
+                errors at compile time, not runtime.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6 shadow-sm">
@@ -122,9 +116,8 @@ export default function HomePage() {
               </div>
               <h3 className="mb-2 text-xl font-semibold">Zero Boilerplate</h3>
               <p className="text-muted-foreground">
-                Declarative column definitions give you filtering, sorting, and
-                pagination automatically. No useState hooks, no prop drilling,
-                no headaches.
+                Declarative column definitions give you filtering, sorting, and pagination
+                automatically. No useState hooks, no prop drilling, no headaches.
               </p>
             </div>
           </div>
@@ -147,54 +140,48 @@ export default function HomePage() {
               <Filter className="mb-3 h-8 w-8 text-primary" />
               <h3 className="mb-2 text-lg font-semibold">Advanced Filtering</h3>
               <p className="text-sm text-muted-foreground">
-                Six filter types with 20+ operators. Text, number, date, option,
-                multi-option, and boolean filters with intuitive UI.
+                Six filter types with 20+ operators. Text, number, date, option, multi-option, and
+                boolean filters with intuitive UI.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6">
               <Database className="mb-3 h-8 w-8 text-primary" />
               <h3 className="mb-2 text-lg font-semibold">Database Adapters</h3>
               <p className="text-sm text-muted-foreground">
-                Connect to any backend with a consistent API. Currently supports
-                Drizzle ORM with more adapters coming soon.
+                Connect to any backend with a consistent API. Currently supports Drizzle ORM with
+                more adapters coming soon.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6">
               <Zap className="mb-3 h-8 w-8 text-primary" />
               <h3 className="mb-2 text-lg font-semibold">Virtual Scrolling</h3>
               <p className="text-sm text-muted-foreground">
-                Render millions of rows efficiently with built-in
-                virtualization. Smooth performance even with large datasets.
+                Render millions of rows efficiently with built-in virtualization. Smooth performance
+                even with large datasets.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6">
               <LinkIcon className="mb-3 h-8 w-8 text-primary" />
-              <h3 className="mb-2 text-lg font-semibold">
-                URL State Persistence
-              </h3>
+              <h3 className="mb-2 text-lg font-semibold">URL State Persistence</h3>
               <p className="text-sm text-muted-foreground">
-                Every filter, sort, and pagination state syncs to the URL. Users
-                can bookmark and share filtered views.
+                Every filter, sort, and pagination state syncs to the URL. Users can bookmark and
+                share filtered views.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6">
               <Palette className="mb-3 h-8 w-8 text-primary" />
-              <h3 className="mb-2 text-lg font-semibold">
-                Beautiful UI Components
-              </h3>
+              <h3 className="mb-2 text-lg font-semibold">Beautiful UI Components</h3>
               <p className="text-sm text-muted-foreground">
-                Production-ready React components built with shadcn/ui. Fully
-                accessible, customizable, and themeable.
+                Production-ready React components built with shadcn/ui. Fully accessible,
+                customizable, and themeable.
               </p>
             </div>
             <div className="rounded-lg border bg-background p-6">
               <Server className="mb-3 h-8 w-8 text-primary" />
-              <h3 className="mb-2 text-lg font-semibold">
-                Server-Side Rendering
-              </h3>
+              <h3 className="mb-2 text-lg font-semibold">Server-Side Rendering</h3>
               <p className="text-sm text-muted-foreground">
-                Full Next.js support with server-side rendering. Works
-                seamlessly with App Router and Pages Router.
+                Full Next.js support with server-side rendering. Works seamlessly with App Router
+                and Pages Router.
               </p>
             </div>
           </div>
@@ -205,12 +192,9 @@ export default function HomePage() {
       <section className="border-b bg-muted/30 py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="mx-auto mb-12 max-w-2xl text-center">
-            <h2 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
-              Simple by Design
-            </h2>
+            <h2 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">Simple by Design</h2>
             <p className="text-lg text-muted-foreground">
-              Define your columns once. Get filtering, sorting, and pagination
-              automatically.
+              Define your columns once. Get filtering, sorting, and pagination automatically.
             </p>
           </div>
           <div className="mx-auto max-w-4xl">
@@ -248,8 +232,8 @@ function UserTable() {
               showLineNumbers={true}
             />
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              That's it. No JOIN queries to write. No filter logic to wire up.
-              Just define your columns and you're done.
+              That's it. No JOIN queries to write. No filter logic to wire up. Just define your
+              columns and you're done.
             </p>
           </div>
         </div>
@@ -263,8 +247,7 @@ function UserTable() {
               Ready to Build Better Tables?
             </h2>
             <p className="mb-8 text-lg text-muted-foreground">
-              Join developers who are building powerful data tables without the
-              boilerplate
+              Join developers who are building powerful data tables without the boilerplate
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link

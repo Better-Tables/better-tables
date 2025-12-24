@@ -20,10 +20,7 @@
  */
 
 import type { FilterState, PaginationState, SortingState } from '@/types';
-import {
-  compressAndEncode,
-  decompressAndDecode,
-} from './compression';
+import { compressAndEncode, decompressAndDecode } from './compression';
 import { deserializeFiltersFromURL, serializeFiltersToURL } from './filter-serialization';
 
 /**

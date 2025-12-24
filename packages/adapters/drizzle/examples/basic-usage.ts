@@ -368,38 +368,14 @@ async function createAdapter() {
 // Example queries
 async function runExamples() {
   const { adapter, sqlite } = await createAdapter();
-
-  console.info('🚀 Drizzle Adapter Examples\n');
-
-  // 1. Basic data fetching
-  console.info('1. Basic data fetching:');
-  const basicResult = await adapter.fetchData({});
-  console.info(`   Found ${basicResult.total} users`);
-  console.info(`   First user: ${(basicResult.data[0] as UserWithRelations)?.name}`);
-  console.info();
-
-  // 2. Pagination
-  console.info('2. Pagination:');
-  const paginatedResult = await adapter.fetchData({
+  const _basicResult = await adapter.fetchData({});
+  const _paginatedResult = await adapter.fetchData({
     pagination: { page: 1, limit: 2 },
   });
-  console.info(`   Page 1: ${paginatedResult.data.length} users`);
-  console.info(`   Has next page: ${paginatedResult.pagination?.hasNext}`);
-  console.info();
-
-  // 3. Sorting
-  console.info('3. Sorting by age:');
-  const sortedResult = await adapter.fetchData({
+  const _sortedResult = await adapter.fetchData({
     sorting: [{ columnId: 'age', direction: 'desc' }],
   });
-  console.info(
-    `   Users sorted by age: ${sortedResult.data.map((u) => (u as UserWithRelations).name).join(', ')}`
-  );
-  console.info();
-
-  // 4. Filtering
-  console.info('4. Filtering users with profiles:');
-  const filteredResult = await adapter.fetchData({
+  const _filteredResult = await adapter.fetchData({
     filters: [
       {
         columnId: 'has_profile',
@@ -409,14 +385,7 @@ async function runExamples() {
       },
     ],
   });
-  console.info(
-    `   Users with profiles: ${filteredResult.data.map((u) => (u as UserWithRelations).name).join(', ')}`
-  );
-  console.info();
-
-  // 5. Cross-table filtering
-  console.info('5. Filtering by profile bio:');
-  const crossTableResult = await adapter.fetchData({
+  const _crossTableResult = await adapter.fetchData({
     filters: [
       {
         columnId: 'profile.bio',
@@ -426,14 +395,7 @@ async function runExamples() {
       },
     ],
   });
-  console.info(
-    `   Developers: ${crossTableResult.data.map((u) => (u as UserWithRelations).name).join(', ')}`
-  );
-  console.info();
-
-  // 6. Complex filtering
-  console.info('6. Complex filtering (active users with posts):');
-  const complexResult = await adapter.fetchData({
+  const _complexResult = await adapter.fetchData({
     filters: [
       {
         columnId: 'is_active',
@@ -450,40 +412,9 @@ async function runExamples() {
     ],
     sorting: [{ columnId: 'engagement_score', direction: 'desc' }],
   });
-  console.info(
-    `   Active users with multiple posts: ${complexResult.data.map((u) => (u as UserWithRelations).name).join(', ')}`
-  );
-  console.info(
-    `   Engagement scores: ${complexResult.data.map((u) => `${(u as UserWithRelations).name}: ${(u as any).engagement_score || 'N/A'}`).join(', ')}`
-  );
-  console.info();
-
-  // 7. Filter options
-  console.info('7. Filter options for age:');
-  const ageOptions = await adapter.getFilterOptions('age');
-  console.info(
-    `   Age options: ${ageOptions.map((opt) => `${opt.value} (${opt.count})`).join(', ')}`
-  );
-  console.info();
-
-  // 8. Faceted values
-  console.info('8. Faceted values for posts count:');
-  const facets = await adapter.getFacetedValues('posts_count');
-  console.info(
-    `   Posts count distribution: ${Array.from(facets.entries())
-      .map(([count, users]) => `${count} posts: ${users} users`)
-      .join(', ')}`
-  );
-  console.info();
-
-  // 9. Min/Max values
-  console.info('9. Min/Max values for total views:');
-  const [minViews, maxViews] = await adapter.getMinMaxValues('total_views');
-  console.info(`   Views range: ${minViews} - ${maxViews}`);
-  console.info();
-
-  // 10. CRUD operations
-  console.info('10. CRUD operations:');
+  const _ageOptions = await adapter.getFilterOptions('age');
+  const _facets = await adapter.getFacetedValues('posts_count');
+  const [_minViews, _maxViews] = await adapter.getMinMaxValues('total_views');
 
   // Create
   const newUser = await adapter.createRecord({
@@ -492,43 +423,25 @@ async function runExamples() {
     age: 33,
     createdAt: new Date(),
   } as Partial<User>);
-  console.info(`   Created user: ${(newUser as UserWithRelations).name} (ID: ${newUser.id})`);
 
   // Update
-  const updatedUser = await adapter.updateRecord(newUser.id.toString(), {
+  const _updatedUser = await adapter.updateRecord(newUser.id.toString(), {
     age: 34,
   } as Partial<User>);
-  console.info(`   Updated user age: ${(updatedUser as UserWithRelations).age}`);
 
   // Delete
   await adapter.deleteRecord(newUser.id.toString());
-  console.info(`   Deleted user: ${(newUser as UserWithRelations).name}`);
-  console.info();
-
-  // 11. Export functionality
-  console.info('11. Export functionality:');
-  const exportResult = await adapter.exportData({
+  const _exportResult = await adapter.exportData({
     format: 'json',
     columns: ['name', 'email', 'posts_count', 'total_views'],
   });
-  console.info(`   Exported ${exportResult.filename} (${exportResult.mimeType})`);
-  console.info(`   Data preview: ${(exportResult.data as string).substring(0, 100)}...`);
-  console.info();
-
-  // 12. Performance metrics
-  console.info('12. Performance metrics:');
-  const perfResult = await adapter.fetchData({
+  const _perfResult = await adapter.fetchData({
     columns: ['name', 'profile.bio', 'posts.title', 'posts_count', 'total_views'],
     sorting: [{ columnId: 'total_views', direction: 'desc' }],
   });
-  console.info(`   Query executed in ${perfResult.meta?.executionTime}ms`);
-  console.info(`   Joins used: ${perfResult.meta?.joinCount}`);
-  console.info(`   Cached: ${perfResult.meta?.cached}`);
-  console.info();
 
   // Cleanup
   sqlite.close();
-  console.info('✅ Examples completed successfully!');
 }
 
 // Run examples

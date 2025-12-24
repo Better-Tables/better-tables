@@ -8,7 +8,7 @@
  * @module utils/server-url-params
  */
 
-import { FilterState, SortingState } from '@/types';
+import type { FilterState, SortingState } from '@/types';
 import { deserializeTableStateFromUrl } from './url-serialization';
 
 /**

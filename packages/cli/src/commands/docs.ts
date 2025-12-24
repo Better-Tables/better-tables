@@ -61,19 +61,12 @@ export function docsCommand(): Command {
     const url = DOCS_URLS[docType];
 
     if (!url) {
-      console.error(`Unknown documentation type: ${type}`);
-      console.error(`Available types: ${Object.keys(DOCS_URLS).join(', ')}`);
       process.exit(1);
     }
 
     try {
-      console.log(`Opening ${docType} documentation...`);
       await open(url);
-      console.log(`Documentation opened in your browser: ${url}`);
-    } catch (error) {
-      console.error(
-        `Failed to open documentation: ${error instanceof Error ? error.message : String(error)}`
-      );
+    } catch (_error) {
       process.exit(1);
     }
   });

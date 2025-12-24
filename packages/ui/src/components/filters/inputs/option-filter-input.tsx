@@ -135,8 +135,8 @@ export function OptionFilterInput<TData = unknown>({
             ref={selectTriggerRef}
             className={cn(
               !validation.isValid &&
-              selectedValues.length > 0 &&
-              'border-destructive focus:ring-destructive'
+                selectedValues.length > 0 &&
+                'border-destructive focus:ring-destructive'
             )}
           >
             <SelectValue placeholder="Add option..." />
@@ -183,8 +183,8 @@ export function OptionFilterInput<TData = unknown>({
           ref={selectTriggerRef}
           className={cn(
             !validation.isValid &&
-            selectedValues.length > 0 &&
-            'border-destructive focus:ring-destructive'
+              selectedValues.length > 0 &&
+              'border-destructive focus:ring-destructive'
           )}
         >
           <SelectValue placeholder="Choose an option..." />

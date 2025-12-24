@@ -27,7 +27,7 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: Fine for live regions 
+    // biome-ignore lint/a11y/useSemanticElements: Fine for live regions
     <div
       role="status"
       aria-live="polite"

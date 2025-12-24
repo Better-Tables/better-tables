@@ -48,8 +48,7 @@ export function formatNumber(
       useGrouping,
       notation,
     }).format(value);
-  } catch (error) {
-    console.warn('Error formatting number:', error);
+  } catch (_error) {
     return value.toString();
   }
 }
@@ -85,8 +84,7 @@ export function formatCurrency(
       useGrouping,
       notation,
     }).format(value);
-  } catch (error) {
-    console.warn('Error formatting currency:', error);
+  } catch (_error) {
     return `${currency} ${value}`;
   }
 }
@@ -122,8 +120,7 @@ export function formatPercentage(
       useGrouping,
       notation,
     }).format(percentValue / 100);
-  } catch (error) {
-    console.warn('Error formatting percentage:', error);
+  } catch (_error) {
     return `${value}%`;
   }
 }
@@ -245,8 +242,7 @@ export function formatJson(value: unknown, options: { pretty?: boolean } = {}): 
     }
 
     return pretty ? JSON.stringify(value, null, 2) : JSON.stringify(value);
-  } catch (error) {
-    console.warn('Error formatting JSON:', error);
+  } catch (_error) {
     return String(value);
   }
 }

@@ -27,7 +27,7 @@ describe('ActionBuilder', () => {
       const builder = new ActionBuilder<TestUser>();
       builder.id('test-action');
 
-      expect(builder['config'].id).toBe('test-action');
+      expect(builder.config.id).toBe('test-action');
     });
 
     it('should return builder instance for chaining', () => {
@@ -43,7 +43,7 @@ describe('ActionBuilder', () => {
       const builder = new ActionBuilder<TestUser>();
       builder.label('Test Action');
 
-      expect(builder['config'].label).toBe('Test Action');
+      expect(builder.config.label).toBe('Test Action');
     });
 
     it('should return builder instance for chaining', () => {
@@ -60,7 +60,7 @@ describe('ActionBuilder', () => {
       const builder = new ActionBuilder<TestUser>();
       builder.icon(MockIcon);
 
-      expect(builder['config'].icon).toBe(MockIcon);
+      expect(builder.config.icon).toBe(MockIcon);
     });
 
     it('should return builder instance for chaining', () => {
@@ -76,20 +76,20 @@ describe('ActionBuilder', () => {
       const builder = new ActionBuilder<TestUser>();
       builder.variant('destructive');
 
-      expect(builder['config'].variant).toBe('destructive');
+      expect(builder.config.variant).toBe('destructive');
     });
 
     it('should support different variants', () => {
       const builder = new ActionBuilder<TestUser>();
 
       builder.variant('default');
-      expect(builder['config'].variant).toBe('default');
+      expect(builder.config.variant).toBe('default');
 
       builder.variant('secondary');
-      expect(builder['config'].variant).toBe('secondary');
+      expect(builder.config.variant).toBe('secondary');
 
       builder.variant('destructive');
-      expect(builder['config'].variant).toBe('destructive');
+      expect(builder.config.variant).toBe('destructive');
     });
 
     it('should return builder instance for chaining', () => {
@@ -108,11 +108,11 @@ describe('ActionBuilder', () => {
       const builder = new ActionBuilder<TestUser>();
       builder.handler(handler);
 
-      expect(builder['config'].handler).toBe(handler);
+      expect(builder.config.handler).toBe(handler);
 
       // Test handler is callable
       await handler(['1', '2']);
-      expect(builder['config'].handler).toBe(handler);
+      expect(builder.config.handler).toBe(handler);
     });
 
     it('should allow handler to receive selectedIds and selectedData', async () => {
@@ -149,7 +149,7 @@ describe('ActionBuilder', () => {
 
       builder.confirmationDialog(config);
 
-      expect(builder['config'].confirmationDialog).toEqual(config);
+      expect(builder.config.confirmationDialog).toEqual(config);
     });
 
     it('should return builder instance for chaining', () => {
@@ -173,7 +173,7 @@ describe('ActionBuilder', () => {
 
       builder.isVisible(visibilityCheck);
 
-      expect(builder['config'].isVisible).toBe(visibilityCheck);
+      expect(builder.config.isVisible).toBe(visibilityCheck);
     });
 
     it('should support visibility check with selected data', () => {
@@ -206,7 +206,7 @@ describe('ActionBuilder', () => {
 
       builder.isEnabled(enabledCheck);
 
-      expect(builder['config'].isEnabled).toBe(enabledCheck);
+      expect(builder.config.isEnabled).toBe(enabledCheck);
     });
 
     it('should support enabled check with selected data', () => {
@@ -239,7 +239,7 @@ describe('ActionBuilder', () => {
 
       builder.meta(meta);
 
-      expect(builder['config'].meta).toEqual(meta);
+      expect(builder.config.meta).toEqual(meta);
     });
 
     it('should return builder instance for chaining', () => {

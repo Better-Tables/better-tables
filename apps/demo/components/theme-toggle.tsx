@@ -14,7 +14,7 @@ export function ThemeToggle() {
     const initialTheme = stored || (prefersDark ? 'dark' : 'light');
     setTheme(initialTheme);
     updateTheme(initialTheme);
-  }, []);
+  }, [updateTheme]);
 
   function updateTheme(newTheme: 'light' | 'dark') {
     if (newTheme === 'dark') {

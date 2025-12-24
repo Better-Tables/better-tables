@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type * as readline from 'readline';
+import type * as readline from 'node:readline';
 import { confirm, input, resolveFileConflict, select } from '../src/lib/prompts';
 
 // Mock readline module

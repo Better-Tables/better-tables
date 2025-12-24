@@ -107,7 +107,7 @@ describe('Column Types', () => {
       };
 
       expect(column.validation).toHaveLength(1);
-      expectTypeOf(column.validation![0].validate).toBeFunction();
+      expectTypeOf(column.validation?.[0].validate).toBeFunction();
     });
   });
 

@@ -1,7 +1,6 @@
 import type { FilterState } from '@/types';
 import { isDateFilterState, isNumberFilterState, isTextFilterState, isValidDate } from '@/utils';
 
-
 /**
  * Safely get filter value as string
  */

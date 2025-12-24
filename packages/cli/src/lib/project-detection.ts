@@ -1,6 +1,6 @@
-import { execFileSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Package manager detection result
@@ -119,7 +119,6 @@ export function installPackage(
       executable = 'bun';
       args = ['add', packageName];
       break;
-    case 'npm':
     default:
       // npm should always be available with Node.js
       executable = 'npm';

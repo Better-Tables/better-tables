@@ -1072,14 +1072,14 @@ describe('RelationshipDetector - mergeManualRelationships', () => {
     detector.mergeManualRelationships(manualRelationships);
 
     // Verify relationships are actually merged into the detector
-    const mergedRelationships = Object.fromEntries(detector['relationships']);
+    const mergedRelationships = Object.fromEntries(detector.relationships);
     expect(mergedRelationships['users.customProfile']).toBeDefined();
     expect(mergedRelationships['users.customProfile']?.joinType).toBe('inner');
     expect(mergedRelationships['users.customProfile']?.nullable).toBe(false);
 
     // Verify relationship graph is updated (for graph-based methods)
     // The graph should now include the manual relationship
-    const graph = detector['relationshipGraph'];
+    const graph = detector.relationshipGraph;
     expect(graph.has('users')).toBe(true);
     expect(graph.has('profiles')).toBe(true);
     // Check that bidirectional edges are added

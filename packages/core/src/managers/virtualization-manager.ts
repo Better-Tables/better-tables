@@ -879,9 +879,7 @@ export class VirtualizationManager {
     for (const callback of this.subscribers) {
       try {
         callback(event);
-      } catch (error) {
-        console.error('Error in virtualization manager subscriber:', error);
-      }
+      } catch (_error) {}
     }
   }
 

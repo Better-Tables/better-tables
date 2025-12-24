@@ -1,8 +1,8 @@
-import Image from "next/image";
-import Link from "next/link";
-import type { ComponentProps } from "react";
+import Image from 'next/image';
+import Link from 'next/link';
+import type { ComponentProps } from 'react';
 
-type LogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
+type LogoSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 const sizeMap: Record<LogoSize, { width: number; height: number }> = {
   xs: { width: 24, height: 24 },
@@ -10,29 +10,20 @@ const sizeMap: Record<LogoSize, { width: number; height: number }> = {
   md: { width: 40, height: 40 },
   lg: { width: 48, height: 48 },
   xl: { width: 64, height: 64 },
-  "2xl": { width: 96, height: 96 },
+  '2xl': { width: 96, height: 96 },
 };
 
-interface LogoProps
-  extends Omit<
-    ComponentProps<typeof Image>,
-    "src" | "alt" | "width" | "height"
-  > {
+interface LogoProps extends Omit<ComponentProps<typeof Image>, 'src' | 'alt' | 'width' | 'height'> {
   size?: LogoSize;
   href?: string;
   className?: string;
 }
 
 function mergeClassNames(...classes: (string | undefined)[]): string {
-  return classes.filter(Boolean).join(" ");
+  return classes.filter(Boolean).join(' ');
 }
 
-export function Logo({
-  size = "md",
-  href,
-  className,
-  ...imageProps
-}: LogoProps) {
+export function Logo({ size = 'md', href, className, ...imageProps }: LogoProps) {
   const dimensions = sizeMap[size];
   const image = (
     <Image
@@ -40,7 +31,7 @@ export function Logo({
       alt="Better Tables Logo"
       width={dimensions.width}
       height={dimensions.height}
-      className={mergeClassNames("h-auto w-auto", className)}
+      className={mergeClassNames('h-auto w-auto', className)}
       priority
       {...imageProps}
     />

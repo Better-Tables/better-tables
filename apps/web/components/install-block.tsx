@@ -1,20 +1,20 @@
-"use client";
+'use client';
 
-import { Check, Copy } from "lucide-react";
-import { useState } from "react";
-import { BunIcon, NpmIcon, PnpmIcon } from "./icons";
-import { YarnIcon } from "./icons/yarn-icon";
+import { Check, Copy } from 'lucide-react';
+import { useState } from 'react';
+import { BunIcon, NpmIcon, PnpmIcon } from './icons';
+import { YarnIcon } from './icons/yarn-icon';
 
-type PackageManager = "npm" | "pnpm" | "bun" | "yarn";
+type PackageManager = 'npm' | 'pnpm' | 'bun' | 'yarn';
 
 interface InstallBlockProps {
   packages?: string[];
 }
 
-const defaultPackages = ["@better-tables/core"];
+const defaultPackages = ['@better-tables/core'];
 
 function getCommands(packages: string[]): Record<PackageManager, string> {
-  const packageList = packages.join(" ");
+  const packageList = packages.join(' ');
   return {
     npm: `npm install ${packageList}`,
     pnpm: `pnpm add ${packageList}`,
@@ -37,29 +37,28 @@ const icons: Record<
   yarn: YarnIcon,
 };
 
-const managerColors: Record<PackageManager, { name: string; command: string }> =
-  {
-    npm: {
-      name: "text-red-500 dark:text-red-400",
-      command: "text-blue-600 dark:text-blue-400",
-    },
-    pnpm: {
-      name: "text-orange-500 dark:text-orange-400",
-      command: "text-blue-600 dark:text-blue-400",
-    },
-    bun: {
-      name: "text-yellow-600 dark:text-yellow-400",
-      command: "text-blue-600 dark:text-blue-400",
-    },
-    yarn: {
-      name: "text-blue-500 dark:text-blue-400",
-      command: "text-blue-600 dark:text-blue-400",
-    },
-  };
+const managerColors: Record<PackageManager, { name: string; command: string }> = {
+  npm: {
+    name: 'text-red-500 dark:text-red-400',
+    command: 'text-blue-600 dark:text-blue-400',
+  },
+  pnpm: {
+    name: 'text-orange-500 dark:text-orange-400',
+    command: 'text-blue-600 dark:text-blue-400',
+  },
+  bun: {
+    name: 'text-yellow-600 dark:text-yellow-400',
+    command: 'text-blue-600 dark:text-blue-400',
+  },
+  yarn: {
+    name: 'text-blue-500 dark:text-blue-400',
+    command: 'text-blue-600 dark:text-blue-400',
+  },
+};
 
 function renderCommand(manager: PackageManager, command: string) {
   const colors = managerColors[manager];
-  const parts = command.split(" ");
+  const parts = command.split(' ');
 
   return (
     <>
@@ -69,7 +68,7 @@ function renderCommand(manager: PackageManager, command: string) {
       <span className="text-muted-foreground"> {parts[1]}</span>
       {parts.slice(2).map((part) => (
         <span key={part} className="text-purple-600 dark:text-purple-400">
-          {" "}
+          {' '}
           {part}
         </span>
       ))}
@@ -77,11 +76,9 @@ function renderCommand(manager: PackageManager, command: string) {
   );
 }
 
-export function InstallBlock({
-  packages = defaultPackages,
-}: InstallBlockProps = {}) {
+export function InstallBlock({ packages = defaultPackages }: InstallBlockProps = {}) {
   const commands = getCommands(packages);
-  const [selectedManager, setSelectedManager] = useState<PackageManager>("npm");
+  const [selectedManager, setSelectedManager] = useState<PackageManager>('npm');
   const [copied, setCopied] = useState(false);
 
   function copyToClipboard() {
@@ -90,7 +87,7 @@ export function InstallBlock({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const availableManagers: PackageManager[] = ["npm", "pnpm", "bun", "yarn"];
+  const availableManagers: PackageManager[] = ['npm', 'pnpm', 'bun', 'yarn'];
 
   return (
     <div className="overflow-hidden rounded-lg border bg-background shadow-lg">
@@ -107,16 +104,14 @@ export function InstallBlock({
                   onClick={() => setSelectedManager(manager)}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                     selectedManager === manager
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background text-muted-foreground hover:bg-muted"
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {Icon && (
                     <Icon
                       className="h-4 w-4"
-                      color={
-                        selectedManager === manager ? undefined : "default"
-                      }
+                      color={selectedManager === manager ? undefined : 'default'}
                       size={16}
                     />
                   )}

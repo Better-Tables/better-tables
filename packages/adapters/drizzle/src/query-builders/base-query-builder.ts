@@ -468,9 +468,10 @@ export abstract class BaseQueryBuilder {
     // Filter out computed fields from sorts before building query context
     // Computed fields are handled separately in applySorting
     const computedFieldNames = params.computedFields ? Object.keys(params.computedFields) : [];
-    const sortsForContext = params.sorting
-      ?.filter((sort) => !computedFieldNames.includes(sort.columnId))
-      .map((sort) => ({ columnId: sort.columnId })) || [];
+    const sortsForContext =
+      params.sorting
+        ?.filter((sort) => !computedFieldNames.includes(sort.columnId))
+        .map((sort) => ({ columnId: sort.columnId })) || [];
 
     const context = this.relationshipManager.buildQueryContext(
       {

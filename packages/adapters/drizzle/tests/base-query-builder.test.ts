@@ -711,10 +711,10 @@ describe('BaseQueryBuilder', () => {
 
       expect(query).toBeDefined();
       expect(columnMetadata.selections).toBeDefined();
-      expect(columnMetadata.selections['name']).toBeDefined();
-      expect(columnMetadata.selections['email']).toBeDefined();
-      expect(columnMetadata.columnMapping['name']).toBe('name');
-      expect(columnMetadata.columnMapping['email']).toBe('email');
+      expect(columnMetadata.selections.name).toBeDefined();
+      expect(columnMetadata.selections.email).toBeDefined();
+      expect(columnMetadata.columnMapping.name).toBe('name');
+      expect(columnMetadata.columnMapping.email).toBe('email');
       expect(queryBuilder.validateQuery(query)).toBe(true);
     });
 
@@ -748,7 +748,7 @@ describe('BaseQueryBuilder', () => {
       const { columnMetadata } = queryBuilder.buildSelectQuery(context, 'users', ['name']);
 
       // Primary key should be included even if not explicitly requested
-      expect(columnMetadata.selections['id']).toBeDefined();
+      expect(columnMetadata.selections.id).toBeDefined();
     });
 
     it('should build flat selections for relationships when filters use relationships but no columns (tests buildFlatSelectionsForRelationships)', () => {

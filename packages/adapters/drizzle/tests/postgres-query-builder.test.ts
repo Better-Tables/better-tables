@@ -223,7 +223,7 @@ describe('PostgresQueryBuilder', () => {
         ]);
 
         expect(columnMetadata.columnMapping).toBeDefined();
-        expect(columnMetadata.columnMapping['name']).toBe('name');
+        expect(columnMetadata.columnMapping.name).toBe('name');
         // Nested columns should have aliased keys
         expect(columnMetadata.columnMapping).toHaveProperty(
           Object.keys(columnMetadata.columnMapping).find((key) => key.includes('bio')) || ''

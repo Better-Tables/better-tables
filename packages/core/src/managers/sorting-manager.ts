@@ -218,7 +218,6 @@ export class SortingManager<TData = unknown> {
     const validSorts = sorts.filter((sort) => {
       const validation = this.validateSort(sort);
       if (!validation.valid) {
-        console.warn(`Invalid sort for column ${sort.columnId}: ${validation.error}`);
         return false;
       }
       return true;
@@ -463,7 +462,6 @@ export class SortingManager<TData = unknown> {
         if (validation.valid) {
           reorderedSorts.push(existingSort);
         } else {
-          console.warn(`Invalid sort for column ${sort.columnId}: ${validation.error}`);
         }
       }
     }
@@ -664,9 +662,7 @@ export class SortingManager<TData = unknown> {
     for (const callback of this.subscribers) {
       try {
         callback(event);
-      } catch (error) {
-        console.error('Error in sorting manager subscriber:', error);
-      }
+      } catch (_error) {}
     }
   }
 

@@ -1,6 +1,10 @@
 'use client';
 
-import { getFilterValueAsString, type ColumnDefinition, type FilterState } from '@better-tables/core';
+import {
+  type ColumnDefinition,
+  type FilterState,
+  getFilterValueAsString,
+} from '@better-tables/core';
 import * as React from 'react';
 import { useFilterValidation } from '../../../hooks/use-filter-validation';
 import { cn } from '../../../lib/utils';

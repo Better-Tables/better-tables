@@ -1,6 +1,15 @@
 'use client';
 
-import { DatePreset, formatDateRange, formatDateWithConfig, getCommonPresets, getDatePresetConfig, getFilterValueAsDate, type ColumnDefinition, type FilterState } from '@better-tables/core';
+import {
+  type ColumnDefinition,
+  type DatePreset,
+  type FilterState,
+  formatDateRange,
+  formatDateWithConfig,
+  getCommonPresets,
+  getDatePresetConfig,
+  getFilterValueAsDate,
+} from '@better-tables/core';
 import { CalendarIcon, Clock } from 'lucide-react';
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';

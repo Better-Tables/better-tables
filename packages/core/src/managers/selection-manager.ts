@@ -325,7 +325,6 @@ export class SelectionManager<TData = unknown> {
     const validIds = rowIds.filter((id) => {
       const validation = this.validateSelection(id, true);
       if (!validation.valid) {
-        console.warn(`Invalid selection for row ${id}: ${validation.error}`);
         return false;
       }
       return true;
@@ -342,7 +341,6 @@ export class SelectionManager<TData = unknown> {
         const remainingSlots = this.config.maxSelections - currentCount;
 
         if (remainingSlots <= 0) {
-          console.warn(`Maximum selections reached (${this.config.maxSelections})`);
           return;
         }
 
@@ -410,7 +408,6 @@ export class SelectionManager<TData = unknown> {
 
       // If already at or over limit, don't select any new rows
       if (currentCount >= this.config.maxSelections) {
-        console.warn(`Maximum selections reached (${this.config.maxSelections})`);
         return;
       }
 
@@ -683,9 +680,7 @@ export class SelectionManager<TData = unknown> {
     this.subscribers.forEach((callback) => {
       try {
         callback(event);
-      } catch (error) {
-        console.error('Error in selection manager subscriber:', error);
-      }
+      } catch (_error) {}
     });
   }
 

@@ -13,7 +13,7 @@ export function NextIcon({ className, size = 16 }: NextIconProps) {
       viewBox="0 0 16 16"
       width={size}
       className={className}
-      style={{ color: "currentcolor" }}
+      style={{ color: 'currentcolor' }}
     >
       <g clipPath="url(#clip0_53_108)">
         <circle

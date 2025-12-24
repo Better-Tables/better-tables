@@ -19,10 +19,6 @@ export function helpCommand(): Command {
 
   // Action handler
   command.action(() => {
-    console.log('\nBetter Tables CLI - Available Commands\n');
-    console.log('Usage: better-tables <command> [options]\n');
-    console.log('Commands:\n');
-
     const commandNames = Object.keys(commandsRegistry) as RegisteredCommandName[];
 
     for (const cmdName of commandNames) {
@@ -50,15 +46,9 @@ export function helpCommand(): Command {
         }
       }
 
-      const argsStr = argsInfo.length > 0 ? ` ${argsInfo.join(' ')}` : '';
-      const optionsStr = optionsInfo.length > 0 ? ` [${optionsInfo.join(', ')}]` : '';
-
-      console.log(`  ${cmdName}${argsStr}${optionsStr}`);
-      console.log(`    ${cmdDef.description}\n`);
+      const _argsStr = argsInfo.length > 0 ? ` ${argsInfo.join(' ')}` : '';
+      const _optionsStr = optionsInfo.length > 0 ? ` [${optionsInfo.join(', ')}]` : '';
     }
-
-    console.log('For more information on a specific command, use:');
-    console.log('  better-tables <command> --help\n');
   });
 
   return command;

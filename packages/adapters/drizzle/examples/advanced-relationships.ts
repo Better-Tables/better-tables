@@ -756,11 +756,6 @@ async function createAdvancedAdapter(): Promise<any> {
 
 async function runAdvancedExamples() {
   const { adapter, sqlite } = await createAdvancedAdapter();
-
-  console.log('🚀 Advanced Drizzle Adapter Examples\n');
-
-  // 1. Complex filtering with multiple relationships
-  console.log('1. Senior developers with active projects:');
   const seniorDevsResult = await adapter.fetchData({
     filters: [
       {
@@ -778,28 +773,12 @@ async function runAdvancedExamples() {
     ],
     sorting: [{ columnId: 'total_hours', direction: 'desc' }],
   });
-  console.log(`   Found ${seniorDevsResult.data.length} senior developers with active projects`);
-  seniorDevsResult.data.forEach((user: UserWithComputed) => {
-    console.log(`   - ${user.name}: ${user.total_hours} hours, ${user.skills_count} skills`);
-  });
-  console.log();
-
-  // 2. Cross-company analysis
-  console.log('2. Users by company and industry:');
+  seniorDevsResult.data.forEach((_user: UserWithComputed) => {});
   const companyResult = await adapter.fetchData({
     columns: ['name', 'company.name', 'company.industry', 'company.size'],
     sorting: [{ columnId: 'company.name', direction: 'asc' }],
   });
-  console.log(`   Users by company:`);
-  companyResult.data.forEach((user: UserWithComputed) => {
-    console.log(
-      `   - ${user.name} at ${user.company?.name} (${user.company?.industry}, ${user.company?.size})`
-    );
-  });
-  console.log();
-
-  // 3. Skill analysis
-  console.log('3. Users with certified skills:');
+  companyResult.data.forEach((_user: UserWithComputed) => {});
   const certifiedResult = await adapter.fetchData({
     filters: [
       {
@@ -811,16 +790,7 @@ async function runAdvancedExamples() {
     ],
     sorting: [{ columnId: 'certified_skills', direction: 'desc' }],
   });
-  console.log(`   Users with certifications:`);
-  certifiedResult.data.forEach((user: UserWithComputed) => {
-    console.log(
-      `   - ${user.name}: ${user.certified_skills} certified skills, avg ${user.avg_experience?.toFixed(1)} years experience`
-    );
-  });
-  console.log();
-
-  // 4. Project workload analysis
-  console.log('4. Project workload distribution:');
+  certifiedResult.data.forEach((_user: UserWithComputed) => {});
   const workloadResult = await adapter.fetchData({
     columns: ['name', 'projects_count', 'total_hours', 'userProjects.role'],
     filters: [
@@ -833,16 +803,7 @@ async function runAdvancedExamples() {
     ],
     sorting: [{ columnId: 'total_hours', direction: 'desc' }],
   });
-  console.log(`   Project workload:`);
-  workloadResult.data.forEach((user: UserWithComputed) => {
-    console.log(
-      `   - ${user.name}: ${user.projects_count} projects, ${user.total_hours} hours, role: ${user.userProjects?.[0]?.role}`
-    );
-  });
-  console.log();
-
-  // 5. Role and skill correlation
-  console.log('5. Role and skill analysis:');
+  workloadResult.data.forEach((_user: UserWithComputed) => {});
   const roleSkillResult = await adapter.fetchData({
     columns: ['name', 'roles.name', 'roles.level', 'skill_summary'],
     filters: [
@@ -854,16 +815,7 @@ async function runAdvancedExamples() {
       },
     ],
   });
-  console.log(`   Role and skills:`);
-  roleSkillResult.data.forEach((user: UserWithComputed) => {
-    console.log(
-      `   - ${user.name}: ${user.userRoles?.[0]?.role?.name} (${user.userRoles?.[0]?.role?.level}) - ${user.skill_summary}`
-    );
-  });
-  console.log();
-
-  // 6. Manager analysis
-  console.log('6. Department managers:');
+  roleSkillResult.data.forEach((_user: UserWithComputed) => {});
   const managerResult = await adapter.fetchData({
     filters: [
       {
@@ -875,16 +827,7 @@ async function runAdvancedExamples() {
     ],
     columns: ['name', 'managedDepartments.name', 'managedDepartments.budget'],
   });
-  console.log(`   Department managers:`);
-  managerResult.data.forEach((user: UserWithComputed) => {
-    console.log(
-      `   - ${user.name} manages ${user.managedDepartments?.[0]?.name} (budget: $${user.managedDepartments?.[0]?.budget?.toLocaleString()})`
-    );
-  });
-  console.log();
-
-  // 7. Complex aggregation
-  console.log('7. Company performance metrics:');
+  managerResult.data.forEach((_user: UserWithComputed) => {});
   const companyMetrics = await adapter.fetchData({
     columns: ['company.name', 'company.industry', 'company.size'],
     sorting: [{ columnId: 'company.name', direction: 'asc' }],
@@ -909,29 +852,12 @@ async function runAdvancedExamples() {
     stats.totalSkills += user.skills_count || 0;
     stats.totalProjects += user.projects_count || 0;
   });
-
-  console.log(`   Company metrics:`);
-  companyStats.forEach((stats) => {
-    console.log(
-      `   - ${stats.name} (${stats.industry}, ${stats.size}): ${stats.userCount} users, ${stats.totalSkills} skills, ${stats.totalProjects} projects`
-    );
-  });
-  console.log();
-
-  // 8. Performance analysis
-  console.log('8. Performance metrics:');
-  const perfResult = await adapter.fetchData({
+  companyStats.forEach((_stats) => {});
+  const _perfResult = await adapter.fetchData({
     columns: ['name', 'company.name', 'roles.name', 'skill_summary', 'project_summary'],
     sorting: [{ columnId: 'name', direction: 'asc' }],
   });
-  console.log(`   Query executed in ${perfResult.meta?.executionTime}ms`);
-  console.log(`   Joins used: ${perfResult.meta?.joinCount}`);
-  console.log(`   Records returned: ${perfResult.data.length}`);
-  console.log();
-
-  // 9. Export complex data
-  console.log('9. Exporting complex organizational data:');
-  const exportResult = await adapter.exportData({
+  const _exportResult = await adapter.exportData({
     format: 'json',
     columns: [
       'name',
@@ -946,12 +872,9 @@ async function runAdvancedExamples() {
       'certified_skills',
     ],
   });
-  console.log(`   Exported ${exportResult.filename} with ${exportResult.data.length} characters`);
-  console.log();
 
   // Cleanup
   sqlite.close();
-  console.log('✅ Advanced examples completed successfully!');
 }
 
 // Run examples

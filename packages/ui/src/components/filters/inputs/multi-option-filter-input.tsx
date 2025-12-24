@@ -214,7 +214,7 @@ export function MultiOptionFilterInput<TData = unknown>({
                     >
                       <Checkbox
                         checked={isSelected}
-                        onChange={() => { }} // Handled by CommandItem onSelect
+                        onChange={() => {}} // Handled by CommandItem onSelect
                       />
                       <div className="flex items-center gap-2 flex-1">
                         {OptionIcon && (

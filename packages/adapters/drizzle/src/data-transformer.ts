@@ -351,7 +351,7 @@ export class DataTransformer {
       }
       // Additional fallback: try common primary key names
       if ((mainKeyValue === undefined || mainKeyValue === null) && primaryKeyName === 'id') {
-        mainKeyValue = record['id'];
+        mainKeyValue = record.id;
       }
       // Last resort: try to find any field that matches the primary key name
       if (mainKeyValue === undefined || mainKeyValue === null) {

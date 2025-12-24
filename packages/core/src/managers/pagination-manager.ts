@@ -633,9 +633,7 @@ export class PaginationManager {
     this.subscribers.forEach((callback) => {
       try {
         callback(event);
-      } catch (error) {
-        console.error('Error in pagination manager subscriber:', error);
-      }
+      } catch (_error) {}
     });
   }
 

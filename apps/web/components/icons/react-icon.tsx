@@ -4,7 +4,7 @@ export function ReactIcon() {
       data-testid="geist-icon"
       height="16"
       strokeLinejoin="round"
-      style={{ color: "currentcolor" }}
+      style={{ color: 'currentcolor' }}
       viewBox="0 0 16 16"
       width="16"
     >

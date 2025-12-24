@@ -16,7 +16,7 @@ export interface BooleanFilterInputProps<TData = unknown> {
 
 /**
  * Boolean filter input component
- * 
+ *
  * Pattern: Purely controlled component (no local state needed)
  * - Values are determined by the operator
  * - Sends appropriate values when operator changes

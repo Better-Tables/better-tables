@@ -490,9 +490,7 @@ export class FilterManager<TData = unknown> {
     this.subscribers.forEach((callback) => {
       try {
         callback(event);
-      } catch (error) {
-        console.error('Error in filter manager subscriber:', error);
-      }
+      } catch (_error) {}
     });
   }
 

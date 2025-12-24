@@ -148,4 +148,3 @@ export function decompressAndDecode<T = unknown>(encoded: string): T | null {
     return null;
   }
 }
-

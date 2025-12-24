@@ -70,7 +70,7 @@ describe('DrizzleAdapter - PostgreSQL [Unit Tests]', () => {
       // Verify that relationships object exists (auto-detection ran)
       // This test verifies the fix: auto-detection should run even when relations config is omitted
       // The key fix was ensuring detectFromSchema({}, schema) is called instead of skipping detection
-      const relationships = adapter['relationships'];
+      const relationships = adapter.relationships;
       expect(relationships).toBeDefined();
       expect(typeof relationships).toBe('object');
 

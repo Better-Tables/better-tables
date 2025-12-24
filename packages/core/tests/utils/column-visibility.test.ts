@@ -297,8 +297,8 @@ describe('Column Visibility Utilities', () => {
       expect(visibility).toEqual({
         name: false,
       });
-      expect((visibility).unknownColumn).toBeUndefined();
-      expect((visibility).anotherUnknown).toBeUndefined();
+      expect(visibility.unknownColumn).toBeUndefined();
+      expect(visibility.anotherUnknown).toBeUndefined();
     });
 
     it('should not mutate the modifications object', () => {

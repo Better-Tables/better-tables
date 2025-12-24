@@ -1,6 +1,16 @@
 'use client';
 
-import { formatNumber, getFilterValueAsNumber, getFormattedPlaceholder, getNumberInputConfig, getNumberInputStep, parseFormattedNumber, validateNumberInput, type ColumnDefinition, type FilterState } from '@better-tables/core';
+import {
+  type ColumnDefinition,
+  type FilterState,
+  formatNumber,
+  getFilterValueAsNumber,
+  getFormattedPlaceholder,
+  getNumberInputConfig,
+  getNumberInputStep,
+  parseFormattedNumber,
+  validateNumberInput,
+} from '@better-tables/core';
 import * as React from 'react';
 import { useFilterValidation } from '../../../hooks';
 
@@ -66,9 +76,7 @@ export function NumberFilterInput<TData = unknown>({
   React.useEffect(() => {
     if (disabled || needsNoValues) return undefined;
 
-    const hasNoValues = needsTwoValues
-      ? !values.min && !values.max
-      : !values.single;
+    const hasNoValues = needsTwoValues ? !values.min && !values.max : !values.single;
 
     if (hasNoValues) {
       // Use setTimeout to ensure the input is visible (e.g., in a Popover/Dialog)
@@ -250,8 +258,8 @@ export function NumberFilterInput<TData = unknown>({
               disabled={disabled}
               className={cn(
                 !finalValidation.isValid &&
-                values.min &&
-                'border-destructive focus-visible:ring-destructive'
+                  values.min &&
+                  'border-destructive focus-visible:ring-destructive'
               )}
             />
           </div>
@@ -274,8 +282,8 @@ export function NumberFilterInput<TData = unknown>({
               disabled={disabled}
               className={cn(
                 !finalValidation.isValid &&
-                values.max &&
-                'border-destructive focus-visible:ring-destructive'
+                  values.max &&
+                  'border-destructive focus-visible:ring-destructive'
               )}
             />
           </div>
@@ -304,8 +312,8 @@ export function NumberFilterInput<TData = unknown>({
         disabled={disabled}
         className={cn(
           !finalValidation.isValid &&
-          values.single &&
-          'border-destructive focus-visible:ring-destructive'
+            values.single &&
+            'border-destructive focus-visible:ring-destructive'
         )}
       />
       {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (
