@@ -1,5 +1,6 @@
 // React hooks
 export * from './use-debounce';
+export * from './use-export';
 export * from './use-filter-validation';
 export * from './use-keyboard-navigation';
 export * from './use-table-data';

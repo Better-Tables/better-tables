@@ -11,6 +11,7 @@ This document provides a comprehensive reference for all UI components in the Be
 
 - [Filter Components](#filter-components)
 - [Table Components](#table-components)
+- [Export Components](#export-components)
 - [Utility Components](#utility-components)
 - [Component Props](#component-props)
 - [Usage Examples](#usage-examples)
@@ -484,6 +485,211 @@ function MyVirtualizedTable() {
         console.log('Clicked item:', item, 'at index:', index);
       }}
     />
+  );
+}
+```
+
+## Export Components
+
+### ExportButton
+
+A dropdown button component for triggering data exports.
+
+#### Props
+
+```typescript
+interface ExportButtonProps {
+  /** Callback when export is triggered */
+  onExport: (format: 'csv' | 'excel' | 'json') => void;
+  /** Whether an export is currently in progress */
+  isExporting?: boolean;
+  /** Current export progress */
+  progress?: ExportProgress | null;
+  /** Callback to cancel the export */
+  onCancel?: () => void;
+  /** Available export formats */
+  formats?: ('csv' | 'excel' | 'json')[];
+  /** Total number of rows to be exported */
+  totalRows?: number;
+  /** Whether the button is disabled */
+  disabled?: boolean;
+  /** Additional CSS classes */
+  className?: string;
+}
+```
+
+#### Example
+
+```tsx
+import { ExportButton } from '@better-tables/ui';
+
+function MyTable() {
+  const { startExport, cancelExport, isExporting, progress } = useExport({
+    columns,
+    adapter,
+  });
+
+  return (
+    <ExportButton
+      onExport={(format) => startExport({ format, filename: 'data' })}
+      isExporting={isExporting}
+      progress={progress}
+      onCancel={cancelExport}
+      formats={['csv', 'excel', 'json']}
+      totalRows={1500}
+    />
+  );
+}
+```
+
+### ExportDialog
+
+A dialog component for advanced export configuration with column selection.
+
+The ExportDialog provides a complete UI for configuring exports, including:
+- **Format selection**: Visual buttons for CSV, Excel, and JSON
+- **Column selection**: Checkboxes for each column with Select All/None
+- **Custom filename**: Input field for the export filename
+- **Batch size**: Advanced option for tuning memory usage
+- **Progress display**: Shows export progress during execution
+
+#### Props
+
+```typescript
+interface ExportDialogProps<TData = unknown> {
+  /** Column definitions for column selection */
+  columns: ColumnDefinition<TData>[];
+  /** Callback when export is triggered */
+  onExport: (config: ExportConfig) => void;
+  /** Whether the dialog is open */
+  open?: boolean;
+  /** Callback when open state changes */
+  onOpenChange?: (open: boolean) => void;
+  /** Whether an export is currently in progress */
+  isExporting?: boolean;
+  /** Current export progress */
+  progress?: ExportProgress | null;
+  /** Last export result for success/error display */
+  lastResult?: ExportResult | null;
+  /** Callback to cancel the export */
+  onCancel?: () => void;
+  /** Available export formats */
+  formats?: ('csv' | 'excel' | 'json')[];
+  /** Total number of rows to be exported */
+  totalRows?: number;
+  /** Default filename */
+  defaultFilename?: string;
+  /** Trigger element */
+  trigger?: React.ReactNode;
+}
+```
+
+#### Column Selection UI
+
+The dialog displays all available columns with checkboxes:
+
+```
+┌─────────────────────────────────────────────┐
+│ Export Data                                 │
+├─────────────────────────────────────────────┤
+│ Format                                      │
+│ ┌─────────┐ ┌─────────┐ ┌─────────┐        │
+│ │   CSV   │ │  Excel  │ │  JSON   │        │
+│ └─────────┘ └─────────┘ └─────────┘        │
+│                                             │
+│ Filename: [users-export    ]                │
+│                                             │
+│ Columns (5 selected)        [All] [None]   │
+│ ┌─────────────────────────────────────────┐ │
+│ │ ☑ Name                                  │ │
+│ │ ☑ Email                                 │ │
+│ │ ☑ Age                                   │ │
+│ │ ☐ Status                                │ │
+│ │ ☑ Created At                            │ │
+│ └─────────────────────────────────────────┘ │
+│                                             │
+│ ▶ Advanced Options                          │
+│   Batch Size: [1000]                        │
+│                                             │
+│              [Cancel] [Export 1,500 Rows]   │
+└─────────────────────────────────────────────┘
+```
+
+#### Example
+
+```tsx
+import { ExportDialog } from '@better-tables/ui';
+
+function MyTable() {
+  const { startExport, cancelExport, isExporting, progress, lastResult } = useExport({
+    columns,
+    adapter,
+  });
+
+  return (
+    <ExportDialog
+      columns={columns}
+      onExport={startExport}
+      isExporting={isExporting}
+      progress={progress}
+      lastResult={lastResult}
+      onCancel={cancelExport}
+      formats={['csv', 'excel', 'json']}
+      totalRows={1500}
+      defaultFilename="users-export"
+      trigger={
+        <Button>
+          <Download className="mr-2 h-4 w-4" />
+          Export Data
+        </Button>
+      }
+    />
+  );
+}
+```
+
+#### Integration with BetterTable
+
+The `BetterTable` component uses `ExportDialog` by default when export is enabled:
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={data}
+  export={{
+    enabled: true,
+    adapter: exportAdapter,
+    formats: ['csv', 'excel', 'json'],
+    filename: 'my-data',
+    // Set showDialog: false to use simple dropdown instead
+    showDialog: true, // default
+  }}
+/>
+```
+
+### Export Progress Display
+
+When exporting, the components display progress information:
+
+```tsx
+// Progress is automatically shown in ExportButton/ExportDialog
+// You can also build custom progress UI:
+function CustomExportProgress({ progress }: { progress: ExportProgress }) {
+  if (!progress) return null;
+  
+  return (
+    <div className="flex items-center gap-4">
+      <Progress value={progress.percentage} className="w-48" />
+      <span className="text-sm text-muted-foreground">
+        {progress.processedRows.toLocaleString()} of {progress.totalRows.toLocaleString()} rows
+        ({progress.percentage}%)
+      </span>
+      {progress.estimatedTimeRemaining && (
+        <span className="text-sm text-muted-foreground">
+          ~{formatDuration(progress.estimatedTimeRemaining)} remaining
+        </span>
+      )}
+    </div>
   );
 }
 ```

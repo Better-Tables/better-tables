@@ -10,6 +10,7 @@
 
 // State managers will be exported from here
 // export * from './table-manager';
+export * from './export-manager';
 export * from './filter-manager';
 export * from './pagination-manager';
 export * from './selection-manager';

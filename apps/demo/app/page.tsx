@@ -139,6 +139,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
                 <li>• Pagination</li>
                 <li>• Server-side rendering</li>
                 <li>• URL-based state</li>
+                <li>• Export (CSV, Excel, JSON)</li>
               </ul>
             </div>
           </div>

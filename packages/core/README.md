@@ -6,6 +6,7 @@ The foundational package for Better Tables - a comprehensive, type-safe React ta
 
 - 🏗️ **Fluent Column Builders** - Type-safe, declarative API for defining table columns
 - 🎛️ **State Management** - Powerful managers for filters, sorting, pagination, selection, and virtualization
+- 📤 **Data Export** - Export to CSV, Excel, JSON with batch processing and progress tracking
 - 🔒 **Full TypeScript Support** - End-to-end type safety from data to UI
 - 🛠️ **Utility Functions** - Helpers for filter serialization, equality checks, and column operations
 - 🏭 **Factory Functions** - Convenient factories for creating column and action builders
@@ -443,6 +444,7 @@ import {
   SelectionManager,
   TableStateManager,
   VirtualizationManager,
+  ExportManager,
 } from '@better-tables/core';
 ```
 
@@ -459,6 +461,10 @@ import type {
   VirtualizationConfig,
   TableConfig,
   TableAdapter,
+  TableExportConfig,
+  TableExportResult,
+  ExportFormat,
+  ExportProgress,
 } from '@better-tables/core';
 ```
 

@@ -11,6 +11,7 @@ The Better Tables UI package provides a comprehensive set of React hooks for man
 
 - [Hooks Overview](#hooks-overview)
 - [useDebounce](#usedebounce)
+- [useExport](#useexport)
 - [useFilterValidation](#usefiltervalidation)
 - [useKeyboardNavigation](#usekeyboardnavigation)
 - [useVirtualization](#usevirtualization)
@@ -24,6 +25,7 @@ The Better Tables UI package provides a comprehensive set of React hooks for man
 The hooks are organized by functionality:
 
 - **State Management**: `useTableData` for data fetching and state management
+- **Export**: `useExport` for data export with progress tracking
 - **Performance**: `useDebounce` for input debouncing, `useVirtualization` for virtual scrolling
 - **Validation**: `useFilterValidation` for filter value validation
 - **Accessibility**: `useKeyboardNavigation` for keyboard interaction management
@@ -120,6 +122,170 @@ function FilterInput() {
     </div>
   );
 }
+```
+
+## useExport
+
+A comprehensive hook for managing data export operations with progress tracking, cancellation, and automatic file downloads.
+
+### Signature
+
+```typescript
+function useExport<TData = unknown>(options: UseExportOptions<TData>): UseExportResult;
+```
+
+### Parameters
+
+```typescript
+interface UseExportOptions<TData = unknown> {
+  /** Column definitions for export */
+  columns: ColumnDefinition<TData>[];
+  /** Table adapter for fetching data */
+  adapter: TableAdapter<TData>;
+  /** Current filters to apply during export */
+  filters?: FilterState[];
+  /** Current sorting to apply during export */
+  sorting?: SortingParams[];
+  /** Custom value transformer for formatting exported values */
+  valueTransformer?: (value: unknown, row: TData, column: ColumnDefinition<TData>) => unknown;
+  /** Callback when export completes successfully */
+  onComplete?: (result: ExportResult) => void;
+  /** Callback when export fails */
+  onError?: (error: Error) => void;
+  /** Callback for progress updates */
+  onProgress?: (progress: ExportProgress) => void;
+  /** Whether to automatically download the file (default: true) */
+  autoDownload?: boolean;
+}
+```
+
+### Returns
+
+```typescript
+interface UseExportResult {
+  /** Start an export operation */
+  startExport: (config: ExportConfig) => Promise<void>;
+  /** Cancel an ongoing export */
+  cancelExport: () => void;
+  /** Current export progress */
+  progress: ExportProgress | null;
+  /** Whether an export is currently in progress */
+  isExporting: boolean;
+}
+```
+
+### Usage Example
+
+```tsx
+import { useExport } from '@better-tables/ui';
+
+function ExportSection({ columns, adapter }) {
+  const {
+    startExport,
+    cancelExport,
+    progress,
+    isExporting,
+  } = useExport({
+    columns,
+    adapter,
+    autoDownload: true,
+    onComplete: (result) => {
+      toast.success(`Exported ${result.rowCount} rows to ${result.filename}`);
+    },
+    onError: (error) => {
+      toast.error(`Export failed: ${error.message}`);
+    },
+    onProgress: (progress) => {
+      console.log(`${progress.percentage}% complete`);
+    },
+  });
+
+  const handleExportCsv = () => {
+    startExport({
+      format: 'csv',
+      filename: 'users-export',
+      batch: { batchSize: 1000 },
+    });
+  };
+
+  const handleExportExcel = () => {
+    startExport({
+      format: 'excel',
+      filename: 'users-export',
+      excel: {
+        sheetName: 'Users',
+        freezeHeader: true,
+        autoFilter: true,
+      },
+    });
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Button onClick={handleExportCsv} disabled={isExporting}>
+        {isExporting ? 'Exporting...' : 'Export CSV'}
+      </Button>
+      <Button onClick={handleExportExcel} disabled={isExporting}>
+        Export Excel
+      </Button>
+      {isExporting && progress && (
+        <div className="flex items-center gap-2">
+          <Progress value={progress.percentage} className="w-32" />
+          <span>{progress.percentage}%</span>
+          <Button variant="ghost" size="sm" onClick={cancelExport}>
+            Cancel
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Advanced Usage with Custom Value Transformer
+
+```tsx
+const { startExport } = useExport({
+  columns,
+  adapter,
+  valueTransformer: (value, row, column) => {
+    // Format dates for export
+    if (column.type === 'date' && value instanceof Date) {
+      return value.toLocaleDateString('en-US');
+    }
+    // Format booleans
+    if (column.type === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    // Format currency
+    if (column.type === 'number' && column.id.includes('price')) {
+      return `$${Number(value).toFixed(2)}`;
+    }
+    return value;
+  },
+  onComplete: (result) => {
+    console.log(`Export complete: ${result.rowCount} rows, ${result.fileSize} bytes`);
+  },
+});
+```
+
+### Integration with BetterTable
+
+The `useExport` hook is integrated into the BetterTable component. Simply provide the `export` prop:
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={data}
+  export={{
+    enabled: true,
+    adapter: exportAdapter,
+    formats: ['csv', 'excel', 'json'],
+    filename: 'my-data',
+    batchSize: 500,
+    onComplete: (result) => toast.success('Export complete!'),
+  }}
+/>
 ```
 
 ## useFilterValidation

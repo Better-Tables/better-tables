@@ -232,6 +232,34 @@ Every filter, sort, and pagination state syncs to the URL. Users can bookmark an
 
 > [📸 **Screenshot: Browser URL bar showing filter state**]
 
+### Data Export
+
+Export your table data to CSV, Excel, or JSON with batch processing for large datasets.
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={users}
+  export={{
+    enabled: true,
+    adapter: exportAdapter,
+    formats: ['csv', 'excel', 'json'],
+    filename: 'users-export',
+    batchSize: 1000,
+    onComplete: (result) => {
+      toast.success(`Exported ${result.rowCount} rows`);
+    },
+  }}
+/>
+```
+
+**Key Features:**
+- 📊 **Multiple Formats**: CSV, Excel (xlsx), and JSON
+- ⚡ **Batch Processing**: Memory-efficient for large datasets
+- 📈 **Progress Tracking**: Real-time progress with cancellation
+- 🎯 **Respects Filters**: Exports only filtered data
+- 🔧 **Custom Formatting**: Transform values during export
+
 ### Declarative Column Configuration
 
 Build complex tables with a fluent, type-safe API.
@@ -474,11 +502,12 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 - ✅ Server-side rendering support (Next.js)
 - ✅ Action builders for bulk operations
 - ✅ Primary table resolution for complex schemas
+- ✅ Data export (CSV, Excel, JSON) with batch processing
 
 ### Coming Next (v0.6+)
 
+- [x] Export functionality (CSV, Excel, JSON)
 - [ ] REST adapter
-- [ ] Export functionality (CSV, Excel)
 - [ ] Saved filter presets
 - [ ] Advanced column customization
 - [ ] Performance benchmarks and optimization

@@ -16,6 +16,7 @@ import type { EventHandler, IconComponent, TableTheme } from './common';
 import type { FilterGroup, FilterState } from './filter';
 import type { PaginationConfig } from './pagination';
 import type { SortingConfig } from './sorting';
+import type { ExportConfig } from './export';
 
 /**
  * Main table configuration interface.
@@ -75,7 +76,7 @@ export interface TableConfig<TData = unknown> {
   actionsConfig?: ActionsConfig;
 
   /** Export configuration and options */
-  exportOptions?: ExportConfig<TData>;
+  exportOptions?: ExportConfig;
 
   /** Data adapter for table operations */
   adapter: TableAdapter<TData>;
@@ -161,42 +162,6 @@ export interface TableFeatures {
 
   /** Configuration for header context menu */
   headerContextMenu?: HeaderContextMenuConfig;
-}
-
-/**
- * Export configuration interface.
- *
- * Configures data export options including available formats,
- * custom handlers, and export behavior.
- *
- * @template TData - The type of data being exported
- *
- * @example
- * ```typescript
- * const exportConfig: ExportConfig<User> = {
- *   formats: ['csv', 'excel', 'json'],
- *   defaultFormat: 'csv',
- *   customHandler: async (format, data) => {
- *     if (format === 'custom') {
- *       await customExport(data);
- *     }
- *   },
- *   includeHiddenColumns: false
- * };
- * ```
- */
-export interface ExportConfig<TData = unknown> {
-  /** Available export formats */
-  formats?: ('csv' | 'json' | 'excel')[];
-
-  /** Default export format to use */
-  defaultFormat?: 'csv' | 'json' | 'excel';
-
-  /** Custom export handler for special cases */
-  customHandler?: (format: string, data: TData[]) => void | Promise<void>;
-
-  /** Whether to include hidden columns in exports */
-  includeHiddenColumns?: boolean;
 }
 
 /**

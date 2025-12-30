@@ -102,6 +102,43 @@ export function MyTable() {
 - **FilterInput**: Individual filter input components for each data type
 - **Table**: Full-featured table with sorting, pagination, and selection
 - **ActiveFilters**: Display and manage active filters
+- **ExportButton**: Dropdown button for triggering CSV, Excel, or JSON exports
+- **ExportDialog**: Advanced export configuration dialog with column selection
+
+## Export Features
+
+Export your table data with built-in progress tracking and batch processing:
+
+```tsx
+import { BetterTable } from '@better-tables/ui';
+
+<BetterTable
+  columns={columns}
+  data={data}
+  export={{
+    enabled: true,
+    adapter: exportAdapter,
+    formats: ['csv', 'excel', 'json'],
+    filename: 'my-data',
+    batchSize: 1000,
+    onComplete: (result) => {
+      console.log(`Exported ${result.rowCount} rows`);
+    },
+  }}
+/>
+```
+
+Or use the `useExport` hook for custom implementations:
+
+```tsx
+import { useExport } from '@better-tables/ui';
+
+const { startExport, cancelExport, progress, isExporting } = useExport({
+  columns,
+  adapter,
+  onComplete: (result) => toast.success('Export complete!'),
+});
+```
 
 ## Customization
 

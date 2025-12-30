@@ -9,6 +9,7 @@
 
 import type { ColumnType } from './column';
 import type { DataEvent } from './common';
+import type { ExportResult } from './export';
 import type { FilterOperator, FilterOption, FilterState } from './filter';
 import type { PaginationParams } from './pagination';
 import type { SortingParams } from './sorting';
@@ -160,30 +161,6 @@ export interface ExportParams {
   includeHeaders?: boolean;
   /** Additional format-specific options */
   options?: Record<string, unknown>;
-}
-
-/**
- * Result from data export operation.
- *
- * Contains the exported data as a blob or string along with
- * metadata about the export file.
- *
- * @example
- * ```typescript
- * const exportResult: ExportResult = {
- *   data: new Blob(['name,email\nJohn,john@example.com'], { type: 'text/csv' }),
- *   filename: 'users.csv',
- *   mimeType: 'text/csv'
- * };
- * ```
- */
-export interface ExportResult {
-  /** Exported data as blob or string */
-  data: Blob | string;
-  /** Suggested filename for the export */
-  filename: string;
-  /** MIME type of the exported data */
-  mimeType: string;
 }
 
 /**

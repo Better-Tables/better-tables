@@ -1,5 +1,6 @@
 'use client';
 
+import type { ExportFormat, ExportProgress, ExportResult } from '@better-tables/core';
 import {
   type ColumnDefinition,
   type ColumnVisibility,
@@ -10,14 +11,16 @@ import {
   getTableStore,
   type PaginationState,
   type SortingState,
+  type TableAdapter,
   type TableConfig,
   type UrlSyncAdapter,
   type UrlSyncConfig,
 } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, GripVertical } from 'lucide-react';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
+import { useExport } from '../../hooks/use-export';
 import {
   useTableColumnOrder,
   useTableColumnVisibility,
@@ -36,9 +39,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { ActionsToolbar } from './actions-toolbar';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
+import { ExportButton } from './export-button';
+import { ExportDialog } from './export-dialog';
 import { TableHeaderContextMenu } from './table-header-context-menu';
 import { TablePagination } from './table-pagination';
 import { TableProviders } from './table-providers';
+import { Button } from '../ui/button';
 
 /**
  * UI-specific props for the BetterTable component
@@ -138,6 +144,36 @@ export interface BetterTableProps<TData = unknown>
    * Protected filters will be shown with a lock icon and cannot be removed.
    */
   isFilterProtected?: (filter: FilterState) => boolean;
+
+  /** Export configuration */
+  export?: {
+    /** Enable export functionality */
+    enabled?: boolean;
+    /** Table adapter for fetching data during export */
+    adapter?: TableAdapter<TData>;
+    /** Available export formats (default: ['csv', 'excel', 'json']) */
+    formats?: ExportFormat[];
+    /** Default filename for exports (without extension) */
+    filename?: string;
+    /** Custom value transformer for export */
+    valueTransformer?: (
+      value: unknown,
+      row: TData,
+      column: ColumnDefinition<TData>
+    ) => string | number | boolean | Date | null;
+    /** Callback when export completes */
+    onComplete?: (result: ExportResult) => void;
+    /** Callback when export fails */
+    onError?: (error: Error) => void;
+    /** Callback for export progress updates */
+    onProgress?: (progress: ExportProgress) => void;
+    /** Whether to automatically download on completion (default: true) */
+    autoDownload?: boolean;
+    /** Batch size for export processing (default: 1000) */
+    batchSize?: number;
+    /** Show advanced export dialog with column selection (default: true) */
+    showDialog?: boolean;
+  };
 }
 
 export function BetterTable<TData = unknown>({
@@ -183,6 +219,9 @@ export function BetterTable<TData = unknown>({
 
   // Filter protection
   isFilterProtected,
+
+  // Export props
+  export: exportConfig,
   ...props
 }: BetterTableProps<TData>) {
   const {
@@ -280,6 +319,75 @@ export function BetterTable<TData = unknown>({
       columnOrder: false,
     },
     urlAdapter
+  );
+
+  // Set up export functionality if enabled and adapter is provided
+  const exportEnabled = Boolean(exportConfig?.enabled && exportConfig?.adapter);
+  const exportAdapter = exportConfig?.adapter;
+
+  // Export hook - only meaningful when adapter is provided
+  const exportHook = useExport({
+    columns: columnsWithDefaults,
+    adapter: exportAdapter as TableAdapter<TData>,
+    filters,
+    sorting: sortingState,
+    valueTransformer: exportConfig?.valueTransformer,
+    onComplete: exportConfig?.onComplete,
+    onError: exportConfig?.onError,
+    onProgress: exportConfig?.onProgress,
+    autoDownload: exportConfig?.autoDownload ?? true,
+  });
+
+  // Handle simple export action (format only)
+  const handleExportFormat = useCallback(
+    (format: ExportFormat) => {
+      if (!exportEnabled) return;
+      exportHook.startExport({
+        format,
+        filename: exportConfig?.filename ?? `${id}-export`,
+        filters,
+        sorting: sortingState,
+        batch: { batchSize: exportConfig?.batchSize ?? 1000 },
+      });
+    },
+    [
+      exportHook,
+      exportConfig?.filename,
+      exportConfig?.batchSize,
+      id,
+      filters,
+      sortingState,
+      exportEnabled,
+    ]
+  );
+
+  // Handle advanced export action (full config with column selection)
+  const handleExportConfig = useCallback(
+    (config: {
+      format: ExportFormat;
+      filename?: string;
+      columns?: Array<{ columnId: string }>;
+      batch?: { batchSize: number };
+    }) => {
+      if (!exportEnabled) return;
+      exportHook.startExport({
+        format: config.format,
+        filename: config.filename ?? exportConfig?.filename ?? `${id}-export`,
+        columns: config.columns,
+        filters,
+        sorting: sortingState,
+        batch: config.batch ?? { batchSize: exportConfig?.batchSize ?? 1000 },
+      });
+    },
+    [
+      exportHook,
+      exportConfig?.filename,
+      exportConfig?.batchSize,
+      id,
+      filters,
+      sortingState,
+      exportEnabled,
+    ]
   );
 
   // Cleanup store on unmount to prevent memory leaks
@@ -620,6 +728,37 @@ export function BetterTable<TData = unknown>({
             }}
           />
         )}
+
+        {/* Export - show when export is enabled */}
+        {exportEnabled &&
+          (exportConfig?.showDialog !== false ? (
+            <ExportDialog
+              columns={columnsWithDefaults}
+              totalRows={totalCount ?? 0}
+              onExport={handleExportConfig}
+              isExporting={exportHook.isExporting}
+              progress={exportHook.progress}
+              lastResult={exportHook.lastResult}
+              onCancel={exportHook.cancelExport}
+              formats={exportConfig?.formats ?? ['csv', 'excel', 'json']}
+              defaultFilename={exportConfig?.filename ?? `${id}-export`}
+              trigger={
+                <Button variant="outline" size="default">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              }
+            />
+          ) : (
+            <ExportButton
+              onExport={handleExportFormat}
+              isExporting={exportHook.isExporting}
+              progress={exportHook.progress}
+              onCancel={exportHook.cancelExport}
+              formats={exportConfig?.formats ?? ['csv', 'excel', 'json']}
+              totalRows={totalCount}
+            />
+          ))}
 
         {/* Filter Bar - only show when filtering is enabled */}
         {filtering && (

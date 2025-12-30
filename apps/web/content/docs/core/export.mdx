@@ -1,0 +1,748 @@
+---
+title: Export API Reference
+description: API reference for data export functionality in Better Tables
+---
+
+## Overview
+
+Better Tables provides comprehensive data export functionality with support for CSV, Excel, and JSON formats. The export system is designed for efficient batch processing of large datasets with progress tracking and cancellation support.
+
+## Table of Contents
+
+- [ExportManager](#exportmanager)
+- [Export Types](#export-types)
+- [Export Utilities](#export-utilities)
+- [React Integration](#react-integration)
+- [UI Components](#ui-components)
+- [Examples](#examples)
+- [Best Practices](#best-practices)
+
+## ExportManager
+
+The `ExportManager` class handles data export operations with batch processing and progress tracking.
+
+### API
+
+```typescript
+class ExportManager<TData = unknown> {
+  constructor(
+    columns: ColumnDefinition<TData>[],
+    options: {
+      dataFetcher: ExportDataFetcher<TData>;
+      valueTransformer?: ExportValueTransformer<TData>;
+    }
+  );
+
+  // Export operations
+  export(config: ExportConfig): Promise<ExportResult>;
+  cancel(): void;
+
+  // State
+  getProgress(): ExportProgress | null;
+  isExporting(): boolean;
+
+  // Event subscription
+  subscribe(callback: ExportEventSubscriber): () => void;
+}
+```
+
+### Basic Usage
+
+```typescript
+import { ExportManager, createExportManager } from '@better-tables/core';
+
+// Create export manager with a data fetcher
+const exportManager = new ExportManager(columns, {
+  dataFetcher: async ({ offset, limit, filters, sorting }) => {
+    const response = await fetch('/api/data', {
+      method: 'POST',
+      body: JSON.stringify({ offset, limit, filters, sorting }),
+    });
+    const result = await response.json();
+    return { data: result.items, total: result.total };
+  },
+});
+
+// Subscribe to progress events
+const unsubscribe = exportManager.subscribe((event) => {
+  switch (event.type) {
+    case 'start':
+      console.log(`Starting export of ${event.totalRows} rows`);
+      break;
+    case 'progress':
+      console.log(`Progress: ${event.progress.percentage}%`);
+      break;
+    case 'complete':
+      console.log(`Export complete: ${event.result.filename}`);
+      break;
+    case 'error':
+      console.error('Export failed:', event.error);
+      break;
+  }
+});
+
+// Start export
+const result = await exportManager.export({
+  format: 'csv',
+  filename: 'users-export',
+  batch: { batchSize: 1000 },
+});
+
+if (result.success && result.data) {
+  // Download the file
+  downloadBlob(result.data, result.filename);
+}
+```
+
+### Export with Custom Value Transformer
+
+```typescript
+const exportManager = new ExportManager(columns, {
+  dataFetcher: fetchData,
+  valueTransformer: (value, row, column) => {
+    // Format dates
+    if (column.type === 'date' && value instanceof Date) {
+      return value.toLocaleDateString();
+    }
+    // Format booleans
+    if (column.type === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    // Format options
+    if (column.type === 'option' && column.meta?.options) {
+      const option = column.meta.options.find(o => o.value === value);
+      return option?.label ?? value;
+    }
+    return value;
+  },
+});
+```
+
+### Factory Function
+
+For convenience, use the `createExportManager` factory with a table adapter:
+
+```typescript
+import { createExportManager } from '@better-tables/core';
+
+const exportManager = createExportManager(columns, adapter, valueTransformer);
+```
+
+## Export Types
+
+### ExportFormat
+
+```typescript
+type ExportFormat = 'csv' | 'excel' | 'json';
+```
+
+### ExportConfig
+
+```typescript
+interface ExportConfig {
+  /** Export format */
+  format: ExportFormat;
+
+  /** Output filename (without extension) */
+  filename?: string;
+
+  /** Column configurations for export */
+  columns?: ExportColumnConfig[];
+
+  /** Filter to apply when fetching data */
+  filters?: FilterState[];
+
+  /** Sorting to apply when fetching data */
+  sorting?: SortingParams[];
+
+  /** Batch processing configuration */
+  batch?: Partial<ExportBatchConfig>;
+
+  /** CSV-specific options */
+  csv?: CsvExportOptions;
+
+  /** Excel-specific options */
+  excel?: ExcelExportOptions;
+
+  /** JSON-specific options */
+  json?: JsonExportOptions;
+
+  /** Abort signal for cancellation */
+  signal?: AbortSignal;
+}
+```
+
+### ExportBatchConfig
+
+```typescript
+interface ExportBatchConfig {
+  /** Number of rows to process per batch (default: 1000) */
+  batchSize: number;
+
+  /** Delay in milliseconds between batches for UI responsiveness */
+  delayBetweenBatches?: number;
+
+  /** Callback invoked after each batch is processed */
+  onBatchComplete?: (processedRows: number, totalRows: number) => void;
+}
+```
+
+### ExportProgress
+
+```typescript
+interface ExportProgress {
+  /** Current export status */
+  status: 'idle' | 'preparing' | 'exporting' | 'completed' | 'error' | 'cancelled';
+
+  /** Number of rows processed */
+  processedRows: number;
+
+  /** Total number of rows to export */
+  totalRows: number;
+
+  /** Percentage complete (0-100) */
+  percentage: number;
+
+  /** Current batch number */
+  currentBatch: number;
+
+  /** Total number of batches */
+  totalBatches: number;
+
+  /** Estimated time remaining in milliseconds */
+  estimatedTimeRemaining?: number;
+}
+```
+
+### ExportResult
+
+```typescript
+interface ExportResult {
+  /** Whether export was successful */
+  success: boolean;
+
+  /** Exported data as Blob */
+  data?: Blob;
+
+  /** Suggested filename with extension */
+  filename: string;
+
+  /** MIME type of the exported data */
+  mimeType: string;
+
+  /** Number of rows exported */
+  rowCount: number;
+
+  /** File size in bytes */
+  fileSize?: number;
+
+  /** Export duration in milliseconds */
+  duration?: number;
+
+  /** Error message if not successful */
+  error?: string;
+}
+```
+
+### Format-Specific Options
+
+#### CsvExportOptions
+
+```typescript
+interface CsvExportOptions {
+  /** Field delimiter (default: ',') */
+  delimiter?: string;
+
+  /** Whether to include column headers (default: true) */
+  includeHeaders?: boolean;
+
+  /** Whether to quote string values (default: true) */
+  quoteStrings?: boolean;
+
+  /** Line ending character(s) (default: '\r\n') */
+  lineEnding?: string;
+
+  /** Value to use for null/undefined (default: '') */
+  nullValue?: string;
+
+  /** Whether to include BOM for UTF-8 (default: true) */
+  includeBom?: boolean;
+}
+```
+
+#### ExcelExportOptions
+
+```typescript
+interface ExcelExportOptions {
+  /** Worksheet name (default: 'Sheet1') */
+  sheetName?: string;
+
+  /** Whether to freeze the header row (default: true) */
+  freezeHeader?: boolean;
+
+  /** Whether to add auto-filter to columns (default: true) */
+  autoFilter?: boolean;
+
+  /** Whether to auto-fit column widths (default: true) */
+  autoFitColumns?: boolean;
+
+  /** Header row style */
+  headerStyle?: ExcelCellStyle;
+}
+```
+
+#### JsonExportOptions
+
+```typescript
+interface JsonExportOptions {
+  /** Whether to format with indentation (default: false) */
+  pretty?: boolean;
+
+  /** Indentation spaces when pretty is true (default: 2) */
+  indentation?: number;
+
+  /** Whether to include export metadata (default: false) */
+  includeMetadata?: boolean;
+}
+```
+
+## Export Utilities
+
+### CsvStreamGenerator
+
+For memory-efficient CSV generation with large datasets:
+
+```typescript
+import { CsvStreamGenerator } from '@better-tables/core';
+
+const generator = new CsvStreamGenerator(columns, {
+  delimiter: ',',
+  includeHeaders: true,
+});
+
+// Process data in chunks
+for (const chunk of dataChunks) {
+  for (const line of generator.generateLines(chunk)) {
+    await writeToStream(line);
+  }
+}
+```
+
+### Helper Functions
+
+```typescript
+import {
+  formatFileSize,
+  formatDuration,
+  generateExportFilename,
+  sanitizeFilename,
+  triggerDownload,
+} from '@better-tables/core';
+
+// Format file size for display
+formatFileSize(1024 * 1024); // "1.0 MB"
+
+// Format duration
+formatDuration(65000); // "1m 5s"
+
+// Generate timestamped filename
+generateExportFilename('users', 'csv'); // "users-20240101T120000.csv"
+
+// Sanitize filename for file system
+sanitizeFilename('file:name.csv'); // "file_name.csv"
+
+// Trigger browser download
+triggerDownload(blob, 'export.csv');
+```
+
+## React Integration
+
+### useExport Hook
+
+The `useExport` hook provides complete export state management for React:
+
+```tsx
+import { useExport } from '@better-tables/ui';
+
+function ExportSection() {
+  const {
+    startExport,
+    cancelExport,
+    progress,
+    isExporting,
+    lastResult,
+    error,
+    clearError,
+    downloadResult,
+  } = useExport({
+    columns,
+    adapter,
+    filters: currentFilters,
+    sorting: currentSorting,
+    autoDownload: true,
+    onComplete: (result) => {
+      toast.success(`Exported ${result.rowCount} rows`);
+    },
+    onError: (error) => {
+      toast.error(`Export failed: ${error.message}`);
+    },
+    onProgress: (progress) => {
+      console.log(`${progress.percentage}% complete`);
+    },
+  });
+
+  return (
+    <div>
+      <button
+        onClick={() => startExport({ format: 'csv', filename: 'data' })}
+        disabled={isExporting}
+      >
+        {isExporting ? `Exporting ${progress?.percentage}%...` : 'Export CSV'}
+      </button>
+      {isExporting && (
+        <button onClick={cancelExport}>Cancel</button>
+      )}
+      {error && (
+        <div className="error">
+          {error.message}
+          <button onClick={clearError}>Dismiss</button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### useQuickExport Hook
+
+For simple export scenarios:
+
+```tsx
+import { useQuickExport } from '@better-tables/ui';
+
+function QuickExportButtons() {
+  const { exportToCsv, exportToExcel, exportToJson, isExporting } = useQuickExport({
+    columns,
+    adapter,
+  });
+
+  return (
+    <div>
+      <button onClick={() => exportToCsv('users')} disabled={isExporting}>
+        CSV
+      </button>
+      <button onClick={() => exportToExcel('users')} disabled={isExporting}>
+        Excel
+      </button>
+      <button onClick={() => exportToJson('users')} disabled={isExporting}>
+        JSON
+      </button>
+    </div>
+  );
+}
+```
+
+## UI Components
+
+### ExportButton
+
+A dropdown button for format selection:
+
+```tsx
+import { ExportButton } from '@better-tables/ui';
+
+<ExportButton
+  onExport={(format) => startExport({ format })}
+  isExporting={isExporting}
+  progress={progress}
+  onCancel={cancelExport}
+  formats={['csv', 'excel', 'json']}
+  totalRows={1500}
+/>
+```
+
+### ExportDialog
+
+A dialog for advanced export configuration:
+
+```tsx
+import { ExportDialog } from '@better-tables/ui';
+
+<ExportDialog
+  columns={columns}
+  totalRows={1500}
+  onExport={startExport}
+  isExporting={isExporting}
+  progress={progress}
+  lastResult={lastResult}
+  onCancel={cancelExport}
+  defaultFilename="users-export"
+  trigger={
+    <Button>
+      <Download className="mr-2 h-4 w-4" />
+      Export Data
+    </Button>
+  }
+/>
+```
+
+### BetterTable Integration
+
+Export is integrated directly into the BetterTable component:
+
+```tsx
+import { BetterTable } from '@better-tables/ui';
+
+<BetterTable
+  id="users-table"
+  columns={columns}
+  data={data}
+  totalCount={totalCount}
+  export={{
+    enabled: true,
+    adapter: exportAdapter,
+    formats: ['csv', 'excel', 'json'],
+    filename: 'users-export',
+    batchSize: 500,
+    onComplete: (result) => {
+      console.log(`Exported ${result.rowCount} rows`);
+    },
+    onError: (error) => {
+      console.error('Export failed:', error);
+    },
+  }}
+/>
+```
+
+## Examples
+
+### Server-Side Export API
+
+Create an API endpoint for export data fetching:
+
+```typescript
+// app/api/export/route.ts (Next.js)
+import { NextResponse } from 'next/server';
+import { getAdapter } from '@/lib/adapter';
+
+export async function POST(request: Request) {
+  const { offset, limit, filters, sorting } = await request.json();
+
+  const adapter = await getAdapter();
+  const page = Math.floor(offset / limit) + 1;
+
+  const result = await adapter.fetchData({
+    pagination: { page, limit },
+    filters,
+    sorting,
+  });
+
+  return NextResponse.json({
+    data: result.data,
+    total: result.total,
+  });
+}
+```
+
+### Client-Side Export Adapter
+
+Create an adapter that fetches from your API:
+
+```typescript
+const exportAdapter = useMemo(() => ({
+  fetchData: async (params) => {
+    const { pagination, filters, sorting } = params;
+    const offset = pagination ? (pagination.page - 1) * pagination.limit : 0;
+    const limit = pagination?.limit ?? 100;
+
+    const response = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offset, limit, filters, sorting }),
+    });
+
+    const result = await response.json();
+    return {
+      data: result.data,
+      total: result.total,
+      pagination: {
+        page: Math.floor(offset / limit) + 1,
+        limit,
+        totalPages: Math.ceil(result.total / limit),
+        hasNext: offset + limit < result.total,
+        hasPrev: offset > 0,
+      },
+    };
+  },
+  // ... other required adapter methods
+}), []);
+```
+
+### Export with Column Selection
+
+The export system allows users to select which columns to include in the export. This is particularly useful when:
+- The table has many columns but users only need specific data
+- You want to provide custom column headers for exports
+- You need to exclude sensitive or internal columns
+
+**Programmatic Column Selection:**
+
+```typescript
+const result = await exportManager.export({
+  format: 'csv',
+  filename: 'users-export',
+  columns: [
+    { columnId: 'name', header: 'Full Name' },
+    { columnId: 'email', header: 'Email Address' },
+    { columnId: 'createdAt', header: 'Registration Date' },
+  ],
+});
+```
+
+**Column Selection Options:**
+
+```typescript
+interface ExportColumnConfig {
+  /** Column ID to include */
+  columnId: string;
+  /** Custom header name (optional) */
+  header?: string;
+  /** Whether to include this column (default: true) */
+  include?: boolean;
+}
+```
+
+**Using the ExportDialog Component:**
+
+The `ExportDialog` component provides a user-friendly interface for column selection:
+
+```tsx
+import { ExportDialog } from '@better-tables/ui';
+
+<ExportDialog
+  columns={columns}
+  totalRows={1500}
+  onExport={(config) => startExport(config)}
+  isExporting={isExporting}
+  progress={progress}
+  formats={['csv', 'excel', 'json']}
+  defaultFilename="users-export"
+  trigger={<Button>Export Data</Button>}
+/>
+```
+
+The dialog provides:
+- **Format selection**: Choose between CSV, Excel, and JSON
+- **Column checkboxes**: Select/deselect individual columns
+- **Select All / None**: Quick bulk selection buttons
+- **Custom filename**: Override the default filename
+- **Batch size control**: Adjust processing batch size
+- **Progress indicator**: Visual progress during export
+
+### Export with Custom Formatting
+
+```typescript
+const result = await exportManager.export({
+  format: 'excel',
+  filename: 'sales-report',
+  excel: {
+    sheetName: 'Sales Data',
+    freezeHeader: true,
+    autoFilter: true,
+    headerStyle: {
+      bold: true,
+      backgroundColor: '#4472C4',
+      fontColor: '#FFFFFF',
+    },
+  },
+});
+```
+
+## Best Practices
+
+### 1. Batch Size Selection
+
+Choose an appropriate batch size based on your data:
+
+```typescript
+// Small rows (few columns, simple data)
+{ batchSize: 2000 }
+
+// Medium rows (10-20 columns)
+{ batchSize: 1000 }
+
+// Large rows (many columns, nested data)
+{ batchSize: 500 }
+
+// Very large rows (complex objects)
+{ batchSize: 100 }
+```
+
+### 2. Error Handling
+
+Always handle export errors gracefully:
+
+```typescript
+const result = await exportManager.export(config);
+
+if (!result.success) {
+  if (result.error === 'Export cancelled') {
+    // User cancelled - no action needed
+    return;
+  }
+  // Show error to user
+  showError(`Export failed: ${result.error}`);
+  return;
+}
+
+// Success
+showSuccess(`Exported ${result.rowCount} rows`);
+```
+
+### 3. Progress Feedback
+
+Provide meaningful progress feedback for large exports:
+
+```tsx
+{isExporting && progress && (
+  <div className="export-progress">
+    <div className="progress-bar" style={{ width: `${progress.percentage}%` }} />
+    <span>
+      Exporting {progress.processedRows.toLocaleString()} of {progress.totalRows.toLocaleString()} rows
+      {progress.estimatedTimeRemaining && (
+        <> - ~{formatDuration(progress.estimatedTimeRemaining)} remaining</>
+      )}
+    </span>
+  </div>
+)}
+```
+
+### 4. Cancellation Support
+
+Allow users to cancel long-running exports:
+
+```tsx
+<button onClick={cancelExport} disabled={!isExporting}>
+  Cancel Export
+</button>
+```
+
+### 5. Memory Management
+
+For very large datasets, consider streaming exports:
+
+```typescript
+// Use batch delays to allow garbage collection
+{
+  batchSize: 500,
+  delayBetweenBatches: 10, // 10ms delay between batches
+}
+```
+
+## Related Documentation
+
+- [Managers API Reference](./managers)
+- [Column Builders Guide](./column-builders)
+- [UI Components](../ui/components)
+- [React Hooks](../ui/hooks)
+
