@@ -7,6 +7,7 @@ export * from './auto-group-filters';
 export * from './column-order';
 export * from './column-visibility';
 export * from './compression';
+export * from './create-export-adapter';
 export * from './equality';
 export * from './export-utils';
 export * from './filter-serialization';

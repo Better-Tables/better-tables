@@ -4,6 +4,8 @@ import type { ExportFormat, ExportProgress, ExportResult } from '@better-tables/
 import {
   type ColumnDefinition,
   type ColumnVisibility,
+  createApiExportAdapter,
+  createInMemoryExportAdapter,
   destroyTableStore,
   type FilterState,
   getFormatterForType,
@@ -32,6 +34,7 @@ import {
 import { useTableUrlSync } from '../../hooks/use-table-url-sync';
 import { cn } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
+import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -44,7 +47,6 @@ import { ExportDialog } from './export-dialog';
 import { TableHeaderContextMenu } from './table-header-context-menu';
 import { TablePagination } from './table-pagination';
 import { TableProviders } from './table-providers';
-import { Button } from '../ui/button';
 
 /**
  * UI-specific props for the BetterTable component
@@ -149,8 +151,18 @@ export interface BetterTableProps<TData = unknown>
   export?: {
     /** Enable export functionality */
     enabled?: boolean;
-    /** Table adapter for fetching data during export */
+
+    /**
+     * API endpoint for fetching export data.
+     * Simplifies configuration - no need to create an adapter.
+     * The endpoint should accept POST with {offset, limit, filters, sorting}
+     * and return {data: TData[], total: number}.
+     */
+    url?: string;
+
+    /** Table adapter for fetching data during export (alternative to url) */
     adapter?: TableAdapter<TData>;
+
     /** Available export formats (default: ['csv', 'excel', 'json']) */
     formats?: ExportFormat[];
     /** Default filename for exports (without extension) */
@@ -321,11 +333,30 @@ export function BetterTable<TData = unknown>({
     urlAdapter
   );
 
-  // Set up export functionality if enabled and adapter is provided
-  const exportEnabled = Boolean(exportConfig?.enabled && exportConfig?.adapter);
-  const exportAdapter = exportConfig?.adapter;
+  // Set up export functionality
+  // Export is enabled if: enabled=true AND (adapter OR url OR data is provided)
+  const hasExportDataSource = Boolean(
+    exportConfig?.adapter || exportConfig?.url || (data && data.length > 0)
+  );
+  const exportEnabled = Boolean(exportConfig?.enabled && hasExportDataSource);
 
-  // Export hook - only meaningful when adapter is provided
+  // Auto-create adapter from url or data if no adapter provided
+  const exportAdapter = useMemo((): TableAdapter<TData> | null => {
+    if (!exportConfig?.enabled) return null;
+    // Use provided adapter first
+    if (exportConfig.adapter) return exportConfig.adapter;
+    // Create adapter from URL
+    if (exportConfig.url) {
+      return createApiExportAdapter<TData>({ url: exportConfig.url });
+    }
+    // Use table data directly (for small datasets already in memory)
+    if (data && data.length > 0) {
+      return createInMemoryExportAdapter<TData>(data);
+    }
+    return null;
+  }, [exportConfig?.enabled, exportConfig?.adapter, exportConfig?.url, data]);
+
+  // Export hook - only meaningful when adapter is available
   const exportHook = useExport({
     columns: columnsWithDefaults,
     adapter: exportAdapter as TableAdapter<TData>,
@@ -367,7 +398,8 @@ export function BetterTable<TData = unknown>({
       format: ExportFormat;
       filename?: string;
       columns?: Array<{ columnId: string }>;
-      batch?: { batchSize: number };
+      batch?: { batchSize?: number };
+      exportSelectedOnly?: boolean;
     }) => {
       if (!exportEnabled) return;
       exportHook.startExport({
@@ -376,7 +408,12 @@ export function BetterTable<TData = unknown>({
         columns: config.columns,
         filters,
         sorting: sortingState,
-        batch: config.batch ?? { batchSize: exportConfig?.batchSize ?? 1000 },
+        batch: {
+          batchSize: config.batch?.batchSize ?? exportConfig?.batchSize ?? 1000,
+        },
+        // If exporting selected only, pass the selected IDs
+        selectedIds: config.exportSelectedOnly ? Array.from(selectedRows) : undefined,
+        scope: config.exportSelectedOnly ? 'selected' : 'all',
       });
     },
     [
@@ -387,6 +424,7 @@ export function BetterTable<TData = unknown>({
       filters,
       sortingState,
       exportEnabled,
+      selectedRows,
     ]
   );
 
@@ -740,8 +778,10 @@ export function BetterTable<TData = unknown>({
               progress={exportHook.progress}
               lastResult={exportHook.lastResult}
               onCancel={exportHook.cancelExport}
+              onReset={exportHook.clearLastResult}
               formats={exportConfig?.formats ?? ['csv', 'excel', 'json']}
               defaultFilename={exportConfig?.filename ?? `${id}-export`}
+              selectedRowCount={selectedRows.size}
               trigger={
                 <Button variant="outline" size="default">
                   <Download className="mr-2 h-4 w-4" />

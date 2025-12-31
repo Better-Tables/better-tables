@@ -85,6 +85,9 @@ export interface UseExportReturn {
   /** Clear the current error */
   clearError: () => void;
 
+  /** Clear the last result to start a new export */
+  clearLastResult: () => void;
+
   /** Download the last export result */
   downloadResult: () => void;
 
@@ -233,6 +236,7 @@ export function useExport<TData = unknown>(options: UseExportOptions<TData>): Us
   const startExport = useCallback(
     async (config: Partial<ExportConfig>): Promise<ExportResult> => {
       setError(null);
+      setLastResult(null);
       const fullConfig: ExportConfig = {
         format: config.format ?? 'csv',
         filename: config.filename ?? 'export',
@@ -261,6 +265,12 @@ export function useExport<TData = unknown>(options: UseExportOptions<TData>): Us
   }, []);
 
   /**
+   * Clear the last result to start a new export.
+   */
+  const clearLastResult = useCallback(() => {
+    setLastResult(null);
+  }, []);
+  /**
    * Download the last export result.
    */
   const downloadResult = useCallback(() => {
@@ -287,6 +297,7 @@ export function useExport<TData = unknown>(options: UseExportOptions<TData>): Us
     lastResult,
     error,
     clearError,
+    clearLastResult,
     downloadResult,
     getEstimatedTime,
   };

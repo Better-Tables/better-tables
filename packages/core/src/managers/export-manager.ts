@@ -7,6 +7,7 @@
  * @module managers/export-manager
  */
 
+import ExcelJS from 'exceljs';
 import type { ColumnDefinition } from '../types/column';
 import type {
   CsvExportOptions,
@@ -358,8 +359,7 @@ export class ExportManager<TData = unknown> {
   }
 
   /**
-   * Generate Excel blob using a simple XML-based approach.
-   * For production use with ExcelJS, this would use the streaming API.
+   * Generate Excel blob using ExcelJS for proper XLSX format.
    */
   private async generateExcelBlob(
     data: TData[],
@@ -367,136 +367,76 @@ export class ExportManager<TData = unknown> {
     options?: ExcelExportOptions
   ): Promise<Blob> {
     const opts = { ...DEFAULT_EXCEL_OPTIONS, ...options };
-    // Use simple XML spreadsheet format for browser compatibility
-    // TODO: FIXME: use ExcelJS with streaming for large datasets
-    const xmlContent = this.generateExcelXml(data, columns, opts);
-    return new Blob([xmlContent], { type: EXPORT_MIME_TYPES.excel });
-  }
-
-  /**
-   * Generate Excel XML content.
-   * This creates an Office Open XML format spreadsheet.
-   */
-  private generateExcelXml(
-    data: TData[],
-    columns: ColumnDefinition<TData>[],
-    options: Required<ExcelExportOptions>
-  ): string {
-    const rows: string[] = [];
-    // Header row
-    const headerCells = columns
-      .map((col, idx) => {
-        const cellRef = this.getCellRef(idx, 0);
-        return `<c r="${cellRef}" t="inlineStr"><is><t>${this.escapeXml(col.displayName)}</t></is></c>`;
-      })
-      .join('');
-    rows.push(`<row r="1">${headerCells}</row>`);
-    // Data rows
-    for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
-      const row = data[rowIdx];
-      const cells = columns
-        .map((col, colIdx) => {
-          const rawValue = col.accessor(row);
-          const value = this.transformValue(rawValue, row, col);
-          const cellRef = this.getCellRef(colIdx, rowIdx + 1);
-          return this.createExcelCell(cellRef, value);
-        })
-        .join('');
-      rows.push(`<row r="${rowIdx + 2}">${cells}</row>`);
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Better Tables';
+    workbook.created = new Date();
+    const worksheet = workbook.addWorksheet(opts.sheetName, {
+      views: opts.freezeHeader ? [{ state: 'frozen', ySplit: 1 }] : undefined,
+    });
+    // Define columns with headers and widths
+    worksheet.columns = columns.map((col) => ({
+      header: col.displayName,
+      key: col.id,
+      width: col.width ?? 15,
+    }));
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    if (opts.headerStyle) {
+      headerRow.font = {
+        bold: opts.headerStyle.bold ?? true,
+        color: opts.headerStyle.fontColor
+          ? { argb: opts.headerStyle.fontColor.replace('#', 'FF') }
+          : undefined,
+      };
+      if (opts.headerStyle.backgroundColor) {
+        headerRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: opts.headerStyle.backgroundColor.replace('#', 'FF') },
+        };
+      }
+      headerRow.alignment = { vertical: 'middle' };
+    } else {
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' },
+      };
+      headerRow.alignment = { vertical: 'middle' };
     }
-    // Column definitions for width
-    const colDefs = columns
-      .map((col, idx) => {
-        const width = col.width ?? 15;
-        return `<col min="${idx + 1}" max="${idx + 1}" width="${width}" customWidth="1"/>`;
-      })
-      .join('');
-    // Build the complete XLSX XML
-    const sheetData = rows.join('');
-    const dimension = `A1:${this.getCellRef(columns.length - 1, data.length)}`;
-    // Return the worksheet XML (simplified - in production would be a proper XLSX package)
-    return this.buildSpreadsheetXml(options.sheetName, dimension, colDefs, sheetData, options);
-  }
-
-  /**
-   * Build the complete spreadsheet XML package.
-   */
-  private buildSpreadsheetXml(
-    // TODO: Pass me using ExcelJS
-    _sheetName: string,
-    dimension: string,
-    colDefs: string,
-    sheetData: string,
-    options: Required<ExcelExportOptions>
-  ): string {
-    const freezePane = options.freezeHeader
-      ? '<sheetViews><sheetView tabSelected="1" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
-      : '';
-    const autoFilter = options.autoFilter ? `<autoFilter ref="${dimension}"/>` : '';
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-${freezePane}
-<dimension ref="${dimension}"/>
-<cols>${colDefs}</cols>
-<sheetData>${sheetData}</sheetData>
-${autoFilter}
-</worksheet>`;
-  }
-
-  /**
-   * Create an Excel cell element.
-   */
-  private createExcelCell(cellRef: string, value: unknown): string {
-    if (value === null || value === undefined) {
-      return `<c r="${cellRef}"/>`;
+    // Add data rows
+    for (const row of data) {
+      const rowData: Record<string, unknown> = {};
+      for (const col of columns) {
+        const rawValue = col.accessor(row);
+        const value = this.transformValue(rawValue, row, col);
+        rowData[col.id] = value;
+      }
+      worksheet.addRow(rowData);
     }
-    if (typeof value === 'number') {
-      return `<c r="${cellRef}" t="n"><v>${value}</v></c>`;
+    // Apply auto-filter if enabled
+    if (opts.autoFilter && columns.length > 0) {
+      worksheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: data.length + 1, column: columns.length },
+      };
     }
-    if (typeof value === 'boolean') {
-      return `<c r="${cellRef}" t="b"><v>${value ? 1 : 0}</v></c>`;
+    // Format number and date columns
+    for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+      const col = columns[colIdx];
+      const wsColumn = worksheet.getColumn(colIdx + 1);
+      if (col.type === 'number' || col.type === 'currency') {
+        wsColumn.numFmt = col.type === 'currency' ? '"$"#,##0.00' : '#,##0.00';
+      } else if (col.type === 'percentage') {
+        wsColumn.numFmt = '0.00%';
+      } else if (col.type === 'date') {
+        wsColumn.numFmt = 'yyyy-mm-dd';
+      }
     }
-    if (value instanceof Date) {
-      // Excel date serial number
-      const excelDate = this.dateToExcelSerial(value);
-      return `<c r="${cellRef}" t="n" s="1"><v>${excelDate}</v></c>`;
-    }
-    // String value
-    return `<c r="${cellRef}" t="inlineStr"><is><t>${this.escapeXml(String(value))}</t></is></c>`;
-  }
-
-  /**
-   * Convert column index to Excel column letter.
-   */
-  private getCellRef(colIndex: number, rowIndex: number): string {
-    let col = '';
-    let n = colIndex;
-    while (n >= 0) {
-      col = String.fromCharCode((n % 26) + 65) + col;
-      n = Math.floor(n / 26) - 1;
-    }
-    return `${col}${rowIndex + 1}`;
-  }
-
-  /**
-   * Convert Date to Excel serial number.
-   */
-  private dateToExcelSerial(date: Date): number {
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    const diff = date.getTime() - epoch.getTime();
-    return diff / (24 * 60 * 60 * 1000);
-  }
-
-  /**
-   * Escape XML special characters.
-   */
-  private escapeXml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new Blob([buffer], { type: EXPORT_MIME_TYPES.excel });
   }
 
   /**

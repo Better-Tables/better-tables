@@ -74,6 +74,9 @@ export interface ExportDialogProps<TData = unknown> {
   /** Callback to cancel export */
   onCancel?: () => void;
 
+  /** Callback to reset state for new export */
+  onReset?: () => void;
+
   /** Available export formats */
   formats?: ExportFormat[];
 
@@ -88,6 +91,15 @@ export interface ExportDialogProps<TData = unknown> {
 
   /** Callback when dialog open state changes */
   onOpenChange?: (open: boolean) => void;
+
+  /** Number of selected rows (if any) */
+  selectedRowCount?: number;
+
+  /** Whether to export only selected rows */
+  exportSelectedOnly?: boolean;
+
+  /** Callback when export selected toggle changes */
+  onExportSelectedChange?: (exportSelected: boolean) => void;
 }
 
 /**
@@ -160,11 +172,15 @@ export function ExportDialog<TData = unknown>({
   progress,
   lastResult,
   onCancel,
+  onReset,
   formats = ['csv', 'excel', 'json'],
   defaultFilename = 'export',
   trigger,
   open: controlledOpen,
   onOpenChange,
+  selectedRowCount = 0,
+  exportSelectedOnly = false,
+  onExportSelectedChange,
 }: ExportDialogProps<TData>): React.ReactElement {
   const [internalOpen, setInternalOpen] = React.useState(false);
   const [selectedFormat, setSelectedFormat] = React.useState<ExportFormat>('csv');
@@ -173,20 +189,42 @@ export function ExportDialog<TData = unknown>({
     new Set(columns.filter((c) => c.defaultVisible !== false).map((c) => c.id))
   );
   const [batchSize, setBatchSize] = React.useState(1000);
+  const [exportSelected, setExportSelected] = React.useState(exportSelectedOnly);
 
   const isOpen = controlledOpen ?? internalOpen;
   const setIsOpen = onOpenChange ?? setInternalOpen;
+  const hasSelectedRows = selectedRowCount > 0;
+  const rowsToExport = exportSelected && hasSelectedRows ? selectedRowCount : totalRows;
 
-  // Reset state when dialog opens
+  // Reset state when dialog opens OR when lastResult is cleared (for new export)
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !lastResult) {
       setSelectedFormat('csv');
       setFilename(defaultFilename);
       setSelectedColumns(
         new Set(columns.filter((c) => c.defaultVisible !== false).map((c) => c.id))
       );
     }
-  }, [isOpen, columns, defaultFilename]);
+  }, [isOpen, columns, defaultFilename, lastResult]);
+
+  // Handler to start a new export after completion
+  const handleNewExport = React.useCallback(() => {
+    // Clear parent state and reset local state
+    onReset?.();
+    setSelectedFormat('csv');
+    setFilename(defaultFilename);
+    setSelectedColumns(new Set(columns.filter((c) => c.defaultVisible !== false).map((c) => c.id)));
+    setExportSelected(false);
+  }, [columns, defaultFilename, onReset]);
+
+  // Handle export selected toggle
+  const handleExportSelectedToggle = React.useCallback(
+    (checked: boolean) => {
+      setExportSelected(checked);
+      onExportSelectedChange?.(checked);
+    },
+    [onExportSelectedChange]
+  );
 
   const handleColumnToggle = React.useCallback((columnId: string) => {
     setSelectedColumns((prev) => {
@@ -209,25 +247,36 @@ export function ExportDialog<TData = unknown>({
   }, []);
 
   const handleExport = React.useCallback(() => {
-    const config: ExportConfig = {
+    const config: ExportConfig & { exportSelectedOnly?: boolean } = {
       format: selectedFormat,
       filename,
       columns: Array.from(selectedColumns).map((id) => ({ columnId: id })),
       batch: { batchSize },
+      exportSelectedOnly: exportSelected && hasSelectedRows,
     };
     onExport(config);
-  }, [selectedFormat, filename, selectedColumns, batchSize, onExport]);
+  }, [
+    selectedFormat,
+    filename,
+    selectedColumns,
+    batchSize,
+    onExport,
+    exportSelected,
+    hasSelectedRows,
+  ]);
 
   const availableFormats = FORMAT_OPTIONS.filter((f) => formats.includes(f.value));
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Export Data</DialogTitle>
           <DialogDescription>
-            Export {totalRows.toLocaleString()} rows to your preferred format.
+            {hasSelectedRows && exportSelected
+              ? `Export ${selectedRowCount.toLocaleString()} selected rows to your preferred format.`
+              : `Export ${totalRows.toLocaleString()} rows to your preferred format.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -241,7 +290,7 @@ export function ExportDialog<TData = unknown>({
 
         {/* Configuration Form */}
         {!isExporting && !lastResult && (
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 overflow-y-auto flex-1 min-h-0">
             {/* Format Selection */}
             <div className="space-y-2">
               <Label>Format</Label>
@@ -272,6 +321,32 @@ export function ExportDialog<TData = unknown>({
                 })}
               </div>
             </div>
+
+            {/* Selected Rows Option */}
+            {hasSelectedRows && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="space-y-0.5">
+                    <div className="font-medium">Export Selected Rows Only</div>
+                    <div className="text-xs text-muted-foreground">
+                      Export {selectedRowCount.toLocaleString()} selected row
+                      {selectedRowCount !== 1 ? 's' : ''} instead of all{' '}
+                      {totalRows.toLocaleString()}
+                    </div>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={exportSelected}
+                      onChange={(e) => handleExportSelectedToggle(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <div className="peer h-5 w-9 rounded-full bg-muted peer-checked:bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary peer-focus:ring-offset-2 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-background after:shadow after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+              </>
+            )}
 
             <Separator />
 
@@ -350,13 +425,21 @@ export function ExportDialog<TData = unknown>({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           {isExporting ? (
             <Button variant="outline" onClick={onCancel}>
               Cancel
             </Button>
           ) : lastResult ? (
-            <Button onClick={() => setIsOpen(false)}>Close</Button>
+            <div className="flex gap-2 w-full justify-end">
+              <Button variant="outline" onClick={() => setIsOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={handleNewExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export Another
+              </Button>
+            </div>
           ) : (
             <>
               <Button variant="outline" onClick={() => setIsOpen(false)}>
@@ -364,7 +447,7 @@ export function ExportDialog<TData = unknown>({
               </Button>
               <Button onClick={handleExport} disabled={selectedColumns.size === 0 || !filename}>
                 <Download className="mr-2 h-4 w-4" />
-                Export {totalRows.toLocaleString()} Rows
+                Export {rowsToExport.toLocaleString()} Row{rowsToExport !== 1 ? 's' : ''}
               </Button>
             </>
           )}
