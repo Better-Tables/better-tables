@@ -7,8 +7,8 @@
  * Note: Console output is intentional for CLI progress reporting.
  */
 import { reset, seed } from 'drizzle-seed';
-import * as schema from './schema';
 import { db } from './db';
+import * as schema from './schema';
 
 /**
  * Predefined categories with meaningful data
@@ -64,9 +64,9 @@ async function seedDatabase(): Promise<void> {
   console.log(`✅ Seeded ${categoriesData.length} categories`);
 
   // Seed users in batches (each batch has unique seed to avoid duplicate UUIDs)
-  console.log('👥 Seeding users (5000 total in batches)...');
+  console.log('👥 Seeding users (1000000 total in batches)...');
   const userBatchSize = 500;
-  const totalUsers = 5000;
+  const totalUsers = 1000000;
   const userBatches = Math.ceil(totalUsers / userBatchSize);
 
   for (let i = 0; i < userBatches; i++) {
@@ -185,9 +185,9 @@ async function seedDatabase(): Promise<void> {
   console.log(`✅ Seeded ${profileCount} profiles`);
 
   // Seed posts in batches
-  console.log('📰 Seeding posts (2000 total in batches)...');
+  console.log('📰 Seeding posts (100000 total in batches)...');
   const postBatchSize = 400;
-  const totalPosts = 2000;
+  const totalPosts = 100000;
   const postBatches = Math.ceil(totalPosts / postBatchSize);
 
   for (let i = 0; i < postBatches; i++) {
@@ -268,9 +268,9 @@ async function seedDatabase(): Promise<void> {
   console.log(`✅ Seeded ${postCategoryPairs.length} post-category relationships`);
 
   // Seed comments in batches
-  console.log('💬 Seeding comments (8000 total in batches)...');
+  console.log('💬 Seeding comments (100000 total in batches)...');
   const commentBatchSize = 500;
-  const totalComments = 8000;
+  const totalComments = 100000;
   const commentBatches = Math.ceil(totalComments / commentBatchSize);
 
   for (let i = 0; i < commentBatches; i++) {
