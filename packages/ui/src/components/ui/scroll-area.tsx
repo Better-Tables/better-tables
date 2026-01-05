@@ -13,7 +13,13 @@ type Mask = {
   right: boolean;
 };
 
-const ScrollArea = React.forwardRef<
+const ScrollArea: React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
+    viewportClassName?: string;
+    maskHeight?: number;
+    maskClassName?: string;
+  } & React.RefAttributes<React.ComponentRef<typeof ScrollAreaPrimitive.Root>>
+> = React.forwardRef<
   React.ComponentRef<typeof ScrollAreaPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
     viewportClassName?: string;
@@ -137,7 +143,10 @@ const ScrollArea = React.forwardRef<
 
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
 
-const ScrollBar = React.forwardRef<
+const ScrollBar: React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar> &
+    React.RefAttributes<React.ComponentRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>>
+> = React.forwardRef<
   React.ComponentRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
 >(({ className, orientation = 'vertical', ...props }, ref) => {

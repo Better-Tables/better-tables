@@ -5,7 +5,10 @@ import * as React from 'react';
 
 import { cn } from '../../lib/utils';
 
-const Switch = React.forwardRef<
+const Switch: React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> &
+    React.RefAttributes<React.ElementRef<typeof SwitchPrimitives.Root>>
+> = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
 >(({ className, ...props }, ref) => (

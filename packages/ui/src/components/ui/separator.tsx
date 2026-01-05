@@ -3,7 +3,10 @@ import * as React from 'react';
 
 import { cn } from '../../lib/utils';
 
-const Separator = React.forwardRef<
+const Separator: React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> &
+    React.RefAttributes<React.ElementRef<typeof SeparatorPrimitive.Root>>
+> = React.forwardRef<
   React.ElementRef<typeof SeparatorPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
 >(({ className, orientation = 'horizontal', decorative = true, ...props }, ref) => (
