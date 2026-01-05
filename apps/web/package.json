@@ -14,11 +14,11 @@
   },
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",
-    "fumadocs-core": "16.2.5",
-    "fumadocs-mdx": "14.1.0",
-    "fumadocs-ui": "16.2.5",
-    "lucide-react": "^0.556.0",
-    "next": "16.0.10",
+    "fumadocs-core": "16.4.3",
+    "fumadocs-mdx": "14.2.4",
+    "fumadocs-ui": "16.4.3",
+    "lucide-react": "^0.562.0",
+    "next": "16.1.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-syntax-highlighter": "^16.1.0"
