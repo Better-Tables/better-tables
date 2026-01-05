@@ -99,6 +99,7 @@ function HeroCTA() {
       >
         <Link
           href="https://github.com/Better-Tables/better-tables"
+          target="_blank"
           className={cn(
             buttonVariants({ variant: "default" }),
             "w-full sm:w-auto text-background flex gap-2 rounded-lg"
