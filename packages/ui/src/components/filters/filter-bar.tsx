@@ -3,7 +3,6 @@
 import type {
   AutoGroupConfig,
   ColumnDefinition,
-  ColumnVisibility,
   FilterGroup,
   FilterState,
 } from '@better-tables/core';
@@ -11,7 +10,6 @@ import { autoGroupFilters, getDefaultOperatorsForType } from '@better-tables/cor
 import { BarChart3, Calendar, Link as LinkIcon, Search, Tag, X } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
-import { ColumnVisibilityToggle } from '../table/column-visibility-toggle';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ActiveFilters } from './active-filters';
@@ -76,18 +74,6 @@ export interface FilterBarProps<TData = unknown> {
   addFilterLabel?: string;
   /** Callback to check if a filter is protected (can't be removed) */
   isFilterProtected?: (filter: FilterState) => boolean;
-  /** Whether to show the column visibility toggle */
-  showColumnVisibility?: boolean;
-  /** Current column visibility state */
-  columnVisibility?: ColumnVisibility;
-  /** Handler to toggle column visibility */
-  onToggleColumnVisibility?: (columnId: string) => void;
-  /** Current column order state */
-  columnOrder?: string[];
-  /** Handler to reset column order */
-  onResetColumnOrder?: () => void;
-  /** Whether column reordering is enabled */
-  enableColumnReordering?: boolean;
   /** Handler to reset all table state (filters, sorting, selection, etc.) */
   onReset?: () => void;
 }
@@ -110,12 +96,6 @@ export function FilterBar<TData = unknown>({
   customFilters = [],
   addFilterLabel = 'Add filter',
   isFilterProtected,
-  showColumnVisibility = true,
-  columnVisibility,
-  onToggleColumnVisibility,
-  columnOrder,
-  onResetColumnOrder,
-  enableColumnReordering = false,
   onReset,
 }: FilterBarProps<TData>) {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
@@ -344,19 +324,6 @@ export function FilterBar<TData = unknown>({
             <X className="mr-1 h-4 w-4" />
             Clear all
           </Button>
-        )}
-
-        {/* Column Visibility Toggle */}
-        {showColumnVisibility && columnVisibility && onToggleColumnVisibility && (
-          <ColumnVisibilityToggle
-            columns={columns}
-            columnVisibility={columnVisibility}
-            onToggleVisibility={onToggleColumnVisibility}
-            columnOrder={columnOrder}
-            onResetColumnOrder={onResetColumnOrder}
-            enableReordering={enableColumnReordering}
-            disabled={disabled}
-          />
         )}
       </div>
     </div>

@@ -40,6 +40,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { ActionsToolbar } from './actions-toolbar';
+import { ColumnManagement } from './column-management';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { ExportButton } from './export-button';
@@ -701,27 +702,32 @@ export function BetterTable<TData = unknown>({
   if (data.length === 0) {
     return (
       <div className={cn('space-y-4', className)}>
-        {filtering && (
-          <FilterBar
+        <div className="flex items-center gap-2">
+          {filtering && (
+            <FilterBar
+              columns={columnsWithDefaults}
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              groups={groups}
+              autoGroupFilters={autoGroupFilters}
+              onReset={handleReset}
+              searchable={false}
+              isFilterProtected={isFilterProtected}
+            />
+          )}
+          <ColumnManagement
             columns={columnsWithDefaults}
-            filters={filters}
-            onFiltersChange={handleFiltersChange}
-            groups={groups}
-            autoGroupFilters={autoGroupFilters}
-            showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
-            onToggleColumnVisibility={toggleColumnVisibility}
+            onToggleVisibility={toggleColumnVisibility}
             columnOrder={columnOrder}
             onResetColumnOrder={() => {
               const store = getTableStore(id);
               if (store) store.getState().resetColumnOrder();
             }}
-            enableColumnReordering={columnReordering}
-            onReset={handleReset}
-            searchable={false}
-            isFilterProtected={isFilterProtected}
+            enableReordering={columnReordering}
+            show={features.columnVisibility !== false}
           />
-        )}
+        </div>
         <EmptyState
           message={emptyMessage || emptyState?.description || 'No data available'}
           hasFilters={filters.length > 0}
@@ -767,6 +773,20 @@ export function BetterTable<TData = unknown>({
           />
         )}
 
+        {/* Filter Bar - only show when filtering is enabled */}
+        {filtering && (
+          <FilterBar
+            columns={columnsWithDefaults}
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            groups={groups}
+            autoGroupFilters={autoGroupFilters}
+            onReset={handleReset}
+            searchable={false}
+            isFilterProtected={isFilterProtected}
+          />
+        )}
+
         {/* Export - show when export is enabled */}
         {exportEnabled &&
           (exportConfig?.showDialog !== false ? (
@@ -783,7 +803,7 @@ export function BetterTable<TData = unknown>({
               defaultFilename={exportConfig?.filename ?? `${id}-export`}
               selectedRowCount={selectedRows.size}
               trigger={
-                <Button variant="outline" size="default">
+                <Button variant="outline" size="default" className='h-8'>
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
@@ -800,28 +820,19 @@ export function BetterTable<TData = unknown>({
             />
           ))}
 
-        {/* Filter Bar - only show when filtering is enabled */}
-        {filtering && (
-          <FilterBar
-            columns={columnsWithDefaults}
-            filters={filters}
-            onFiltersChange={handleFiltersChange}
-            groups={groups}
-            autoGroupFilters={autoGroupFilters}
-            showColumnVisibility={features.columnVisibility !== false}
-            columnVisibility={columnVisibility}
-            onToggleColumnVisibility={toggleColumnVisibility}
-            columnOrder={columnOrder}
-            onResetColumnOrder={() => {
-              const store = getTableStore(id);
-              if (store) store.getState().resetColumnOrder();
-            }}
-            enableColumnReordering={columnReordering}
-            onReset={handleReset}
-            searchable={false}
-            isFilterProtected={isFilterProtected}
-          />
-        )}
+        {/* Column Management - separate from filter bar */}
+        <ColumnManagement
+          columns={columnsWithDefaults}
+          columnVisibility={columnVisibility}
+          onToggleVisibility={toggleColumnVisibility}
+          columnOrder={columnOrder}
+          onResetColumnOrder={() => {
+            const store = getTableStore(id);
+            if (store) store.getState().resetColumnOrder();
+          }}
+          enableReordering={columnReordering}
+          show={features.columnVisibility !== false}
+        />
       </div>
       <div className="border rounded-md">
         <Table>

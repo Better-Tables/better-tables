@@ -108,7 +108,6 @@ export interface ExportDialogProps<TData = unknown> {
 interface FormatOption {
   value: ExportFormat;
   label: string;
-  description: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -116,19 +115,16 @@ const FORMAT_OPTIONS: FormatOption[] = [
   {
     value: 'csv',
     label: 'CSV',
-    description: 'Best for spreadsheet software and data analysis',
     icon: FileText,
   },
   {
     value: 'excel',
     label: 'Excel',
-    description: 'Native Excel format with formatting support',
     icon: FileSpreadsheet,
   },
   {
     value: 'json',
     label: 'JSON',
-    description: 'Best for programmatic access and APIs',
     icon: FileJson,
   },
 ];
@@ -294,7 +290,7 @@ export function ExportDialog<TData = unknown>({
             {/* Format Selection */}
             <div className="space-y-2">
               <Label>Format</Label>
-              <div className="grid gap-2">
+              <div className="grid gap-2 grid-cols-3">
                 {availableFormats.map((format) => {
                   const Icon = format.icon;
                   const isSelected = selectedFormat === format.value;
@@ -312,10 +308,7 @@ export function ExportDialog<TData = unknown>({
                       <Icon
                         className={`h-5 w-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}
                       />
-                      <div>
-                        <div className="font-medium">{format.label}</div>
-                        <div className="text-xs text-muted-foreground">{format.description}</div>
-                      </div>
+                      <div className="font-medium">{format.label}</div>
                     </button>
                   );
                 })}
