@@ -78,6 +78,7 @@ export type {
   ValidateColumnAccess,
   VirtualColumnType,
 } from './schema-inference';
+export { createDrizzleExportActions, createDrizzleFetchDataAction } from './server-action-helper';
 // Type exports
 export type {
   AggregateColumn,

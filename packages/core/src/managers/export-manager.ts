@@ -8,6 +8,7 @@
  */
 
 import ExcelJS from 'exceljs';
+import pako from 'pako';
 import type { ColumnDefinition } from '../types/column';
 import type {
   CsvExportOptions,
@@ -22,11 +23,14 @@ import type {
   ExportResult,
   ExportValueTransformer,
   JsonExportOptions,
+  SqlDialect,
+  SqlExportOptions,
 } from '../types/export';
 import {
   DEFAULT_BATCH_CONFIG,
   DEFAULT_CSV_OPTIONS,
   DEFAULT_EXCEL_OPTIONS,
+  DEFAULT_SQL_OPTIONS,
   EXPORT_EXTENSIONS,
   EXPORT_MIME_TYPES,
 } from '../types/export';
@@ -160,6 +164,7 @@ export class ExportManager<TData = unknown> {
         duration: Date.now() - startTime,
         data: blob,
         fileSize: blob.size,
+        sqlCompressed: config.format === 'sql' && config.sql?.compressWithGzip,
       });
       this.updateProgress(
         'completed',
@@ -298,6 +303,8 @@ export class ExportManager<TData = unknown> {
         return this.generateExcelBlob(data, columns, config.excel);
       case 'json':
         return this.generateJsonBlob(data, columns, config.json);
+      case 'sql':
+        return this.generateSqlBlob(data, columns, config.sql, config.filename);
       default:
         throw new Error(`Unsupported export format: ${config.format}`);
     }
@@ -340,20 +347,62 @@ export class ExportManager<TData = unknown> {
    */
   private escapeCsvValue(value: unknown, options: Required<CsvExportOptions>): string {
     if (value === null || value === undefined) {
-      return options.nullValue;
+      return options.nullValue === 'NULL' ? 'NULL' : options.nullValue;
     }
     let stringValue = String(value);
-    // Check if value needs quoting
-    const needsQuoting =
-      options.quoteStrings &&
-      (stringValue.includes(options.delimiter) ||
-        stringValue.includes('"') ||
-        stringValue.includes('\n') ||
-        stringValue.includes('\r'));
+
+    // Convert line breaks to space if requested
+    if (options.convertLineBreaksToSpace) {
+      stringValue = stringValue.replace(/\r?\n/g, ' ').replace(/\r/g, ' ');
+    }
+
+    // Handle decimal separator for numbers
+    if (options.decimalSeparator === ',' && /^\d+\.\d+$/.test(stringValue)) {
+      stringValue = stringValue.replace('.', ',');
+    }
+
+    // Determine if value needs quoting based on quote style
+    let needsQuoting = false;
+    let quoteChar = '"';
+
+    switch (options.quoteStyle) {
+      case 'double-quote':
+        quoteChar = '"';
+        needsQuoting = true;
+        break;
+      case 'single-quote':
+        quoteChar = "'";
+        needsQuoting = true;
+        break;
+      case 'space':
+        quoteChar = ' ';
+        needsQuoting = true;
+        break;
+      case 'quote-if-needed':
+      default:
+        quoteChar = '"';
+        needsQuoting =
+          stringValue.includes(options.delimiter) ||
+          stringValue.includes('"') ||
+          stringValue.includes("'") ||
+          stringValue.includes('\n') ||
+          stringValue.includes('\r');
+        break;
+    }
+
     if (needsQuoting) {
-      // Escape existing quotes by doubling them
-      stringValue = stringValue.replace(/"/g, '""');
-      return `"${stringValue}"`;
+      if (quoteChar === '"') {
+        // Escape existing quotes by doubling them
+        stringValue = stringValue.replace(/"/g, '""');
+        return `"${stringValue}"`;
+      } else if (quoteChar === "'") {
+        // Escape existing single quotes by doubling them
+        stringValue = stringValue.replace(/'/g, "''");
+        return `'${stringValue}'`;
+      } else {
+        // For space or other quote chars, just wrap
+        return `${quoteChar}${stringValue}${quoteChar}`;
+      }
     }
     return stringValue;
   }
@@ -471,6 +520,238 @@ export class ExportManager<TData = unknown> {
   }
 
   /**
+   * Generate SQL blob with dialect-specific SQL generation.
+   */
+  private async generateSqlBlob(
+    data: TData[],
+    columns: ColumnDefinition<TData>[],
+    options?: SqlExportOptions,
+    tableName?: string
+  ): Promise<Blob> {
+    const opts = { ...DEFAULT_SQL_OPTIONS, ...options };
+    const dialect = opts.dialect || 'postgres';
+    const effectiveTableName = tableName || 'exported_data';
+
+    const sqlLines: string[] = [];
+
+    // Generate DROP TABLE statement if requested
+    if (opts.includeDrop) {
+      sqlLines.push(this.generateDropTableStatement(effectiveTableName, dialect));
+      sqlLines.push('');
+    }
+
+    // Generate CREATE TABLE statement if requested
+    if (opts.includeStructure) {
+      sqlLines.push(this.generateCreateTableStatement(effectiveTableName, columns, dialect));
+      sqlLines.push('');
+    }
+
+    // Generate INSERT statements if requested and data exists
+    if (opts.includeData && data.length > 0) {
+      const insertStatements = this.generateInsertStatements(
+        effectiveTableName,
+        data,
+        columns,
+        dialect
+      );
+      sqlLines.push(...insertStatements);
+    }
+
+    const sqlContent = sqlLines.join('\n');
+
+    // Compress with gzip if requested
+    if (opts.compressWithGzip) {
+      const compressed = pako.gzip(sqlContent, { level: 9 });
+      return new Blob([compressed], { type: 'application/gzip' });
+    }
+
+    return new Blob([sqlContent], { type: EXPORT_MIME_TYPES.sql });
+  }
+
+  /**
+   * Generate DROP TABLE statement for the specified dialect.
+   */
+  private generateDropTableStatement(tableName: string, dialect: SqlDialect): string {
+    const escapedTableName = this.escapeTableName(tableName, dialect);
+    switch (dialect) {
+      case 'postgres':
+        return `DROP TABLE IF EXISTS ${escapedTableName} CASCADE;`;
+      case 'mysql':
+        return `DROP TABLE IF EXISTS ${escapedTableName};`;
+      case 'sqlite':
+        return `DROP TABLE IF EXISTS ${escapedTableName};`;
+      default:
+        return `DROP TABLE IF EXISTS ${escapedTableName};`;
+    }
+  }
+
+  /**
+   * Generate CREATE TABLE statement for the specified dialect.
+   */
+  private generateCreateTableStatement(
+    tableName: string,
+    columns: ColumnDefinition<TData>[],
+    dialect: SqlDialect
+  ): string {
+    const escapedTableName = this.escapeTableName(tableName, dialect);
+    const columnDefinitions: string[] = [];
+
+    for (const col of columns) {
+      const escapedColumnName = this.escapeColumnName(col.id, dialect);
+      const sqlType = this.getSqlType(col.type, dialect);
+      const nullable = col.nullable !== false ? '' : ' NOT NULL';
+      columnDefinitions.push(`  ${escapedColumnName} ${sqlType}${nullable}`);
+    }
+
+    const columnDefs = columnDefinitions.join(',\n');
+    let createStatement = `CREATE TABLE ${escapedTableName} (\n${columnDefs}\n)`;
+
+    // Add dialect-specific options
+    if (dialect === 'mysql') {
+      createStatement += ' ENGINE=InnoDB';
+    }
+
+    return createStatement + ';';
+  }
+
+  /**
+   * Generate INSERT statements for the data.
+   */
+  private generateInsertStatements(
+    tableName: string,
+    data: TData[],
+    columns: ColumnDefinition<TData>[],
+    dialect: SqlDialect
+  ): string[] {
+    const escapedTableName = this.escapeTableName(tableName, dialect);
+    const columnNames = columns.map((col) => this.escapeColumnName(col.id, dialect));
+    const statements: string[] = [];
+
+    // Batch inserts for better performance (100 rows per statement for most dialects)
+    const batchSize = dialect === 'sqlite' ? 500 : 100;
+
+    for (let i = 0; i < data.length; i += batchSize) {
+      const batch = data.slice(i, i + batchSize);
+      const valueGroups: string[] = [];
+
+      for (const row of batch) {
+        const values = columns.map((col) => {
+          const rawValue = col.accessor(row);
+          const value = this.transformValue(rawValue, row, col);
+          return this.escapeSqlValue(value, dialect);
+        });
+        valueGroups.push(`(${values.join(', ')})`);
+      }
+
+      const insertStatement = `INSERT INTO ${escapedTableName} (${columnNames.join(', ')}) VALUES\n${valueGroups.join(',\n')};`;
+      statements.push(insertStatement);
+    }
+
+    return statements;
+  }
+
+  /**
+   * Escape table name for SQL.
+   */
+  private escapeTableName(name: string, dialect: SqlDialect): string {
+    switch (dialect) {
+      case 'postgres':
+      case 'sqlite':
+        return `"${name.replace(/"/g, '""')}"`;
+      case 'mysql':
+        return `\`${name.replace(/`/g, '``')}\``;
+      default:
+        return `"${name}"`;
+    }
+  }
+
+  /**
+   * Escape column name for SQL.
+   */
+  private escapeColumnName(name: string, dialect: SqlDialect): string {
+    return this.escapeTableName(name, dialect);
+  }
+
+  /**
+   * Get SQL type from column type.
+   */
+  private getSqlType(columnType: string, dialect: SqlDialect): string {
+    const typeMap: Record<string, Record<SqlDialect, string>> = {
+      text: {
+        postgres: 'TEXT',
+        mysql: 'TEXT',
+        sqlite: 'TEXT',
+      },
+      number: {
+        postgres: 'INTEGER',
+        mysql: 'INT',
+        sqlite: 'INTEGER',
+      },
+      date: {
+        postgres: 'TIMESTAMP',
+        mysql: 'DATETIME',
+        sqlite: 'TEXT',
+      },
+      boolean: {
+        postgres: 'BOOLEAN',
+        mysql: 'BOOLEAN',
+        sqlite: 'INTEGER',
+      },
+      currency: {
+        postgres: 'DECIMAL(10, 2)',
+        mysql: 'DECIMAL(10, 2)',
+        sqlite: 'REAL',
+      },
+    };
+
+    const normalizedType = columnType.toLowerCase();
+    return typeMap[normalizedType]?.[dialect] || 'TEXT';
+  }
+
+  /**
+   * Escape SQL value for the specified dialect.
+   */
+  private escapeSqlValue(value: unknown, dialect: SqlDialect): string {
+    if (value === null || value === undefined) {
+      return 'NULL';
+    }
+
+    if (typeof value === 'boolean') {
+      switch (dialect) {
+        case 'postgres':
+        case 'mysql':
+          return value ? 'TRUE' : 'FALSE';
+        case 'sqlite':
+          return value ? '1' : '0';
+        default:
+          return value ? 'TRUE' : 'FALSE';
+      }
+    }
+
+    if (typeof value === 'number') {
+      return String(value);
+    }
+
+    if (value instanceof Date) {
+      const isoString = value.toISOString();
+      switch (dialect) {
+        case 'postgres':
+          return `'${isoString}'::TIMESTAMP`;
+        case 'mysql':
+        case 'sqlite':
+          return `'${isoString}'`;
+        default:
+          return `'${isoString}'`;
+      }
+    }
+
+    // String value - escape single quotes
+    const stringValue = String(value);
+    const escaped = stringValue.replace(/'/g, "''");
+    return `'${escaped}'`;
+  }
+
+  /**
    * Transform a cell value for export.
    */
   private transformValue(value: unknown, row: TData, column: ColumnDefinition<TData>): unknown {
@@ -579,14 +860,24 @@ export class ExportManager<TData = unknown> {
     data?: Blob;
     fileSize?: number;
     error?: string;
+    sqlCompressed?: boolean;
   }): ExportResult {
-    const extension = EXPORT_EXTENSIONS[params.format];
+    let extension = EXPORT_EXTENSIONS[params.format];
+    // For SQL exports, if compressed, use .sql.gz extension
+    if (params.format === 'sql' && params.sqlCompressed) {
+      extension = '.sql.gz';
+    }
     const filename = (params.filename ?? `export-${Date.now()}`) + extension;
+    let mimeType = EXPORT_MIME_TYPES[params.format];
+    // For compressed SQL, use gzip MIME type
+    if (params.format === 'sql' && params.sqlCompressed) {
+      mimeType = 'application/gzip';
+    }
     return {
       success: params.success,
       data: params.data,
       filename,
-      mimeType: EXPORT_MIME_TYPES[params.format],
+      mimeType,
       rowCount: params.rowCount,
       fileSize: params.fileSize,
       duration: params.duration,

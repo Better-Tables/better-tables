@@ -29,9 +29,11 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
+    "@types/pako": "^2.0.4",
     "date-fns": "4.1.0",
     "exceljs": "^4.4.0",
     "lz-string": "^1.5.0",
+    "pako": "^2.1.0",
     "zustand": "^5.0.2"
   },
   "peerDependencies": {

@@ -1,7 +1,8 @@
 'use client';
 
-import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import type { FilterState, PaginationState, SchemaInfo, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { fetchExportData } from '@/lib/actions/export-actions';
 import { userActions } from '@/lib/actions/user-actions';
 import { defaultVisibleColumns, userColumns } from '@/lib/columns/user-columns';
 import type { UserWithRelations } from '@/lib/db/schema';
@@ -15,6 +16,7 @@ interface UsersTableClientProps {
   initialPagination: PaginationState;
   initialSorting: SortingState;
   initialFilters: FilterState[];
+  schemaInfo: SchemaInfo;
 }
 
 export function UsersTableClient({
@@ -23,6 +25,7 @@ export function UsersTableClient({
   initialPagination,
   initialSorting,
   initialFilters,
+  schemaInfo,
 }: UsersTableClientProps) {
   // Set up URL sync with Next.js adapter
   const urlAdapter = useNextjsUrlAdapter();
@@ -72,9 +75,10 @@ export function UsersTableClient({
       }}
       export={{
         enabled: true,
-        // Just provide the API URL - no need for a full adapter!
-        url: '/api/export',
-        formats: ['csv', 'excel', 'json'],
+        // Use server action instead of API route - no boilerplate needed!
+        serverAction: fetchExportData,
+        schemaInfo, // Pass schema info for SQL export support
+        formats: ['csv', 'excel', 'json', 'sql'],
         filename: 'users-export',
         batchSize: 500,
       }}

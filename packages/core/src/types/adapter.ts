@@ -9,7 +9,7 @@
 
 import type { ColumnType } from './column';
 import type { DataEvent } from './common';
-import type { ExportResult } from './export';
+import type { ExportResult, SchemaInfo } from './export';
 import type { FilterOperator, FilterOption, FilterState } from './filter';
 import type { PaginationParams } from './pagination';
 import type { SortingParams } from './sorting';
@@ -352,6 +352,22 @@ export interface TableAdapter<TData = unknown> {
    * ```
    */
   subscribe?(callback: (event: DataEvent<TData>) => void): () => void;
+
+  /**
+   * Get schema information for export operations (optional operation).
+   *
+   * Returns metadata about all tables and columns in the database schema,
+   * enabling table browser functionality and full database exports.
+   *
+   * @returns Promise resolving to schema information or schema information directly
+   *
+   * @example
+   * ```typescript
+   * const schemaInfo = await adapter.getSchemaInfo();
+   * // Returns: { schemas: { public: [...] }, tables: [...], dialect: 'postgres' }
+   * ```
+   */
+  getSchemaInfo?(): Promise<SchemaInfo> | SchemaInfo;
 
   /** Adapter metadata and capabilities */
   meta: AdapterMeta;

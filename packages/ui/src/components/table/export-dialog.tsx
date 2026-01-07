@@ -11,14 +11,20 @@
 
 import type {
   ColumnDefinition,
+  CsvExportOptions,
   ExportConfig,
   ExportFormat,
+  ExportMode,
   ExportProgress,
+  SchemaInfo,
+  SqlExportOptions,
+  TableAdapter,
 } from '@better-tables/core';
 import { formatDuration, formatFileSize } from '@better-tables/core';
 import {
   CheckCircle2,
   Download,
+  FileCode,
   FileJson,
   FileSpreadsheet,
   FileText,
@@ -40,7 +46,11 @@ import {
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
+import { CsvOptionsPanel } from './csv-options-panel';
+import { SqlOptionsPanel } from './sql-options-panel';
+import { TableBrowserPanel } from './table-browser-panel';
 
 /**
  * Props for the ExportDialog component.
@@ -100,6 +110,15 @@ export interface ExportDialogProps<TData = unknown> {
 
   /** Callback when export selected toggle changes */
   onExportSelectedChange?: (exportSelected: boolean) => void;
+
+  /** Adapter instance for schema information (optional, for table export mode) */
+  adapter?: TableAdapter<unknown>;
+
+  /** Schema information (optional, if provided directly) */
+  schemaInfo?: SchemaInfo;
+
+  /** Initial export mode when dialog opens */
+  initialMode?: ExportMode;
 }
 
 /**
@@ -126,6 +145,11 @@ const FORMAT_OPTIONS: FormatOption[] = [
     value: 'json',
     label: 'JSON',
     icon: FileJson,
+  },
+  {
+    value: 'sql',
+    label: 'SQL',
+    icon: FileCode,
   },
 ];
 
@@ -177,31 +201,62 @@ export function ExportDialog<TData = unknown>({
   selectedRowCount = 0,
   exportSelectedOnly = false,
   onExportSelectedChange,
+  adapter,
+  schemaInfo: providedSchemaInfo,
+  initialMode = 'columns',
 }: ExportDialogProps<TData>): React.ReactElement {
   const [internalOpen, setInternalOpen] = React.useState(false);
+  const [exportMode, setExportMode] = React.useState<ExportMode>(initialMode);
   const [selectedFormat, setSelectedFormat] = React.useState<ExportFormat>('csv');
   const [filename, setFilename] = React.useState(defaultFilename);
   const [selectedColumns, setSelectedColumns] = React.useState<Set<string>>(
     new Set(columns.filter((c) => c.defaultVisible !== false).map((c) => c.id))
   );
+  const [selectedTables, setSelectedTables] = React.useState<Set<string>>(new Set());
   const [batchSize, setBatchSize] = React.useState(1000);
   const [exportSelected, setExportSelected] = React.useState(exportSelectedOnly);
+  const [csvOptions, setCsvOptions] = React.useState<CsvExportOptions>({});
+  const [sqlOptions, setSqlOptions] = React.useState<SqlExportOptions>({});
+  const [schemaInfo, setSchemaInfo] = React.useState<SchemaInfo | null>(providedSchemaInfo || null);
+
+  // Load schema info from adapter if available
+  React.useEffect(() => {
+    if (adapter && !schemaInfo && adapter.getSchemaInfo) {
+      const info = adapter.getSchemaInfo();
+      if (info instanceof Promise) {
+        info.then(setSchemaInfo).catch(() => {
+          // Silently fail - table export mode just won't be available
+        });
+      } else {
+        setSchemaInfo(info);
+      }
+    }
+  }, [adapter, schemaInfo]);
 
   const isOpen = controlledOpen ?? internalOpen;
   const setIsOpen = onOpenChange ?? setInternalOpen;
   const hasSelectedRows = selectedRowCount > 0;
   const rowsToExport = exportSelected && hasSelectedRows ? selectedRowCount : totalRows;
 
+  // Update export mode when initialMode prop changes (e.g., when user selects different option from dropdown)
+  React.useEffect(() => {
+    setExportMode(initialMode);
+  }, [initialMode]);
+
   // Reset state when dialog opens OR when lastResult is cleared (for new export)
   React.useEffect(() => {
     if (isOpen && !lastResult) {
       setSelectedFormat('csv');
       setFilename(defaultFilename);
+      setExportMode(initialMode);
       setSelectedColumns(
         new Set(columns.filter((c) => c.defaultVisible !== false).map((c) => c.id))
       );
+      setSelectedTables(new Set());
+      setCsvOptions({});
+      setSqlOptions({});
     }
-  }, [isOpen, columns, defaultFilename, lastResult]);
+  }, [isOpen, columns, defaultFilename, lastResult, initialMode]);
 
   // Handler to start a new export after completion
   const handleNewExport = React.useCallback(() => {
@@ -209,9 +264,13 @@ export function ExportDialog<TData = unknown>({
     onReset?.();
     setSelectedFormat('csv');
     setFilename(defaultFilename);
+    setExportMode(initialMode);
     setSelectedColumns(new Set(columns.filter((c) => c.defaultVisible !== false).map((c) => c.id)));
+    setSelectedTables(new Set());
     setExportSelected(false);
-  }, [columns, defaultFilename, onReset]);
+    setCsvOptions({});
+    setSqlOptions({});
+  }, [columns, defaultFilename, onReset, initialMode]);
 
   // Handle export selected toggle
   const handleExportSelectedToggle = React.useCallback(
@@ -242,20 +301,48 @@ export function ExportDialog<TData = unknown>({
     setSelectedColumns(new Set());
   }, []);
 
+  const handleTableSelectionChange = React.useCallback((tableName: string, selected: boolean) => {
+    setSelectedTables((prev) => {
+      const next = new Set(prev);
+      if (selected) {
+        next.add(tableName);
+      } else {
+        next.delete(tableName);
+      }
+      return next;
+    });
+  }, []);
+
   const handleExport = React.useCallback(() => {
     const config: ExportConfig & { exportSelectedOnly?: boolean } = {
       format: selectedFormat,
       filename,
-      columns: Array.from(selectedColumns).map((id) => ({ columnId: id })),
+      mode: exportMode,
+      columns:
+        exportMode === 'columns'
+          ? Array.from(selectedColumns).map((id) => ({ columnId: id }))
+          : undefined,
       batch: { batchSize },
       exportSelectedOnly: exportSelected && hasSelectedRows,
+      csv: selectedFormat === 'csv' ? csvOptions : undefined,
+      sql:
+        selectedFormat === 'sql'
+          ? {
+              ...sqlOptions,
+              selectedTables: exportMode === 'tables' ? Array.from(selectedTables) : undefined,
+            }
+          : undefined,
     };
     onExport(config);
   }, [
     selectedFormat,
     filename,
+    exportMode,
     selectedColumns,
+    selectedTables,
     batchSize,
+    csvOptions,
+    sqlOptions,
     onExport,
     exportSelected,
     hasSelectedRows,
@@ -287,10 +374,34 @@ export function ExportDialog<TData = unknown>({
         {/* Configuration Form */}
         {!isExporting && !lastResult && (
           <div className="grid gap-4 py-4 overflow-y-auto flex-1 min-h-0">
+            {/* Mode Selection */}
+            {schemaInfo && (
+              <>
+                <div className="space-y-2">
+                  <Label>Export Mode</Label>
+                  <Select
+                    value={exportMode}
+                    onValueChange={(value) => setExportMode(value as ExportMode)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="columns">Export with Column Selection</SelectItem>
+                      <SelectItem value="tables">Export Tables</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Separator />
+              </>
+            )}
+
             {/* Format Selection */}
             <div className="space-y-2">
               <Label>Format</Label>
-              <div className="grid gap-2 grid-cols-3">
+              <div
+                className={`grid gap-2 ${availableFormats.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}
+              >
                 {availableFormats.map((format) => {
                   const Icon = format.icon;
                   const isSelected = selectedFormat === format.value;
@@ -356,44 +467,80 @@ export function ExportDialog<TData = unknown>({
 
             <Separator />
 
-            {/* Column Selection */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Columns ({selectedColumns.size} selected)</Label>
-                <div className="flex gap-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={handleSelectAllColumns}>
-                    All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDeselectAllColumns}
-                  >
-                    None
-                  </Button>
+            {/* Table Browser or Column Selection based on mode */}
+            {exportMode === 'tables' && schemaInfo ? (
+              <TableBrowserPanel
+                schemaInfo={schemaInfo}
+                selectedTables={selectedTables}
+                onTableSelectionChange={handleTableSelectionChange}
+              />
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Columns ({selectedColumns.size} selected)</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSelectAllColumns}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDeselectAllColumns}
+                    >
+                      None
+                    </Button>
+                  </div>
                 </div>
+                <ScrollArea className="h-40 rounded-md border">
+                  <div className="p-3 space-y-2">
+                    {columns.map((column) => (
+                      <div key={column.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`column-${column.id}`}
+                          checked={selectedColumns.has(column.id)}
+                          onCheckedChange={() => handleColumnToggle(column.id)}
+                        />
+                        <label
+                          htmlFor={`column-${column.id}`}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          {column.displayName}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
-              <ScrollArea className="h-40 rounded-md border">
-                <div className="p-3 space-y-2">
-                  {columns.map((column) => (
-                    <div key={column.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`column-${column.id}`}
-                        checked={selectedColumns.has(column.id)}
-                        onCheckedChange={() => handleColumnToggle(column.id)}
-                      />
-                      <label
-                        htmlFor={`column-${column.id}`}
-                        className="text-sm font-medium leading-none cursor-pointer"
-                      >
-                        {column.displayName}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
+            )}
+
+            {/* Format-specific Options */}
+            <Separator />
+            <details className="space-y-2">
+              <summary className="cursor-pointer text-sm font-medium">
+                {selectedFormat.toUpperCase()} Options
+              </summary>
+              <div className="pt-2 space-y-2">
+                {selectedFormat === 'csv' && (
+                  <CsvOptionsPanel options={csvOptions} onOptionsChange={setCsvOptions} />
+                )}
+                {selectedFormat === 'sql' && (
+                  <SqlOptionsPanel
+                    options={sqlOptions}
+                    detectedDialect={schemaInfo?.dialect}
+                    onOptionsChange={setSqlOptions}
+                  />
+                )}
+                {selectedFormat === 'json' && (
+                  <p className="text-sm text-muted-foreground">JSON options: as is</p>
+                )}
+              </div>
+            </details>
 
             {/* Advanced Options */}
             <details className="space-y-2">
@@ -438,9 +585,18 @@ export function ExportDialog<TData = unknown>({
               <Button variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleExport} disabled={selectedColumns.size === 0 || !filename}>
+              <Button
+                onClick={handleExport}
+                disabled={
+                  (exportMode === 'columns' && selectedColumns.size === 0) ||
+                  (exportMode === 'tables' && selectedTables.size === 0) ||
+                  !filename
+                }
+              >
                 <Download className="mr-2 h-4 w-4" />
-                Export {rowsToExport.toLocaleString()} Row{rowsToExport !== 1 ? 's' : ''}
+                {exportMode === 'tables'
+                  ? `Export ${selectedTables.size} Table${selectedTables.size !== 1 ? 's' : ''}`
+                  : `Export ${rowsToExport.toLocaleString()} Row${rowsToExport !== 1 ? 's' : ''}`}
               </Button>
             </>
           )}

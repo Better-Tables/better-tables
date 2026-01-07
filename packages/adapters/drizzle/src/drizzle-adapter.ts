@@ -62,6 +62,7 @@ import type {
   FilterOperator,
   FilterOption,
   FilterState,
+  SchemaInfo,
   TableAdapter,
 } from '@better-tables/core';
 import type { InferSelectModel, Relations, SQL, SQLWrapper } from 'drizzle-orm';
@@ -86,6 +87,7 @@ import type {
   TableWithId,
 } from './types';
 import { QueryError, SchemaError } from './types';
+import { getTableColumns } from './utils/drizzle-schema-utils';
 
 /**
  * Drizzle adapter implementation for Better Tables.
@@ -135,6 +137,7 @@ export class DrizzleAdapter<
 {
   private db: DrizzleDatabase<TDriver>;
   private schema: TSchema;
+  private driver: TDriver;
   private operations: DatabaseOperations<InferSelectModel<TSchema[keyof TSchema]>>;
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
@@ -198,6 +201,7 @@ export class DrizzleAdapter<
   constructor(config: DrizzleAdapterConfig<TSchema, TDriver>) {
     this.db = config.db;
     this.schema = config.schema;
+    this.driver = config.driver;
     this.options = config.options || {};
     if (config.hooks !== undefined) {
       this.hooks = config.hooks;
@@ -986,6 +990,93 @@ export class DrizzleAdapter<
         this.subscribers.splice(index, 1);
       }
     };
+  }
+
+  /**
+   * Get schema information for export operations.
+   *
+   * Returns metadata about all tables and columns in the database schema,
+   * enabling table browser functionality and full database exports.
+   *
+   * @returns Schema information with tables and columns
+   */
+  getSchemaInfo(): SchemaInfo {
+    const tables: SchemaInfo['tables'] = [];
+    const schemas: Record<string, SchemaInfo['tables']> = {};
+
+    // Map driver to dialect
+    const dialect: 'postgres' | 'mysql' | 'sqlite' = this.driver;
+
+    // Iterate through all tables in the schema
+    for (const [tableKey, tableSchema] of Object.entries(this.schema)) {
+      if (!tableSchema || typeof tableSchema !== 'object') continue;
+
+      // Get table name from schema (database table name)
+      const tableName = this.getTableNameFromSchema(tableSchema) || tableKey;
+
+      // Get column information
+      const columnInfos = getTableColumns(tableSchema);
+      const columns = columnInfos.map((col) => ({
+        name: col.name,
+        type: col.dataType || 'unknown',
+        nullable: col.isNullable,
+        isPrimaryKey: col.isPrimaryKey,
+        isForeignKey: col.isForeignKey,
+        defaultValue: undefined, // Drizzle doesn't expose default values easily
+      }));
+
+      const tableInfo: SchemaInfo['tables'][0] = {
+        name: tableName,
+        schema: undefined, // Drizzle doesn't expose schema names directly
+        columns,
+        columnCount: columns.length,
+      };
+
+      tables.push(tableInfo);
+
+      // For now, group all tables under 'default' schema
+      // In the future, we could extract schema from table name if it contains a dot
+      const schemaName = 'default';
+      if (!schemas[schemaName]) {
+        schemas[schemaName] = [];
+      }
+      schemas[schemaName].push(tableInfo);
+    }
+
+    return {
+      schemas,
+      tables,
+      dialect,
+    };
+  }
+
+  /**
+   * Extract table name from Drizzle table schema.
+   */
+  private getTableNameFromSchema(tableSchema: AnyTableType): string | null {
+    if (!tableSchema || typeof tableSchema !== 'object') {
+      return null;
+    }
+
+    const tableObj = tableSchema as unknown as Record<string, unknown>;
+
+    // Check for tableName property (common in Drizzle tables)
+    if ('tableName' in tableObj && typeof tableObj.tableName === 'string') {
+      return tableObj.tableName;
+    }
+
+    // Check internal _ property
+    const internal = tableObj._ as unknown as Record<string, unknown> | undefined;
+    if (internal && typeof internal === 'object') {
+      if ('name' in internal && typeof internal.name === 'string') {
+        return internal.name;
+      }
+      if ('tableName' in internal && typeof internal.tableName === 'string') {
+        return internal.tableName;
+      }
+    }
+
+    return null;
   }
 
   /**

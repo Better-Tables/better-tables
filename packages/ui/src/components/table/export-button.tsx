@@ -10,7 +10,7 @@
  */
 
 import type { ExportFormat, ExportProgress } from '@better-tables/core';
-import { Download, FileJson, FileSpreadsheet, FileText, Loader2, X } from 'lucide-react';
+import { Download, FileCode, FileJson, FileSpreadsheet, FileText, Loader2, X } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '../ui/button';
 import {
@@ -87,6 +87,11 @@ const FORMAT_CONFIG: Record<ExportFormat, FormatConfig> = {
     description: 'JavaScript Object Notation',
     icon: FileJson,
   },
+  sql: {
+    label: 'SQL',
+    description: 'SQL dump file',
+    icon: FileCode,
+  },
 };
 
 /**
@@ -118,7 +123,7 @@ export function ExportButton({
   progress,
   onCancel,
   disabled = false,
-  formats = ['csv', 'excel', 'json'],
+  formats = ['csv', 'excel', 'json', 'sql'],
   variant = 'outline',
   size = 'default',
   className,

@@ -1,25 +1,36 @@
 'use client';
 
-import type { ExportFormat, ExportProgress, ExportResult } from '@better-tables/core';
+import type {
+  ExportConfig,
+  ExportFormat,
+  ExportProgress,
+  ExportResult,
+  SchemaInfo,
+} from '@better-tables/core';
 import {
   type ColumnDefinition,
   type ColumnVisibility,
   createApiExportAdapter,
   createInMemoryExportAdapter,
+  createServerActionAdapter,
   destroyTableStore,
+  type FetchDataParams,
+  type FetchDataResult,
   type FilterState,
   getFormatterForType,
   getOrCreateTableStore,
+  getSchemaInfoSafe,
   getTableStore,
   type PaginationState,
   type SortingState,
+  supportsSchemaIntrospection,
   type TableAdapter,
   type TableConfig,
   type UrlSyncAdapter,
   type UrlSyncConfig,
 } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, GripVertical } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Database, Download, GripVertical } from 'lucide-react';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useExport } from '../../hooks/use-export';
@@ -36,6 +47,13 @@ import { cn } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
@@ -44,7 +62,8 @@ import { ColumnManagement } from './column-management';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { ExportButton } from './export-button';
-import { ExportDialog } from './export-dialog';
+import { ExportColumnsDialog } from './export-columns-dialog';
+import { ExportTablesDialog } from './export-tables-dialog';
 import { TableHeaderContextMenu } from './table-header-context-menu';
 import { TablePagination } from './table-pagination';
 import { TableProviders } from './table-providers';
@@ -163,6 +182,19 @@ export interface BetterTableProps<TData = unknown>
 
     /** Table adapter for fetching data during export (alternative to url) */
     adapter?: TableAdapter<TData>;
+
+    /**
+     * Server action function for fetching export data (Next.js).
+     * When provided, automatically creates a server action adapter.
+     * This is the recommended approach for Next.js apps as it eliminates the need for API routes.
+     */
+    serverAction?: (params: FetchDataParams) => Promise<FetchDataResult<TData>>;
+
+    /**
+     * Schema information for SQL export support.
+     * If not provided, will be automatically extracted from the adapter if it supports introspection.
+     */
+    schemaInfo?: SchemaInfo;
 
     /** Available export formats (default: ['csv', 'excel', 'json']) */
     formats?: ExportFormat[];
@@ -335,17 +367,51 @@ export function BetterTable<TData = unknown>({
   );
 
   // Set up export functionality
-  // Export is enabled if: enabled=true AND (adapter OR url OR data is provided)
+  // Export is enabled if: enabled=true AND (adapter OR url OR serverAction OR data is provided)
   const hasExportDataSource = Boolean(
-    exportConfig?.adapter || exportConfig?.url || (data && data.length > 0)
+    exportConfig?.adapter ||
+      exportConfig?.url ||
+      exportConfig?.serverAction ||
+      (data && data.length > 0)
   );
   const exportEnabled = Boolean(exportConfig?.enabled && hasExportDataSource);
 
-  // Auto-create adapter from url or data if no adapter provided
+  // Auto-extract schema info from adapter if available
+  const [extractedSchemaInfo, setExtractedSchemaInfo] = React.useState<SchemaInfo | null>(
+    exportConfig?.schemaInfo || null
+  );
+
+  React.useEffect(() => {
+    // If schemaInfo is explicitly provided, use it
+    if (exportConfig?.schemaInfo) {
+      setExtractedSchemaInfo(exportConfig.schemaInfo);
+      return;
+    }
+
+    // Otherwise, try to extract from adapter
+    if (exportConfig?.adapter && supportsSchemaIntrospection(exportConfig.adapter)) {
+      getSchemaInfoSafe(exportConfig.adapter).then((info) => {
+        if (info) {
+          setExtractedSchemaInfo(info);
+        }
+      });
+    } else {
+      setExtractedSchemaInfo(null);
+    }
+  }, [exportConfig?.adapter, exportConfig?.schemaInfo]);
+
+  // Auto-create adapter from url, serverAction, or data if no adapter provided
   const exportAdapter = useMemo((): TableAdapter<TData> | null => {
     if (!exportConfig?.enabled) return null;
     // Use provided adapter first
     if (exportConfig.adapter) return exportConfig.adapter;
+    // Create adapter from server action (Next.js)
+    if (exportConfig.serverAction) {
+      return createServerActionAdapter<TData>({
+        fetchDataAction: exportConfig.serverAction,
+        schemaInfo: extractedSchemaInfo || undefined,
+      });
+    }
     // Create adapter from URL
     if (exportConfig.url) {
       return createApiExportAdapter<TData>({ url: exportConfig.url });
@@ -355,7 +421,14 @@ export function BetterTable<TData = unknown>({
       return createInMemoryExportAdapter<TData>(data);
     }
     return null;
-  }, [exportConfig?.enabled, exportConfig?.adapter, exportConfig?.url, data]);
+  }, [
+    exportConfig?.enabled,
+    exportConfig?.adapter,
+    exportConfig?.serverAction,
+    exportConfig?.url,
+    data,
+    extractedSchemaInfo,
+  ]);
 
   // Export hook - only meaningful when adapter is available
   const exportHook = useExport({
@@ -395,13 +468,7 @@ export function BetterTable<TData = unknown>({
 
   // Handle advanced export action (full config with column selection)
   const handleExportConfig = useCallback(
-    (config: {
-      format: ExportFormat;
-      filename?: string;
-      columns?: Array<{ columnId: string }>;
-      batch?: { batchSize?: number };
-      exportSelectedOnly?: boolean;
-    }) => {
+    (config: ExportConfig & { exportSelectedOnly?: boolean }) => {
       if (!exportEnabled) return;
       exportHook.startExport({
         format: config.format,
@@ -415,6 +482,10 @@ export function BetterTable<TData = unknown>({
         // If exporting selected only, pass the selected IDs
         selectedIds: config.exportSelectedOnly ? Array.from(selectedRows) : undefined,
         scope: config.exportSelectedOnly ? 'selected' : 'all',
+        // New fields for enhanced export
+        mode: config.mode,
+        csv: config.csv,
+        sql: config.sql,
       });
     },
     [
@@ -790,7 +861,7 @@ export function BetterTable<TData = unknown>({
         {/* Export - show when export is enabled */}
         {exportEnabled &&
           (exportConfig?.showDialog !== false ? (
-            <ExportDialog
+            <ExportDropdownMenu
               columns={columnsWithDefaults}
               totalRows={totalCount ?? 0}
               onExport={handleExportConfig}
@@ -799,15 +870,11 @@ export function BetterTable<TData = unknown>({
               lastResult={exportHook.lastResult}
               onCancel={exportHook.cancelExport}
               onReset={exportHook.clearLastResult}
-              formats={exportConfig?.formats ?? ['csv', 'excel', 'json']}
+              formats={exportConfig?.formats ?? ['csv', 'excel', 'json', 'sql']}
               defaultFilename={exportConfig?.filename ?? `${id}-export`}
               selectedRowCount={selectedRows.size}
-              trigger={
-                <Button variant="outline" size="default" className='h-8'>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-              }
+              adapter={exportAdapter ?? undefined}
+              schemaInfo={extractedSchemaInfo || undefined}
             />
           ) : (
             <ExportButton
@@ -815,7 +882,7 @@ export function BetterTable<TData = unknown>({
               isExporting={exportHook.isExporting}
               progress={exportHook.progress}
               onCancel={exportHook.cancelExport}
-              formats={exportConfig?.formats ?? ['csv', 'excel', 'json']}
+              formats={exportConfig?.formats ?? ['csv', 'excel', 'json', 'sql']}
               totalRows={totalCount}
             />
           ))}
@@ -1210,5 +1277,129 @@ export function BetterTable<TData = unknown>({
     >
       {tableContent}
     </TableProviders>
+  );
+}
+
+/**
+ * Export dropdown menu component that shows options before opening the dialog.
+ */
+function ExportDropdownMenu<TData = unknown>({
+  columns,
+  totalRows,
+  onExport,
+  isExporting = false,
+  progress,
+  lastResult,
+  onCancel,
+  onReset,
+  formats = ['csv', 'excel', 'json', 'sql'],
+  defaultFilename = 'export',
+  selectedRowCount = 0,
+  adapter,
+  schemaInfo,
+}: {
+  columns: ColumnDefinition<TData>[];
+  totalRows: number;
+  onExport: (config: ExportConfig & { exportSelectedOnly?: boolean }) => void;
+  isExporting?: boolean;
+  progress?: ExportProgress | null;
+  lastResult?: {
+    success: boolean;
+    filename: string;
+    rowCount: number;
+    fileSize?: number;
+    duration?: number;
+    error?: string;
+  } | null;
+  onCancel?: () => void;
+  onReset?: () => void;
+  formats?: ExportFormat[];
+  defaultFilename?: string;
+  selectedRowCount?: number;
+  adapter?: TableAdapter<unknown>;
+  schemaInfo?: SchemaInfo;
+}): React.ReactElement {
+  const [tablesDialogOpen, setTablesDialogOpen] = React.useState(false);
+  const [columnsDialogOpen, setColumnsDialogOpen] = React.useState(false);
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+
+  const handleSelectTables = React.useCallback(() => {
+    setDropdownOpen(false);
+    setTimeout(() => {
+      setTablesDialogOpen(true);
+    }, 0);
+  }, []);
+
+  const handleSelectColumns = React.useCallback(() => {
+    setDropdownOpen(false);
+    setTimeout(() => {
+      setColumnsDialogOpen(true);
+    }, 0);
+  }, []);
+
+  return (
+    <>
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="default" className="h-8" disabled={isExporting}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={handleSelectTables}>
+            <Database className="mr-2 h-4 w-4" />
+            <div className="flex flex-col">
+              <span>Export Tables</span>
+              <span className="text-xs text-muted-foreground">
+                Export entire tables from database
+              </span>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSelectColumns}>
+            <Download className="mr-2 h-4 w-4" />
+            <div className="flex flex-col">
+              <span>Export with Column Selection</span>
+              <span className="text-xs text-muted-foreground">
+                Export filtered data with column selection
+              </span>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ExportTablesDialog
+        totalRows={totalRows}
+        onExport={onExport}
+        isExporting={isExporting}
+        progress={progress}
+        lastResult={lastResult}
+        onCancel={onCancel}
+        onReset={onReset}
+        formats={formats}
+        defaultFilename={defaultFilename}
+        adapter={adapter ?? undefined}
+        schemaInfo={schemaInfo}
+        open={tablesDialogOpen}
+        onOpenChange={setTablesDialogOpen}
+      />
+      <ExportColumnsDialog
+        columns={columns}
+        totalRows={totalRows}
+        onExport={onExport}
+        isExporting={isExporting}
+        progress={progress}
+        lastResult={lastResult}
+        onCancel={onCancel}
+        onReset={onReset}
+        formats={formats}
+        defaultFilename={defaultFilename}
+        selectedRowCount={selectedRowCount}
+        adapter={adapter ?? undefined}
+        schemaInfo={schemaInfo}
+        open={columnsDialogOpen}
+        onOpenChange={setColumnsDialogOpen}
+      />
+    </>
   );
 }

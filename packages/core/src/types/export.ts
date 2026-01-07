@@ -15,7 +15,17 @@ import type { SortingParams } from './sorting';
 /**
  * Supported export formats.
  */
-export type ExportFormat = 'csv' | 'excel' | 'json';
+export type ExportFormat = 'csv' | 'excel' | 'json' | 'sql';
+
+/**
+ * SQL database dialects supported for export.
+ */
+export type SqlDialect = 'postgres' | 'mysql' | 'sqlite';
+
+/**
+ * Export mode for determining what to export.
+ */
+export type ExportMode = 'tables' | 'columns';
 
 /**
  * Export status for tracking progress.
@@ -93,7 +103,10 @@ export interface ExportColumnConfig {
  *   includeHeaders: true,
  *   quoteStrings: true,
  *   lineEnding: '\r\n',
- *   nullValue: ''
+ *   nullValue: '',
+ *   convertLineBreaksToSpace: false,
+ *   quoteStyle: 'quote-if-needed',
+ *   decimalSeparator: '.'
  * };
  * ```
  */
@@ -118,6 +131,15 @@ export interface CsvExportOptions {
 
   /** Whether to include BOM for UTF-8 (default: true for Excel compatibility) */
   includeBom?: boolean;
+
+  /** Whether to convert line breaks to spaces (default: false) */
+  convertLineBreaksToSpace?: boolean;
+
+  /** Quote style: 'quote-if-needed', 'double-quote', 'single-quote', 'space' (default: 'quote-if-needed') */
+  quoteStyle?: 'quote-if-needed' | 'double-quote' | 'single-quote' | 'space';
+
+  /** Decimal separator for numbers: '.' or ',' (default: '.') */
+  decimalSeparator?: '.' | ',';
 }
 
 /**
@@ -215,6 +237,95 @@ export interface JsonExportOptions {
 }
 
 /**
+ * SQL-specific export options.
+ *
+ * @example
+ * ```typescript
+ * const sqlOptions: SqlExportOptions = {
+ *   dialect: 'postgres',
+ *   includeStructure: true,
+ *   includeDrop: true,
+ *   includeData: true,
+ *   compressWithGzip: false,
+ *   selectedTables: ['users', 'profiles']
+ * };
+ * ```
+ */
+export interface SqlExportOptions {
+  /** SQL dialect to use (default: auto-detected from adapter) */
+  dialect?: SqlDialect;
+
+  /** Whether to include CREATE TABLE statements (default: true) */
+  includeStructure?: boolean;
+
+  /** Whether to include DROP TABLE IF EXISTS statements (default: false) */
+  includeDrop?: boolean;
+
+  /** Whether to include INSERT statements for data (default: true) */
+  includeData?: boolean;
+
+  /** Whether to compress the output with gzip (default: false) */
+  compressWithGzip?: boolean;
+
+  /** Selected table names to export (if empty, exports all tables) */
+  selectedTables?: string[];
+}
+
+/**
+ * Column information for schema metadata.
+ */
+export interface SchemaColumnInfo {
+  /** Column name */
+  name: string;
+
+  /** Column data type */
+  type: string;
+
+  /** Whether the column is nullable */
+  nullable: boolean;
+
+  /** Whether the column is a primary key */
+  isPrimaryKey: boolean;
+
+  /** Whether the column is a foreign key */
+  isForeignKey: boolean;
+
+  /** Default value if any */
+  defaultValue?: unknown;
+}
+
+/**
+ * Table information for schema metadata.
+ */
+export interface SchemaTableInfo {
+  /** Table name */
+  name: string;
+
+  /** Schema name (if applicable, e.g., 'public' for PostgreSQL) */
+  schema?: string;
+
+  /** Column information */
+  columns: SchemaColumnInfo[];
+
+  /** Number of columns */
+  columnCount: number;
+}
+
+/**
+ * Schema information for export operations.
+ */
+export interface SchemaInfo {
+  /** Tables grouped by schema name */
+  schemas: Record<string, SchemaTableInfo[]>;
+
+  /** All tables flattened (for schemas that don't support schema grouping) */
+  tables: SchemaTableInfo[];
+
+  /** Detected SQL dialect from adapter */
+  dialect?: SqlDialect;
+}
+
+/**
  * Comprehensive export configuration.
  *
  * @template TData - The type of data being exported
@@ -267,6 +378,12 @@ export interface ExportConfig {
 
   /** JSON-specific options */
   json?: JsonExportOptions;
+
+  /** SQL-specific options */
+  sql?: SqlExportOptions;
+
+  /** Export mode: 'tables' for full table export, 'columns' for column selection (default: 'columns') */
+  mode?: ExportMode;
 
   /** Abort signal for cancellation */
   signal?: AbortSignal;
@@ -418,6 +535,7 @@ export const EXPORT_MIME_TYPES: Record<ExportFormat, string> = {
   csv: 'text/csv;charset=utf-8',
   excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   json: 'application/json',
+  sql: 'application/sql',
 } as const;
 
 /**
@@ -427,6 +545,7 @@ export const EXPORT_EXTENSIONS: Record<ExportFormat, string> = {
   csv: '.csv',
   excel: '.xlsx',
   json: '.json',
+  sql: '.sql',
 } as const;
 
 /**
@@ -448,6 +567,19 @@ export const DEFAULT_CSV_OPTIONS: Required<CsvExportOptions> = {
   nullValue: '',
   encoding: 'utf-8',
   includeBom: true,
+  convertLineBreaksToSpace: false,
+  quoteStyle: 'quote-if-needed',
+  decimalSeparator: '.',
+} as const;
+
+/**
+ * Default SQL export options.
+ */
+export const DEFAULT_SQL_OPTIONS: Required<Omit<SqlExportOptions, 'dialect' | 'selectedTables'>> = {
+  includeStructure: true,
+  includeDrop: false,
+  includeData: true,
+  compressWithGzip: false,
 } as const;
 
 /**

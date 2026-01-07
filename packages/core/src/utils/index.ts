@@ -3,6 +3,7 @@
 // export * from './filter-converter';
 // export * from './sort-comparator';
 // export * from './validation';
+export * from './adapter-helpers';
 export * from './auto-group-filters';
 export * from './column-order';
 export * from './column-visibility';

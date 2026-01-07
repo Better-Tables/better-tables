@@ -7,7 +7,8 @@
  * @module utils/create-export-adapter
  */
 
-import type { AdapterMeta, TableAdapter } from '../types/adapter';
+import type { AdapterMeta, FetchDataParams, FetchDataResult, TableAdapter } from '../types/adapter';
+import type { SchemaInfo } from '../types/export';
 import type { FilterState } from '../types/filter';
 import type { SortingParams } from '../types/sorting';
 
@@ -267,5 +268,69 @@ export function createInMemoryExportAdapter<TData = unknown>(data: TData[]): Tab
     getFacetedValues: async () => new Map(),
     getMinMaxValues: async () => [0, 0] as [number, number],
     meta: DEFAULT_EXPORT_ADAPTER_META,
+  };
+}
+
+/**
+ * Options for creating a server action-based export adapter.
+ *
+ * This is useful in Next.js applications where you want to use server actions
+ * instead of API routes for data fetching.
+ */
+export interface CreateServerActionAdapterOptions<TData = unknown> {
+  /** Server action function that fetches data */
+  fetchDataAction: (params: FetchDataParams) => Promise<FetchDataResult<TData>>;
+
+  /** Optional schema information for SQL export support */
+  schemaInfo?: SchemaInfo;
+}
+
+/**
+ * Creates a client-side TableAdapter that uses a server action for data fetching.
+ *
+ * This utility is designed for Next.js applications where you want to use server
+ * actions instead of API routes. The adapter wraps a server action function and
+ * provides schema introspection support if available.
+ *
+ * @example Basic usage
+ * ```typescript
+ * // In a server action file (e.g., app/actions/export.ts)
+ * 'use server';
+ * export async function fetchExportData(params: FetchDataParams) {
+ *   const adapter = await getAdapter();
+ *   return adapter.fetchData(params);
+ * }
+ *
+ * // In a client component
+ * import { createServerActionAdapter } from '@better-tables/core';
+ * import { fetchExportData } from '@/actions/export';
+ *
+ * const exportAdapter = createServerActionAdapter({
+ *   fetchDataAction: fetchExportData,
+ *   schemaInfo: await getSchemaInfo(), // Optional
+ * });
+ * ```
+ *
+ * @template TData - The type of data returned by the server action
+ * @param options - Configuration options for the adapter
+ * @returns A TableAdapter configured for export operations using server actions
+ */
+export function createServerActionAdapter<TData = unknown>(
+  options: CreateServerActionAdapterOptions<TData>
+): TableAdapter<TData> {
+  const { fetchDataAction, schemaInfo } = options;
+
+  return {
+    fetchData: async (params) => {
+      return fetchDataAction(params);
+    },
+    getFilterOptions: async () => [],
+    getFacetedValues: async () => new Map(),
+    getMinMaxValues: async () => [0, 0] as [number, number],
+    getSchemaInfo: schemaInfo ? () => schemaInfo : undefined,
+    meta: {
+      ...DEFAULT_EXPORT_ADAPTER_META,
+      name: 'server-action-adapter',
+    },
   };
 }

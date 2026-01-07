@@ -36,6 +36,9 @@ export default async function DemoPage({ searchParams }: PageProps) {
     sorting,
   });
 
+  // Extract schema info for export functionality
+  const schemaInfo = adapter.getSchemaInfo();
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4">
@@ -104,6 +107,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
             }
             initialSorting={sorting}
             initialFilters={filters}
+            schemaInfo={schemaInfo}
           />
         </div>
 
