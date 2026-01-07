@@ -385,6 +385,12 @@ export interface ExportConfig {
   /** Export mode: 'tables' for full table export, 'columns' for column selection (default: 'columns') */
   mode?: ExportMode;
 
+  /** Schema information for tables mode (required when mode === 'tables') */
+  schemaInfo?: SchemaInfo;
+
+  /** Selected table names for tables mode (required when mode === 'tables') */
+  selectedTables?: string[];
+
   /** Abort signal for cancellation */
   signal?: AbortSignal;
 }
@@ -486,7 +492,7 @@ export interface ExportResult {
  *
  * @example
  * ```typescript
- * const fetcher: ExportDataFetcher<User> = async ({ offset, limit, signal }) => {
+ * const fetcher: ExportDataFetcher<User> = async ({ offset, limit, signal, columns }) => {
  *   const response = await fetch(`/api/users?offset=${offset}&limit=${limit}`, { signal });
  *   const data = await response.json();
  *   return { data: data.items, total: data.total };
@@ -499,6 +505,8 @@ export type ExportDataFetcher<TData = unknown> = (params: {
   filters?: FilterState[];
   sorting?: SortingParams[];
   signal?: AbortSignal;
+  primaryTable?: string;
+  columns?: string[];
 }) => Promise<{ data: TData[]; total: number }>;
 
 /**

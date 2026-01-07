@@ -34,6 +34,7 @@ import {
   EXPORT_EXTENSIONS,
   EXPORT_MIME_TYPES,
 } from '../types/export';
+import { schemaTableToColumnDefinitions } from '../utils/schema-to-columns';
 
 /**
  * Export manager for handling table data export with batch processing.
@@ -112,13 +113,22 @@ export class ExportManager<TData = unknown> {
     this.abortController = new AbortController();
     const signal = config.signal ?? this.abortController.signal;
     try {
+      // Handle "tables" mode specially - export each selected table
+      if (config.mode === 'tables' && config.selectedTables && config.selectedTables.length > 0) {
+        return this.exportTables(config, startTime, signal);
+      }
+
       // Get initial data to determine total count
+      // Extract column IDs to ensure relations are loaded
+      const exportColumnsForFetch = this.getExportColumns(config);
+      const columnIds = exportColumnsForFetch.map((col) => col.id);
       const initialResult = await this.dataFetcher({
         offset: 0,
         limit: 1,
         filters: config.filters,
         sorting: config.sorting,
         signal,
+        columns: columnIds,
       });
       const totalRows = initialResult.total;
       if (totalRows === 0) {
@@ -196,6 +206,245 @@ export class ExportManager<TData = unknown> {
   }
 
   /**
+   * Export multiple tables in "tables" mode.
+   * Each table is exported separately using its schema-derived columns.
+   */
+  private async exportTables(
+    config: ExportConfig,
+    startTime: number,
+    signal: AbortSignal
+  ): Promise<ExportResult> {
+    if (!config.schemaInfo || !config.selectedTables || config.selectedTables.length === 0) {
+      throw new Error('Schema info and selected tables are required for tables mode');
+    }
+
+    const { schemaInfo, selectedTables } = config;
+    const batchConfig = this.getBatchConfig(config.batch);
+
+    // For SQL format, export all tables in one file
+    if (config.format === 'sql') {
+      return this.exportTablesAsSql(config, schemaInfo, selectedTables, startTime, signal);
+    }
+
+    // For other formats, export the first selected table (or combine them)
+    // For now, we'll export the first table - in the future we could combine or create separate files
+    const firstTableName = selectedTables[0];
+    const tableInfo = schemaInfo.tables.find((t) => t.name === firstTableName);
+
+    if (!tableInfo) {
+      throw new Error(`Table "${firstTableName}" not found in schema`);
+    }
+
+    // Create columns from schema
+    const tableColumns = schemaTableToColumnDefinitions<Record<string, unknown>>(tableInfo);
+    // Extract column names from schema for explicit fetching
+    const columnNames = tableInfo.columns.map((col) => col.name);
+
+    // Get initial data to determine total count
+    // For table dumps, we don't apply filters or sorting - we want ALL raw table data
+    const initialResult = await this.dataFetcher({
+      offset: 0,
+      limit: 1,
+      filters: undefined,
+      sorting: undefined,
+      signal,
+      primaryTable: firstTableName,
+      columns: columnNames,
+    });
+    const totalRows = initialResult.total;
+    if (totalRows === 0) {
+      return this.createResult({
+        success: true,
+        format: config.format,
+        filename: config.filename,
+        rowCount: 0,
+        duration: Date.now() - startTime,
+      });
+    }
+
+    // Initialize progress
+    const totalBatches = Math.ceil(totalRows / batchConfig.batchSize);
+    this.initializeProgress(totalRows, totalBatches, startTime);
+    this.notifySubscribers({ type: 'start', totalRows });
+
+    // Fetch all data in batches
+    const allData = await this.fetchAllDataInBatchesForTable(
+      totalRows,
+      batchConfig,
+      config,
+      firstTableName,
+      columnNames,
+      signal,
+      startTime
+    );
+
+    if (signal.aborted) {
+      this.notifySubscribers({ type: 'cancelled' });
+      return this.createResult({
+        success: false,
+        format: config.format,
+        filename: config.filename,
+        rowCount: 0,
+        error: 'Export cancelled',
+      });
+    }
+
+    // Generate export data using schema-derived columns
+    // Type assertion is safe here because we're in "tables" mode with Record<string, unknown> data
+    const blob = await this.generateExportBlob(
+      allData as unknown as TData[],
+      tableColumns as unknown as ColumnDefinition<TData>[],
+      config
+    );
+    const result = this.createResult({
+      success: true,
+      format: config.format,
+      filename: config.filename,
+      rowCount: allData.length,
+      duration: Date.now() - startTime,
+      data: blob,
+      fileSize: blob.size,
+    });
+
+    this.updateProgress(
+      'completed',
+      allData.length,
+      totalRows,
+      totalBatches,
+      totalBatches,
+      startTime
+    );
+    this.notifySubscribers({ type: 'complete', result });
+    return result;
+  }
+
+  /**
+   * Export tables as SQL (handles multiple tables).
+   */
+  private async exportTablesAsSql(
+    config: ExportConfig,
+    schemaInfo: import('../types/export').SchemaInfo,
+    selectedTables: string[],
+    startTime: number,
+    signal: AbortSignal
+  ): Promise<ExportResult> {
+    // SQL export already handles multiple tables in generateSqlBlob
+    // We just need to fetch data for each table and combine them
+    const allTableData: Array<{
+      tableName: string;
+      data: Record<string, unknown>[];
+      columns: ColumnDefinition<Record<string, unknown>>[];
+    }> = [];
+    const batchConfig = this.getBatchConfig(config.batch);
+
+    let totalRows = 0;
+    for (const tableName of selectedTables) {
+      const tableInfo = schemaInfo.tables.find((t) => t.name === tableName);
+      if (!tableInfo) continue;
+
+      const tableColumns = schemaTableToColumnDefinitions<Record<string, unknown>>(tableInfo);
+      // Extract column names from schema for explicit fetching
+      const columnNames = tableInfo.columns.map((col) => col.name);
+
+      // Get initial data to determine total count
+      // For table dumps, we don't apply filters or sorting - we want ALL raw table data
+      const initialResult = await this.dataFetcher({
+        offset: 0,
+        limit: 1,
+        filters: undefined,
+        sorting: undefined,
+        signal,
+        primaryTable: tableName,
+        columns: columnNames,
+      });
+
+      const tableTotalRows = initialResult.total;
+      totalRows += tableTotalRows;
+
+      if (tableTotalRows > 0) {
+        const tableData = await this.fetchAllDataInBatchesForTable(
+          tableTotalRows,
+          batchConfig,
+          config,
+          tableName,
+          columnNames,
+          signal,
+          startTime
+        );
+        allTableData.push({ tableName, data: tableData, columns: tableColumns });
+      }
+    }
+
+    // Generate SQL blob with all tables
+    const blob = await this.generateSqlBlobForTables(allTableData, config.sql || {});
+    const result = this.createResult({
+      success: true,
+      format: 'sql',
+      filename: config.filename,
+      rowCount: totalRows,
+      duration: Date.now() - startTime,
+      data: blob,
+      fileSize: blob.size,
+      sqlCompressed: config.sql?.compressWithGzip,
+    });
+
+    this.notifySubscribers({ type: 'complete', result });
+    return result;
+  }
+
+  /**
+   * Fetch all data in batches for a specific table.
+   * For table dumps, this method does not apply filters or sorting to ensure we get ALL raw table data.
+   */
+  private async fetchAllDataInBatchesForTable(
+    totalRows: number,
+    batchConfig: ExportBatchConfig,
+    _config: ExportConfig,
+    tableName: string,
+    columnNames: string[],
+    signal: AbortSignal,
+    startTime: number
+  ): Promise<Record<string, unknown>[]> {
+    const allData: Record<string, unknown>[] = [];
+    const totalBatches = Math.ceil(totalRows / batchConfig.batchSize);
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      if (signal.aborted) {
+        break;
+      }
+      const offset = batchIndex * batchConfig.batchSize;
+      const limit = Math.min(batchConfig.batchSize, totalRows - offset);
+      // For table dumps, we don't apply filters or sorting - we want ALL raw table data
+      // Pass explicit column names to ensure we get all columns from the table
+      const result = await this.dataFetcher({
+        offset,
+        limit,
+        filters: undefined,
+        sorting: undefined,
+        signal,
+        primaryTable: tableName,
+        columns: columnNames,
+      });
+      allData.push(...(result.data as Record<string, unknown>[]));
+      const processedRows = Math.min(offset + limit, totalRows);
+      this.updateProgress(
+        'exporting',
+        processedRows,
+        totalRows,
+        batchIndex + 1,
+        totalBatches,
+        startTime
+      );
+      if (batchConfig.onBatchComplete) {
+        batchConfig.onBatchComplete(processedRows, totalRows);
+      }
+      if (batchConfig.delayBetweenBatches && batchIndex < totalBatches - 1) {
+        await this.delay(batchConfig.delayBetweenBatches);
+      }
+    }
+    return allData;
+  }
+
+  /**
    * Cancel the current export operation.
    */
   cancel(): void {
@@ -249,6 +498,9 @@ export class ExportManager<TData = unknown> {
   ): Promise<TData[]> {
     const allData: TData[] = [];
     const totalBatches = Math.ceil(totalRows / batchConfig.batchSize);
+    // Extract column IDs from export columns (including relation columns like 'profile.bio')
+    const exportColumns = this.getExportColumns(config);
+    const columnIds = exportColumns.map((col) => col.id);
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
       if (signal.aborted) {
         break;
@@ -261,6 +513,7 @@ export class ExportManager<TData = unknown> {
         filters: config.filters,
         sorting: config.sorting,
         signal,
+        columns: columnIds,
       });
       allData.push(...result.data);
       const processedRows = Math.min(offset + limit, totalRows);
@@ -569,6 +822,66 @@ export class ExportManager<TData = unknown> {
   }
 
   /**
+   * Generate SQL blob for multiple tables.
+   */
+  private async generateSqlBlobForTables(
+    allTableData: Array<{
+      tableName: string;
+      data: Record<string, unknown>[];
+      columns: ColumnDefinition<Record<string, unknown>>[];
+    }>,
+    options: SqlExportOptions
+  ): Promise<Blob> {
+    const opts = { ...DEFAULT_SQL_OPTIONS, ...options };
+    const dialect = opts.dialect || 'postgres';
+    const sqlLines: string[] = [];
+
+    for (const { tableName, data, columns } of allTableData) {
+      // Generate DROP TABLE statement if requested
+      if (opts.includeDrop) {
+        sqlLines.push(this.generateDropTableStatement(tableName, dialect));
+        sqlLines.push('');
+      }
+
+      // Generate CREATE TABLE statement if requested
+      if (opts.includeStructure) {
+        // Type assertion is safe here - we're working with Record<string, unknown> in tables mode
+        sqlLines.push(
+          this.generateCreateTableStatement(
+            tableName,
+            columns as unknown as ColumnDefinition<TData>[],
+            dialect
+          )
+        );
+        sqlLines.push('');
+      }
+
+      // Generate INSERT statements if requested and data exists
+      if (opts.includeData && data.length > 0) {
+        // Type assertion is safe here - we're working with Record<string, unknown> in tables mode
+        const insertStatements = this.generateInsertStatements(
+          tableName,
+          data as unknown as TData[],
+          columns as unknown as ColumnDefinition<TData>[],
+          dialect
+        );
+        sqlLines.push(...insertStatements);
+        sqlLines.push('');
+      }
+    }
+
+    const sqlContent = sqlLines.join('\n');
+
+    // Compress with gzip if requested
+    if (opts.compressWithGzip) {
+      const compressed = pako.gzip(sqlContent, { level: 9 });
+      return new Blob([compressed], { type: 'application/gzip' });
+    }
+
+    return new Blob([sqlContent], { type: EXPORT_MIME_TYPES.sql });
+  }
+
+  /**
    * Generate DROP TABLE statement for the specified dialect.
    */
   private generateDropTableStatement(tableName: string, dialect: SqlDialect): string {
@@ -608,10 +921,10 @@ export class ExportManager<TData = unknown> {
 
     // Add dialect-specific options
     if (dialect === 'mysql') {
-      createStatement += ' ENGINE=InnoDB';
+      createStatement = `${createStatement} ENGINE=InnoDB`;
     }
 
-    return createStatement + ';';
+    return `${createStatement};`;
   }
 
   /**
@@ -775,6 +1088,8 @@ export class ExportManager<TData = unknown> {
    * Get columns to export based on configuration.
    */
   private getExportColumns(config: ExportConfig): ColumnDefinition<TData>[] {
+    // For "tables" mode, columns should be derived from schema info (handled in exportTables)
+    // This method is only used for "columns" mode
     if (!config.columns || config.columns.length === 0) {
       // Export all visible columns
       return this.columns.filter((col) => col.defaultVisible !== false);

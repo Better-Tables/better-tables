@@ -13,6 +13,7 @@ export * from './equality';
 export * from './export-utils';
 export * from './filter-serialization';
 export * from './meta-accessors';
+export * from './schema-to-columns';
 export * from './server-url-params';
 export * from './state-change-detection';
 export * from './type-guards';

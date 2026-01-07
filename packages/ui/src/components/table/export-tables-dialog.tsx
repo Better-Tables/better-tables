@@ -303,9 +303,21 @@ export function ExportTablesDialog({
               // For now, use global options
             }
           : undefined,
+      // Always pass selectedTables and schemaInfo for tables mode (required for all formats)
+      selectedTables,
+      schemaInfo: schemaInfo || undefined,
     };
     onExport(config);
-  }, [selectedFormat, filename, selectedTables, batchSize, csvOptions, sqlOptions, onExport]);
+  }, [
+    selectedFormat,
+    filename,
+    selectedTables,
+    batchSize,
+    csvOptions,
+    sqlOptions,
+    schemaInfo,
+    onExport,
+  ]);
 
   const handleNewExport = React.useCallback(() => {
     onReset?.();

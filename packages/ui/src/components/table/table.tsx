@@ -470,12 +470,18 @@ export function BetterTable<TData = unknown>({
   const handleExportConfig = useCallback(
     (config: ExportConfig & { exportSelectedOnly?: boolean }) => {
       if (!exportEnabled) return;
+
+      // For "tables" mode, we want pure database dumps without filters or sorting
+      // For "columns" mode, we respect the table component's filters and sorting
+      const isTablesMode = config.mode === 'tables';
+
       exportHook.startExport({
         format: config.format,
         filename: config.filename ?? exportConfig?.filename ?? `${id}-export`,
         columns: config.columns,
-        filters,
-        sorting: sortingState,
+        // Don't apply filters/sorting for pure database dumps (tables mode)
+        filters: isTablesMode ? undefined : filters,
+        sorting: isTablesMode ? undefined : sortingState,
         batch: {
           batchSize: config.batch?.batchSize ?? exportConfig?.batchSize ?? 1000,
         },
@@ -486,6 +492,12 @@ export function BetterTable<TData = unknown>({
         mode: config.mode,
         csv: config.csv,
         sql: config.sql,
+        // For "tables" mode, pass schema info and selected tables
+        // selectedTables can be at top level (for CSV/JSON/Excel) or in sql config (for SQL)
+        schemaInfo: isTablesMode ? extractedSchemaInfo || undefined : undefined,
+        selectedTables: isTablesMode
+          ? config.selectedTables || config.sql?.selectedTables
+          : undefined,
       });
     },
     [
@@ -497,6 +509,7 @@ export function BetterTable<TData = unknown>({
       sortingState,
       exportEnabled,
       selectedRows,
+      extractedSchemaInfo,
     ]
   );
 

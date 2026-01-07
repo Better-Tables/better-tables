@@ -9,17 +9,18 @@
  * @module hooks/use-export
  */
 
-import type { ExportConfig, ExportResult } from '@better-tables/core';
-import {
-  type ColumnDefinition,
-  type ExportEvent,
-  ExportManager,
-  type ExportProgress,
-  type FilterState,
-  type SortingParams,
-  type TableAdapter,
-  triggerDownload,
+import type {
+  ColumnDefinition,
+  ExportConfig,
+  ExportDataFetcher,
+  ExportEvent,
+  ExportProgress,
+  ExportResult,
+  FilterState,
+  SortingParams,
+  TableAdapter,
 } from '@better-tables/core';
+import { ExportManager, triggerDownload } from '@better-tables/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
@@ -170,16 +171,27 @@ export function useExport<TData = unknown>(options: UseExportOptions<TData>): Us
 
   // Create export manager
   const exportManager = useMemo(() => {
+    const dataFetcher: ExportDataFetcher<TData> = async ({
+      offset,
+      limit,
+      filters: fetchFilters,
+      sorting: fetchSorting,
+      primaryTable,
+      columns: columnIds,
+    }) => {
+      const page = Math.floor(offset / limit) + 1;
+      const result = await adapter.fetchData({
+        pagination: { page, limit },
+        filters: fetchFilters,
+        sorting: fetchSorting,
+        primaryTable,
+        columns: columnIds,
+      });
+      return { data: result.data, total: result.total };
+    };
+
     return new ExportManager<TData>(columns, {
-      dataFetcher: async ({ offset, limit, filters: fetchFilters, sorting: fetchSorting }) => {
-        const page = Math.floor(offset / limit) + 1;
-        const result = await adapter.fetchData({
-          pagination: { page, limit },
-          filters: fetchFilters,
-          sorting: fetchSorting,
-        });
-        return { data: result.data, total: result.total };
-      },
+      dataFetcher,
       valueTransformer,
     });
   }, [columns, adapter, valueTransformer]);
