@@ -8,6 +8,7 @@
  */
 
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import pako from 'pako';
 import type { ColumnDefinition } from '../types/column';
 import type {
@@ -354,13 +355,38 @@ export class ExportManager<TData = unknown> {
       });
     }
 
+    // If multiple files, create a ZIP archive (if enabled)
+    let finalData: Blob | undefined;
+    let finalFilename = config.filename || 'export';
+    const shouldZip = config.useZipForMultiFile !== false; // Default to true if not specified
+
+    if (files.length > 1 && shouldZip) {
+      // Create ZIP archive
+      const zip = new JSZip();
+      for (const file of files) {
+        zip.file(file.filename, file.data);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      finalData = zipBlob;
+      // Remove extension and add .zip
+      finalFilename = `${(config.filename || 'export').replace(/\.[^.]+$/, '')}.zip`;
+    } else if (files.length === 1) {
+      // Single file, use it directly
+      finalData = files[0].data;
+      finalFilename = files[0].filename;
+    }
+    // If multiple files and ZIP disabled, files array will be used for individual downloads
+
     const result = this.createResult({
       success: true,
       format: config.format,
-      filename: config.filename,
+      filename: finalFilename,
       rowCount: totalRows,
       duration: Date.now() - startTime,
-      files,
+      data: finalData,
+      fileSize: finalData?.size,
+      // Include files array if multiple files and ZIP is disabled, or if single file
+      files: files.length > 1 && !shouldZip ? files : files.length === 1 ? files : undefined,
     });
 
     this.updateProgress(
@@ -1457,15 +1483,27 @@ export class ExportManager<TData = unknown> {
       fileSize?: number;
     }>;
   }): ExportResult {
+    // Check if filename ends with .zip (ZIP archive for multi-file exports)
+    const isZipFile = params.filename?.endsWith('.zip');
+
     let extension = EXPORT_EXTENSIONS[params.format];
     // For SQL exports, if compressed, use .sql.gz extension
     if (params.format === 'sql' && params.sqlCompressed) {
       extension = '.sql.gz';
     }
-    const filename = (params.filename ?? `export-${Date.now()}`) + extension;
+
+    // For ZIP files, use the filename as-is (it already has .zip extension)
+    const filename =
+      isZipFile && params.filename
+        ? params.filename
+        : (params.filename ?? `export-${Date.now()}`) + extension;
+
     let mimeType = EXPORT_MIME_TYPES[params.format];
-    // For compressed SQL, use gzip MIME type
-    if (params.format === 'sql' && params.sqlCompressed) {
+    // For ZIP files, use application/zip MIME type
+    if (isZipFile) {
+      mimeType = 'application/zip';
+    } else if (params.format === 'sql' && params.sqlCompressed) {
+      // For compressed SQL, use gzip MIME type
       mimeType = 'application/gzip';
     }
     return {
@@ -1516,8 +1554,10 @@ export class ExportManager<TData = unknown> {
  * ```
  */
 export function downloadExportResult(result: ExportResult): void {
-  // Handle multiple files (CSV/JSON multi-table exports)
-  if (result.files && result.files.length > 0) {
+  // Handle multiple files (CSV/JSON multi-table exports) - now zipped into single file
+  // If files array exists but data also exists, data is the ZIP file
+  if (result.files && result.files.length > 0 && !result.data) {
+    // Legacy: multiple individual downloads (shouldn't happen with ZIP, but keep for compatibility)
     for (const file of result.files) {
       const url = URL.createObjectURL(file.data);
       const link = document.createElement('a');
@@ -1526,13 +1566,12 @@ export function downloadExportResult(result: ExportResult): void {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      // Small delay between downloads to ensure browser processes them
       URL.revokeObjectURL(url);
     }
     return;
   }
 
-  // Handle single file export
+  // Handle single file export (including ZIP files for multi-table exports)
   if (!result.data) {
     throw new Error('No data to download');
   }

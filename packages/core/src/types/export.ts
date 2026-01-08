@@ -391,6 +391,9 @@ export interface ExportConfig {
   /** Selected table names for tables mode (required when mode === 'tables') */
   selectedTables?: string[];
 
+  /** Whether to use ZIP for multi-file exports (CSV/JSON only, default: true) */
+  useZipForMultiFile?: boolean;
+
   /** Abort signal for cancellation */
   signal?: AbortSignal;
 }

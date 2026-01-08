@@ -34,6 +34,7 @@ import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { CsvOptionsPanel } from './csv-options-panel';
+import { ERDDialog } from './erd-dialog';
 import { ExportFormatSelector } from './export-format-selector';
 import { ExportProgressSection } from './export-progress-section';
 import { ExportResultSection } from './export-result-section';
@@ -130,6 +131,8 @@ export function ExportTablesDialog({
   const [tableSelections, setTableSelections] = React.useState<Map<string, TableSelectionState>>(
     new Map()
   );
+  const [viewMode, setViewMode] = React.useState<'list' | 'erd'>('list');
+  const [useZipForMultiFile, setUseZipForMultiFile] = React.useState(true);
 
   const isOpen = controlledOpen ?? internalOpen;
   const setIsOpen = onOpenChange ?? setInternalOpen;
@@ -306,6 +309,9 @@ export function ExportTablesDialog({
       // Always pass selectedTables and schemaInfo for tables mode (required for all formats)
       selectedTables,
       schemaInfo: schemaInfo || undefined,
+      // Pass ZIP option for CSV/JSON multi-file exports
+      useZipForMultiFile:
+        selectedFormat === 'csv' || selectedFormat === 'json' ? useZipForMultiFile : undefined,
     };
     onExport(config);
   }, [
@@ -315,6 +321,7 @@ export function ExportTablesDialog({
     batchSize,
     csvOptions,
     sqlOptions,
+    useZipForMultiFile,
     schemaInfo,
     onExport,
   ]);
@@ -365,8 +372,8 @@ export function ExportTablesDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="!max-w-2/3 max-h-[90vh] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4">
+      <DialogContent className="!max-w-2/3 !h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <DialogTitle>Export Tables</DialogTitle>
           <DialogDescription>
             Export entire tables from your database to your preferred format.
@@ -382,7 +389,7 @@ export function ExportTablesDialog({
 
         {/* Export Result */}
         {!isExporting && lastResult && (
-          <div className="px-6">
+          <div className="px-6 flex-1 flex items-center justify-center">
             <ExportResultSection result={lastResult} />
           </div>
         )}
@@ -403,10 +410,30 @@ export function ExportTablesDialog({
 
             {/* Main Content: Tables on left, Options on right */}
             <div className="flex-1 flex gap-6 min-h-0">
-              {/* Left Side: Tables */}
+              {/* Left Side: Tables or ERD */}
               <div className="flex-1 flex flex-col min-w-0">
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-base font-semibold">Tables</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={viewMode === 'list' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
+                      className="h-auto py-1 px-3"
+                    >
+                      <span className="text-base font-semibold">Tables</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={viewMode === 'erd' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('erd')}
+                      className="h-auto py-1 px-3"
+                    >
+                      <Database className="mr-2 h-4 w-4" />
+                      <span className="text-base font-semibold">ERD</span>
+                    </Button>
+                  </div>
                   <div className="flex gap-2">
                     <Button type="button" variant="ghost" size="sm" onClick={handleSelectAll}>
                       All
@@ -417,7 +444,17 @@ export function ExportTablesDialog({
                   </div>
                 </div>
 
-                {isLoadingSchema ? (
+                {viewMode === 'erd' && schemaInfo ? (
+                  <div className="flex-1 min-h-0 relative border rounded-md overflow-hidden">
+                    <ERDDialog
+                      schemaInfo={schemaInfo}
+                      selectedTables={Array.from(tableSelections.entries())
+                        .filter(([_, selection]) => selection?.selected)
+                        .map(([tableName]) => tableName)}
+                      onTableToggle={handleTableToggle}
+                    />
+                  </div>
+                ) : isLoadingSchema ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
                       <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mb-2" />
@@ -547,6 +584,33 @@ export function ExportTablesDialog({
               {/* Right Side: Format Options */}
               <div className="w-80 flex flex-col min-h-0 border-l pl-6">
                 <ScrollArea className="flex-1">
+                  {/* ZIP option for CSV/JSON multi-file exports */}
+                  {(selectedFormat === 'csv' || selectedFormat === 'json') && (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Multi-file Export</Label>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="useZip"
+                            checked={useZipForMultiFile}
+                            onCheckedChange={(checked) => setUseZipForMultiFile(checked === true)}
+                          />
+                          <label
+                            htmlFor="useZip"
+                            className="text-sm text-muted-foreground cursor-pointer"
+                          >
+                            Download as ZIP archive (when exporting multiple tables)
+                          </label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {useZipForMultiFile
+                            ? 'Multiple tables will be packaged into a single ZIP file.'
+                            : 'Each table will be downloaded as a separate file.'}
+                        </p>
+                      </div>
+                      <Separator className="my-4" />
+                    </>
+                  )}
                   <div className="space-y-4">
                     {selectedFormat === 'csv' && (
                       <CsvOptionsPanel options={csvOptions} onOptionsChange={setCsvOptions} />
