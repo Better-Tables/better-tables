@@ -12,5 +12,9 @@ export async function fetchExportData(
   params: FetchDataParams
 ): Promise<FetchDataResult<UserWithRelations>> {
   const adapter = await getAdapter();
-  return adapter.fetchData(params);
+  const result = await adapter.fetchData(params);
+  return {
+    ...result,
+    data: result.data as UserWithRelations[],
+  };
 }
