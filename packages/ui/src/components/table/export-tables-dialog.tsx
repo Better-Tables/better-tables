@@ -240,23 +240,6 @@ export function ExportTablesDialog({
     [sqlOptions]
   );
 
-  const handleSqlOptionToggle = React.useCallback(
-    (tableName: string, option: 'includeStructure' | 'includeDrop' | 'includeData') => {
-      setTableSelections((prev) => {
-        const next = new Map(prev);
-        const current = next.get(tableName);
-        if (current) {
-          next.set(tableName, {
-            ...current,
-            [option]: !current[option],
-          });
-        }
-        return next;
-      });
-    },
-    []
-  );
-
   const handleSelectAll = React.useCallback(() => {
     if (!schemaInfo) return;
     setTableSelections((prev) => {
@@ -515,56 +498,6 @@ export function ExportTablesDialog({
                                       {table.name}
                                     </label>
 
-                                    {/* SQL-specific options */}
-                                    {isSqlFormat && isSelected && (
-                                      <div className="flex items-center gap-4 text-xs">
-                                        <div className="flex items-center gap-1.5">
-                                          <Checkbox
-                                            id={`structure-${table.name}`}
-                                            checked={selection?.includeStructure ?? true}
-                                            onCheckedChange={() =>
-                                              handleSqlOptionToggle(table.name, 'includeStructure')
-                                            }
-                                          />
-                                          <label
-                                            htmlFor={`structure-${table.name}`}
-                                            className="cursor-pointer text-muted-foreground"
-                                          >
-                                            Structure
-                                          </label>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <Checkbox
-                                            id={`drop-${table.name}`}
-                                            checked={selection?.includeDrop ?? false}
-                                            onCheckedChange={() =>
-                                              handleSqlOptionToggle(table.name, 'includeDrop')
-                                            }
-                                          />
-                                          <label
-                                            htmlFor={`drop-${table.name}`}
-                                            className="cursor-pointer text-muted-foreground"
-                                          >
-                                            Drop
-                                          </label>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <Checkbox
-                                            id={`data-${table.name}`}
-                                            checked={selection?.includeData ?? true}
-                                            onCheckedChange={() =>
-                                              handleSqlOptionToggle(table.name, 'includeData')
-                                            }
-                                          />
-                                          <label
-                                            htmlFor={`data-${table.name}`}
-                                            className="cursor-pointer text-muted-foreground"
-                                          >
-                                            Data
-                                          </label>
-                                        </div>
-                                      </div>
-                                    )}
                                   </div>
                                 );
                               })}
