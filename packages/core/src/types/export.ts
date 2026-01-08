@@ -461,19 +461,28 @@ export interface ExportResult {
   /** Whether export was successful */
   success: boolean;
 
-  /** Exported data as Blob */
+  /** Exported data as Blob (for single file exports) */
   data?: Blob;
 
-  /** Suggested filename with extension */
+  /** Multiple files for multi-table exports (CSV/JSON) */
+  files?: Array<{
+    data: Blob;
+    filename: string;
+    mimeType: string;
+    rowCount: number;
+    fileSize?: number;
+  }>;
+
+  /** Suggested filename with extension (for single file exports) */
   filename: string;
 
   /** MIME type of the exported data */
   mimeType: string;
 
-  /** Number of rows exported */
+  /** Number of rows exported (total across all files/sheets) */
   rowCount: number;
 
-  /** File size in bytes */
+  /** File size in bytes (for single file exports) */
   fileSize?: number;
 
   /** Export duration in milliseconds */

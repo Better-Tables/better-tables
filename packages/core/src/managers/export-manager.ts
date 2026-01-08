@@ -219,88 +219,347 @@ export class ExportManager<TData = unknown> {
     }
 
     const { schemaInfo, selectedTables } = config;
-    const batchConfig = this.getBatchConfig(config.batch);
 
     // For SQL format, export all tables in one file
     if (config.format === 'sql') {
       return this.exportTablesAsSql(config, schemaInfo, selectedTables, startTime, signal);
     }
 
-    // For other formats, export the first selected table (or combine them)
-    // For now, we'll export the first table - in the future we could combine or create separate files
-    const firstTableName = selectedTables[0];
-    const tableInfo = schemaInfo.tables.find((t) => t.name === firstTableName);
-
-    if (!tableInfo) {
-      throw new Error(`Table "${firstTableName}" not found in schema`);
+    // For Excel format, export all tables in one file with multiple sheets
+    if (config.format === 'excel') {
+      return this.exportTablesAsExcel(config, schemaInfo, selectedTables, startTime, signal);
     }
 
-    // Create columns from schema
-    const tableColumns = schemaTableToColumnDefinitions<Record<string, unknown>>(tableInfo);
-    // Extract column names from schema for explicit fetching
-    const columnNames = tableInfo.columns.map((col) => col.name);
+    // For CSV/JSON formats, export each table as a separate file
+    return this.exportTablesAsMultipleFiles(config, schemaInfo, selectedTables, startTime, signal);
+  }
 
-    // Get initial data to determine total count
-    // For table dumps, we don't apply filters or sorting - we want ALL raw table data
-    const initialResult = await this.dataFetcher({
-      offset: 0,
-      limit: 1,
-      filters: undefined,
-      sorting: undefined,
-      signal,
-      primaryTable: firstTableName,
-      columns: columnNames,
-    });
-    const totalRows = initialResult.total;
-    if (totalRows === 0) {
-      return this.createResult({
-        success: true,
-        format: config.format,
-        filename: config.filename,
-        rowCount: 0,
-        duration: Date.now() - startTime,
+  /**
+   * Export multiple tables as separate files (CSV/JSON formats).
+   */
+  private async exportTablesAsMultipleFiles(
+    config: ExportConfig,
+    schemaInfo: import('../types/export').SchemaInfo,
+    selectedTables: string[],
+    startTime: number,
+    signal: AbortSignal
+  ): Promise<ExportResult> {
+    const batchConfig = this.getBatchConfig(config.batch);
+    const files: Array<{
+      data: Blob;
+      filename: string;
+      mimeType: string;
+      rowCount: number;
+      fileSize?: number;
+    }> = [];
+    let totalRows = 0;
+
+    for (let tableIndex = 0; tableIndex < selectedTables.length; tableIndex++) {
+      if (signal.aborted) {
+        this.notifySubscribers({ type: 'cancelled' });
+        return this.createResult({
+          success: false,
+          format: config.format,
+          filename: config.filename,
+          rowCount: 0,
+          error: 'Export cancelled',
+        });
+      }
+
+      const tableName = selectedTables[tableIndex];
+      const tableInfo = schemaInfo.tables.find((t) => t.name === tableName);
+      if (!tableInfo) continue;
+
+      // Create columns from schema
+      const tableColumns = schemaTableToColumnDefinitions<Record<string, unknown>>(tableInfo);
+      const columnNames = tableInfo.columns.map((col) => col.name);
+
+      // Get initial data to determine total count
+      const initialResult = await this.dataFetcher({
+        offset: 0,
+        limit: 1,
+        filters: undefined,
+        sorting: undefined,
+        signal,
+        primaryTable: tableName,
+        columns: columnNames,
+      });
+
+      const tableTotalRows = initialResult.total;
+      if (tableTotalRows === 0) {
+        // Create empty file for empty table
+        const emptyBlob = await this.generateExportBlob(
+          [],
+          tableColumns as unknown as ColumnDefinition<TData>[],
+          config
+        );
+        const extension = EXPORT_EXTENSIONS[config.format];
+        const filename = `${tableName}${extension}`;
+        files.push({
+          data: emptyBlob,
+          filename,
+          mimeType: EXPORT_MIME_TYPES[config.format],
+          rowCount: 0,
+          fileSize: emptyBlob.size,
+        });
+        continue;
+      }
+
+      totalRows += tableTotalRows;
+
+      // Update progress for this table
+      const totalBatches = Math.ceil(tableTotalRows / batchConfig.batchSize);
+      if (tableIndex === 0) {
+        this.initializeProgress(totalRows, totalBatches, startTime);
+        this.notifySubscribers({ type: 'start', totalRows });
+      }
+
+      // Fetch all data in batches
+      const allData = await this.fetchAllDataInBatchesForTable(
+        tableTotalRows,
+        batchConfig,
+        config,
+        tableName,
+        columnNames,
+        signal,
+        startTime
+      );
+
+      if (signal.aborted) {
+        this.notifySubscribers({ type: 'cancelled' });
+        return this.createResult({
+          success: false,
+          format: config.format,
+          filename: config.filename,
+          rowCount: 0,
+          error: 'Export cancelled',
+        });
+      }
+
+      // Generate export blob for this table
+      const blob = await this.generateExportBlob(
+        allData as unknown as TData[],
+        tableColumns as unknown as ColumnDefinition<TData>[],
+        config
+      );
+
+      const extension = EXPORT_EXTENSIONS[config.format];
+      const filename = `${tableName}${extension}`;
+      files.push({
+        data: blob,
+        filename,
+        mimeType: EXPORT_MIME_TYPES[config.format],
+        rowCount: allData.length,
+        fileSize: blob.size,
       });
     }
 
-    // Initialize progress
-    const totalBatches = Math.ceil(totalRows / batchConfig.batchSize);
-    this.initializeProgress(totalRows, totalBatches, startTime);
-    this.notifySubscribers({ type: 'start', totalRows });
-
-    // Fetch all data in batches
-    const allData = await this.fetchAllDataInBatchesForTable(
-      totalRows,
-      batchConfig,
-      config,
-      firstTableName,
-      columnNames,
-      signal,
-      startTime
-    );
-
-    if (signal.aborted) {
-      this.notifySubscribers({ type: 'cancelled' });
-      return this.createResult({
-        success: false,
-        format: config.format,
-        filename: config.filename,
-        rowCount: 0,
-        error: 'Export cancelled',
-      });
-    }
-
-    // Generate export data using schema-derived columns
-    // Type assertion is safe here because we're in "tables" mode with Record<string, unknown> data
-    const blob = await this.generateExportBlob(
-      allData as unknown as TData[],
-      tableColumns as unknown as ColumnDefinition<TData>[],
-      config
-    );
     const result = this.createResult({
       success: true,
       format: config.format,
       filename: config.filename,
-      rowCount: allData.length,
+      rowCount: totalRows,
+      duration: Date.now() - startTime,
+      files,
+    });
+
+    this.updateProgress(
+      'completed',
+      totalRows,
+      totalRows,
+      selectedTables.length,
+      selectedTables.length,
+      startTime
+    );
+    this.notifySubscribers({ type: 'complete', result });
+    return result;
+  }
+
+  /**
+   * Export multiple tables as Excel with separate sheets.
+   */
+  private async exportTablesAsExcel(
+    config: ExportConfig,
+    schemaInfo: import('../types/export').SchemaInfo,
+    selectedTables: string[],
+    startTime: number,
+    signal: AbortSignal
+  ): Promise<ExportResult> {
+    const batchConfig = this.getBatchConfig(config.batch);
+    const opts = { ...DEFAULT_EXCEL_OPTIONS, ...config.excel };
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Better Tables';
+    workbook.created = new Date();
+
+    let totalRows = 0;
+    const allTableData: Array<{
+      tableName: string;
+      data: Record<string, unknown>[];
+      columns: ColumnDefinition<Record<string, unknown>>[];
+    }> = [];
+
+    // Fetch data for all tables
+    for (let tableIndex = 0; tableIndex < selectedTables.length; tableIndex++) {
+      if (signal.aborted) {
+        this.notifySubscribers({ type: 'cancelled' });
+        return this.createResult({
+          success: false,
+          format: 'excel',
+          filename: config.filename,
+          rowCount: 0,
+          error: 'Export cancelled',
+        });
+      }
+
+      const tableName = selectedTables[tableIndex];
+      const tableInfo = schemaInfo.tables.find((t) => t.name === tableName);
+      if (!tableInfo) continue;
+
+      const tableColumns = schemaTableToColumnDefinitions<Record<string, unknown>>(tableInfo);
+      const columnNames = tableInfo.columns.map((col) => col.name);
+
+      // Get initial data to determine total count
+      const initialResult = await this.dataFetcher({
+        offset: 0,
+        limit: 1,
+        filters: undefined,
+        sorting: undefined,
+        signal,
+        primaryTable: tableName,
+        columns: columnNames,
+      });
+
+      const tableTotalRows = initialResult.total;
+      if (tableTotalRows === 0) {
+        // Still create a sheet for empty table
+        allTableData.push({ tableName, data: [], columns: tableColumns });
+        continue;
+      }
+
+      totalRows += tableTotalRows;
+
+      // Update progress
+      if (tableIndex === 0) {
+        const totalBatches = Math.ceil(tableTotalRows / batchConfig.batchSize);
+        this.initializeProgress(totalRows, totalBatches, startTime);
+        this.notifySubscribers({ type: 'start', totalRows });
+      }
+
+      // Fetch all data in batches
+      const tableData = await this.fetchAllDataInBatchesForTable(
+        tableTotalRows,
+        batchConfig,
+        config,
+        tableName,
+        columnNames,
+        signal,
+        startTime
+      );
+
+      if (signal.aborted) {
+        this.notifySubscribers({ type: 'cancelled' });
+        return this.createResult({
+          success: false,
+          format: 'excel',
+          filename: config.filename,
+          rowCount: 0,
+          error: 'Export cancelled',
+        });
+      }
+
+      allTableData.push({ tableName, data: tableData, columns: tableColumns });
+    }
+
+    // Create worksheets for each table
+    for (const { tableName, data, columns } of allTableData) {
+      // Sanitize sheet name (Excel has restrictions on sheet names)
+      const sheetName = this.sanitizeSheetName(tableName);
+      const worksheet = workbook.addWorksheet(sheetName, {
+        views: opts.freezeHeader ? [{ state: 'frozen', ySplit: 1 }] : undefined,
+      });
+
+      // Define columns with headers and widths
+      worksheet.columns = columns.map((col) => ({
+        header: col.displayName,
+        key: col.id,
+        width: col.width ?? 15,
+      }));
+
+      // Style header row
+      const headerRow = worksheet.getRow(1);
+      if (opts.headerStyle) {
+        headerRow.font = {
+          bold: opts.headerStyle.bold ?? true,
+          color: opts.headerStyle.fontColor
+            ? { argb: opts.headerStyle.fontColor.replace('#', 'FF') }
+            : undefined,
+        };
+        if (opts.headerStyle.backgroundColor) {
+          headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: opts.headerStyle.backgroundColor.replace('#', 'FF') },
+          };
+        }
+        headerRow.alignment = { vertical: 'middle' };
+      } else {
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE0E0E0' },
+        };
+        headerRow.alignment = { vertical: 'middle' };
+      }
+
+      // Add data rows
+      for (const row of data) {
+        const rowData: Record<string, unknown> = {};
+        for (const col of columns) {
+          // Type assertion is safe here - we're in tables mode with Record<string, unknown> data
+          const rawValue = col.accessor(row);
+          // For transformValue, we need to cast since it expects TData but we have Record<string, unknown>
+          const value = this.transformValue(
+            rawValue,
+            row as unknown as TData,
+            col as unknown as ColumnDefinition<TData>
+          );
+          rowData[col.id] = value;
+        }
+        worksheet.addRow(rowData);
+      }
+
+      // Apply auto-filter if enabled
+      if (opts.autoFilter && columns.length > 0 && data.length > 0) {
+        worksheet.autoFilter = {
+          from: { row: 1, column: 1 },
+          to: { row: data.length + 1, column: columns.length },
+        };
+      }
+
+      // Format number and date columns
+      for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+        const col = columns[colIdx];
+        const wsColumn = worksheet.getColumn(colIdx + 1);
+        if (col.type === 'number' || col.type === 'currency') {
+          wsColumn.numFmt = col.type === 'currency' ? '"$"#,##0.00' : '#,##0.00';
+        } else if (col.type === 'percentage') {
+          wsColumn.numFmt = '0.00%';
+        } else if (col.type === 'date') {
+          wsColumn.numFmt = 'yyyy-mm-dd';
+        }
+      }
+    }
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: EXPORT_MIME_TYPES.excel });
+
+    const result = this.createResult({
+      success: true,
+      format: 'excel',
+      filename: config.filename,
+      rowCount: totalRows,
       duration: Date.now() - startTime,
       data: blob,
       fileSize: blob.size,
@@ -308,14 +567,28 @@ export class ExportManager<TData = unknown> {
 
     this.updateProgress(
       'completed',
-      allData.length,
       totalRows,
-      totalBatches,
-      totalBatches,
+      totalRows,
+      selectedTables.length,
+      selectedTables.length,
       startTime
     );
     this.notifySubscribers({ type: 'complete', result });
     return result;
+  }
+
+  /**
+   * Sanitize sheet name for Excel (max 31 chars, no special characters).
+   */
+  private sanitizeSheetName(name: string): string {
+    // Excel sheet name restrictions:
+    // - Max 31 characters
+    // - Cannot contain: [ ] * ? : / \
+    let sanitized = name.replace(/[[\]*?:/\\]/g, '_');
+    if (sanitized.length > 31) {
+      sanitized = sanitized.substring(0, 31);
+    }
+    return sanitized || 'Sheet';
   }
 
   /**
@@ -1176,6 +1449,13 @@ export class ExportManager<TData = unknown> {
     fileSize?: number;
     error?: string;
     sqlCompressed?: boolean;
+    files?: Array<{
+      data: Blob;
+      filename: string;
+      mimeType: string;
+      rowCount: number;
+      fileSize?: number;
+    }>;
   }): ExportResult {
     let extension = EXPORT_EXTENSIONS[params.format];
     // For SQL exports, if compressed, use .sql.gz extension
@@ -1191,6 +1471,7 @@ export class ExportManager<TData = unknown> {
     return {
       success: params.success,
       data: params.data,
+      files: params.files,
       filename,
       mimeType,
       rowCount: params.rowCount,
@@ -1235,6 +1516,23 @@ export class ExportManager<TData = unknown> {
  * ```
  */
 export function downloadExportResult(result: ExportResult): void {
+  // Handle multiple files (CSV/JSON multi-table exports)
+  if (result.files && result.files.length > 0) {
+    for (const file of result.files) {
+      const url = URL.createObjectURL(file.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Small delay between downloads to ensure browser processes them
+      URL.revokeObjectURL(url);
+    }
+    return;
+  }
+
+  // Handle single file export
   if (!result.data) {
     throw new Error('No data to download');
   }

@@ -221,8 +221,16 @@ export function useExport<TData = unknown>(options: UseExportOptions<TData>): Us
           setLastResult(event.result);
           setProgress(null);
           onComplete?.(event.result);
-          if (autoDownload && event.result.success && event.result.data) {
-            triggerDownload(event.result.data, event.result.filename);
+          if (autoDownload && event.result.success) {
+            // Handle multiple files (CSV/JSON multi-table exports)
+            if (event.result.files && event.result.files.length > 0) {
+              for (const file of event.result.files) {
+                triggerDownload(file.data, file.filename);
+              }
+            } else if (event.result.data) {
+              // Handle single file export
+              triggerDownload(event.result.data, event.result.filename);
+            }
           }
           break;
         case 'error':
@@ -286,7 +294,18 @@ export function useExport<TData = unknown>(options: UseExportOptions<TData>): Us
    * Download the last export result.
    */
   const downloadResult = useCallback(() => {
-    if (lastResult?.success && lastResult.data) {
+    if (!lastResult?.success) return;
+
+    // Handle multiple files (CSV/JSON multi-table exports)
+    if (lastResult.files && lastResult.files.length > 0) {
+      for (const file of lastResult.files) {
+        triggerDownload(file.data, file.filename);
+      }
+      return;
+    }
+
+    // Handle single file export
+    if (lastResult.data) {
       triggerDownload(lastResult.data, lastResult.filename);
     }
   }, [lastResult]);
