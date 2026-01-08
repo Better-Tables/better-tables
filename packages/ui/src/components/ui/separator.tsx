@@ -18,7 +18,10 @@ const Separator = React.forwardRef<
     )}
     {...props}
   />
-));
+)) as React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> &
+    React.RefAttributes<React.ElementRef<typeof SeparatorPrimitive.Root>>
+>;
 Separator.displayName = SeparatorPrimitive.Root.displayName;
 
 export { Separator };

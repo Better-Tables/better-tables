@@ -5,9 +5,9 @@ import * as React from 'react';
 
 import { cn } from '../../lib/utils';
 
-const Popover = PopoverPrimitive.Root;
+const Popover: typeof PopoverPrimitive.Root = PopoverPrimitive.Root;
 
-const PopoverTrigger = PopoverPrimitive.Trigger;
+const PopoverTrigger: typeof PopoverPrimitive.Trigger = PopoverPrimitive.Trigger;
 
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
@@ -25,7 +25,10 @@ const PopoverContent = React.forwardRef<
       {...props}
     />
   </PopoverPrimitive.Portal>
-));
+)) as React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> &
+    React.RefAttributes<React.ElementRef<typeof PopoverPrimitive.Content>>
+>;
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
 export { Popover, PopoverTrigger, PopoverContent };

@@ -23,7 +23,10 @@ const Switch = React.forwardRef<
       )}
     />
   </SwitchPrimitives.Root>
-));
+)) as React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> &
+    React.RefAttributes<React.ElementRef<typeof SwitchPrimitives.Root>>
+>;
 Switch.displayName = SwitchPrimitives.Root.displayName;
 
 export { Switch };

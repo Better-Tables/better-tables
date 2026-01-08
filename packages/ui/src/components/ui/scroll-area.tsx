@@ -133,7 +133,13 @@ const ScrollArea = React.forwardRef<
       </ScrollAreaContext.Provider>
     );
   }
-);
+) as React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
+    viewportClassName?: string;
+    maskHeight?: number;
+    maskClassName?: string;
+  } & React.RefAttributes<React.ComponentRef<typeof ScrollAreaPrimitive.Root>>
+>;
 
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
 
@@ -168,7 +174,10 @@ const ScrollBar = React.forwardRef<
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );
-});
+}) as React.ForwardRefExoticComponent<
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar> &
+    React.RefAttributes<React.ComponentRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>>
+>;
 
 ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
 
