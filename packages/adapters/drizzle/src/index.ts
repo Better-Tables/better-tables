@@ -88,6 +88,7 @@ export type {
   DrizzleAdapterFactoryOptions,
   ExtractDriverFromDB,
   ExtractSchemaFromDB,
+  FilterTablesFromSchema,
   JoinConfig,
   QueryBuilderFactory,
   QueryContext,
