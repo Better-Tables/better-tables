@@ -33,9 +33,9 @@
     "release": "bun i && bun run build && changeset publish"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.7",
+    "@biomejs/biome": "2.3.11",
     "@changesets/cli": "^2.29.7",
-    "@types/node": "^24.0.12",
+    "@types/node": "^25.0.6",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "turbo": "^2.6.1",
