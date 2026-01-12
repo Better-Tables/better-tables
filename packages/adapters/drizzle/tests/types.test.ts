@@ -7,14 +7,18 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { eq, ilike, isNull, sql } from 'drizzle-orm';
+import { eq, ilike, isNull, relations, sql } from 'drizzle-orm';
 import { jsonb as pgJsonb, pgTable, text as pgText } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type {
   ColumnOrExpression,
   ComputedFieldConfig,
   DrizzleAdapterConfig,
   DrizzleDatabase,
+  ExtractSchemaFromDB,
+  FilterTablesFromSchema,
 } from '../src/types';
+import { filterTablesFromSchema } from '../src/utils/schema-extractor';
 
 // Create test schema
 const mockTable = pgTable('users', {
@@ -263,5 +267,179 @@ describe('DrizzleAdapterConfig with ComputedFields', () => {
     };
 
     expect(config.computedFields?.users).toHaveLength(2);
+  });
+});
+
+describe('FilterTablesFromSchema Type and Runtime Function', () => {
+  // Create test tables
+  const usersTable = pgTable('users', {
+    id: pgText('id').primaryKey(),
+    email: pgText('email').notNull(),
+  });
+
+  const profilesTable = pgTable('profiles', {
+    id: pgText('id').primaryKey(),
+    userId: pgText('user_id').notNull(),
+    bio: pgText('bio'),
+  });
+
+  // Create test relations
+  const usersRelations = relations(usersTable, ({ one }) => ({
+    profile: one(profilesTable, {
+      fields: [usersTable.id],
+      references: [profilesTable.userId],
+    }),
+  }));
+
+  const profilesRelations = relations(profilesTable, ({ one }) => ({
+    user: one(usersTable, {
+      fields: [profilesTable.userId],
+      references: [usersTable.id],
+    }),
+  }));
+
+  describe('filterTablesFromSchema runtime function', () => {
+    it('should filter out relations and keep only tables', () => {
+      const schemaWithRelations = {
+        users: usersTable,
+        profiles: profilesTable,
+        usersRelations,
+        profilesRelations,
+      };
+
+      const filtered = filterTablesFromSchema(schemaWithRelations);
+
+      // Should only contain tables, not relations
+      expect(filtered).toHaveProperty('users');
+      expect(filtered).toHaveProperty('profiles');
+      expect(filtered).not.toHaveProperty('usersRelations');
+      expect(filtered).not.toHaveProperty('profilesRelations');
+      expect(Object.keys(filtered)).toHaveLength(2);
+    });
+
+    it('should handle schema with only tables', () => {
+      const schemaWithOnlyTables = {
+        users: usersTable,
+        profiles: profilesTable,
+      };
+
+      const filtered = filterTablesFromSchema(schemaWithOnlyTables);
+
+      expect(filtered).toHaveProperty('users');
+      expect(filtered).toHaveProperty('profiles');
+      expect(Object.keys(filtered)).toHaveLength(2);
+    });
+
+    it('should handle schema with only relations', () => {
+      const schemaWithOnlyRelations = {
+        usersRelations,
+        profilesRelations,
+      };
+
+      const filtered = filterTablesFromSchema(schemaWithOnlyRelations);
+
+      // Should return empty object since there are no tables
+      expect(Object.keys(filtered)).toHaveLength(0);
+    });
+
+    it('should handle empty schema', () => {
+      const emptySchema = {};
+
+      const filtered = filterTablesFromSchema(emptySchema);
+
+      expect(Object.keys(filtered)).toHaveLength(0);
+    });
+
+    it('should handle schema with mixed valid and invalid entries', () => {
+      const mixedSchema = {
+        users: usersTable,
+        invalidEntry: null,
+        anotherInvalid: 'not an object',
+        profiles: profilesTable,
+        usersRelations,
+      };
+
+      const filtered = filterTablesFromSchema(mixedSchema);
+
+      // Should only contain valid tables
+      expect(filtered).toHaveProperty('users');
+      expect(filtered).toHaveProperty('profiles');
+      expect(filtered).not.toHaveProperty('invalidEntry');
+      expect(filtered).not.toHaveProperty('anotherInvalid');
+      expect(filtered).not.toHaveProperty('usersRelations');
+      expect(Object.keys(filtered)).toHaveLength(2);
+    });
+  });
+
+  describe('FilterTablesFromSchema type', () => {
+    it('should filter relation types from schema type', () => {
+      const schemaWithRelations = {
+        users: usersTable,
+        profiles: profilesTable,
+        usersRelations,
+        profilesRelations,
+      };
+
+      // Type-level test: FilterTablesFromSchema should exclude relations
+      type FilteredSchema = FilterTablesFromSchema<typeof schemaWithRelations>;
+
+      // These should compile without errors, indicating the type works correctly
+      const _test1: FilteredSchema = {
+        users: usersTable,
+        profiles: profilesTable,
+      };
+
+      // This should cause a type error if uncommented (relations should be excluded)
+      // const _test2: FilteredSchema = {
+      //   users: usersTable,
+      //   profiles: profilesTable,
+      //   usersRelations, // Should cause type error
+      // };
+
+      expect(_test1).toBeDefined();
+      expect(_test1.users).toBe(usersTable);
+      expect(_test1.profiles).toBe(profilesTable);
+    });
+
+    it('should preserve all properties when schema has no relations', () => {
+      const schemaWithoutRelations = {
+        users: usersTable,
+        profiles: profilesTable,
+      };
+
+      type FilteredSchema = FilterTablesFromSchema<typeof schemaWithoutRelations>;
+
+      const _test: FilteredSchema = schemaWithoutRelations;
+
+      expect(_test).toBeDefined();
+      expect(_test.users).toBe(usersTable);
+      expect(_test.profiles).toBe(profilesTable);
+    });
+  });
+
+  describe('ExtractSchemaFromDB type', () => {
+    it('should extract and filter schema from PostgresJsDatabase type', () => {
+      // Create a mock database type with schema including relations
+      const schemaWithRelations = {
+        users: usersTable,
+        profiles: profilesTable,
+        usersRelations,
+        profilesRelations,
+      };
+
+      // Simulate a PostgresJsDatabase type
+      type MockDB = PostgresJsDatabase<typeof schemaWithRelations>;
+      type ExtractedSchema = ExtractSchemaFromDB<MockDB>;
+
+      // The extracted schema should only contain tables, not relations
+      const _test: ExtractedSchema = {
+        users: usersTable,
+        profiles: profilesTable,
+      };
+
+      expect(_test).toBeDefined();
+      expect(_test.users).toBe(usersTable);
+      expect(_test.profiles).toBe(profilesTable);
+    });
   });
 });
