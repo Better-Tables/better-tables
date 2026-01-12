@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.31
+
+### Patch Changes
+
+- Updated DrizzleAdapter and related types to automatically filter out relations from the schema, ensuring only tables are used for type inference and operations. Introduced InferSelectModelFromFilteredSchema type for improved type safety and replaced direct usage of InferSelectModel<TSchema[keyof TSchema]>. Adjusted DrizzleAdapterConfig, computed fields, and method signatures to align with the new schema filtering approach.
+
 ## 0.5.30
 
 ### Patch Changes
