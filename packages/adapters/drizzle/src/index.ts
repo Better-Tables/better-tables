@@ -89,6 +89,7 @@ export type {
   ExtractDriverFromDB,
   ExtractSchemaFromDB,
   FilterTablesFromSchema,
+  InferSelectModelFromFilteredSchema,
   JoinConfig,
   QueryBuilderFactory,
   QueryContext,

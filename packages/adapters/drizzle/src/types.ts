@@ -560,13 +560,13 @@ export interface SQLiteQueryBuilderWithJoins extends QueryBuilderWithJoins {
  * ```
  */
 export interface DrizzleAdapterConfig<
-  TSchema extends Record<string, AnyTableType>,
+  TSchema extends Record<string, unknown>,
   TDriver extends DatabaseDriver,
 > {
   /** Drizzle database instance - automatically typed based on driver */
   db: DrizzleDatabase<TDriver>;
 
-  /** Schema containing tables and relations */
+  /** Schema containing tables and relations (relations will be filtered out automatically) */
   schema: TSchema;
 
   /** Database driver type - determines the type of the `db` property */
@@ -583,7 +583,11 @@ export interface DrizzleAdapterConfig<
 
   /** Computed/virtual fields that don't exist in the database schema */
   computedFields?: {
-    [K in keyof TSchema]?: ComputedFieldConfig<InferSelectModel<TSchema[K]>>[];
+    [K in keyof FilterTablesFromSchema<TSchema>]?: K extends string
+      ? FilterTablesFromSchema<TSchema>[K] extends AnyTableType
+        ? ComputedFieldConfig<InferSelectModel<FilterTablesFromSchema<TSchema>[K]>>[]
+        : never
+      : never;
   };
 
   /** Adapter options */
@@ -637,7 +641,7 @@ export interface RelationshipPath {
  * Context provided to computed field functions
  */
 export interface ComputedFieldContext<
-  TSchema extends Record<string, AnyTableType> = Record<string, AnyTableType>,
+  TSchema extends Record<string, unknown> = Record<string, AnyTableType>,
   TDriver extends DatabaseDriver = DatabaseDriver,
 > {
   /** Primary table name */
@@ -649,8 +653,8 @@ export interface ComputedFieldContext<
   /** Database instance (for querying related tables) */
   db: DrizzleDatabase<TDriver>;
 
-  /** Schema */
-  schema: TSchema;
+  /** Schema (filtered to only include tables, relations are excluded) */
+  schema: FilterTablesFromSchema<TSchema>;
 }
 
 /**
@@ -1065,6 +1069,16 @@ export type FilterTablesFromSchema<TSchema> = TSchema extends Record<string, unk
       [K in keyof TSchema as TSchema[K] extends AnyTableType ? K : never]: TSchema[K];
     }
   : Record<string, AnyTableType>;
+
+/**
+ * Extract the union of all inferred select models from a filtered schema.
+ * This is used internally by DrizzleAdapter to represent the union of all possible record types.
+ */
+export type InferSelectModelFromFilteredSchema<TSchema extends Record<string, unknown>> = {
+  [K in keyof FilterTablesFromSchema<TSchema>]: InferSelectModel<
+    FilterTablesFromSchema<TSchema>[K] & AnyTableType
+  >;
+}[keyof FilterTablesFromSchema<TSchema>];
 
 /**
  * Extract schema type from Drizzle database instance.

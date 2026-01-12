@@ -64,7 +64,7 @@ import type {
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
-import type { InferSelectModel, Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
 
 import { DataTransformer } from './data-transformer';
 import { getOperationsFactory } from './operations';
@@ -82,10 +82,13 @@ import type {
   DrizzleAdapterConfig,
   DrizzleDatabase,
   FilterHandlerHooks,
+  FilterTablesFromSchema,
+  InferSelectModelFromFilteredSchema,
   RelationshipMap,
   TableWithId,
 } from './types';
 import { QueryError, SchemaError } from './types';
+import { filterTablesFromSchema } from './utils/schema-extractor';
 
 /**
  * Drizzle adapter implementation for Better Tables.
@@ -128,14 +131,12 @@ import { QueryError, SchemaError } from './types';
  * @see {@link TableAdapter} for the interface contract
  * @since 1.0.0
  */
-export class DrizzleAdapter<
-  TSchema extends Record<string, AnyTableType>,
-  TDriver extends DatabaseDriver,
-> implements TableAdapter<InferSelectModel<TSchema[keyof TSchema]>>
+export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver extends DatabaseDriver>
+  implements TableAdapter<InferSelectModelFromFilteredSchema<TSchema>>
 {
   private db: DrizzleDatabase<TDriver>;
-  private schema: TSchema;
-  private operations: DatabaseOperations<InferSelectModel<TSchema[keyof TSchema]>>;
+  private schema: FilterTablesFromSchema<TSchema>;
+  private operations: DatabaseOperations<InferSelectModelFromFilteredSchema<TSchema>>;
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
@@ -145,13 +146,14 @@ export class DrizzleAdapter<
   private cache: Map<
     string,
     {
-      value: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>;
+      value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>;
       timestamp: number;
       ttl: number;
     }
   > = new Map();
-  private subscribers: Array<(event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>) => void> =
-    [];
+  private subscribers: Array<
+    (event: DataEvent<InferSelectModelFromFilteredSchema<TSchema>>) => void
+  > = [];
   private options: DrizzleAdapterConfig<TSchema, TDriver>['options'];
   // Internal storage uses generic type for runtime flexibility
   // Type safety is enforced at config level via DrizzleAdapterConfig
@@ -197,7 +199,8 @@ export class DrizzleAdapter<
    */
   constructor(config: DrizzleAdapterConfig<TSchema, TDriver>) {
     this.db = config.db;
-    this.schema = config.schema;
+    // Filter out relations from schema at runtime - schema may include both tables and relations
+    this.schema = filterTablesFromSchema(config.schema) as FilterTablesFromSchema<TSchema>;
     this.options = config.options || {};
     if (config.hooks !== undefined) {
       this.hooks = config.hooks;
@@ -272,9 +275,9 @@ export class DrizzleAdapter<
    */
   private createOperationsStrategy(
     driver: TDriver
-  ): DatabaseOperations<InferSelectModel<TSchema[keyof TSchema]>> {
+  ): DatabaseOperations<InferSelectModelFromFilteredSchema<TSchema>> {
     const createOperations = getOperationsFactory(driver);
-    return createOperations<InferSelectModel<TSchema[keyof TSchema]>>(this.db);
+    return createOperations<InferSelectModelFromFilteredSchema<TSchema>>(this.db);
   }
 
   /**
@@ -302,8 +305,8 @@ export class DrizzleAdapter<
    */
   private async executeInsert(
     table: TableWithId,
-    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     return this.operations.insert(table, data);
   }
 
@@ -314,8 +317,8 @@ export class DrizzleAdapter<
   private async executeUpdate(
     table: TableWithId,
     id: string,
-    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     return this.operations.update(table, id, data);
   }
 
@@ -326,7 +329,7 @@ export class DrizzleAdapter<
   private async executeDelete(
     table: TableWithId,
     id: string
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     return this.operations.delete(table, id);
   }
 
@@ -337,8 +340,8 @@ export class DrizzleAdapter<
   private async executeBulkUpdate(
     table: TableWithId,
     ids: string[],
-    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>[]> {
     return this.operations.bulkUpdate(table, ids, data);
   }
 
@@ -349,7 +352,7 @@ export class DrizzleAdapter<
   private async executeBulkDelete(
     table: TableWithId,
     ids: string[]
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>[]> {
     return this.operations.bulkDelete(table, ids);
   }
 
@@ -402,7 +405,7 @@ export class DrizzleAdapter<
    */
   async fetchData(
     params: FetchDataParams
-  ): Promise<FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>> {
+  ): Promise<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>> {
     const startTime = Date.now();
 
     try {
@@ -656,7 +659,7 @@ export class DrizzleAdapter<
         transformerMetadata.isNested = isNested;
       }
       const transformedData = this.dataTransformer.transformToNested<
-        InferSelectModel<TSchema[keyof TSchema]>
+        InferSelectModelFromFilteredSchema<TSchema>
       >(data, primaryTable, columnsWithoutComputed, transformerMetadata);
 
       // Build pagination info
@@ -693,7 +696,7 @@ export class DrizzleAdapter<
       );
 
       // Build result
-      const result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> = {
+      const result: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>> = {
         data: dataWithComputed.data,
         total: dataWithComputed.total,
         pagination: dataWithComputed.pagination,
@@ -788,7 +791,7 @@ export class DrizzleAdapter<
    * Determine table from data or use first table as fallback
    */
   private determineTableFromData(
-    _data?: Partial<InferSelectModel<TSchema[keyof TSchema]>>
+    _data?: Partial<InferSelectModelFromFilteredSchema<TSchema>>
   ): string {
     // For now, use the first table as fallback
     // In a more sophisticated implementation, we could analyze the data structure
@@ -807,11 +810,13 @@ export class DrizzleAdapter<
    * Create new record
    */
   async createRecord(
-    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     try {
       const primaryTable = this.determineTableFromData(data);
-      const mainTableSchema = this.schema[primaryTable] as TableWithId;
+      const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
+        primaryTable
+      ] as TableWithId;
       if (!mainTableSchema) {
         throw new SchemaError(`Table not found: ${primaryTable}`, {
           primaryTable,
@@ -837,11 +842,13 @@ export class DrizzleAdapter<
    */
   async updateRecord(
     id: string,
-    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>> {
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     try {
       const primaryTable = this.determineTableFromData(data);
-      const mainTableSchema = this.schema[primaryTable] as TableWithId;
+      const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
+        primaryTable
+      ] as TableWithId;
       if (!mainTableSchema) {
         throw new SchemaError(`Table not found: ${primaryTable}`, {
           primaryTable,
@@ -868,7 +875,9 @@ export class DrizzleAdapter<
   async deleteRecord(id: string): Promise<void> {
     try {
       const primaryTable = this.determineTableFromData();
-      const mainTableSchema = this.schema[primaryTable] as TableWithId;
+      const mainTableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable] as
+        | TableWithId
+        | undefined;
       if (!mainTableSchema) {
         throw new SchemaError(`Table not found: ${primaryTable}`, {
           primaryTable,
@@ -892,11 +901,13 @@ export class DrizzleAdapter<
    */
   async bulkUpdate(
     ids: string[],
-    data: Partial<InferSelectModel<TSchema[keyof TSchema]>>
-  ): Promise<InferSelectModel<TSchema[keyof TSchema]>[]> {
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+  ): Promise<InferSelectModelFromFilteredSchema<TSchema>[]> {
     try {
       const primaryTable = this.determineTableFromData(data);
-      const mainTableSchema = this.schema[primaryTable] as TableWithId;
+      const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
+        primaryTable
+      ] as TableWithId;
       if (!mainTableSchema) {
         throw new SchemaError(`Table not found: ${primaryTable}`, {
           primaryTable,
@@ -923,7 +934,9 @@ export class DrizzleAdapter<
   async bulkDelete(ids: string[]): Promise<void> {
     try {
       const primaryTable = this.determineTableFromData();
-      const mainTableSchema = this.schema[primaryTable] as TableWithId;
+      const mainTableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable] as
+        | TableWithId
+        | undefined;
       if (!mainTableSchema) {
         throw new SchemaError(`Table not found: ${primaryTable}`, {
           primaryTable,
@@ -977,7 +990,7 @@ export class DrizzleAdapter<
    * Subscribe to real-time updates
    */
   subscribe(
-    callback: (event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>) => void
+    callback: (event: DataEvent<InferSelectModelFromFilteredSchema<TSchema>>) => void
   ): () => void {
     this.subscribers.push(callback);
     return () => {
@@ -1155,10 +1168,10 @@ export class DrizzleAdapter<
    * Add computed fields to result data
    */
   private async addComputedFields(
-    result: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>,
+    result: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>,
     computedFields: ComputedFieldConfig[],
     primaryTable: string
-  ): Promise<FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>> {
+  ): Promise<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>> {
     if (computedFields.length === 0 || result.data.length === 0) {
       return result;
     }
@@ -1188,7 +1201,7 @@ export class DrizzleAdapter<
     );
 
     return {
-      data: dataWithComputed as InferSelectModel<TSchema[keyof TSchema]>[],
+      data: dataWithComputed as InferSelectModelFromFilteredSchema<TSchema>[],
       total: result.total,
       pagination: result.pagination,
       meta: result.meta || {},
@@ -1197,14 +1210,14 @@ export class DrizzleAdapter<
 
   private getFromCache(
     key: string
-  ): FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>> | undefined {
+  ): FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>> | undefined {
     const cached = this.cache.get(key);
     return cached ? cached.value : undefined;
   }
 
   private setCache(
     key: string,
-    value: FetchDataResult<InferSelectModel<TSchema[keyof TSchema]>>,
+    value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>,
     ttl?: number
   ): void {
     if (this.options?.cache?.enabled !== false) {
@@ -1231,7 +1244,7 @@ export class DrizzleAdapter<
   /**
    * Event system
    */
-  private emit(event: DataEvent<InferSelectModel<TSchema[keyof TSchema]>>): void {
+  private emit(event: DataEvent<InferSelectModelFromFilteredSchema<TSchema>>): void {
     this.subscribers.forEach((callback) => {
       callback(event);
     });
@@ -1272,7 +1285,7 @@ export class DrizzleAdapter<
   }
 
   private convertToExportFormat(
-    data: InferSelectModel<TSchema[keyof TSchema]>[],
+    data: InferSelectModelFromFilteredSchema<TSchema>[],
     format: string
   ): Blob | string {
     switch (format) {
@@ -1288,7 +1301,7 @@ export class DrizzleAdapter<
     }
   }
 
-  private convertToCSV(data: InferSelectModel<TSchema[keyof TSchema]>[]): string {
+  private convertToCSV(data: InferSelectModelFromFilteredSchema<TSchema>[]): string {
     if (data.length === 0) return '';
 
     const firstRecord = data[0];
