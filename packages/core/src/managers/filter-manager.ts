@@ -490,7 +490,10 @@ export class FilterManager<TData = unknown> {
     this.subscribers.forEach((callback) => {
       try {
         callback(event);
-      } catch (_error) {}
+      } catch (error) {
+        // biome-ignore lint: Intentional error logging for subscriber errors
+        console.error('Error in filter manager subscriber:', error);
+      }
     });
   }
 

@@ -680,7 +680,10 @@ export class SelectionManager<TData = unknown> {
     this.subscribers.forEach((callback) => {
       try {
         callback(event);
-      } catch (_error) {}
+      } catch (error) {
+        // biome-ignore lint: Intentional error logging for subscriber errors
+        console.error('Error in selection manager subscriber:', error);
+      }
     });
   }
 

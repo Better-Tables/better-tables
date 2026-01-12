@@ -633,7 +633,10 @@ export class PaginationManager {
     this.subscribers.forEach((callback) => {
       try {
         callback(event);
-      } catch (_error) {}
+      } catch (error) {
+        // biome-ignore lint: Intentional error logging for subscriber errors
+        console.error('Error in pagination manager subscriber:', error);
+      }
     });
   }
 
