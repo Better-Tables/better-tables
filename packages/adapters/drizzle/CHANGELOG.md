@@ -1,5 +1,11 @@
 # @better-tables/adapters-drizzle
 
+## 0.5.30
+
+### Patch Changes
+
+- Introduces a utility type and function to filter out relations from Drizzle schemas, ensuring only actual table types are passed to the adapter. Updates factory functions and type inference to use filtered schemas, improving type safety and preventing relations from being incorrectly included in adapter operations.
+
 ## 0.5.29
 
 ### Patch Changes
