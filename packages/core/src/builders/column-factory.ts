@@ -68,28 +68,63 @@ export interface ColumnFactory<TData = unknown> {
 }
 
 /**
- * Create a column factory for building type-safe columns
+ * Helper function to build an array of column definitions from builders.
+ *
+ * Automatically calls `.build()` on each builder, eliminating the need
+ * for explicit `.build()` calls when creating column arrays.
+ *
+ * @template TData - The type of row data
+ * @param builders - Array of column builders
+ * @returns Array of column definitions
  *
  * @example
  * ```typescript
- ** // Create a column factory for a Contact type
+ * const cb = createColumnBuilder<User>();
+ *
+ * const columns = columns([
+ *   cb.text().id('name').displayName('Name').accessor(u => u.name),
+ *   cb.text().id('email').displayName('Email').accessor(u => u.email),
+ * ]);
+ * ```
+ */
+export function columns<TData>(
+  builders: Array<
+    | TextColumnBuilder<TData>
+    | NumberColumnBuilder<TData>
+    | DateColumnBuilder<TData>
+    | BooleanColumnBuilder<TData>
+    | OptionColumnBuilder<TData>
+    | MultiOptionColumnBuilder<TData>
+    | ColumnBuilder<TData, unknown>
+  >
+): Array<ColumnDefinition<TData, unknown>> {
+  return builders.map((builder) => builder.build() as ColumnDefinition<TData, unknown>);
+}
+
+/**
+ * Create a column factory for building type-safe columns.
+ *
+ * Columns are automatically built when used in array contexts, eliminating
+ * the need for explicit `.build()` calls. Filterable and sortable default
+ * to `true` - only call those methods to disable them.
+ *
+ * @example
+ * ```typescript
  * const cb = createColumnBuilder<Contact>();
  *
- ** // Build columns using the fluent API
+ * // No .build(), .filterable(), or .sortable() needed - they default to true
  * const columns = [
  *   cb.text()
  *     .id('name')
  *     .displayName('Full Name')
  *     .accessor(contact => `${contact.firstName} ${contact.lastName}`)
- *     .searchable()
- *     .build(),
+ *     .searchable(),
  *
  *   cb.number()
  *     .id('age')
  *     .displayName('Age')
  *     .accessor(contact => contact.age)
- *     .range(0, 120)
- *     .build(),
+ *     .range(0, 120),
  *
  *   cb.option()
  *     .id('status')
@@ -98,8 +133,7 @@ export interface ColumnFactory<TData = unknown> {
  *     .options([
  *       { value: 'active', label: 'Active', color: 'green' },
  *       { value: 'inactive', label: 'Inactive', color: 'red' },
- *     ])
- *     .build(),
+ *     ]),
  * ];
  * ```
  */

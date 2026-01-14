@@ -1,38 +1,29 @@
-import { createColumnBuilder } from '@better-tables/core';
+import { columns, createColumnBuilder } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
 import type { UserWithRelations } from '../db/schema';
 
 const cb = createColumnBuilder<UserWithRelations>();
 
-export const userColumns = [
+export const userColumns = columns([
   // Direct user columns
   cb
     .text()
     .id('name')
     .displayName('Name')
-    .accessor((user) => user.name)
-    .filterable()
-    .sortable()
-    .build(),
+    .accessor((user) => user.name),
 
   cb
     .text()
     .id('email')
     .displayName('Email')
-    .accessor((user) => user.email)
-    .filterable()
-    .sortable()
-    .build(),
+    .accessor((user) => user.email),
 
   cb
     .number()
     .id('age')
     .displayName('Age')
     .accessorWithDefault((user) => user.age, 0)
-    .range(18, 100, { includeNull: true })
-    .filterable()
-    .sortable()
-    .build(),
+    .range(18, 100, { includeNull: true }),
 
   cb
     .option()
@@ -45,8 +36,6 @@ export const userColumns = [
       { value: 'contributor', label: 'Contributor' },
       { value: 'viewer', label: 'Viewer' },
     ])
-    .filterable()
-    .sortable()
     .cellRenderer(({ value }) => {
       const colors: Record<string, string> = {
         admin: 'bg-purple-100 text-purple-800',
@@ -59,8 +48,7 @@ export const userColumns = [
           {value as string}
         </Badge>
       );
-    })
-    .build(),
+    }),
 
   cb
     .option()
@@ -73,8 +61,6 @@ export const userColumns = [
       { value: 'pending', label: 'Pending' },
       { value: 'suspended', label: 'Suspended' },
     ])
-    .filterable()
-    .sortable()
     .cellRenderer(({ value }) => {
       const colors: Record<string, string> = {
         active: 'bg-green-100 text-green-800',
@@ -87,17 +73,13 @@ export const userColumns = [
           {value as string}
         </Badge>
       );
-    })
-    .build(),
+    }),
 
   cb
     .date()
     .id('createdAt')
     .displayName('Joined')
-    .accessor((user) => user.createdAt)
-    .filterable(true) // Enable filtering for date testing
-    .sortable()
-    .build(),
+    .accessor((user) => user.createdAt),
 
   // One-to-one relationship (profile)
   cb
@@ -106,16 +88,13 @@ export const userColumns = [
     .displayName('Bio')
     .accessorWithDefault((user) => user.profile?.bio)
     .searchable({ includeNull: true })
-    .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
-    .filterable()
-    .build(),
+    .truncate({ maxLength: 32, suffix: '...', showTooltip: true }),
 
   cb
     .text()
     .id('profile.website')
     .displayName('Website')
     .accessorWithDefault((user) => user.profile?.website)
-    .filterable()
     .cellRenderer(({ value }) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
 
@@ -144,24 +123,20 @@ export const userColumns = [
           {url}
         </a>
       );
-    })
-    .build(),
+    }),
 
   cb
     .text()
     .id('profile.location')
     .displayName('Location')
     .accessorWithDefault((user) => user.profile?.location)
-    .searchable({ includeNull: true })
-    .filterable()
-    .build(),
+    .searchable({ includeNull: true }),
 
   cb
     .text()
     .id('profile.github')
     .displayName('GitHub')
     .accessorWithDefault((user) => user.profile?.github)
-    .filterable()
     .cellRenderer(({ value }) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
       return (
@@ -174,12 +149,11 @@ export const userColumns = [
           @{value as string}
         </a>
       );
-    })
-    .build(),
+    }),
 
   // Note: Computed columns are not yet supported by the adapter
   // These would need to be implemented as virtual columns or handled differently
-];
+]);
 
 // Default visible columns for the demo
 export const defaultVisibleColumns = [

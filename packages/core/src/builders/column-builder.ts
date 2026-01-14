@@ -31,30 +31,31 @@ import type { FilterConfig } from '../types/filter';
  *
  * @example
  * ```typescript
- * // Create a basic text column
- * const nameColumn = new ColumnBuilder<User, string>('text')
- *   .id('name')
- *   .displayName('Full Name')
- *   .accessor(user => `${user.firstName} ${user.lastName}`)
- *   .sortable()
- *   .filterable()
- *   .width(200)
- *   .build();
+ * const cb = createColumnBuilder<User>();
  *
- * // Create a custom column with renderers
- * const statusColumn = new ColumnBuilder<User, string>('custom')
- *   .id('status')
- *   .displayName('Status')
- *   .accessor(user => user.status)
- *   .cellRenderer(({ value }) => (
- *     <span className={`status-${value}`}>{value}</span>
- *   ))
- *   .headerRenderer(({ column }) => (
- *     <div className="status-header">
- *       <Icon name="status" />
- *       {column.displayName}
- *     </div>
- *   ))
+ * // Create columns - no need for .build(), .filterable(), or .sortable()
+ * // They default to true and auto-build when used in arrays
+ * const columns = [
+ *   cb.text()
+ *     .id('name')
+ *     .displayName('Full Name')
+ *     .accessor(user => `${user.firstName} ${user.lastName}`)
+ *     .width(200),
+ *
+ *   cb.text()
+ *     .id('status')
+ *     .displayName('Status')
+ *     .accessor(user => user.status)
+ *     .cellRenderer(({ value }) => (
+ *       <span className={`status-${value}`}>{value}</span>
+ *     )),
+ * ];
+ *
+ * // Explicit .build() still works for backward compatibility
+ * const singleColumn = cb.text()
+ *   .id('email')
+ *   .displayName('Email')
+ *   .accessor(user => user.email)
  *   .build();
  * ```
  */
@@ -190,7 +191,31 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
-   * Configure column sorting
+   * Configure column sorting.
+   *
+   * By default, columns are sortable. Only call this method to disable sorting.
+   * This is an opt-out method - you don't need to call it unless you want to disable sorting.
+   *
+   * @param sortable - Whether the column is sortable (default: true). Pass `false` to disable.
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Column is sortable by default - no need to call this
+   * const column = cb.text()
+   *   .id('name')
+   *   .displayName('Name')
+   *   .accessor(user => user.name)
+   *   .build();
+   *
+   * // Only call to disable sorting
+   * const nonSortableColumn = cb.text()
+   *   .id('id')
+   *   .displayName('ID')
+   *   .accessor(user => user.id)
+   *   .sortable(false)
+   *   .build();
+   * ```
    */
   sortable(sortable = true): this {
     this.config.sortable = sortable;
@@ -198,7 +223,41 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   }
 
   /**
-   * Configure column filtering
+   * Configure column filtering.
+   *
+   * By default, columns are filterable. Only call this method to disable filtering
+   * or to configure filter options. This is an opt-out method - you don't need to
+   * call it unless you want to disable filtering or configure filter behavior.
+   *
+   * @param filterable - Whether the column is filterable (default: true). Pass `false` to disable.
+   * @param filterConfig - Optional filter configuration for advanced filtering options
+   * @returns This builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Column is filterable by default - no need to call this
+   * const column = cb.text()
+   *   .id('name')
+   *   .displayName('Name')
+   *   .accessor(user => user.name)
+   *   .build();
+   *
+   * // Only call to disable filtering
+   * const nonFilterableColumn = cb.text()
+   *   .id('id')
+   *   .displayName('ID')
+   *   .accessor(user => user.id)
+   *   .filterable(false)
+   *   .build();
+   *
+   * // Or to configure filter options
+   * const searchableColumn = cb.text()
+   *   .id('email')
+   *   .displayName('Email')
+   *   .accessor(user => user.email)
+   *   .filterable(true, { operators: ['contains', 'equals'] })
+   *   .build();
+   * ```
    */
   filterable(filterable = true, filterConfig?: FilterConfig<TValue>): this {
     this.config.filterable = filterable;
@@ -339,25 +398,28 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    * Build the final column definition.
    *
    * Creates and returns the complete column definition object with all configured
-   * properties. This method should be called last in the builder chain to finalize
-   * the column configuration.
+   * properties. This method can be called explicitly, but it's not required - the
+   * builder will automatically build when used in array contexts or when assigned
+   * to variables expecting a ColumnDefinition.
    *
    * @returns Complete column definition
    * @throws {Error} If required properties are missing
    *
    * @example
    * ```typescript
+   * // Explicit build (still supported for backward compatibility)
    * const column = new ColumnBuilder<User, string>('text')
    *   .id('name')
    *   .displayName('Full Name')
    *   .accessor(user => `${user.firstName} ${user.lastName}`)
-   *   .sortable()
-   *   .filterable()
    *   .width(200)
    *   .build();
    *
-   * // Use the column definition
-   * const columns = [column];
+   * // Auto-build when used in arrays (no .build() needed)
+   * const columns = [
+   *   cb.text().id('name').displayName('Name').accessor(u => u.name),
+   *   cb.text().id('email').displayName('Email').accessor(u => u.email),
+   * ];
    * ```
    */
   build(): ColumnDefinition<TData, TValue> {
@@ -377,6 +439,32 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
     }
 
     return this.config as ColumnDefinition<TData, TValue>;
+  }
+
+  /**
+   * Auto-build when used as a value (e.g., in arrays, assignments, spread operations).
+   *
+   * This method is called automatically by JavaScript when the builder is used
+   * in contexts that expect a ColumnDefinition, eliminating the need for explicit
+   * `.build()` calls in most cases.
+   *
+   * @returns Complete column definition
+   */
+  valueOf(): ColumnDefinition<TData, TValue> {
+    return this.build();
+  }
+
+  /**
+   * Auto-build when converted to a primitive value.
+   *
+   * This method is called automatically by JavaScript when the builder is used
+   * in contexts that require primitive conversion, enabling seamless auto-building.
+   *
+   * @param _hint - Type hint ('string', 'number', or 'default')
+   * @returns Complete column definition
+   */
+  [Symbol.toPrimitive](_hint: string): ColumnDefinition<TData, TValue> {
+    return this.build();
   }
 
   /**

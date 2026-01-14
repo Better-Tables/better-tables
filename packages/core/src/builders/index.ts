@@ -22,6 +22,7 @@ export { ColumnBuilder } from './column-builder';
 export {
   type ColumnFactory,
   column,
+  columns,
   createColumnBuilder,
   createColumnBuilders,
   createTypedColumnBuilder,
