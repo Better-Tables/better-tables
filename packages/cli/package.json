@@ -32,8 +32,8 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
-    "commander": "^12.1.0",
-    "open": "^10.1.0",
+    "commander": "^14.0.2",
+    "open": "^11.0.0",
     "picocolors": "^1.1.0"
   },
   "devDependencies": {
