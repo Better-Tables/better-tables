@@ -18,8 +18,8 @@
     "@better-tables/adapters-drizzle": "workspace:*",
     "better-sqlite3": "^12.4.6",
     "drizzle-orm": "^0.45.1",
-    "lucide-react": "^0.562.0",
-    "next": "^16.1.3",
+    "lucide-react": "^0.563.0",
+    "next": "^16.1.4",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
