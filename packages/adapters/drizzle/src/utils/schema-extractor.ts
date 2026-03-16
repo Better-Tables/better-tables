@@ -175,3 +175,57 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
 export function isValidExtractedSchema(extracted: ExtractedSchema): boolean {
   return extracted.hasSchema && Object.keys(extracted.tables).length > 0;
 }
+
+/**
+ * Filter out relations from a schema object, keeping only actual table types.
+ *
+ * @description
+ * This function filters a schema object to include only properties that are
+ * actual table types (extending AnyTableType), excluding relation objects.
+ * This is necessary because Drizzle schemas often include both tables and relations
+ * (e.g., `{ users, profiles, usersRelations }`), but the adapter only needs tables.
+ *
+ * @param schema - The schema object that may include both tables and relations
+ * @returns A schema object containing only table types
+ *
+ * @example
+ * ```typescript
+ * const schemaWithRelations = {
+ *   users: usersTable,
+ *   profiles: profilesTable,
+ *   usersRelations: usersRelations, // This will be filtered out
+ * };
+ *
+ * const tablesOnly = filterTablesFromSchema(schemaWithRelations);
+ * // Result: { users: usersTable, profiles: profilesTable }
+ * ```
+ */
+export function filterTablesFromSchema(
+  schema: Record<string, unknown>
+): Record<string, AnyTableType> {
+  const filtered: Record<string, AnyTableType> = {};
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (!value || typeof value !== 'object') continue;
+
+    const potentialTable = value as Record<string, unknown>;
+
+    // Check if this is a table (has _ property with columns)
+    if ('_' in potentialTable && potentialTable._ && typeof potentialTable._ === 'object') {
+      const meta = potentialTable._ as Record<string, unknown>;
+
+      // Check if it has columns (table) or config (relation)
+      if ('columns' in meta) {
+        filtered[key] = value as AnyTableType;
+      }
+    }
+    // Check if this is a relation wrapper with a 'table' property
+    // Relations have a 'table' property but we want to skip them
+    else if (!('table' in potentialTable && potentialTable.table)) {
+      // If no _ property and no table property, treat as table (handles flattened schema structures)
+      filtered[key] = value as AnyTableType;
+    }
+  }
+
+  return filtered;
+}

@@ -560,13 +560,13 @@ export interface SQLiteQueryBuilderWithJoins extends QueryBuilderWithJoins {
  * ```
  */
 export interface DrizzleAdapterConfig<
-  TSchema extends Record<string, AnyTableType>,
+  TSchema extends Record<string, unknown>,
   TDriver extends DatabaseDriver,
 > {
   /** Drizzle database instance - automatically typed based on driver */
   db: DrizzleDatabase<TDriver>;
 
-  /** Schema containing tables and relations */
+  /** Schema containing tables and relations (relations will be filtered out automatically) */
   schema: TSchema;
 
   /** Database driver type - determines the type of the `db` property */
@@ -583,7 +583,11 @@ export interface DrizzleAdapterConfig<
 
   /** Computed/virtual fields that don't exist in the database schema */
   computedFields?: {
-    [K in keyof TSchema]?: ComputedFieldConfig<InferSelectModel<TSchema[K]>>[];
+    [K in keyof FilterTablesFromSchema<TSchema>]?: K extends string
+      ? FilterTablesFromSchema<TSchema>[K] extends AnyTableType
+        ? ComputedFieldConfig<InferSelectModel<FilterTablesFromSchema<TSchema>[K]>>[]
+        : never
+      : never;
   };
 
   /** Adapter options */
@@ -637,7 +641,7 @@ export interface RelationshipPath {
  * Context provided to computed field functions
  */
 export interface ComputedFieldContext<
-  TSchema extends Record<string, AnyTableType> = Record<string, AnyTableType>,
+  TSchema extends Record<string, unknown> = Record<string, AnyTableType>,
   TDriver extends DatabaseDriver = DatabaseDriver,
 > {
   /** Primary table name */
@@ -649,8 +653,8 @@ export interface ComputedFieldContext<
   /** Database instance (for querying related tables) */
   db: DrizzleDatabase<TDriver>;
 
-  /** Schema */
-  schema: TSchema;
+  /** Schema (filtered to only include tables, relations are excluded) */
+  schema: FilterTablesFromSchema<TSchema>;
 }
 
 /**
@@ -1035,45 +1039,79 @@ export interface QueryMetadata {
 }
 
 /**
+ * Filter out relations from a schema, keeping only actual table types.
+ *
+ * @description
+ * This utility type filters a schema object to include only properties that are
+ * actual table types (extending AnyTableType), excluding relation objects.
+ * This is necessary because Drizzle schemas often include both tables and relations
+ * (e.g., `{ users, profiles, usersRelations }`), but the adapter only needs tables.
+ *
+ * @template TSchema - The schema type that may include both tables and relations
+ * @returns A schema type containing only table types
+ *
+ * @example
+ * ```typescript
+ * type SchemaWithRelations = {
+ *   users: PgTable;
+ *   profiles: PgTable;
+ *   usersRelations: Relations<...>; // This will be filtered out
+ * };
+ *
+ * type TablesOnly = FilterTablesFromSchema<SchemaWithRelations>;
+ * // Result: { users: PgTable; profiles: PgTable; }
+ * ```
+ *
+ * @since 1.1.0
+ */
+export type FilterTablesFromSchema<TSchema> = TSchema extends Record<string, unknown>
+  ? {
+      [K in keyof TSchema as TSchema[K] extends AnyTableType ? K : never]: TSchema[K];
+    }
+  : Record<string, AnyTableType>;
+
+/**
+ * Extract the union of all inferred select models from a filtered schema.
+ * This is used internally by DrizzleAdapter to represent the union of all possible record types.
+ */
+export type InferSelectModelFromFilteredSchema<TSchema extends Record<string, unknown>> = {
+  [K in keyof FilterTablesFromSchema<TSchema>]: InferSelectModel<
+    FilterTablesFromSchema<TSchema>[K] & AnyTableType
+  >;
+}[keyof FilterTablesFromSchema<TSchema>];
+
+/**
  * Extract schema type from Drizzle database instance.
  *
  * @description
  * Attempts to extract the schema type parameter from a Drizzle database instance.
  * This enables automatic type inference when using the factory function.
+ * The extracted schema is filtered to include only tables, excluding relations.
  *
  * @template TDB - The Drizzle database instance type
- * @returns The schema type if available, otherwise a generic record
+ * @returns The schema type filtered to only include tables (not relations)
  *
  * @example
  * ```typescript
  * type MySchema = ExtractSchemaFromDB<typeof db>;
  * // Returns the schema type passed to drizzle(connection, { schema })
+ * // but filtered to only include tables, not relations
  * ```
  */
 export type ExtractSchemaFromDB<TDB> =
   // PostgreSQL drivers
   TDB extends PostgresJsDatabase<infer S>
-    ? S extends Record<string, AnyTableType>
-      ? S
-      : Record<string, AnyTableType>
+    ? FilterTablesFromSchema<S>
     : TDB extends NodePgDatabase<infer S>
-      ? S extends Record<string, AnyTableType>
-        ? S
-        : Record<string, AnyTableType>
+      ? FilterTablesFromSchema<S>
       : TDB extends NeonHttpDatabase<infer S>
-        ? S extends Record<string, AnyTableType>
-          ? S
-          : Record<string, AnyTableType>
+        ? FilterTablesFromSchema<S>
         : // MySQL drivers
           TDB extends MySql2Database<infer S>
-          ? S extends Record<string, AnyTableType>
-            ? S
-            : Record<string, AnyTableType>
+          ? FilterTablesFromSchema<S>
           : // SQLite drivers
             TDB extends BetterSQLite3Database<infer S>
-            ? S extends Record<string, AnyTableType>
-              ? S
-              : Record<string, AnyTableType>
+            ? FilterTablesFromSchema<S>
             : Record<string, AnyTableType>;
 
 /**

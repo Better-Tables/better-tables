@@ -19,6 +19,19 @@ export function helpCommand(): Command {
 
   // Action handler
   command.action(() => {
+    // biome-ignore lint: CLI commands require console output
+    console.log('Better Tables CLI - Available Commands');
+    // biome-ignore lint: CLI commands require console output
+    console.log('');
+    // biome-ignore lint: CLI commands require console output
+    console.log('Usage: better-tables <command> [options]');
+    // biome-ignore lint: CLI commands require console output
+    console.log('');
+    // biome-ignore lint: CLI commands require console output
+    console.log('Commands:');
+    // biome-ignore lint: CLI commands require console output
+    console.log('');
+
     const commandNames = Object.keys(commandsRegistry) as RegisteredCommandName[];
 
     for (const cmdName of commandNames) {
@@ -46,9 +59,21 @@ export function helpCommand(): Command {
         }
       }
 
-      const _argsStr = argsInfo.length > 0 ? ` ${argsInfo.join(' ')}` : '';
-      const _optionsStr = optionsInfo.length > 0 ? ` [${optionsInfo.join(', ')}]` : '';
+      const argsStr = argsInfo.length > 0 ? ` ${argsInfo.join(' ')}` : '';
+      const optionsStr = optionsInfo.length > 0 ? ` [${optionsInfo.join(', ')}]` : '';
+
+      // biome-ignore lint: CLI commands require console output
+      console.log(`  ${cmdName}${argsStr}${optionsStr}`);
+      // biome-ignore lint: CLI commands require console output
+      console.log(`    ${cmdDef.description}`);
+      // biome-ignore lint: CLI commands require console output
+      console.log('');
     }
+
+    // biome-ignore lint: CLI commands require console output
+    console.log('For more information on a specific command, run:');
+    // biome-ignore lint: CLI commands require console output
+    console.log('  better-tables <command> --help');
   });
 
   return command;

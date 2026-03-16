@@ -218,6 +218,8 @@ export class SortingManager<TData = unknown> {
     const validSorts = sorts.filter((sort) => {
       const validation = this.validateSort(sort);
       if (!validation.valid) {
+        // biome-ignore lint: Intentional warning logging for invalid sorts
+        console.warn(`Invalid sort for column ${sort.columnId}: ${validation.error}`);
         return false;
       }
       return true;

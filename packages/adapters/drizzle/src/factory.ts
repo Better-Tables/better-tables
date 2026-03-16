@@ -19,16 +19,20 @@
 
 import { DrizzleAdapter } from './drizzle-adapter';
 import type {
-  AnyTableType,
   DatabaseDriver,
   DrizzleAdapterConfig,
   DrizzleAdapterFactoryOptions,
   ExtractDriverFromDB,
   ExtractSchemaFromDB,
+  FilterTablesFromSchema,
 } from './types';
 import { SchemaError } from './types';
 import { detectDriver, getDriverDetectionError, isValidDriver } from './utils/driver-detector';
-import { extractSchemaFromDB, isValidExtractedSchema } from './utils/schema-extractor';
+import {
+  extractSchemaFromDB,
+  filterTablesFromSchema,
+  isValidExtractedSchema,
+} from './utils/schema-extractor';
 
 /**
  * Create a Drizzle adapter with automatic schema extraction and driver detection.
@@ -109,6 +113,10 @@ export function drizzleAdapter<TDB>(
     if (!relations && Object.keys(extracted.relations).length > 0) {
       relations = extracted.relations;
     }
+  } else {
+    // Filter out relations from provided schema (schema may include both tables and relations)
+    // This ensures only actual table types are passed to the adapter
+    schema = filterTablesFromSchema(schema) as ExtractSchemaFromDB<TDB>;
   }
 
   // Step 2: Detect or use provided driver
@@ -158,36 +166,46 @@ export function drizzleAdapter<TDB>(
  * Use this when you need to explicitly specify the schema and driver types,
  * or when TypeScript inference isn't working as expected.
  *
- * @template TSchema - The schema type containing all tables
+ * Note: The schema can include both tables and relations. Relations will be
+ * automatically filtered out, keeping only actual table types.
+ *
+ * @template TSchema - The schema type (may include both tables and relations)
  * @template TDriver - The database driver type
  *
  * @param db - The Drizzle database instance
  * @param factoryOptions - Configuration options
- * @returns A fully typed DrizzleAdapter instance
+ * @returns A fully typed DrizzleAdapter instance with filtered schema (tables only)
  *
  * @example
  * ```typescript
+ * // Schema with relations - relations will be filtered automatically
  * const adapter = createDrizzleAdapter<typeof schema, 'postgres'>(db, {
- *   schema: mySchema,
+ *   schema: mySchema, // Can include relations like usersRelations
  *   driver: 'postgres',
  *   options: { cache: { enabled: true } }
  * });
  * ```
  */
 export function createDrizzleAdapter<
-  TSchema extends Record<string, AnyTableType>,
+  TSchema extends Record<string, unknown>,
   TDriver extends DatabaseDriver,
 >(
   db: unknown,
-  factoryOptions: DrizzleAdapterFactoryOptions<TSchema, TDriver> & {
+  factoryOptions: DrizzleAdapterFactoryOptions<FilterTablesFromSchema<TSchema>, TDriver> & {
     schema: TSchema;
     driver: TDriver;
   }
-): DrizzleAdapter<TSchema, TDriver> {
+): DrizzleAdapter<FilterTablesFromSchema<TSchema>, TDriver> {
+  // Filter out relations from provided schema (schema may include both tables and relations)
+  // This ensures only actual table types are passed to the adapter
+  const filteredSchema = filterTablesFromSchema(
+    factoryOptions.schema
+  ) as FilterTablesFromSchema<TSchema>;
+
   // Build config with conditional properties
   const baseConfig = {
     db,
-    schema: factoryOptions.schema,
+    schema: filteredSchema,
     driver: factoryOptions.driver,
     autoDetectRelationships:
       factoryOptions.autoDetectRelationships ?? !factoryOptions.relationships,
@@ -204,7 +222,7 @@ export function createDrizzleAdapter<
     : configWithRelations;
 
   // Complex generic inference requires boundary assertion
-  return new DrizzleAdapter<TSchema, TDriver>(
-    configWithRelationships as DrizzleAdapterConfig<TSchema, TDriver>
+  return new DrizzleAdapter<FilterTablesFromSchema<TSchema>, TDriver>(
+    configWithRelationships as DrizzleAdapterConfig<FilterTablesFromSchema<TSchema>, TDriver>
   );
 }

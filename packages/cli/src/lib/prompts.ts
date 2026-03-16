@@ -48,14 +48,19 @@ export async function input(message: string, defaultValue?: string): Promise<str
  * Ask user to select from a list of options
  */
 export async function select<T extends string>(
-  _message: string,
+  message: string,
   options: { label: string; value: T }[]
 ): Promise<T> {
   if (options.length === 0) {
     throw new Error('select() requires at least one option');
   }
   const rl = createInterface();
-  options.forEach((_option, _index) => {});
+  // biome-ignore lint: CLI prompts require console output
+  console.log(`\n${message}`);
+  options.forEach((option, index) => {
+    // biome-ignore lint: CLI prompts require console output
+    console.log(`  ${index + 1}. ${option.label}`);
+  });
   return new Promise((resolve) => {
     rl.question('\nEnter your choice (number): ', (answer) => {
       rl.close();

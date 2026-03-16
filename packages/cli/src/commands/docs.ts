@@ -56,17 +56,35 @@ export function docsCommand(): Command {
   }
 
   // Action handler
-  command.action(async (type: string) => {
-    const docType = type.toLowerCase() as DocType;
+  command.action(async (type?: string) => {
+    const docType = (type?.toLowerCase() || 'main') as DocType;
     const url = DOCS_URLS[docType];
 
     if (!url) {
+      // biome-ignore lint: CLI commands require console output
+      console.error(`Unknown documentation type: ${type || 'main'}`);
+      // biome-ignore lint: CLI commands require console output
+      console.error(`Available types: ${Object.keys(DOCS_URLS).join(', ')}`);
       process.exit(1);
     }
 
+    const docTypeLabels: Record<DocType, string> = {
+      main: 'main',
+      core: 'core',
+      ui: 'ui',
+      drizzle: 'drizzle',
+    };
+
+    // biome-ignore lint: CLI commands require console output
+    console.log(`Opening ${docTypeLabels[docType]} documentation...`);
+
     try {
       await open(url);
-    } catch (_error) {
+    } catch (error) {
+      // biome-ignore lint: CLI commands require console output
+      console.error(
+        `Failed to open documentation: ${error instanceof Error ? error.message : String(error)}`
+      );
       process.exit(1);
     }
   });
