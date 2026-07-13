@@ -46,14 +46,18 @@ describe('serializeFiltersToURL', () => {
 
     expect(serialized).toBeTypeOf('string');
     expect(serialized.length).toBeGreaterThan(0);
-    expect(serialized).toStartWith('c:'); // Always compressed
+    // Plan 015: WRITE always emits the c2: (group-aware) wire format now,
+    // not the legacy c: prefix.
+    expect(serialized).toStartWith('c2:');
   });
 
   it('should include metadata when present in filters', () => {
     const filtersWithMeta = [mockFilterWithMeta];
     const serialized = serializeFiltersToURL(filtersWithMeta);
 
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
     expect(deserialized[0].meta).toEqual(mockFilterWithMeta.meta);
     expect(deserialized[0].includeNull).toBe(true);
   });
@@ -62,9 +66,13 @@ describe('serializeFiltersToURL', () => {
     const serialized = serializeFiltersToURL([]);
 
     expect(serialized).toBeTypeOf('string');
-    expect(serialized).toStartWith('c:');
+    // Plan 015: WRITE always emits the c2: (group-aware) wire format now,
+    // not the legacy c: prefix.
+    expect(serialized).toStartWith('c2:');
 
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
     expect(deserialized).toEqual([]);
   });
 
@@ -78,7 +86,9 @@ describe('serializeFiltersToURL', () => {
 
     const serialized = serializeFiltersToURL(largeFilters);
 
-    expect(serialized).toStartWith('c:'); // Always compressed
+    // Plan 015: WRITE always emits the c2: (group-aware) wire format now,
+    // not the legacy c: prefix.
+    expect(serialized).toStartWith('c2:');
     expect(serialized.length).toBeGreaterThan(0);
   });
 });
@@ -86,7 +96,9 @@ describe('serializeFiltersToURL', () => {
 describe('deserializeFiltersFromURL', () => {
   it('should deserialize filters from compressed URL string', () => {
     const serialized = serializeFiltersToURL(mockFilters);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(mockFilters);
   });
@@ -112,7 +124,9 @@ describe('deserializeFiltersFromURL', () => {
   it('should preserve special properties', () => {
     const filtersWithProps = [mockFilterWithMeta];
     const serialized = serializeFiltersToURL(filtersWithProps);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized[0]).toEqual(mockFilterWithMeta);
   });
@@ -127,7 +141,9 @@ describe('deserializeFiltersFromURL', () => {
     };
 
     const serialized = serializeFiltersToURL([filterWithNull]);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized[0].includeNull).toBe(true);
   });
@@ -145,7 +161,9 @@ describe('edge cases', () => {
     ];
 
     const serialized = serializeFiltersToURL(specialFilters);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(specialFilters);
   });
@@ -161,7 +179,9 @@ describe('edge cases', () => {
     ];
 
     const serialized = serializeFiltersToURL(filtersWithNulls);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(filtersWithNulls);
   });
@@ -190,7 +210,9 @@ describe('edge cases', () => {
     ];
 
     const serialized = serializeFiltersToURL(filtersWithKeyNames);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     // Values should be completely unchanged
     expect(deserialized).toEqual(filtersWithKeyNames);
@@ -220,7 +242,9 @@ describe('edge cases', () => {
     ];
 
     const serialized = serializeFiltersToURL(filtersWithNestedKeyNames);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(filtersWithNestedKeyNames);
     expect(deserialized[0].meta?.description).toBe('The type operator is used');
@@ -259,7 +283,9 @@ describe('edge cases', () => {
     ];
 
     const serialized = serializeFiltersToURL(complexFilters);
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(complexFilters);
   });
@@ -280,7 +306,9 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
 
       let deserialized: FilterState[] = [];
       expect(() => {
-        deserialized = deserializeFiltersFromURL(serialized);
+        // All fixtures in this file are flat FilterState[] payloads (implicit
+        // AND); narrow the union return type accordingly, per plan 015.
+        deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
       }).not.toThrow();
 
       expect(deserialized).toHaveLength(1);
@@ -299,7 +327,9 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
     ];
     const serialized = compressAndEncode(tampered);
 
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toHaveLength(1);
     expect(deserialized[0].columnId).toBe('name');
@@ -312,7 +342,9 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
     ];
     const serialized = compressAndEncode(tampered);
 
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toHaveLength(1);
     expect(deserialized[0].columnId).toBe('name');
@@ -325,7 +357,9 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
     ];
     const serialized = serializeFiltersToURL(filters);
 
-    const deserialized = deserializeFiltersFromURL(serialized);
+    // All fixtures in this file are flat FilterState[] payloads (implicit
+    // AND); narrow the union return type accordingly, per plan 015.
+    const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(filters);
   });
