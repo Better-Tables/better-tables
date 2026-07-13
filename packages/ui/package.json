@@ -17,6 +17,7 @@
     "dist",
     "src"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
