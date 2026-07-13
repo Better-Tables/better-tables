@@ -19,12 +19,12 @@ const Section = forwardRef<HTMLElement, SectionProps>(
   ({ id, title, subtitle, description, children, className, align }, forwardedRef) => {
     const internalRef = useRef<HTMLElement>(null);
     const ref = forwardedRef || internalRef;
-    const _sectionId = title ? title.toLowerCase().replace(/\s+/g, '-') : id;
+    const sectionId = id ?? (title ? title.toLowerCase().replace(/\s+/g, '-') : undefined);
     const alignmentClass =
       align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
 
     return (
-      <section id={id} ref={ref}>
+      <section id={sectionId} ref={ref}>
         <div
           className={cn('relative mx-auto container max-w-[var(--container-max-width)]', className)}
         >

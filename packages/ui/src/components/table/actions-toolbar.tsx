@@ -96,20 +96,22 @@ export function ActionsToolbar<TData = unknown>({
   return (
     <div className="inline-flex items-center">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isAnyExecuting}
-            className="h-8 border-dashed"
-          >
-            {isAnyExecuting ? (
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-            ) : (
-              <ChevronDown className="mr-1 h-4 w-4" />
-            )}
-            Actions ({selectedIds.length})
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isAnyExecuting}
+              className="h-8 border-dashed"
+            />
+          }
+        >
+          {isAnyExecuting ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <ChevronDown className="mr-1 h-4 w-4" />
+          )}
+          Actions ({selectedIds.length})
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {visibleActions.map((action) => {

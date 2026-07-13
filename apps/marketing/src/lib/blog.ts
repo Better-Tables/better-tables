@@ -22,6 +22,9 @@ function parseFrontmatter(fileContent: string) {
   const match = frontmatterRegex.exec(fileContent);
   const frontMatterBlock = match?.[1];
   const content = fileContent.replace(frontmatterRegex, '').trim();
+  if (!frontMatterBlock) {
+    throw new Error('Missing frontmatter block');
+  }
   const frontMatterLines = frontMatterBlock.trim().split('\n');
   const metadata: Partial<Post> = {};
 

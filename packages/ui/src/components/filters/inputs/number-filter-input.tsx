@@ -15,7 +15,7 @@ import * as React from 'react';
 import { useFilterValidation } from '../../../hooks';
 
 import { cn } from '../../../lib/utils';
-import { Input } from '../../ui/input';
+import { InputGroup, InputGroupInput } from '../../ui/input-group';
 import { Label } from '../../ui/label';
 
 export interface NumberFilterInputProps<TData = unknown> {
@@ -236,56 +236,58 @@ export function NumberFilterInput<TData = unknown>({
 
   if (needsTwoValues) {
     return (
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         <Label className="text-sm font-medium">Range</Label>
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label htmlFor={`min-${filter.columnId}`} className="text-xs text-muted-foreground">
               Minimum {column.displayName}
             </Label>
-            <Input
-              ref={minInputRef}
-              id={`min-${filter.columnId}`}
-              type="number"
-              value={values.min}
-              onChange={handleMinChange}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Min value' })}
-              min={numberConfig.min}
-              max={numberConfig.max}
-              step={getNumberInputStep(numberConfig)}
-              disabled={disabled}
+            <InputGroup
               className={cn(
-                !finalValidation.isValid &&
-                  values.min &&
-                  'border-destructive focus-visible:ring-destructive'
+                !finalValidation.isValid && values.min && 'border-destructive ring-destructive/20'
               )}
-            />
+            >
+              <InputGroupInput
+                ref={minInputRef}
+                id={`min-${filter.columnId}`}
+                type="number"
+                value={values.min}
+                onChange={handleMinChange}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Min value' })}
+                min={numberConfig.min}
+                max={numberConfig.max}
+                step={getNumberInputStep(numberConfig)}
+                disabled={disabled}
+              />
+            </InputGroup>
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label htmlFor={`max-${filter.columnId}`} className="text-xs text-muted-foreground">
               Maximum {column.displayName}
             </Label>
-            <Input
-              ref={maxInputRef}
-              id={`max-${filter.columnId}`}
-              type="number"
-              value={values.max}
-              onChange={handleMaxChange}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Max value' })}
-              min={numberConfig.min}
-              max={numberConfig.max}
-              step={getNumberInputStep(numberConfig)}
-              disabled={disabled}
+            <InputGroup
               className={cn(
-                !finalValidation.isValid &&
-                  values.max &&
-                  'border-destructive focus-visible:ring-destructive'
+                !finalValidation.isValid && values.max && 'border-destructive ring-destructive/20'
               )}
-            />
+            >
+              <InputGroupInput
+                ref={maxInputRef}
+                id={`max-${filter.columnId}`}
+                type="number"
+                value={values.max}
+                onChange={handleMaxChange}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                placeholder={getFormattedPlaceholder({ ...numberConfig, placeholder: 'Max value' })}
+                min={numberConfig.min}
+                max={numberConfig.max}
+                step={getNumberInputStep(numberConfig)}
+                disabled={disabled}
+              />
+            </InputGroup>
           </div>
         </div>
         {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (
@@ -296,26 +298,27 @@ export function NumberFilterInput<TData = unknown>({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <Label className="text-sm font-medium">Value</Label>
-      <Input
-        ref={singleInputRef}
-        type="number"
-        value={values.single}
-        onChange={handleSingleChange}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        placeholder={getFormattedPlaceholder(numberConfig)}
-        min={numberConfig.min}
-        max={numberConfig.max}
-        step={getNumberInputStep(numberConfig)}
-        disabled={disabled}
+      <InputGroup
         className={cn(
-          !finalValidation.isValid &&
-            values.single &&
-            'border-destructive focus-visible:ring-destructive'
+          !finalValidation.isValid && values.single && 'border-destructive ring-destructive/20'
         )}
-      />
+      >
+        <InputGroupInput
+          ref={singleInputRef}
+          type="number"
+          value={values.single}
+          onChange={handleSingleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          placeholder={getFormattedPlaceholder(numberConfig)}
+          min={numberConfig.min}
+          max={numberConfig.max}
+          step={getNumberInputStep(numberConfig)}
+          disabled={disabled}
+        />
+      </InputGroup>
       {!finalValidation.isValid && finalValidation.error && validationValues.length > 0 && (
         <p className="text-sm text-destructive">{finalValidation.error}</p>
       )}

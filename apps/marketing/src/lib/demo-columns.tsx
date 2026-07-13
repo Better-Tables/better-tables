@@ -1,12 +1,12 @@
-import { createColumnBuilder } from '@better-tables/core';
-import { Badge } from '@better-tables/ui';
+import { createColumnBuilder, defineColumns } from '@better-tables/core';
+import { Badge } from '@/components/ui/badge';
 import type { UserWithRelations } from './db/schema';
 
 type DemoUser = UserWithRelations;
 
 const cb = createColumnBuilder<DemoUser>();
 
-export const demoColumns = [
+export const demoColumns = defineColumns<DemoUser>()([
   cb
     .text()
     .id('name')
@@ -117,7 +117,7 @@ export const demoColumns = [
     .filterable()
     .sortable()
     .build(),
-];
+]);
 
 export const defaultVisibleColumns = [
   'name',

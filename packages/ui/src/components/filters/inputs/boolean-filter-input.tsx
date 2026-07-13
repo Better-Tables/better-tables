@@ -2,6 +2,7 @@
 
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import * as React from 'react';
+import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group';
 
 export interface BooleanFilterInputProps<TData = unknown> {
   /** Filter state */
@@ -10,32 +11,24 @@ export interface BooleanFilterInputProps<TData = unknown> {
   column: ColumnDefinition<TData>;
   /** Value change handler */
   onChange: (values: unknown[]) => void;
+  /** Operator change handler */
+  onOperatorChange?: (operator: FilterState['operator']) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
 
-/**
- * Boolean filter input component
- *
- * Pattern: Purely controlled component (no local state needed)
- * - Values are determined by the operator
- * - Sends appropriate values when operator changes
- * - No user input required - operator defines the value
- */
 export function BooleanFilterInput<TData = unknown>({
   filter,
   column,
   onChange,
+  onOperatorChange,
   disabled = false,
 }: BooleanFilterInputProps<TData>) {
-  // Store onChange in ref to prevent effect dependencies
   const onChangeRef = React.useRef(onChange);
   React.useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Set the appropriate value based on the operator
-  // Only run when operator changes
   React.useEffect(() => {
     switch (filter.operator) {
       case 'isTrue':
@@ -53,24 +46,51 @@ export function BooleanFilterInput<TData = unknown>({
     }
   }, [filter.operator]);
 
-  const getDescription = () => {
-    switch (filter.operator) {
-      case 'isTrue':
-        return `${column.displayName} is true`;
-      case 'isFalse':
-        return `${column.displayName} is false`;
-      case 'isNull':
-        return `${column.displayName} is null or undefined`;
-      case 'isNotNull':
-        return `${column.displayName} is not null and not undefined`;
-      default:
-        return 'Boolean filter';
+  const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
+
+  if (needsNoValues) {
+    return (
+      <div className={`text-sm text-muted-foreground ${disabled ? 'opacity-50' : ''}`}>
+        {filter.operator === 'isNull'
+          ? `${column.displayName} is empty or undefined`
+          : `${column.displayName} has a value`}
+      </div>
+    );
+  }
+
+  const currentValue =
+    filter.operator === 'isTrue' ? 'true' : filter.operator === 'isFalse' ? 'false' : '';
+
+  const handleValueChange = (value: string) => {
+    if (!value || disabled) return;
+    if (value === 'true') {
+      onOperatorChange?.('isTrue');
+      onChange([true]);
+      return;
     }
+    onOperatorChange?.('isFalse');
+    onChange([false]);
   };
 
   return (
-    <div className={`text-sm text-muted-foreground ${disabled ? 'opacity-50' : ''}`}>
-      {getDescription()}
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">Value for {column.displayName}</p>
+      <ToggleGroup
+        value={currentValue ? [currentValue] : []}
+        onValueChange={(values: string[]) => handleValueChange(values[0] ?? '')}
+        disabled={disabled}
+        variant="outline"
+        size="sm"
+        spacing={0}
+        className="w-full"
+      >
+        <ToggleGroupItem value="true" className="flex-1">
+          True
+        </ToggleGroupItem>
+        <ToggleGroupItem value="false" className="flex-1">
+          False
+        </ToggleGroupItem>
+      </ToggleGroup>
     </div>
   );
 }

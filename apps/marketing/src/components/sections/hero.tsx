@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import type { ComponentType } from 'react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AuroraText } from '@/components/aurora-text';
 import { Icons } from '@/components/icons';
@@ -115,7 +116,11 @@ function HeroCTA() {
     </div>
   );
 }
-const LazySpline = lazy(() => import('@splinetool/react-spline'));
+const LazySpline = lazy(() =>
+  import('@splinetool/react-spline').then((module) => ({
+    default: module.default as ComponentType<{ scene: string; className?: string }>,
+  }))
+);
 
 export function Hero() {
   const [showSpline, setShowSpline] = useState(false);

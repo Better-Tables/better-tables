@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { IoMenuSharp } from 'react-icons/io5';
+import { Menu } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -17,13 +17,21 @@ import { cn } from '@/lib/utils';
 export function MobileDrawer() {
   return (
     <Drawer>
-      <DrawerTrigger>
-        <IoMenuSharp className="text-2xl" />
+      <DrawerTrigger
+        render={
+          <button
+            type="button"
+            className="inline-flex size-9 items-center justify-center rounded-md text-foreground hover:bg-muted"
+            aria-label="Open menu"
+          />
+        }
+      >
+        <Menu />
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader className="px-6">
-          <Link href="/" title="brand-logo" className="relative mr-6 flex items-center space-x-2">
-            <Icons.logo className="w-auto h-[40px]" />
+          <Link href="/" title="brand-logo" className="relative mr-6 flex items-center gap-2">
+            <Icons.logo className="h-10 w-auto" />
             <DrawerTitle>{siteConfig.name}</DrawerTitle>
           </Link>
           <DrawerDescription>{siteConfig.description}</DrawerDescription>
@@ -31,7 +39,7 @@ export function MobileDrawer() {
         <DrawerFooter>
           <Link
             href="#"
-            className={cn(buttonVariants({ variant: 'default' }), 'text-white rounded-full group')}
+            className={cn(buttonVariants({ variant: 'default' }), 'rounded-full text-white')}
           >
             {siteConfig.cta}
           </Link>

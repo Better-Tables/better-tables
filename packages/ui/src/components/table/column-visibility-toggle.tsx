@@ -72,25 +72,23 @@ export function ColumnVisibilityToggle<TData = unknown>({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={disabled}
-          className="h-8 px-2 lg:px-3"
-          aria-label={enableReordering ? 'Manage columns' : 'Toggle column visibility'}
-        >
-          <Columns2 className="h-4 w-4" />
-        </Button>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            className="h-8 px-2 lg:px-3"
+            aria-label={enableReordering ? 'Manage columns' : 'Toggle column visibility'}
+          />
+        }
+      >
+        <Columns2 className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[240px]">
         <DropdownMenuLabel>{enableReordering ? 'Columns' : 'Column Visibility'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <ScrollArea
-          className="h-60"
-          maskHeight={40}
-          maskClassName="before:from-popover after:from-popover"
-        >
+        <ScrollArea className="h-60">
           {columns.length === 0 ? (
             <div className="px-2 py-1.5 text-sm text-muted-foreground text-center">No columns</div>
           ) : (

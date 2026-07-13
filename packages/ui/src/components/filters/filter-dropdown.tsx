@@ -481,15 +481,18 @@ export function FilterDropdown<TData = unknown>({
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={disabled ? undefined : onOpenChange}>
-        <DialogTrigger asChild disabled={disabled}>
-          {React.isValidElement(children)
-            ? React.cloneElement(children, {
-                tabIndex: disabled ? -1 : 0,
-                onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
-                ...keyboardNavigation.ariaAttributes,
-              } as React.HTMLAttributes<HTMLElement>)
-            : children}
-        </DialogTrigger>
+        <DialogTrigger
+          disabled={disabled}
+          render={
+            React.isValidElement(children)
+              ? React.cloneElement(children, {
+                  tabIndex: disabled ? -1 : 0,
+                  onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
+                  ...keyboardNavigation.ariaAttributes,
+                } as React.HTMLAttributes<HTMLElement>)
+              : <Button disabled={disabled} />
+          }
+        />
         <DialogContent className="max-w-sm backdrop-blur-xs">
           <DialogHeader>
             <DialogTitle className="text-left">
@@ -504,15 +507,18 @@ export function FilterDropdown<TData = unknown>({
 
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
-      <PopoverTrigger asChild disabled={disabled}>
-        {React.isValidElement(children)
-          ? React.cloneElement(children, {
-              tabIndex: disabled ? -1 : 0,
-              onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
-              ...keyboardNavigation.ariaAttributes,
-            } as React.HTMLAttributes<HTMLElement>)
-          : children}
-      </PopoverTrigger>
+      <PopoverTrigger
+        disabled={disabled}
+        render={
+          React.isValidElement(children)
+            ? React.cloneElement(children, {
+                tabIndex: disabled ? -1 : 0,
+                onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
+                ...keyboardNavigation.ariaAttributes,
+              } as React.HTMLAttributes<HTMLElement>)
+            : <Button disabled={disabled} />
+        }
+      />
       <PopoverContent className="w-[320px] p-0" align="start">
         {commandContent}
       </PopoverContent>

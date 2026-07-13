@@ -1,5 +1,5 @@
 import type { FetchDataResult } from '@better-tables/core';
-import { parseTableSearchParams } from '@better-tables/core';
+import { flattenFilterNode, isFilterGroupNode, parseTableSearchParams } from '@better-tables/core';
 import { Section } from '@/components/section';
 import type { DemoUser } from '@/lib/demo-columns';
 import { DemoTableClient } from './demo-table-client';
@@ -21,7 +21,10 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
     limit: 10,
   });
 
-  const { page, limit, filters, sorting } = tableParams;
+  const { page, limit, filters: filterNode, sorting } = tableParams;
+  const filters = isFilterGroupNode(filterNode)
+    ? flattenFilterNode(filterNode)
+    : filterNode;
 
   // Fetch data from API route
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

@@ -8,7 +8,8 @@ import {
 import * as React from 'react';
 import { useFilterValidation } from '../../../hooks/use-filter-validation';
 import { cn } from '../../../lib/utils';
-import { Input } from '../../ui/input';
+import { InputGroup, InputGroupInput } from '../../ui/input-group';
+import { Label } from '../../ui/label';
 
 export interface TextFilterInputProps<TData = unknown> {
   /** Filter state */
@@ -131,25 +132,27 @@ export function TextFilterInput<TData = unknown>({
   }
 
   return (
-    <div className="space-y-2">
-      <label htmlFor={`value-${filter.columnId}`} className="text-sm font-medium">
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={`value-${filter.columnId}`} className="text-sm font-medium">
         Value
-      </label>
-      <Input
-        ref={inputRef}
-        id={`value-${filter.columnId}`}
-        type="text"
-        value={localValue}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
+      </Label>
+      <InputGroup
         className={cn(
-          'w-full',
-          !validation.isValid && localValue && 'border-destructive focus-visible:ring-destructive'
+          !validation.isValid && localValue && 'border-destructive ring-destructive/20'
         )}
-        disabled={disabled}
-      />
+      >
+        <InputGroupInput
+          ref={inputRef}
+          id={`value-${filter.columnId}`}
+          type="text"
+          value={localValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled}
+        />
+      </InputGroup>
       {!validation.isValid && validation.error && localValue && (
         <p className="text-sm text-destructive">{validation.error}</p>
       )}

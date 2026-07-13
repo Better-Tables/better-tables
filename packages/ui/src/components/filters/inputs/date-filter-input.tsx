@@ -287,28 +287,30 @@ export function DateFilterInput<TData = unknown>({
       <div className="space-y-2">
         <Label className="text-sm font-medium">Date Range</Label>
         <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'w-full justify-start text-left font-normal',
-                !dateRange && 'text-muted-foreground',
-                !validation.isValid && validationValues.length > 0 && 'border-destructive'
-              )}
-              disabled={disabled}
-              onKeyDown={keyboardNavigation.onKeyDown}
-              {...keyboardNavigation.ariaAttributes}
-            >
-              {dateRange?.from ? (
-                <span className="truncate">
-                  {formatDateRange(dateRange.from, dateRange.to, dateFormat)}
-                </span>
-              ) : (
-                <span className="truncate">
-                  Pick a date range{dateFormat.showTime ? ' and time' : ''}
-                </span>
-              )}
-            </Button>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !dateRange && 'text-muted-foreground',
+                  !validation.isValid && validationValues.length > 0 && 'border-destructive'
+                )}
+                disabled={disabled}
+                onKeyDown={keyboardNavigation.onKeyDown}
+                {...keyboardNavigation.ariaAttributes}
+              />
+            }
+          >
+            {dateRange?.from ? (
+              <span className="truncate">
+                {formatDateRange(dateRange.from, dateRange.to, dateFormat)}
+              </span>
+            ) : (
+              <span className="truncate">
+                Pick a date range{dateFormat.showTime ? ' and time' : ''}
+              </span>
+            )}
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <div className="flex">
@@ -337,25 +339,27 @@ export function DateFilterInput<TData = unknown>({
     <div className="space-y-2">
       <Label className="text-sm font-medium">Date</Label>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              'w-full justify-start text-left font-normal',
-              !singleDate && 'text-muted-foreground',
-              !validation.isValid && validationValues.length > 0 && 'border-destructive'
-            )}
-            disabled={disabled}
-            onKeyDown={keyboardNavigation.onKeyDown}
-            {...keyboardNavigation.ariaAttributes}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {singleDate ? (
-              <span>{formatDateWithConfig(singleDate, dateFormat)}</span>
-            ) : (
-              <span>Pick a date{dateFormat.showTime ? ' and time' : ''}</span>
-            )}
-          </Button>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="outline"
+              className={cn(
+                'w-full justify-start text-left font-normal',
+                !singleDate && 'text-muted-foreground',
+                !validation.isValid && validationValues.length > 0 && 'border-destructive'
+              )}
+              disabled={disabled}
+              onKeyDown={keyboardNavigation.onKeyDown}
+              {...keyboardNavigation.ariaAttributes}
+            />
+          }
+        >
+          <CalendarIcon data-icon="inline-start" />
+          {singleDate ? (
+            <span>{formatDateWithConfig(singleDate, dateFormat)}</span>
+          ) : (
+            <span>Pick a date{dateFormat.showTime ? ' and time' : ''}</span>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex">
@@ -365,7 +369,7 @@ export function DateFilterInput<TData = unknown>({
               mode="single"
               selected={singleDate}
               onSelect={disabled ? undefined : setSingleDate}
-              initialFocus
+              autoFocus
               disabled={disabled}
             />
           </div>

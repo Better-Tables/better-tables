@@ -865,12 +865,14 @@ export function BetterTable<TData = unknown>({
                                 if (isTruncated) {
                                   return (
                                     <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="cursor-help truncate max-w-full inline-block">
-                                          {formatted}
-                                        </span>
+                                      <TooltipTrigger
+                                        render={
+                                          <span className="cursor-help truncate max-w-full inline-block" />
+                                        }
+                                      >
+                                        {formatted}
                                       </TooltipTrigger>
-                                      <TooltipContent side="top" className="max-w-xs" showArrow>
+                                      <TooltipContent side="top" className="max-w-xs">
                                         <div className="wrap-break-word whitespace-pre-wrap text-pretty">
                                           {originalValue}
                                         </div>

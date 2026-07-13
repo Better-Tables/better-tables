@@ -28,6 +28,9 @@ export const REQUIRED_SHADCN_COMPONENTS = [
   'switch',
   'table',
   'tooltip',
+  'toggle-group',
+  'input-group',
+  'field',
 ] as const;
 
 export type ShadcnComponent = (typeof REQUIRED_SHADCN_COMPONENTS)[number];
@@ -57,7 +60,8 @@ export function getMissingComponents(uiPath: string): ShadcnComponent[] {
 }
 
 /**
- * Install shadcn components using npx shadcn@latest add
+ * Install shadcn components using npx shadcn@latest add.
+ * Better Tables expects Base UI primitives (`base-mira` or compatible `base-*` style in components.json).
  */
 export function installShadcnComponents(
   components: ShadcnComponent[],

@@ -166,7 +166,7 @@ export function TableProviders({
 
   // Wrap with Tooltip provider if enabled
   if (enableTooltip) {
-    content = <TooltipProvider delayDuration={0}>{content}</TooltipProvider>;
+    content = <TooltipProvider delay={0}>{content}</TooltipProvider>;
   }
 
   return <>{content}</>;

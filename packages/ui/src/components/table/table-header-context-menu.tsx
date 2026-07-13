@@ -8,6 +8,7 @@ import type {
 } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, EyeOff, X } from 'lucide-react';
+import * as React from 'react';
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -109,7 +110,13 @@ export function TableHeaderContextMenu<TData = unknown>({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger
+        render={
+          React.isValidElement(children)
+            ? children
+            : <div className="contents">{children}</div>
+        }
+      />
       <ContextMenuContent className="w-56">
         {/* Sorting controls */}
         {isSortable && contextMenuConfig.showSortToggle && (

@@ -10,66 +10,6 @@ import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { siteConfig } from '@/lib/config';
 import { cn } from '@/lib/utils';
 
-interface TabsProps {
-  activeTab: string;
-  setActiveTab: (tab: 'yearly' | 'monthly') => void;
-  className?: string;
-  children: (activeTab: string) => React.ReactNode;
-}
-
-interface TabsListProps {
-  children: React.ReactNode;
-}
-
-interface TabsTriggerProps {
-  value: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  isActive: boolean;
-}
-
-const _Tabs = ({ activeTab, setActiveTab, className, children }: TabsProps) => {
-  return (
-    <div className={cn('mx-auto flex w-full items-center justify-center', className)}>
-      {children(activeTab)}
-    </div>
-  );
-};
-
-const _TabsList = ({ children }: TabsListProps) => {
-  return (
-    <div className="relative flex w-fit items-center rounded-full border p-1.5">{children}</div>
-  );
-};
-
-const _TabsTrigger = ({ value, onClick, children, isActive }: TabsTriggerProps) => {
-  return (
-    <button onClick={onClick} className={cn('relative z-[1] px-4 py-2', { 'z-0': isActive })}>
-      {isActive && (
-        <motion.div
-          layoutId="active-tab"
-          className="absolute inset-0 rounded-full bg-accent"
-          transition={{
-            duration: 0.2,
-            type: 'spring',
-            stiffness: 300,
-            damping: 25,
-            velocity: 2,
-          }}
-        />
-      )}
-      <span
-        className={cn(
-          'relative block text-sm font-medium duration-200',
-          isActive ? 'delay-100 text-primary' : ''
-        )}
-      >
-        {children}
-      </span>
-    </button>
-  );
-};
-
 function PricingTier({
   tier,
   billingCycle,
@@ -148,11 +88,7 @@ function PricingTier({
 }
 
 export function Pricing() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
-
-  const _handleTabChange = (tab: 'yearly' | 'monthly') => {
-    setBillingCycle(tab);
-  };
+  const [billingCycle] = useState<'monthly' | 'yearly'>('yearly');
 
   return (
     <Section id="pricing" title="Pricing">

@@ -27,6 +27,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Separator } from '../ui/separator';
 import { FilterOperatorSelect } from './filter-operator-select';
 import { FilterValueInput } from './filter-value-input';
+import {
+  filterTypeAccent,
+  filterTypeIconTone,
+  getFilterTypeFamily,
+} from './filter-type-styles';
 
 export interface ActiveFiltersProps<TData = unknown> {
   /** Column definitions */
@@ -215,38 +220,40 @@ function FilterBadge<TData = unknown>({
 
   // Show value panel if operator is selected AND operator needs values (not for zero-value operators)
   const shouldShowValuePanel = hasOperator && !needsNoValues;
+  const typeFamily = getFilterTypeFamily(column.type);
+  const typeAccent = filterTypeAccent[typeFamily];
+  const iconTone = filterTypeIconTone[typeFamily];
 
   return (
     <div
       className={cn(
-        'flex items-center rounded-2xl border bg-background text-sm shadow-xs h-8',
+        'flex items-center rounded-lg border border-l-2 bg-background text-xs shadow-xs h-7',
+        typeAccent,
         disabled && 'opacity-50 cursor-not-allowed',
-        isProtected && 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
+        isProtected && 'ring-1 ring-amber-500/30'
       )}
     >
       {/* Column Name */}
-      <div className="flex items-center gap-1 px-3 py-2">
-        {Icon && <Icon className="h-4 w-4" />}
+      <div className="flex items-center gap-1 px-2 py-1.5">
+        {Icon && <Icon className={cn('size-3.5', iconTone)} />}
         <span className="font-medium">{column.displayName}</span>
-        {isProtected && <Lock className="ml-1 h-4 w-4 text-amber-600 dark:text-amber-400" />}
+        {isProtected && <Lock className="size-3 text-amber-600 dark:text-amber-400" />}
       </div>
 
-      <Separator orientation="vertical" className="h-6" />
+      <Separator orientation="vertical" className="h-5" />
 
       {/* Operator */}
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            className={cn(
-              'h-full rounded-none px-3 py-2 text-sm hover:bg-muted',
-              isProtected && 'cursor-not-allowed opacity-75'
-            )}
-            disabled={disabled || isProtected}
-          >
-            {operatorLabel}
-            {isProtected && <Lock className="ml-1 h-4 w-4" />}
-          </Button>
+        <PopoverTrigger
+          disabled={disabled || isProtected}
+          render={
+            <Button
+              variant="ghost"
+              className="h-full rounded-none px-2 py-1.5 text-xs hover:bg-muted"
+            />
+          }
+        >
+          {operatorLabel}
         </PopoverTrigger>
         <PopoverContent className="w-56 p-2" align="start">
           <FilterOperatorSelect
@@ -263,24 +270,22 @@ function FilterBadge<TData = unknown>({
         </PopoverContent>
       </Popover>
 
-      <Separator orientation="vertical" className="h-6" />
+      <Separator orientation="vertical" className="h-5" />
 
       {/* Value - show if operator needs values OR supports null (for include-null toggle) */}
       {shouldShowValuePanel &&
         (isMobile ? (
           <Dialog open={isValuePanelOpen} onOpenChange={handleValuePanelOpenChange}>
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                className={cn(
-                  'h-full rounded-none px-3 py-2 text-sm hover:bg-muted',
-                  isProtected && 'cursor-not-allowed opacity-75'
-                )}
-                disabled={disabled || isProtected}
-              >
-                <FilterValueDisplay filter={filter} column={column} />
-                {isProtected && <Lock className="ml-1 h-4 w-4" />}
-              </Button>
+            <DialogTrigger
+              disabled={disabled || isProtected}
+              render={
+                <Button
+                  variant="ghost"
+                  className="h-full rounded-none px-2 py-1.5 text-xs hover:bg-muted max-w-40"
+                />
+              }
+            >
+              <FilterValueDisplay filter={filter} column={column} />
             </DialogTrigger>
             <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-xs">
               <DialogHeader>
@@ -291,6 +296,7 @@ function FilterBadge<TData = unknown>({
                 column={column}
                 onChange={(values) => onUpdate({ values })}
                 onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
+                onOperatorChange={(operator) => onUpdate({ operator })}
                 disabled={disabled || isProtected}
               />
               {isProtected && (
@@ -302,18 +308,16 @@ function FilterBadge<TData = unknown>({
           </Dialog>
         ) : (
           <Popover open={isValuePanelOpen} onOpenChange={handleValuePanelOpenChange}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                className={cn(
-                  'h-full rounded-none px-3 py-2 text-sm hover:bg-muted',
-                  isProtected && 'cursor-not-allowed opacity-75'
-                )}
-                disabled={disabled || isProtected}
-              >
-                <FilterValueDisplay filter={filter} column={column} />
-                {isProtected && <Lock className="ml-1 h-4 w-4" />}
-              </Button>
+            <PopoverTrigger
+              disabled={disabled || isProtected}
+              render={
+                <Button
+                  variant="ghost"
+                  className="h-full rounded-none px-2 py-1.5 text-xs hover:bg-muted max-w-40"
+                />
+              }
+            >
+              <FilterValueDisplay filter={filter} column={column} />
             </PopoverTrigger>
             <PopoverContent className="w-80 p-3" align="start">
               <FilterValueInput
@@ -321,6 +325,7 @@ function FilterBadge<TData = unknown>({
                 column={column}
                 onChange={(values) => onUpdate({ values })}
                 onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
+                onOperatorChange={(operator) => onUpdate({ operator })}
                 disabled={disabled || isProtected}
               />
               {isProtected && (
@@ -332,22 +337,22 @@ function FilterBadge<TData = unknown>({
           </Popover>
         ))}
 
-      <Separator orientation="vertical" className="h-6" />
+      <Separator orientation="vertical" className="h-5" />
 
       {/* Remove Button */}
       {isProtected ? (
         <div className="flex h-full items-center px-2 text-muted-foreground">
-          <Lock className="h-4 w-4" />
+          <Lock className="size-3.5" />
         </div>
       ) : (
         <Button
           variant="ghost"
-          className="h-full rounded-none rounded-r-2xl px-3 py-2 hover:bg-muted"
+          className="h-full rounded-none rounded-r-lg px-2 py-1.5 hover:bg-muted"
           onClick={onRemove}
           disabled={disabled}
           aria-label={`Remove ${column.displayName} filter`}
         >
-          <X className="h-4 w-4" />
+          <X className="size-3.5" />
         </Button>
       )}
     </div>

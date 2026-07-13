@@ -39,8 +39,8 @@ describe('shadcn', () => {
   });
 
   describe('REQUIRED_SHADCN_COMPONENTS', () => {
-    it('should contain 21 components', () => {
-      expect(REQUIRED_SHADCN_COMPONENTS.length).toBe(21);
+    it('should contain 24 components', () => {
+      expect(REQUIRED_SHADCN_COMPONENTS.length).toBe(24);
     });
 
     it('should include all expected components', () => {
@@ -54,7 +54,9 @@ describe('shadcn', () => {
         'context-menu',
         'dialog',
         'dropdown-menu',
+        'field',
         'input',
+        'input-group',
         'label',
         'pagination',
         'popover',
@@ -65,6 +67,7 @@ describe('shadcn', () => {
         'skeleton',
         'switch',
         'table',
+        'toggle-group',
         'tooltip',
       ];
       for (const component of expected) {

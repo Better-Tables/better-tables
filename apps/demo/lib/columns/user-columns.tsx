@@ -91,6 +91,37 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .build(),
 
   cb
+    .boolean()
+    .id('profile.hasBio')
+    .displayName('Has Bio')
+    .accessor((user) => Boolean(user.profile?.bio))
+    .filterable()
+    .build(),
+
+  cb
+    .multiOption()
+    .id('roleTags')
+    .displayName('Role Tags')
+    .accessor((user) => [user.role])
+    .options([
+      { value: 'admin', label: 'Admin' },
+      { value: 'editor', label: 'Editor' },
+      { value: 'contributor', label: 'Contributor' },
+      { value: 'viewer', label: 'Viewer' },
+    ])
+    .filterable()
+    .cellRenderer(({ value }) => (
+      <div className="flex flex-wrap gap-1">
+        {(value as string[]).map((tag) => (
+          <Badge key={tag} variant="secondary" className="text-xs">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+    ))
+    .build(),
+
+  cb
     .date()
     .id('createdAt')
     .displayName('Joined')
@@ -188,6 +219,8 @@ export const defaultVisibleColumns = [
   'age',
   'role',
   'status',
+  'profile.hasBio',
+  'roleTags',
   'createdAt',
   'profile.bio',
   'profile.website',

@@ -18,6 +18,8 @@ export interface FilterValueInputProps<TData = unknown> {
   onChange: (values: unknown[]) => void;
   /** Include null change handler */
   onIncludeNullChange?: (includeNull: boolean) => void;
+  /** Operator change handler */
+  onOperatorChange?: (operator: FilterState['operator']) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
 }
@@ -27,6 +29,7 @@ export function FilterValueInput<TData = unknown>({
   column,
   onChange,
   onIncludeNullChange,
+  onOperatorChange,
   disabled = false,
 }: FilterValueInputProps<TData>) {
   // Check if we should show the include unknown control
@@ -100,6 +103,7 @@ export function FilterValueInput<TData = unknown>({
             filter={filter}
             column={column}
             onChange={onChange}
+            onOperatorChange={onOperatorChange}
             disabled={disabled}
           />
         );
@@ -155,7 +159,7 @@ export function FilterValueInput<TData = unknown>({
 
   // Render both the input component and the include unknown control
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {getInputComponent()}
 
       {shouldShowIncludeUnknown && onIncludeNullChange && (

@@ -176,22 +176,24 @@ export function MultiOptionFilterInput<TData = unknown>({
 
       {/* Option Selection Dropdown */}
       <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn(
-              'w-full justify-between',
-              !validation.isValid && selectedValues.length > 0 && 'border-destructive'
-            )}
-            disabled={disabled}
-          >
-            <span className="text-sm text-muted-foreground">
-              {selectedValues.length > 0 ? `${selectedValues.length} selected` : 'Add options...'}
-            </span>
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className={cn(
+                'w-full justify-between',
+                !validation.isValid && selectedValues.length > 0 && 'border-destructive'
+              )}
+              disabled={disabled}
+            />
+          }
+        >
+          <span className="text-sm text-muted-foreground">
+            {selectedValues.length > 0 ? `${selectedValues.length} selected` : 'Add options...'}
+          </span>
+          <ChevronDown data-icon="inline-end" className="opacity-50" />
         </PopoverTrigger>
         <PopoverContent ref={popoverContentRef} className="w-full p-0" align="start">
           <Command>
@@ -214,7 +216,7 @@ export function MultiOptionFilterInput<TData = unknown>({
                     >
                       <Checkbox
                         checked={isSelected}
-                        onChange={() => {}} // Handled by CommandItem onSelect
+                        onCheckedChange={() => handleToggleOption(option.value, !isSelected)}
                       />
                       <div className="flex items-center gap-2 flex-1">
                         {OptionIcon && (
