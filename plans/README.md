@@ -18,12 +18,10 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 22 plans (001–007, 010–020, 022–024, 027–028) —
-  verification baseline, CI gating, URL hardening, type-inference stack,
-  FilterNode through core state + Drizzle AND/OR, adapter toolkit extraction,
-  UI hooks harness, both design docs, instance API, migration guide, real
-  timezone conversion, shared manager emitter, loud relationship inference,
-  join pagination fix, virtualization offsets, null-filter Option A.
+- **Done and merged**: 23 plans (001–007, 010–024, 027–028) — verification
+  baseline through join pagination, facets, virtualization offsets, null-filter
+  Option A, timezone conversion, manager emitter, loud inference. Remaining in
+  flight: 025 (UI perf), 026 (strictness flags).
 - **Gates on main**: root typecheck 11/11 · core 1119/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
@@ -32,13 +30,12 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: 021, 025, 026.
+- **In flight**: 025, 026.
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | 020 (DONE) | IN FLIGHT — wave 2; rides 0.6 |
 | 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
 | 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | 023+024 (DONE) | IN FLIGHT — wave 3 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
@@ -83,6 +80,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 020 | Join pagination under-fill | `8e15c00` | Two-phase fan-out pagination; many-to-one path unchanged; SQLite 520/0 |
 | 024 | Virtualization offset correctness | `e68b9fd` | Lazy prefix offsets; no stale start/end; O(log n) position lookup; core 1118/0 |
 | 027 | Null-filter semantics (Option A) | `8cad0b4` | includeNull satisfies value req; FilterHandler null-only gate fix; core 1119/0 |
+| 021 | Filter-aware facets | merged 2026-07-13 | Additive FacetQueryParams; self-exclusion + distinct under joins; no UI callers yet |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -118,8 +116,8 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
 - **ADAPTER-05** (M): ~~primary-table resolver `break`s on first relationship
   match~~ — **FIXED (alias-scan slice + 022)**: zero-match throws; Strategy 3
   FK-verified; no-columns warns once.
-- **ADAPTER-06** (M): faceted values / min-max ignore active filters and inflate
-  under joins. **PLANNED as 021** (contract widening is additive — optional param).
+- **ADAPTER-06** (M): ~~faceted values / min-max ignore active filters and inflate
+  under joins~~ — **FIXED in 021** (additive FacetQueryParams; no UI callers yet).
 - **ADAPTER-07**: ~~silent per-leaf filter drops on type mismatch (fail-open)~~ —
   **FIXED (2026-07-13)**: `drizzle-predicate-emitter` throws `QueryError` on
   present-but-wrong-type values; empty/missing still `undefined` for partial UI.
