@@ -8,9 +8,13 @@ on:
     paths:
       - 'packages/core/**'
       - 'packages/adapters/**'
+      - 'packages/ui/**'
+      - 'packages/cli/**'
       - 'package.json'
       - 'bun.lock'
       - 'turbo.json'
+      - 'tsconfig.json'
+      - 'biome.json'
       - '.github/workflows/test.yml'
   push:
     branches:
@@ -19,15 +23,35 @@ on:
     paths:
       - 'packages/core/**'
       - 'packages/adapters/**'
+      - 'packages/ui/**'
+      - 'packages/cli/**'
       - 'package.json'
       - 'bun.lock'
       - 'turbo.json'
+      - 'tsconfig.json'
+      - 'biome.json'
       - '.github/workflows/test.yml'
 
 env:
   NODE_VERSION: '20'
 
 jobs:
+  static-checks:
+    name: Typecheck & Lint (all packages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.1'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint (check only)
+        run: bunx biome check .
+        continue-on-error: true   # TODO: make blocking once biome residue is cleared (see plans/013 report — 71 errors remain)
+
   test-core:
     name: Test Core Package
     runs-on: ubuntu-latest
@@ -44,7 +68,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.3.1'
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -79,6 +103,59 @@ jobs:
           echo ""
           echo "========================================="
           echo "✅ Core tests completed successfully"
+          echo "========================================="
+
+  test-cli:
+    name: Test CLI Package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.1'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies from workspace root..."
+          cd ../..
+          bun install --frozen-lockfile
+          echo ""
+          echo "✓ Dependencies installed successfully"
+          echo "Workspace packages:"
+          bun pm ls 2>/dev/null | head -20 || echo "Package list command not available"
+
+      - name: Run CLI Tests
+        run: |
+          echo "========================================="
+          echo "🧪 Running CLI Package Tests"
+          echo "========================================="
+          echo ""
+          echo "Working directory: $(pwd)"
+          echo "Node version: $(node --version)"
+          echo "Bun version: $(bun --version)"
+          echo ""
+          echo "Starting test execution..."
+          echo ""
+          echo "Running: bun test"
+          echo ""
+          bun test
+          echo ""
+          echo "========================================="
+          echo "✅ CLI tests completed successfully"
           echo "========================================="
 
   test-adapters:
@@ -128,7 +205,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.3.1'
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -193,7 +270,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [test-core, test-adapters]
+    needs: [static-checks, test-core, test-cli, test-adapters]
     if: always()
 
     steps:
@@ -203,26 +280,40 @@ jobs:
           echo "📊 Test Execution Summary"
           echo "========================================="
           echo ""
-          
+
+          STATIC_RESULT="${{ needs.static-checks.result }}"
           CORE_RESULT="${{ needs.test-core.result }}"
+          CLI_RESULT="${{ needs.test-cli.result }}"
           ADAPTER_RESULT="${{ needs.test-adapters.result }}"
-          
+
+          if [ "$STATIC_RESULT" = "success" ]; then
+            echo "Typecheck & Lint: ✅ PASSED"
+          else
+            echo "Typecheck & Lint: ❌ FAILED"
+          fi
+
           if [ "$CORE_RESULT" = "success" ]; then
             echo "Core Package Tests: ✅ PASSED"
           else
             echo "Core Package Tests: ❌ FAILED"
           fi
-          
+
+          if [ "$CLI_RESULT" = "success" ]; then
+            echo "CLI Package Tests: ✅ PASSED"
+          else
+            echo "CLI Package Tests: ❌ FAILED"
+          fi
+
           if [ "$ADAPTER_RESULT" = "success" ]; then
             echo "Adapter Package Tests: ✅ PASSED"
           else
             echo "Adapter Package Tests: ❌ FAILED"
           fi
-          
+
           echo ""
           echo "========================================="
-          
-          if [ "$CORE_RESULT" != "success" ] || [ "$ADAPTER_RESULT" != "success" ]; then
+
+          if [ "$STATIC_RESULT" != "success" ] || [ "$CORE_RESULT" != "success" ] || [ "$CLI_RESULT" != "success" ] || [ "$ADAPTER_RESULT" != "success" ]; then
             echo "❌ Some tests failed. Please check the logs above for details."
             exit 1
           else
