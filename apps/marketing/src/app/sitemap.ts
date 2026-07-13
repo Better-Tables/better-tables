@@ -11,5 +11,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${protocol}://${domain}`,
       lastModified: new Date(),
     },
+    {
+      url: `${protocol}://${domain}/examples/relationship-filtering`,
+      lastModified: new Date(),
+    },
+    {
+      url: `${protocol}://${domain}/blog`,
+      lastModified: new Date(),
+    },
   ];
 }

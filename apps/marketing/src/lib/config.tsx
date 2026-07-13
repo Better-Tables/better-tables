@@ -130,6 +130,7 @@ export const siteConfig = {
       },
     ],
     links: [
+      { text: 'Examples', url: '/examples/relationship-filtering' },
       { text: 'Pricing', url: '#' },
       { text: 'Contact', url: '#' },
     ],

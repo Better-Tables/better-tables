@@ -1,6 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { type NextRequest, NextResponse } from 'next/server';
-import { fetchUsers } from '@/lib/demo/fetch-users';
+import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   });
 
   const { page, limit, filters, sorting } = tableParams;
-  const { result, error } = await fetchUsers({ page, limit, filters, sorting });
+  const { result, error } = await fetchTickets({ page, limit, filters, sorting });
 
   if (error) {
     return NextResponse.json({ error, details: error }, { status: 500 });
