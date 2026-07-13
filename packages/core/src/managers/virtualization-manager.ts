@@ -176,6 +176,13 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
   private offsets: number[] = [0];
   /** Offsets are valid for indices `<= cleanUpTo`; everything past it is dirty. */
   private cleanUpTo = 0;
+  /**
+   * Count of individual offset slots filled by `ensureCleanTo`'s linear
+   * pass. Test-only instrumentation (accessed via a private cast in specs)
+   * to prove revalidation is amortized, not a full recompute per call.
+   */
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: read via a private cast in the complexity-guard test, not from within this class
+  private offsetFillOperations = 0;
   private totalRows = 0;
   private totalColumns = 0;
   private resizeObserver: ResizeObserver | null = null;
@@ -507,6 +514,7 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
 
     for (let i = this.cleanUpTo; i < clampedTarget; i++) {
       this.offsets[i + 1] = this.offsets[i] + this.getRowHeightAt(i);
+      this.offsetFillOperations++;
     }
     this.cleanUpTo = clampedTarget;
   }

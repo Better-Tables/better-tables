@@ -573,6 +573,46 @@ describe('VirtualizationManager', () => {
     });
   });
 
+  describe('complexity guard (plan 024)', () => {
+    it('amortizes offset revalidation instead of recomputing the whole prefix on every lookup', () => {
+      manager = new VirtualizationManager(
+        { containerHeight: 400, defaultRowHeight: 40, overscan: 0, dynamicRowHeight: true },
+        50_000
+      );
+
+      // Test-only instrumentation: `offsetFillOperations` counts individual
+      // offset slots filled by the internal linear pass; `getRowStart` is
+      // otherwise private. Both accessed via a cast, same pattern the
+      // existing resize-observer tests in this file already use.
+      const internals = manager as unknown as {
+        offsetFillOperations: number;
+        getRowStart(rowIndex: number): number;
+      };
+
+      const afterConstruction = internals.offsetFillOperations;
+
+      // Dirty the entire prefix by re-measuring the very first row.
+      manager.measureRow(0, 60);
+      const firstStart = internals.getRowStart(49_999);
+      const firstQueryCost = internals.offsetFillOperations - afterConstruction;
+
+      // The first query after a full invalidation legitimately walks
+      // (close to) the whole 50k-row prefix once.
+      expect(firstQueryCost).toBeGreaterThan(40_000);
+      expect(firstStart).toBeGreaterThan(0);
+
+      const afterFirstQuery = internals.offsetFillOperations;
+
+      // Re-measuring a row right next to the already-queried tail should
+      // only dirty a couple of slots, not the whole prefix again.
+      manager.measureRow(49_998, 70);
+      internals.getRowStart(49_999);
+      const secondQueryCost = internals.offsetFillOperations - afterFirstQuery;
+
+      expect(secondQueryCost).toBeLessThan(10);
+    });
+  });
+
   describe('cloning', () => {
     it('should clone manager with same state', () => {
       manager = new VirtualizationManager({ containerHeight: 500, defaultRowHeight: 50 }, 100);
