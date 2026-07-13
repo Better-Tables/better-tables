@@ -1,141 +1,181 @@
 /**
- * @fileoverview Main factory function for creating Better Tables instances
+ * @fileoverview The app-level `betterTables()` instance + `defineTable()`
+ * table-definition runtime.
  * @module factory
  *
  * @description
- * Provides the primary API for creating Better Tables instances with any adapter.
- * This factory function creates a unified interface regardless of the underlying
- * data source (Drizzle, Prisma, REST API, etc.).
+ * This is the 0.6 runtime realization of the plan 011 design
+ * (`plans/design/table-definition-dx.md`) and its compiling prototype
+ * (`packages/core/src/types/experimental/table-def-v1.ts`). Per the
+ * maintainer's 2026-07-12 release-policy decision, it REPLACES the legacy
+ * per-table `betterTables(config)` shell outright -- same export name, new
+ * signature, no overload, no deprecation cycle (`plans/018-instance-api-runtime.md`).
  *
  * @example
  * ```typescript
- * import { betterTables } from '@better-tables/core';
+ * import { betterTables, defineTable } from '@better-tables/core';
  * import { drizzleAdapter } from '@better-tables/adapters-drizzle';
  *
- * const tables = betterTables({
- *   database: drizzleAdapter(db),
- *   columns: [...],
- *   pagination: { page: 1, limit: 20 }
+ * export const tables = betterTables({
+ *   database: drizzleAdapter(db),          // carries $types (schema catalog)
+ *   defaults: { pageSize: 20 },
+ *   plugins: [],
  * });
- * ```
- */
-
-import type { TableAdapter } from './types/adapter';
-import type { ColumnDefinition } from './types/column';
-import type { BetterTablesConfig, BetterTablesInstance } from './types/factory';
-
-/**
- * Create a Better Tables instance with any adapter.
  *
- * @description
- * This is the main entry point for Better Tables. It accepts a configuration
- * object with a data adapter and optional settings for columns, filters,
- * pagination, sorting, and more.
- *
- * The function provides a clean, adapter-agnostic API that works consistently
- * whether you're using Drizzle, Prisma, a REST API, or any other data source.
- *
- * @template TRecord - The record type for table rows (auto-inferred from adapter)
- *
- * @param config - Configuration object with adapter and optional settings
- * @returns A fully configured Better Tables instance
- *
- * @example
- * ```typescript
- * // With Drizzle adapter
- * import { betterTables } from '@better-tables/core';
- * import { drizzleAdapter } from '@better-tables/adapters-drizzle';
- *
- * const tables = betterTables({
- *   database: drizzleAdapter(db),
+ * export const usersTable = defineTable<typeof tables>()('users', (t) => ({
  *   columns: [
- *     { id: 'name', displayName: 'Name', type: 'text' },
- *     { id: 'email', displayName: 'Email', type: 'text' }
+ *     t.text('name'),
+ *     t.number('age').range(18, 100),
+ *     t.option('role').options([
+ *       { value: 'admin', label: 'Admin' },
+ *       { value: 'editor', label: 'Editor' },
+ *     ]),
  *   ],
- *   pagination: { page: 1, limit: 20 }
- * });
- *
- * // Use the adapter directly
- * const result = await tables.adapter.fetchData({
- *   columns: ['name', 'email'],
- *   pagination: { page: 1, limit: 20 }
- * });
- * ```
- *
- * @example
- * ```typescript
- * // With future Prisma adapter
- * import { betterTables } from '@better-tables/core';
- * import { prismaAdapter } from '@better-tables/adapters-prisma';
- *
- * const tables = betterTables({
- *   database: prismaAdapter(prisma.user)
- * });
+ * }));
+ * // also supported: tables.define('users', (t) => ({...})) -- method form
  * ```
  */
-export function betterTables<TRecord = unknown>(
-  config: BetterTablesConfig<TRecord>
-): BetterTablesInstance<TRecord> {
-  // Store the configuration with defaults
-  const initialColumns = config.columns ?? [];
-  let currentConfig: BetterTablesConfig<TRecord> = {
-    ...config,
-    columns: initialColumns,
-  };
 
-  // Return the instance with methods
+import type { ColumnBuilder } from './builders/column-builder';
+import { validateColumns } from './builders/column-factory';
+import { createPathColumnFactory, type PathColumnFactory } from './builders/path-builders';
+import type { ColumnDefinition } from './types/column';
+import type {
+  BetterTablesConfig,
+  BetterTablesInstance,
+  DefineTableCurried,
+  DefineTableRowCurried,
+  RowOf,
+  TableColumnEntry,
+  TableDefinition,
+  TableDefResult,
+  TableNamesOf,
+} from './types/factory';
+import type { SchemaAwareAdapter } from './types/paths';
+
+/**
+ * Create the app-level Better Tables instance (Better-Auth-style: ONE config
+ * object, provider decided here). See design doc Step 1 decision 1.
+ *
+ * `$types` is a type-only phantom -- never assigned or read at runtime; see
+ * {@link SchemaAwareAdapter}.
+ */
+export function betterTables<TAdapter extends SchemaAwareAdapter>(
+  config: BetterTablesConfig<TAdapter>
+): BetterTablesInstance<TAdapter> {
+  const instance = {
+    database: config.database,
+    defaults: config.defaults ?? {},
+    plugins: config.plugins ?? [],
+    // Phantom: intentionally not a real value. Never read at runtime.
+    $types: undefined,
+  } as unknown as BetterTablesInstance<TAdapter>;
+
+  // The method form (design doc Step 1 decision 3): `tables.define('users', (t) => ({...}))`.
+  // Implemented via the same erasure/cast bridge as the standalone `defineTable()`/
+  // `defineTableRow()` curried functions below -- see their doc comments.
+  instance.define = ((
+    tableName: string,
+    factory: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>
+  ) => defineTableImpl(tableName, factory)) as unknown as DefineTableCurried<
+    BetterTablesInstance<TAdapter>
+  >;
+
+  return instance;
+}
+
+/**
+ * Build every column entry in a `defineTable()` factory's `columns` array
+ * into a real `ColumnDefinition`, calling `.build()` on any builder entries
+ * (the "implicit build" design decision -- Step 2 section 3) and passing raw
+ * `ColumnDefinition` literals through unchanged (the escape hatch -- Step 2
+ * section 8). Duplicate-id validation reuses `validateColumns`'s existing
+ * check (`builders/column-factory.ts`) -- the same runtime check the design
+ * doc names for computed-id/real-path collisions (Step 2 section 4), since
+ * `Exclude<string, Paths<Row>>` cannot be expressed at the type level.
+ *
+ * The final erasure to `ColumnDefinition<TRow, unknown>[]` is the SAME
+ * single-cast pattern `defineColumns()` (`builders/column-factory.ts`) uses
+ * for its own value-type erasure -- applied inline here (rather than calling
+ * `defineColumns` itself) because `defineColumns` is shaped for a literal
+ * call-site tuple (per-element compile-time inference), while this
+ * function's input is a dynamic-length array assembled at runtime from a
+ * heterogeneous factory return. One audited erasure POINT (this function),
+ * not a second erasure MECHANISM.
+ */
+function buildTableColumns<TRow>(
+  tableName: string,
+  entries: ReadonlyArray<TableColumnEntry<TRow>>
+): ColumnDefinition<TRow, unknown>[] {
+  const built = entries.map((entry) => {
+    const maybeBuilder = entry as unknown as ColumnBuilder<TRow, unknown>;
+    return typeof maybeBuilder.build === 'function'
+      ? maybeBuilder.build()
+      : (entry as ColumnDefinition<TRow, unknown>);
+  });
+
+  const validation = validateColumns(built as unknown as ColumnDefinition[]);
+  if (!validation.valid) {
+    throw new Error(
+      `defineTable('${tableName}'): invalid columns -- ${validation.errors.join('; ')}`
+    );
+  }
+
+  // Single audited erasure to the table boundary's value-type-erased shape --
+  // see the doc comment above.
+  return built as unknown as ColumnDefinition<TRow, unknown>[];
+}
+
+/** Shared implementation behind `defineTable<TInstance>()(...)`, `defineTableRow<TRow>()(...)`, and `tables.define(...)`. */
+function defineTableImpl<TRow>(
+  tableName: string,
+  factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
+): TableDefinition<string, TRow> {
+  const t = createPathColumnFactory<TRow>();
+  const result = factory(t);
+  const columns = buildTableColumns<TRow>(tableName, result.columns);
+
   return {
-    // Use getter/setter to always reflect current adapter and allow writes
-    get adapter(): TableAdapter<TRecord> {
-      return currentConfig.database;
-    },
-
-    set adapter(value: TableAdapter<TRecord>) {
-      currentConfig.database = value;
-    },
-
-    // Use getter/setter to always reflect current columns and allow writes
-    get columns(): ColumnDefinition<TRecord>[] {
-      return currentConfig.columns ?? [];
-    },
-
-    set columns(value: ColumnDefinition<TRecord>[]) {
-      currentConfig.columns = value ?? [];
-    },
-
-    getConfig() {
-      return {
-        ...currentConfig,
-        columns: currentConfig.columns ? [...currentConfig.columns] : [],
-      };
-    },
-
-    updateConfig(updates: Partial<BetterTablesConfig<TRecord>>) {
-      const updatedColumns = updates.columns ?? currentConfig.columns ?? [];
-      currentConfig = {
-        ...currentConfig,
-        ...updates,
-        // Preserve existing values if not provided in updates
-        columns: updatedColumns,
-      };
-    },
+    tableName,
+    columns,
+    // Type-only phantom -- $infer is never read at runtime, see TableDefInfer.
+    $infer: undefined as unknown as TableDefinition<string, TRow>['$infer'],
   };
 }
 
 /**
- * Type helper to extract the record type from an adapter.
+ * The curried form: `defineTable<typeof tables>()('users', (t) => ({...}))`.
  *
- * @template TAdapter - The adapter type
+ * Curried because TypeScript has no partial type-argument inference --
+ * `TInstance` must be supplied explicitly while the table name's literal
+ * type is inferred from the call (design doc Step 1 decision 3). This is the
+ * RSC-safe form: it needs only `import type { tables } from '../tables'`, no
+ * runtime import of the instance (and therefore no transitive DB-driver
+ * import) in files that only define column shapes.
  *
- * @example
- * ```typescript
- * type MyAdapter = typeof myAdapter;
- * type MyRecord = ExtractAdapterRecord<MyAdapter>;
- * ```
+ * The `as unknown as DefineTableCurried<TInstance>` bridge is necessary
+ * because the runtime implementation is a single, non-generic function
+ * (`defineTableImpl`) doing the real work for every table, while the public
+ * type is a per-call-site generic signature (`TName` inferred fresh at each
+ * call) -- TypeScript generics have no runtime representation to dispatch
+ * on, so the cast documents "this implementation is correct for every `TRow`
+ * the caller instantiates it with," the same trust boundary
+ * `ColumnBuilder.id()`/`.accessor()` already cross internally.
  */
-export type ExtractAdapterRecord<TAdapter> = TAdapter extends {
-  // biome-ignore lint/suspicious/noExplicitAny: Generic function signature for type extraction
-  fetchData: (...args: any[]) => Promise<{ data: Array<infer TData> }>;
+export function defineTable<TInstance>(): DefineTableCurried<TInstance> {
+  return ((tableName: string, factory: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>) =>
+    defineTableImpl(tableName, factory)) as unknown as DefineTableCurried<TInstance>;
 }
-  ? TData
-  : unknown;
+
+/**
+ * Tier-2 escape hatch for adapters without `$types` (REST, memory): an
+ * explicit row generic replaces schema-derived inference. Table name is an
+ * unconstrained `string` (no schema catalog to check it against), but
+ * columns remain fully path-typed against `TRow`.
+ */
+export function defineTableRow<TRow>(): DefineTableRowCurried<TRow> {
+  return ((tableName: string, factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>) =>
+    defineTableImpl<TRow>(tableName, factory)) as unknown as DefineTableRowCurried<TRow>;
+}
+
+export type { TableNamesOf, RowOf };

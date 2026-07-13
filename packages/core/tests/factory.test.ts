@@ -1,16 +1,32 @@
 import { describe, expect, it } from 'bun:test';
-import { betterTables } from '../src/factory';
+import { betterTables, defineTable, defineTableRow } from '../src/factory';
 import type { TableAdapter } from '../src/types/adapter';
-import type { ColumnDefinition } from '../src/types/column';
+import type { SchemaAwareAdapter } from '../src/types/paths';
+
+/**
+ * Runtime tests for the 0.6 `betterTables()` instance + `defineTable()`
+ * runtime (`plans/018-instance-api-runtime.md`, Step 2). Replaces the legacy
+ * per-table `betterTables({database, columns, ...})` shell's test suite
+ * (`ExtractAdapterRecord`, getter/setter `columns`/`adapter`, `getConfig`/
+ * `updateConfig`) -- all REMOVED per the maintainer's 0.6 release-policy
+ * decision (no deprecation interlude). "Adapter access" -- the one
+ * still-meaningful legacy behavior called out in the plan -- is preserved as
+ * `tables.database`.
+ */
 
 interface TestRecord {
   id: string;
   name: string;
   email: string;
+  age: number;
 }
 
-describe('betterTables Factory', () => {
-  const createMockAdapter = (): TableAdapter<TestRecord> => ({
+type TestSchema = {
+  users: { row: TestRecord };
+};
+
+const createMockAdapter = (): TableAdapter<TestRecord> & SchemaAwareAdapter<{ tables: TestSchema }> =>
+  ({
     fetchData: async () => ({
       data: [],
       total: 0,
@@ -55,356 +71,148 @@ describe('betterTables Factory', () => {
         custom: ['equals'],
       },
     },
-  });
+    // Type-only phantom -- never read at runtime; see `SchemaAwareAdapter`.
+    $types: undefined as unknown as { tables: TestSchema },
+  }) satisfies TableAdapter<TestRecord> & SchemaAwareAdapter<{ tables: TestSchema }>;
 
-  const createMockColumn = (id: string): ColumnDefinition<TestRecord, unknown> => ({
-    id,
-    displayName: id,
-    accessor: () => null,
-    type: 'text',
-  });
-
-  describe('Instance Creation', () => {
-    it('should create an instance with adapter', () => {
+describe('betterTables() instance', () => {
+  describe('instance creation', () => {
+    it('creates an instance exposing the configured adapter as `database`', () => {
       const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter });
+      const tables = betterTables({ database: adapter });
 
-      expect(instance).toBeDefined();
-      expect(instance.adapter).toBe(adapter);
+      expect(tables).toBeDefined();
+      expect(tables.database).toBe(adapter);
     });
 
-    it('should create an instance with adapter and columns', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name'), createMockColumn('email')];
-      const instance = betterTables({ database: adapter, columns });
+    it('defaults `defaults` to an empty object when omitted', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      expect(instance.columns).toEqual(columns);
+      expect(tables.defaults).toEqual({});
     });
 
-    it('should create an instance with empty columns array', () => {
-      const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter, columns: [] });
+    it('exposes `defaults` as passed', () => {
+      const tables = betterTables({
+        database: createMockAdapter(),
+        defaults: { pageSize: 20, urlSync: true },
+      });
 
-      expect(instance.columns).toEqual([]);
+      expect(tables.defaults).toEqual({ pageSize: 20, urlSync: true });
     });
 
-    it('should default to empty array when columns is undefined', () => {
-      const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter });
+    it('defaults `plugins` to an empty array when omitted', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      expect(instance.columns).toEqual([]);
-    });
-  });
-
-  describe('Adapter Getter/Setter', () => {
-    it('should get adapter via getter', () => {
-      const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter });
-
-      expect(instance.adapter).toBe(adapter);
+      expect(tables.plugins).toEqual([]);
     });
 
-    it('should set adapter via setter', () => {
+    it('exposes `plugins` as passed', () => {
+      const plugin = { name: 'csvExport' };
+      const tables = betterTables({ database: createMockAdapter(), plugins: [plugin] });
+
+      expect(tables.plugins).toEqual([plugin]);
+    });
+
+    it('isolates config between instances', () => {
       const adapter1 = createMockAdapter();
       const adapter2 = createMockAdapter();
-      const instance = betterTables({ database: adapter1 });
+      const tables1 = betterTables({ database: adapter1, defaults: { pageSize: 10 } });
+      const tables2 = betterTables({ database: adapter2, defaults: { pageSize: 50 } });
 
-      expect(instance.adapter).toBe(adapter1);
-
-      instance.adapter = adapter2;
-      expect(instance.adapter).toBe(adapter2);
-    });
-
-    it('should update adapter and maintain other config', () => {
-      const adapter1 = createMockAdapter();
-      const adapter2 = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter1, columns });
-
-      instance.adapter = adapter2;
-
-      expect(instance.adapter).toBe(adapter2);
-      expect(instance.columns).toEqual(columns);
+      expect(tables1.database).toBe(adapter1);
+      expect(tables2.database).toBe(adapter2);
+      expect(tables1.defaults).toEqual({ pageSize: 10 });
+      expect(tables2.defaults).toEqual({ pageSize: 50 });
     });
   });
 
-  describe('Columns Getter/Setter', () => {
-    it('should get columns via getter', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name'), createMockColumn('email')];
-      const instance = betterTables({ database: adapter, columns });
+  describe('defineTable() -- curried form', () => {
+    it('builds a table definition with path-typed columns', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      expect(instance.columns).toEqual(columns);
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name'), t.number('age').range(0, 130)],
+      }));
+
+      expect(usersTable.tableName).toBe('users');
+      expect(usersTable.columns).toHaveLength(2);
+      expect(usersTable.columns[0]).toMatchObject({ id: 'name', displayName: 'Name', type: 'text' });
+      expect(usersTable.columns[1]).toMatchObject({ id: 'age', displayName: 'Age', type: 'number' });
     });
 
-    it('should set columns via setter', () => {
-      const adapter = createMockAdapter();
-      const columns1 = [createMockColumn('name')];
-      const columns2 = [createMockColumn('email')];
-      const instance = betterTables({ database: adapter, columns: columns1 });
+    it('the derived accessor reads the row value', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      expect(instance.columns).toEqual(columns1);
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name')],
+      }));
 
-      instance.columns = columns2;
-      expect(instance.columns).toEqual(columns2);
+      const row: TestRecord = { id: '1', name: 'Ada', email: 'ada@example.com', age: 30 };
+      expect(usersTable.columns[0]?.accessor(row)).toBe('Ada');
     });
 
-    it('should handle setting columns to empty array', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
+    it('throws on duplicate column ids (computed/path collision guard)', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      instance.columns = [];
-      expect(instance.columns).toEqual([]);
+      expect(() =>
+        defineTable<typeof tables>()('users', (t) => ({
+          columns: [t.text('name'), t.computed('name', () => 'dup')],
+        }))
+      ).toThrow();
     });
 
-    it('should default to empty array when setting columns to null/undefined', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
+    it('accepts a raw ColumnDefinition literal alongside path builders (escape hatch)', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      instance.columns = null as unknown as ColumnDefinition<TestRecord, unknown>[];
-      expect(instance.columns).toEqual([]);
-    });
-  });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [
+          t.text('name'),
+          {
+            id: 'custom',
+            displayName: 'Custom',
+            type: 'custom',
+            accessor: (row: TestRecord) => row.email.toUpperCase(),
+          },
+        ],
+      }));
 
-  describe('getConfig', () => {
-    it('should return current configuration', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
-
-      const config = instance.getConfig();
-
-      expect(config.database).toBe(adapter);
-      expect(config.columns).toEqual(columns);
-    });
-
-    it('should return a copy of the config', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
-
-      const config1 = instance.getConfig();
-      instance.columns = [createMockColumn('email')];
-      const config2 = instance.getConfig();
-
-      // Verify arrays are different references
-      expect(config1.columns).not.toBe(instance.columns);
-      expect(config1.columns).not.toBe(config2.columns);
-
-      // Verify values
-      expect(config1.columns).toHaveLength(1);
-      if (config1.columns?.[0]) {
-        expect(config1.columns[0].id).toBe('name');
-      }
-      expect(config2.columns).toHaveLength(1);
-      if (config2.columns?.[0]) {
-        expect(config2.columns[0].id).toBe('email');
-      }
-    });
-
-    it('should include all config properties', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const pagination = {
-        page: 1,
-        limit: 20,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false,
-      };
-      const instance = betterTables({ database: adapter, columns, pagination });
-
-      const config = instance.getConfig();
-
-      expect(config.database).toBe(adapter);
-      expect(config.columns).toEqual(columns);
-      expect(config.pagination).toEqual(pagination);
-    });
-
-    it('should ensure returned config is immutable regarding internal state', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
-
-      const config = instance.getConfig();
-      if (config.columns) {
-        config.columns.push(createMockColumn('hacked'));
-      }
-
-      // Internal state should not be affected
-      expect(instance.columns).toHaveLength(1);
-      expect(instance.getConfig().columns).toHaveLength(1);
+      expect(usersTable.columns).toHaveLength(2);
+      const row: TestRecord = { id: '1', name: 'Ada', email: 'ada@example.com', age: 30 };
+      expect(usersTable.columns[1]?.accessor(row)).toBe('ADA@EXAMPLE.COM');
     });
   });
 
-  describe('updateConfig', () => {
-    it('should update columns in config', () => {
-      const adapter = createMockAdapter();
-      const columns1 = [createMockColumn('name')];
-      const columns2 = [createMockColumn('email')];
-      const instance = betterTables({ database: adapter, columns: columns1 });
+  describe('tables.define() -- method form', () => {
+    it('produces the same output as the curried form for the same input', () => {
+      const tables = betterTables({ database: createMockAdapter() });
 
-      instance.updateConfig({ columns: columns2 });
+      const viaMethod = tables.define('users', (t) => ({
+        columns: [t.text('name'), t.number('age').range(0, 130)],
+      }));
+      const viaCurried = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name'), t.number('age').range(0, 130)],
+      }));
 
-      expect(instance.columns).toEqual(columns2);
-      expect(instance.getConfig().columns).toEqual(columns2);
-    });
-
-    it('should preserve existing columns when not updating', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
-
-      instance.updateConfig({});
-
-      expect(instance.columns).toEqual(columns);
-    });
-
-    it('should update multiple config properties', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const pagination1 = {
-        page: 1,
-        limit: 20,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false,
-      };
-      const pagination2 = {
-        page: 2,
-        limit: 50,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: true,
-      };
-      const instance = betterTables({ database: adapter, columns, pagination: pagination1 });
-
-      instance.updateConfig({ pagination: pagination2 });
-
-      expect(instance.getConfig().pagination).toEqual(pagination2);
-      expect(instance.columns).toEqual(columns); // Preserved
-    });
-
-    it('should handle updating columns with empty array', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
-
-      instance.updateConfig({ columns: [] });
-
-      expect(instance.columns).toEqual([]);
-    });
-
-    it('should handle undefined columns in update', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const instance = betterTables({ database: adapter, columns });
-
-      instance.updateConfig({ columns: undefined });
-
-      expect(instance.columns).toEqual(columns); // Should preserve
-    });
-
-    it('should merge updates with existing config', () => {
-      const adapter = createMockAdapter();
-      const columns = [createMockColumn('name')];
-      const pagination1 = {
-        page: 1,
-        limit: 20,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false,
-      };
-      const pagination2 = {
-        page: 2,
-        limit: 50,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: true,
-      };
-      const instance = betterTables({ database: adapter, columns, pagination: pagination1 });
-
-      instance.updateConfig({ pagination: pagination2 });
-
-      const config = instance.getConfig();
-      expect(config.database).toBe(adapter);
-      expect(config.columns).toEqual(columns);
-      expect(config.pagination).toEqual(pagination2);
+      expect(viaMethod.tableName).toBe(viaCurried.tableName);
+      expect(viaMethod.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))).toEqual(
+        viaCurried.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))
+      );
     });
   });
 
-  describe('Type Safety', () => {
-    it('should maintain type safety for records', () => {
-      const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter });
+  describe('defineTableRow() -- tier-2 escape hatch (schema-less adapters)', () => {
+    interface RestCustomer {
+      id: string;
+      email: string;
+    }
 
-      // TypeScript should infer TestRecord type
-      const columns: ColumnDefinition<TestRecord, unknown>[] = [createMockColumn('name')];
-      instance.columns = columns;
+    it('compiles and works for an adapter without $types', () => {
+      const customerTable = defineTableRow<RestCustomer>()('customers', (t) => ({
+        columns: [t.text('email')],
+      }));
 
-      expect(instance.columns).toEqual(columns);
-    });
-  });
-
-  describe('Edge cases', () => {
-    it('should handle minimal config with only adapter', () => {
-      const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter });
-
-      expect(instance.adapter).toBe(adapter);
-      expect(instance.columns).toEqual([]);
-    });
-
-    it('should handle multiple sequential updates', () => {
-      const adapter = createMockAdapter();
-      const instance = betterTables({ database: adapter });
-
-      instance.updateConfig({ columns: [createMockColumn('name')] });
-      expect(instance.columns).toHaveLength(1);
-
-      instance.updateConfig({ columns: [createMockColumn('email'), createMockColumn('age')] });
-      expect(instance.columns).toHaveLength(2);
-
-      instance.updateConfig({ columns: [] });
-      expect(instance.columns).toHaveLength(0);
-    });
-
-    it('should handle getter/setter interactions', () => {
-      const adapter = createMockAdapter();
-      const columns1 = [createMockColumn('name')];
-      const columns2 = [createMockColumn('email')];
-      const instance = betterTables({ database: adapter, columns: columns1 });
-
-      // Use getter
-      const currentColumns = instance.columns;
-      expect(currentColumns).toEqual(columns1);
-
-      // Use setter
-      instance.columns = columns2;
-
-      // Verify change via getter
-      expect(instance.columns).toEqual(columns2);
-
-      // Verify change via getConfig
-      expect(instance.getConfig().columns).toEqual(columns2);
-    });
-
-    it('should handle config isolation between instances', () => {
-      const adapter1 = createMockAdapter();
-      const adapter2 = createMockAdapter();
-      const columns1 = [createMockColumn('name')];
-      const columns2 = [createMockColumn('email')];
-
-      const instance1 = betterTables({ database: adapter1, columns: columns1 });
-      const instance2 = betterTables({ database: adapter2, columns: columns2 });
-
-      expect(instance1.columns).toEqual(columns1);
-      expect(instance2.columns).toEqual(columns2);
-
-      instance1.columns = [createMockColumn('updated')];
-      expect(instance2.columns).toEqual(columns2); // Unchanged
+      expect(customerTable.tableName).toBe('customers');
+      expect(customerTable.columns[0]?.accessor({ id: '1', email: 'a@b.com' })).toBe('a@b.com');
     });
   });
 });
