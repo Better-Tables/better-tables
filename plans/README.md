@@ -18,11 +18,11 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 16 plans (001–007, 010–019) — verification baseline, CI
+- **Done and merged**: 17 plans (001–007, 010–019, 028) — verification baseline, CI
   gating, URL hardening, type-inference stack, FilterNode through core state +
   Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design
-  docs, instance API, migration guide.
-- **Gates on main**: root typecheck 11/11 · core 1098/0 · toolkit 93/0 · drizzle
+  docs, instance API, migration guide, real timezone conversion.
+- **Gates on main**: root typecheck 11/11 · core 1104/0 · toolkit 93/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
   pre-publish steps are the maintainer runbook at the bottom of `MIGRATION.md`
@@ -30,23 +30,21 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **Next up**: the 020–028 backlog wave (plans written 2026-07-13, none
-  dispatched yet); publish 0.6 whenever the maintainer chooses (before or after
-  the wave — 021 rides the train if it lands pre-publish).
+- **In flight**: 020, 023, 022, 025 (worktrees). **Next after merges**: 021←020;
+  024/027←023; 026←023+024.
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 020 | Fix page under-fill on one-to-many joins (ADAPTER-03) | 007/017 (DONE) | PLANNED — P1, wave 1 |
-| 023 | Shared subscription emitter for six managers (CORE-08) | 018 (DONE) | PLANNED — wave 1 (parallel: core managers) |
-| 028 | Real timezone conversion (CORE-04 remainder) | — | PLANNED — wave 1 (parallel: core lib); has a builder-default STOP gate |
-| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2; maintainer 2026-07-13: rides 0.6, breaking allowed for the better end design (guide section in-branch if broken) |
+| 020 | Fix page under-fill on one-to-many joins (ADAPTER-03) | 007/017 (DONE) | IN FLIGHT — wave 1 |
+| 023 | Shared subscription emitter for six managers (CORE-08) | 018 (DONE) | IN FLIGHT — wave 1 |
+| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2; rides 0.6 |
 | 024 | Virtualization offsets: stale positions + O(n) scans (CORE-03/09) | **023 merged** (same file) | PLANNED — wave 2 |
-| 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | PLANNED — wave 2 (parallel: ui only) |
-| 022 | Relationship/primary-table inference fails loudly (ADAPTER-05 rem.) | 007 (DONE) | PLANNED — wave 2/3 (disjoint files from 020/021) |
-| 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3; blast radius measured: core 78+28 errors |
-| 027 | Null-filter semantics: includeNull satisfies value requirement (CORE-10) | 023 merged (same file, disjoint region) | PLANNED — **Option A chosen (maintainer 2026-07-13)**, dispatchable; wave 2 |
+| 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
+| 022 | Relationship/primary-table inference fails loudly (ADAPTER-05 rem.) | 007 (DONE) | IN FLIGHT — wave 2/3 |
+| 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3 |
+| 027 | Null-filter semantics: includeNull satisfies value requirement (CORE-10) | 023 merged (same file, disjoint region) | PLANNED — Option A; after 023 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
 Wave logic: within a wave, plans touch disjoint files and can run in parallel
@@ -83,6 +81,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 010 | UI hooks correctness + first UI test harness | `cf80ce7` | Maintainer-executed; reviewer post-merge verified: dead-ref code gone, `FetchDataParams.signal` added, harness + 7 tests (smoke + 6 characterization), CI test-ui job wired |
 | 017 | Drizzle FilterNode group translation | post-`dde0070` merge | Placement (a): generic walk in toolkit router (Prisma inherits it); joins fed from all tree leaves; count/data agreement proven by paginated walk; `supportsFilterGroups: true`, depth cap 3; 7 row-set integration tests |
 | 019 | 0.5→0.6 migration guide | merged 2026-07-13 | MIGRATION.md (10 breaking surfaces, not-changed section, capabilities closer, maintainer runbook); every example compile-checked in CI (core 16 tests + drizzle 5, old APIs pinned dead via @ts-expect-error, 0.5 examples verified against the `@better-tables/core@0.5.3` tag); changeset audit found ZERO gaps; core suite 1077→1098 |
+| 028 | Real timezone conversion | `d06fee9` | `@date-fns/tz` TZDate conversion in formatDateWithConfig/range; UTC builder default honored (MIGRATION §11); soft-fail unknown zones; core 1104/0 |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -132,9 +131,9 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
 - **CORE-03** (M): dynamic row measurement leaves downstream offsets stale
   (virtualization-manager recalculates only one row). **PLANNED as 024** (with CORE-09).
 - **CORE-04** (M): ~~`locale` no-op + TZ label without conversion~~ —
-  **PARTIALLY FIXED (2026-07-13)**: locale wired through date-fns locale map;
-  misleading TZ suffix removed. Remaining: real timezone conversion (needs
-  `date-fns-tz` or equivalent) — **remainder PLANNED as 028** (`@date-fns/tz`).
+  **FIXED (2026-07-13 + 028)**: locale wired; TZ suffix removed; real
+  conversion via `@date-fns/tz` (builder `'UTC'` default now honored —
+  MIGRATION §11).
 - **CORE-06**: ~~compression renameKeys mangles user data~~ — **FIXED in 015**
   (structural-keys-only renaming + named regression test).
 - **CORE-07**: ~~`updateState` multi-`state_changed` refetch waterfall~~ —
