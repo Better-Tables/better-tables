@@ -25,14 +25,14 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   86/86 · drizzle 490 pass / 3 skip / 3 env-dependent (need DB URLs; CI provides)
   · CLI 127/0.
 - **In flight**: nothing — AND/OR is complete end-to-end (URL → state → adapter → SQL).
-- **Next up**: 018 (`betterTables()`/`defineTable` runtime), 010 (UI hooks).
+- **Next up**: 018 (`betterTables()`/`defineTable` runtime).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 018 | `betterTables()` instance + `defineTable` runtime (the 011 design's implementation: schema-aware `t.*` path builders, `$infer`, registry from `define()`) | 014 (DONE), 011+006 designs (DONE) | PLAN TO BE WRITTEN |
-| 010 | UI hooks correctness (fetch race, url-sync leaks/hydration stub) + first UI test harness | 001 (DONE) | TODO — plan ready to dispatch |
+| 018 | `betterTables()` instance + `defineTable` runtime (the 011 design's implementation: schema-aware `t.*` path builders, `$infer`, registry from `define()`) | 014 (DONE), 011+006 designs (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13. Deferred within it: aggregates, json-path, runtime enum options, RSC bridge, plugin hooks, ui `table=` prop, app migration |
+| 010 | UI hooks correctness (fetch race, url-sync leaks/hydration stub) + first UI test harness | 001 (DONE) | **DONE** — `ui-hooks-correctness` branch |
 | 019 | Migration guide for 0.6 (assemble all changeset "what breaks" sections; required by release policy) | all 0.6 work | PLAN TO BE WRITTEN — last before publish |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lifts of the hold | **ON HOLD** (maintainer) — last item on the board |
 
@@ -82,7 +82,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
   ~10 are plan 011's `experimental/`+fixture files — add pragmas or fix when the
   prototype is promoted).
 - **Typecheck exclusions (recorded debt)**: none — `apps/docs` and `apps/marketing`
-  both have `typecheck` scripts and participate in root turbo typecheck.
+  both have `typecheck` scripts; `packages/ui` now has a `bun test` harness (plan 010).
 - **Changesets accumulate for one 0.6 train** — do not partially publish.
 - Root `lint` script mutates (`biome check --write --unsafe .`); check-only is
   `bunx biome check .`. Fresh worktrees: `bun install` first; build core (and now
