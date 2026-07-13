@@ -18,8 +18,9 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 25 plans (001–007, 010–028) — full 020–028 backlog wave
-  complete. Only **008 Prisma** remains (on hold).
+- **Done and merged**: 26 plans (001–007, 010–029) — 020–028 backlog wave +
+  029 showcase dogfood complete. **030–032** in flight (dispatched from the 029
+  findings). **008 Prisma** remains on hold.
 - **Gates on main**: root typecheck 11/11 · core 1127/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 137/0 · UI 17/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
@@ -63,22 +64,42 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   `schema-extractor.ts`). Also: homepage demo has a pre-existing faker
   seed error (spawned as a separate follow-up task, untouched by 029).
 
-**Proposed next wave from the findings (no plans written yet — maintainer
-gates)**: 030 = the correctness trio (14 keying fix; 9 escalate wrong-table
-fallback from warn to throw for `fetchData` — revisits 022's no-columns
-decision with new evidence; 10 decide+implement relation-projection
-semantics). 031 = filter-authoring DX (typed `buildFilter` helper from the
-registry line, `filter.id` identity, better group-shape errors — findings
-1/2/8/16/17). 032 = UI integration gaps (VirtualizedTable
-adapter/formatter integration, facet sidebar component, chip URL resync —
-findings 6/7/15). Smaller: 3/4/5/12/13 are docs/design-doc inputs.
+- **Wave 030–032 WRITTEN + DISPATCHED (2026-07-13)** from the 029 findings,
+  after scouting current-state at every fix site. Maintainer decisions folded
+  in: finding 9 → **fix at the source** (the multi-table primary-table problem
+  is "key to the whole product" per the maintainer) via a typed table-scoped
+  query surface + a safety throw mirroring §7, NOT warn-only; finding 10 →
+  **auto-embed** relations referenced in filters/sorting. Finding→plan map
+  below.
+
+## Finding → plan coverage (all 17 assigned)
+
+| Findings | Plan | Theme |
+|----------|------|-------|
+| 9, 10, 11, 14, 16 (+13a doc) | **030** | Multi-table done right: keying bug, safety throw, typed table-scoped fetch, auto-embed, construction validation |
+| 1, 2, 8, 12, 17 (+3 doc) | **031** | Filter-authoring type-safety: per-type operators, identity, generic values, typed buildFilter, row-type back-refs |
+| 5, 6, 7, 15 | **032** | UI integration: table prop, virtualized data path + formatter, facet hook/sidebar, soft-nav chip rehydration |
+| 4 (flagship example), 13b (detectDriver-under-next-build) | backlog | small docs / upstream investigation — see below |
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 029 | Marketing showcase examples as DX dogfood (4 example pages + `plans/findings/029-dx-findings.md`) | 018–028 merged | IN PROGRESS — builds on maintainer WIP (`marketing-examples-wip` @ `b1300d7`); every workaround logged as a library finding |
+| 030 | Multi-table identity, safety throw, typed table-scoped fetch surface, auto-embed, construction validation (findings 9/10/11/14/16) | 018/021/022 (DONE) | IN PROGRESS — P0, "key to the whole product"; land before 032's `table` prop |
+| 031 | Filter-authoring type-safety (findings 1/2/8/12/17) | none hard; parallel-safe | IN PROGRESS — has a type-perf gate (Step 1) |
+| 032 | UI integration gaps (findings 5/6/7/15) | 025 (DONE); finding-5 prop pairs with 030 | IN PROGRESS — soft-nav chip fix is a correctness bug |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
+
+Backlog from the 029 findings not in 030–032: **finding 4** — no in-repo
+flagship-API example to pattern-match (the marketing homepage demo is still
+pre-018 `createColumnBuilder`); migrating it + an `@deprecated`-style nudge on
+`createColumnBuilder`/`defineColumns` would stop the next author copying the
+old style. **Finding 13b** — `detectDriver()` returns null under Next's
+build-time page-data-collection phase for a `better-sqlite3` binding that
+detects fine at request time; worth an upstream-ish investigation
+(`packages/adapters/drizzle/src/utils/driver-detector.ts`). Homepage demo
+faker seed error (`maxRepeatedValuesCount`) — spawned as its own task by the
+029 executor, untouched by that plan.
 
 Wave logic: within a wave, plans touch disjoint files and can run in parallel
 worktrees; across waves the arrow is a same-file merge dependency, not a design
