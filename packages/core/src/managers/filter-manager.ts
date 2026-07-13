@@ -7,6 +7,7 @@
  * @module managers/filter-manager
  */
 
+import { Subscribable } from '../lib/subscribable';
 import type { ColumnDefinition, ColumnType } from '../types/column';
 import type {
   FilterGroupNode,
@@ -173,7 +174,7 @@ export interface FilterSerializationOptions {
  * console.log('Active filters:', filters);
  * ```
  */
-export class FilterManager<TData = unknown> {
+export class FilterManager<TData = unknown> extends Subscribable<FilterManagerEvent> {
   /**
    * The real stored filter state (plan 016 semantic contract rule 2): either
    * a flat `FilterState[]` (implicit AND) or a single {@link FilterGroupNode}
@@ -181,7 +182,6 @@ export class FilterManager<TData = unknown> {
    */
   private filterNode: FilterState[] | FilterGroupNode = [];
   private columns: ColumnDefinition<TData>[] = [];
-  private subscribers: FilterManagerSubscriber[] = [];
   private operatorDefinitions: Map<FilterOperator, FilterOperatorDefinition> = new Map();
 
   /**
@@ -207,6 +207,7 @@ export class FilterManager<TData = unknown> {
     columns: ColumnDefinition<TData>[],
     initialFilters: FilterState[] | FilterGroupNode = []
   ) {
+    super('filter manager');
     this.columns = columns;
     this.operatorDefinitions = createOperatorRegistry(getAllOperators());
     this.setFilterNode(initialFilters);
@@ -258,7 +259,7 @@ export class FilterManager<TData = unknown> {
     });
 
     this.filterNode = validFilters;
-    this.notifySubscribers({ type: 'filters_replaced', filters: validFilters });
+    this.notify({ type: 'filters_replaced', filters: validFilters });
   }
 
   /**
@@ -292,7 +293,7 @@ export class FilterManager<TData = unknown> {
       normalized === null ? [] : isFilterGroupNode(normalized) ? normalized : [normalized];
 
     this.filterNode = finalNode;
-    this.notifySubscribers({ type: 'filters_replaced', filters: finalNode });
+    this.notify({ type: 'filters_replaced', filters: finalNode });
   }
 
   /**
@@ -349,11 +350,11 @@ export class FilterManager<TData = unknown> {
     if (existingIndex >= 0) {
       currentFilters[existingIndex] = filter;
       this.filterNode = currentFilters;
-      this.notifySubscribers({ type: 'filter_updated', columnId: filter.columnId, filter });
+      this.notify({ type: 'filter_updated', columnId: filter.columnId, filter });
     } else {
       currentFilters.push(filter);
       this.filterNode = currentFilters;
-      this.notifySubscribers({ type: 'filter_added', filter });
+      this.notify({ type: 'filter_added', filter });
     }
   }
 
@@ -366,7 +367,7 @@ export class FilterManager<TData = unknown> {
     if (index >= 0) {
       currentFilters.splice(index, 1);
       this.filterNode = currentFilters;
-      this.notifySubscribers({ type: 'filter_removed', columnId });
+      this.notify({ type: 'filter_removed', columnId });
     }
   }
 
@@ -388,7 +389,7 @@ export class FilterManager<TData = unknown> {
 
       currentFilters[index] = updatedFilter;
       this.filterNode = currentFilters;
-      this.notifySubscribers({ type: 'filter_updated', columnId, filter: updatedFilter });
+      this.notify({ type: 'filter_updated', columnId, filter: updatedFilter });
     }
   }
 
@@ -397,7 +398,7 @@ export class FilterManager<TData = unknown> {
    */
   clearFilters(): void {
     this.filterNode = [];
-    this.notifySubscribers({ type: 'filters_cleared' });
+    this.notify({ type: 'filters_cleared' });
   }
 
   /**
@@ -557,33 +558,6 @@ export class FilterManager<TData = unknown> {
    */
   getOperatorDefinition(operator: FilterOperator): FilterOperatorDefinition | undefined {
     return getOperatorDefinition(operator);
-  }
-
-  /**
-   * Subscribe to filter changes
-   */
-  subscribe(callback: FilterManagerSubscriber): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index >= 0) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Notify all subscribers of filter changes
-   */
-  private notifySubscribers(event: FilterManagerEvent): void {
-    this.subscribers.forEach((callback) => {
-      try {
-        callback(event);
-      } catch (error) {
-        // biome-ignore lint: Intentional error logging for subscriber errors
-        console.error('Error in filter manager subscriber:', error);
-      }
-    });
   }
 
   /**

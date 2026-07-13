@@ -7,6 +7,7 @@
  * @module managers/virtualization-manager
  */
 
+import { Subscribable } from '../lib/subscribable';
 import type {
   RowMeasurement,
   ScrollInfo,
@@ -131,7 +132,7 @@ export type VirtualizationManagerSubscriber = (event: VirtualizationManagerEvent
  * virtualizationManager.measureRow(50, 75);
  * ```
  */
-export class VirtualizationManager {
+export class VirtualizationManager extends Subscribable<VirtualizationManagerEvent> {
   private state: VirtualizationState = {
     virtualRows: [],
     virtualColumns: [],
@@ -166,7 +167,6 @@ export class VirtualizationManager {
     containerWidth: 800,
   };
 
-  private subscribers: VirtualizationManagerSubscriber[] = [];
   private rowMeasurements: Map<number, RowMeasurement> = new Map();
   private totalRows = 0;
   private totalColumns = 0;
@@ -207,6 +207,7 @@ export class VirtualizationManager {
    * ```
    */
   constructor(config: Partial<VirtualizationConfig> = {}, totalRows = 0, totalColumns = 0) {
+    super('virtualization manager');
     this.config = { ...this.config, ...config };
     this.totalRows = totalRows;
     this.totalColumns = totalColumns;
@@ -276,7 +277,7 @@ export class VirtualizationManager {
     this.state.scrollInfo = { ...prevScrollInfo, ...scrollInfo };
 
     this.updateVirtualItems();
-    this.notifySubscribers({
+    this.notify({
       type: 'scroll',
       scrollInfo: this.state.scrollInfo,
     });
@@ -321,7 +322,7 @@ export class VirtualizationManager {
     // Update virtual items if this affects visible range
     this.updateVirtualItems();
 
-    this.notifySubscribers({ type: 'row_measured', rowIndex, height });
+    this.notify({ type: 'row_measured', rowIndex, height });
   }
 
   /**
@@ -524,7 +525,7 @@ export class VirtualizationManager {
     this.state.totalWidth = totalWidth;
 
     if (prevTotalHeight !== totalHeight || prevTotalWidth !== totalWidth) {
-      this.notifySubscribers({
+      this.notify({
         type: 'total_size_changed',
         totalHeight,
         totalWidth,
@@ -603,14 +604,14 @@ export class VirtualizationManager {
     this.state.endColumnIndex = endColumnIndex;
 
     // Notify subscribers
-    this.notifySubscribers({
+    this.notify({
       type: 'virtual_items_changed',
       virtualRows,
       virtualColumns,
     });
 
     if (prevStartIndex !== startRowIndex || prevEndIndex !== endRowIndex) {
-      this.notifySubscribers({
+      this.notify({
         type: 'viewport_changed',
         startIndex: startRowIndex,
         endIndex: endRowIndex,
@@ -773,7 +774,7 @@ export class VirtualizationManager {
       this.updateVirtualItems();
     }
 
-    this.notifySubscribers({
+    this.notify({
       type: 'configuration_updated',
       config: this.config,
     });
@@ -862,27 +863,6 @@ export class VirtualizationManager {
    * unsubscribe();
    * ```
    */
-  subscribe(callback: VirtualizationManagerSubscriber): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index >= 0) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Notify all subscribers of virtualization changes
-   */
-  private notifySubscribers(event: VirtualizationManagerEvent): void {
-    for (const callback of this.subscribers) {
-      try {
-        callback(event);
-      } catch (_error) {}
-    }
-  }
-
   /**
    * Enable or disable virtualization
    */
@@ -917,7 +897,7 @@ export class VirtualizationManager {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
-    this.subscribers.length = 0;
+    this.clearSubscribers();
     this.rowMeasurements.clear();
   }
 

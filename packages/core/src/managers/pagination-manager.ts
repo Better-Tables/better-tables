@@ -7,6 +7,7 @@
  * @module managers/pagination-manager
  */
 
+import { Subscribable } from '../lib/subscribable';
 import type { PaginationConfig, PaginationParams, PaginationState } from '../types/pagination';
 
 /**
@@ -118,7 +119,7 @@ export interface PaginationValidationResult {
  * paginationManager.reset();
  * ```
  */
-export class PaginationManager {
+export class PaginationManager extends Subscribable<PaginationManagerEvent> {
   private paginationState: PaginationState = {
     page: 1,
     limit: 10,
@@ -127,7 +128,6 @@ export class PaginationManager {
     hasPrev: false,
   };
   private total = 0;
-  private subscribers: PaginationManagerSubscriber[] = [];
   private config: PaginationConfig = {};
 
   /**
@@ -155,6 +155,7 @@ export class PaginationManager {
    * ```
    */
   constructor(config: PaginationConfig = {}, initialState?: Partial<PaginationState>) {
+    super('pagination manager');
     this.config = {
       defaultPageSize: 10,
       pageSizeOptions: [10, 20, 50, 100],
@@ -242,7 +243,7 @@ export class PaginationManager {
     const previousTotal = this.total;
     this.total = total;
     this.updateState({ ...this.paginationState });
-    this.notifySubscribers({ type: 'total_updated', total, previousTotal });
+    this.notify({ type: 'total_updated', total, previousTotal });
   }
 
   /**
@@ -279,7 +280,7 @@ export class PaginationManager {
 
     const previousPage = this.paginationState.page;
     this.updateState({ ...this.paginationState, page });
-    this.notifySubscribers({ type: 'page_changed', page, previousPage });
+    this.notify({ type: 'page_changed', page, previousPage });
   }
 
   /**
@@ -374,7 +375,7 @@ export class PaginationManager {
       page: newPage,
     });
 
-    this.notifySubscribers({ type: 'page_size_changed', pageSize, previousPageSize });
+    this.notify({ type: 'page_size_changed', pageSize, previousPageSize });
   }
 
   /**
@@ -399,7 +400,7 @@ export class PaginationManager {
       hasPrev: false,
     });
     this.total = 0;
-    this.notifySubscribers({ type: 'pagination_reset' });
+    this.notify({ type: 'pagination_reset' });
   }
 
   /**
@@ -582,62 +583,6 @@ export class PaginationManager {
       this.paginationState.page = this.paginationState.totalPages;
       this.paginationState.hasNext = false;
     }
-  }
-
-  /**
-   * Subscribe to pagination changes.
-   *
-   * Registers a callback function to be called whenever pagination state changes.
-   * Returns an unsubscribe function to remove the subscription.
-   *
-   * @param callback - Function to call when pagination changes
-   * @returns Unsubscribe function to remove the subscription
-   *
-   * @example
-   * ```typescript
-   * const unsubscribe = paginationManager.subscribe((event) => {
-   *   switch (event.type) {
-   *     case 'page_changed':
-   *       console.log(`Page changed to ${event.page}`);
-   *       break;
-   *     case 'page_size_changed':
-   *       console.log(`Page size changed to ${event.pageSize}`);
-   *       break;
-   *     case 'total_updated':
-   *       console.log(`Total updated to ${event.total}`);
-   *       break;
-   *     case 'pagination_reset':
-   *       console.log('Pagination was reset');
-   *       break;
-   *   }
-   * });
-   *
-   * // Later, unsubscribe
-   * unsubscribe();
-   * ```
-   */
-  subscribe(callback: PaginationManagerSubscriber): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index >= 0) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Notify all subscribers of pagination changes
-   */
-  private notifySubscribers(event: PaginationManagerEvent): void {
-    this.subscribers.forEach((callback) => {
-      try {
-        callback(event);
-      } catch (error) {
-        // biome-ignore lint: Intentional error logging for subscriber errors
-        console.error('Error in pagination manager subscriber:', error);
-      }
-    });
   }
 
   /**
