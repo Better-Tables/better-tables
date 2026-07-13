@@ -86,7 +86,11 @@ export function installResizeObserverMock(): ResizeObserverMock {
 
   return {
     restore: () => {
-      globalObject.ResizeObserver = original;
+      if (original) {
+        globalObject.ResizeObserver = original;
+      } else {
+        delete globalObject.ResizeObserver;
+      }
     },
     constructionCount: () => constructions,
     observeCallCount: () => observeCalls,

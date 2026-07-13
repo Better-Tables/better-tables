@@ -29,11 +29,14 @@ const filterB: FilterState = { columnId: 'b', type: 'text', operator: 'contains'
  * `FilterBadge`/`MemoizedFilterBadge` from the module. */
 function makeCountingColumns(counts: Map<string, number>): ColumnDefinition<Row>[] {
   return baseColumns.map((col) => ({
-    ...col,
+    id: col.id,
+    displayName: col.displayName,
+    type: col.type,
+    accessor: col.accessor,
     icon: (() => {
       counts.set(col.id, (counts.get(col.id) ?? 0) + 1);
       return null;
-    }) as unknown as ColumnDefinition<Row>['icon'],
+    }) as NonNullable<ColumnDefinition<Row>['icon']>,
   }));
 }
 
