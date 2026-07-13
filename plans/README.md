@@ -18,13 +18,13 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 21 plans (001–007, 010–020, 022–024, 028) — verification
-  baseline, CI gating, URL hardening, type-inference stack, FilterNode through
-  core state + Drizzle AND/OR, adapter toolkit extraction, UI hooks harness,
-  both design docs, instance API, migration guide, real timezone conversion,
-  shared manager emitter, loud relationship inference, join pagination fix,
-  virtualization offsets.
-- **Gates on main**: root typecheck 11/11 · core 1118/0 · toolkit 96/0 · drizzle
+- **Done and merged**: 22 plans (001–007, 010–020, 022–024, 027–028) —
+  verification baseline, CI gating, URL hardening, type-inference stack,
+  FilterNode through core state + Drizzle AND/OR, adapter toolkit extraction,
+  UI hooks harness, both design docs, instance API, migration guide, real
+  timezone conversion, shared manager emitter, loud relationship inference,
+  join pagination fix, virtualization offsets, null-filter Option A.
+- **Gates on main**: root typecheck 11/11 · core 1119/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
   pre-publish steps are the maintainer runbook at the bottom of `MIGRATION.md`
@@ -32,7 +32,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: 021, 025, 026, 027.
+- **In flight**: 021, 025, 026.
 
 ## Outstanding
 
@@ -41,7 +41,6 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 | 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | 020 (DONE) | IN FLIGHT — wave 2; rides 0.6 |
 | 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
 | 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | 023+024 (DONE) | IN FLIGHT — wave 3 |
-| 027 | Null-filter semantics: includeNull satisfies value requirement (CORE-10) | 023 (DONE) | IN FLIGHT — Option A; wave 2 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
 Wave logic: within a wave, plans touch disjoint files and can run in parallel
@@ -83,6 +82,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 022 | Relationship inference honesty | merged 2026-07-13 | Zero-match throws SchemaError + suggestions; Strategy 3 FK-verified; toolkit 96/0 |
 | 020 | Join pagination under-fill | `8e15c00` | Two-phase fan-out pagination; many-to-one path unchanged; SQLite 520/0 |
 | 024 | Virtualization offset correctness | `e68b9fd` | Lazy prefix offsets; no stale start/end; O(log n) position lookup; core 1118/0 |
+| 027 | Null-filter semantics (Option A) | `8cad0b4` | includeNull satisfies value req; FilterHandler null-only gate fix; core 1119/0 |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -139,11 +139,10 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
 - **CORE-08** (M): six managers duplicate subscribe/notify with drifted error
   policy; extract an emitter base. **FIXED in 023.**
 - **CORE-09** (L): ~~virtualization offset math O(n) per lookup~~ — **FIXED in 024.**
-- **CORE-10** (M): `includeNull`/`supportsNull` dead in validation — null-only
-  filters can't pass strict mode. **PLANNED as 027 — Option A chosen
-  (maintainer 2026-07-13)**: includeNull satisfies the value requirement;
-  supportsNull gains its first real job (rejecting includeNull on valueCount-0
-  operators).
+- **CORE-10** (M): ~~`includeNull`/`supportsNull` dead in validation~~ —
+  **FIXED in 027 (Option A)**: includeNull satisfies value requirement;
+  supportsNull rejects includeNull on valueCount-0 ops; FilterHandler
+  pre-gate no longer drops null-only leaves.
 - **UI-05/06/08** (M each): render perf — unmemoized rows/cells; VirtualizedTable
   recreates per-row ResizeObservers every render; auto-show + callback-bridge
   effect churn. **PLANNED as 025** (includes building the render-count harness —
