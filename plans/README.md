@@ -37,7 +37,7 @@ language, this policy wins.
 | 002  | Stop mutations targeting the first schema table | P1 | M | — (001 rec.) | TODO |
 | 003  | Fix join count inflation on MySQL/SQLite | P1 | S | — | TODO |
 | 004  | Validate URL-deserialized state, fail closed | P1 | M | baseline (merged) | DONE (2026-07-13: reviewer APPROVED — `isFilterStateShape` boundary guard, fail-closed drops w/ value-free warnings, pagination clamping, 7 new tests (core 1007/0); merged to local main at `ce9f1ea`) |
-| 005  | Builder type inference end-to-end | P1 | L | 001 (DONE) | DONE (2026-07-13: reviewer-less self-verified — accessor/options infer real value types end-to-end, `defineColumns` replaces the `any` erasure at `BetterTable`, zero `as string` casts left in the demo; step 3 (compile-gated `build()`) skipped per plan 011; changeset added for `@better-tables/core`/`@better-tables/ui` minor) |
+| 005  | Builder type inference end-to-end | P1 | L | 001 (DONE) | DONE (2026-07-13: accessor/options infer real value types end-to-end, `defineColumns` replaces the `any` erasure at `BetterTable`, zero `as string` casts left in the demo; step 3 (compile-gated `build()`) skipped per plan 011; changeset for `@better-tables/core`/`@better-tables/ui` minor — awaiting local merge) |
 | 006  | Design: contract v2 — typed registry + AND/OR groups | P1 | L (design) | 005 | TODO |
 | 007  | Extract ORM-agnostic adapter toolkit | P2 | L | 002, 003 (006 rec.) | TODO |
 | 008  | Prisma adapter spike (read path) | P2 | L (spike) | 007 (hard), 006, 005 | TODO |
