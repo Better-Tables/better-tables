@@ -441,7 +441,7 @@ Migration guides that only list breakage overstate the pain. In 0.6:
 
 ## New capabilities you get
 
-Three things 0.6 unlocks that weren't possible before, each linking to the
+Four things 0.6 unlocks that weren't possible before, each linking to the
 full design rather than repeating it here:
 
 - **Schema-derived, path-typed columns.** `defineTable<typeof tables>()('users', (t) => ({ columns: [t.text('profile.location')] }))`
@@ -464,6 +464,12 @@ full design rather than repeating it here:
   `columnId -> valueType` filter registry is designed but not yet wired
   through `defineTable()`; see `plans/design/core-contract-v2.md`, "Step 2 —
   Typed column registry".)
+- **Null-only filters.** A filter with `includeNull: true` and no `values`
+  is now a valid strict-mode filter meaning "match rows where this column
+  is null" — the same shape the include-unknown UI checkbox already
+  produced when checked before a value was entered. It's rejected on
+  `isEmpty`/`isNull`-style operators, whose own condition already means
+  null, as redundant. See `plans/027-null-filter-semantics.md`.
 
 ---
 
