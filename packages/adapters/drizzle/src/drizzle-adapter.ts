@@ -788,22 +788,65 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   }
 
   /**
-   * Determine table from data or use first table as fallback
+   * Resolve which table a record mutation (create/update/delete/bulk) should
+   * target.
+   *
+   * Mutation methods carry no per-call table hint, so routing must be
+   * explicit rather than inferred from data shape (inference invites silent
+   * wrong-table writes). Resolution order:
+   *
+   * 1. `options.defaultMutationTable`, if set — validated against the schema.
+   * 2. The schema's single table, if the schema has exactly one table.
+   * 3. Otherwise, throw — the caller must configure `defaultMutationTable`.
+   *
+   * @private
+   * @throws {SchemaError} If `defaultMutationTable` names a table absent from
+   *   the schema, or if the schema has multiple tables and no
+   *   `defaultMutationTable` is configured.
    */
-  private determineTableFromData(
-    _data?: Partial<InferSelectModelFromFilteredSchema<TSchema>>
-  ): string {
-    // For now, use the first table as fallback
-    // In a more sophisticated implementation, we could analyze the data structure
+  private resolveMutationTable(): string {
     const tableNames = Object.keys(this.schema);
     if (tableNames.length === 0) {
       throw new SchemaError('No tables found in schema', { schema: this.schema });
     }
-    const firstTable = tableNames[0];
-    if (!firstTable) {
-      throw new SchemaError('No tables found in schema', { schema: this.schema });
+
+    const configuredTable = this.options?.defaultMutationTable;
+    if (configuredTable !== undefined) {
+      if (!tableNames.includes(configuredTable)) {
+        throw new SchemaError(
+          `defaultMutationTable '${configuredTable}' is not present in the schema`,
+          { defaultMutationTable: configuredTable, availableTables: tableNames }
+        );
+      }
+      return configuredTable;
     }
-    return firstTable;
+
+    if (tableNames.length === 1) {
+      // Single-table schemas are unambiguous - no configuration required.
+      return tableNames[0] as string;
+    }
+
+    throw new SchemaError(
+      "Multiple tables in schema — set 'defaultMutationTable' in drizzleAdapter options to enable create/update/delete",
+      { availableTables: tableNames }
+    );
+  }
+
+  /**
+   * Whether {@link resolveMutationTable} would succeed for this adapter
+   * instance, without throwing. Used to advertise mutation capability in
+   * {@link AdapterMeta.features} so UI layers don't render actions that
+   * would throw at call time.
+   *
+   * @private
+   */
+  private canResolveMutationTable(): boolean {
+    try {
+      this.resolveMutationTable();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -812,8 +855,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   async createRecord(
     data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
   ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
+    // Resolved before the try block so routing failures surface as SchemaError
+    // rather than being wrapped in a QueryError below.
+    const primaryTable = this.resolveMutationTable();
     try {
-      const primaryTable = this.determineTableFromData(data);
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
         primaryTable
       ] as TableWithId;
@@ -844,8 +889,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     id: string,
     data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
   ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
+    // Resolved before the try block so routing failures surface as SchemaError
+    // rather than being wrapped in a QueryError below.
+    const primaryTable = this.resolveMutationTable();
     try {
-      const primaryTable = this.determineTableFromData(data);
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
         primaryTable
       ] as TableWithId;
@@ -873,8 +920,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Delete record
    */
   async deleteRecord(id: string): Promise<void> {
+    // Resolved before the try block so routing failures surface as SchemaError
+    // rather than being wrapped in a QueryError below.
+    const primaryTable = this.resolveMutationTable();
     try {
-      const primaryTable = this.determineTableFromData();
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable] as
         | TableWithId
         | undefined;
@@ -903,8 +952,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     ids: string[],
     data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
   ): Promise<InferSelectModelFromFilteredSchema<TSchema>[]> {
+    // Resolved before the try block so routing failures surface as SchemaError
+    // rather than being wrapped in a QueryError below.
+    const primaryTable = this.resolveMutationTable();
     try {
-      const primaryTable = this.determineTableFromData(data);
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
         primaryTable
       ] as TableWithId;
@@ -932,8 +983,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Bulk delete records
    */
   async bulkDelete(ids: string[]): Promise<void> {
+    // Resolved before the try block so routing failures surface as SchemaError
+    // rather than being wrapped in a QueryError below.
+    const primaryTable = this.resolveMutationTable();
     try {
-      const primaryTable = this.determineTableFromData();
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable] as
         | TableWithId
         | undefined;
@@ -1005,12 +1058,18 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Build adapter metadata
    */
   private buildAdapterMeta(customMeta?: Partial<AdapterMeta>): AdapterMeta {
+    // Mutation actions are only safe to advertise when resolveMutationTable()
+    // can actually resolve a target table (single-table schema, or
+    // options.defaultMutationTable configured) - otherwise callers would hit
+    // a SchemaError at call time.
+    const mutationsResolvable = this.canResolveMutationTable();
+
     const features: AdapterFeatures = {
-      create: true,
+      create: mutationsResolvable,
       read: true,
-      update: true,
-      delete: true,
-      bulkOperations: true,
+      update: mutationsResolvable,
+      delete: mutationsResolvable,
+      bulkOperations: mutationsResolvable,
       realTimeUpdates: true,
       export: true,
       transactions: true,

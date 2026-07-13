@@ -437,6 +437,10 @@ export function createPostgresAdapter(
     driver: 'postgres',
     autoDetectRelationships: true,
     relations: relationsSchema,
+    // `schema` has multiple tables (users, profiles, posts, comments, surveys);
+    // mutation tests below target `users`, so it must be named explicitly now
+    // that mutation routing no longer falls back to the first schema table.
+    options: { defaultMutationTable: 'users' },
   };
 
   return new DrizzleAdapterClass(config);
@@ -695,6 +699,10 @@ export function createMySQLAdapter(
     driver: 'mysql',
     autoDetectRelationships: true,
     relations: relationsSchema,
+    // `schema` has multiple tables (users, profiles, posts, comments, surveys);
+    // mutation tests below target `users`, so it must be named explicitly now
+    // that mutation routing no longer falls back to the first schema table.
+    options: { defaultMutationTable: 'users' },
   };
 
   return new DrizzleAdapterClass(config);
