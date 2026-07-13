@@ -34,8 +34,9 @@ language, this policy wins.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001  | CI gates every package (typecheck, lint, tests) | P1 | S | 012+013 (DONE) | DONE (2026-07-13: reviewer APPROVED, merged to local main — paths cover all packages, Bun pinned 1.3.1, static-checks job w/ non-blocking lint, test-cli job, test-summary gates all four. First real CI run happens when the remote is restored) |
-| 002  | Stop mutations targeting the first schema table | P1 | M | — | IN PROGRESS (executor dispatched 2026-07-13 from `0bf6c24`) |
-| 003  | Fix join count inflation on MySQL/SQLite | P1 | S | — | TODO |
+| 002  | Stop mutations targeting the first schema table | P1 | M | — | DONE (2026-07-13: reviewer APPROVED — explicit `defaultMutationTable`, single-table auto, SchemaError-on-ambiguity surfaced unwrapped, honest meta.features, 14 tests incl. the wrong-table regression; merged to local main at `fb7654e`) |
+| 003  | Fix join count inflation on MySQL/SQLite | P1 | S | — | IN PROGRESS (executor dispatched 2026-07-13 from `fb7654e`) |
+| 015  | FilterNode core types + `c2:` wire format + CORE-06 fix | P1 | M–L | 004/006/014 (DONE) | IN PROGRESS (executor dispatched 2026-07-13; plan text delivered inline after a worktree-timing correction) |
 | 004  | Validate URL-deserialized state, fail closed | P1 | M | baseline (merged) | DONE (2026-07-13: reviewer APPROVED — `isFilterStateShape` boundary guard, fail-closed drops w/ value-free warnings, pagination clamping, 7 new tests (core 1007/0); merged to local main at `ce9f1ea`) |
 | 005  | Builder type inference end-to-end | P1 | L | 001 (DONE) | DONE (2026-07-13: merged to local main at `97cd354` — accessor/options infer real value types end-to-end, `defineColumns` replaces the `any` erasure at `BetterTable`, zero `as string` casts left in the demo; step 3 skipped per plan 011; changeset for `@better-tables/core`/`@better-tables/ui` minor) |
 | 006  | Design: contract v2 — typed registry + AND/OR groups | P1 | L (design) | 005 (DONE) | DONE (2026-07-13: merged to local main at `7fbc6f2` — design doc + experimental prototype + 11 type tests; registry derives from 011 `define()`; `.id()` literal-preservation flagged as follow-up blocker) |
