@@ -7,6 +7,7 @@ export * from './factory';
 export * from './filter';
 export * from './filter-operators';
 export * from './pagination';
+export * from './paths';
 export * from './selection';
 export * from './sorting';
 export * from './table';
