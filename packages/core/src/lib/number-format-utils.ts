@@ -43,6 +43,8 @@ export interface NumberInputConfig {
   max?: number;
   /** Step value */
   step?: number;
+  /** Whether stored percentage values are decimal (0–1) or already percentage (0–100) */
+  percentageFormat?: 'decimal' | 'percentage';
 }
 
 /**
@@ -62,6 +64,7 @@ export function formatNumberInput(
     useGrouping = true,
     prefix = '',
     suffix = '',
+    percentageFormat = 'decimal',
   } = config;
 
   if (value === null || value === undefined || value === '') {
@@ -94,6 +97,7 @@ export function formatNumberInput(
           minimumFractionDigits: minDecimals,
           maximumFractionDigits: maxDecimals ?? decimals,
           useGrouping,
+          format: percentageFormat,
         } as PercentageFormatConfig);
         break;
 
@@ -230,15 +234,32 @@ export function getNumberInputConfig(
       baseConfig.placeholder = 'Enter amount...';
       break;
 
-    case 'percentage':
+    case 'percentage': {
+      const percentageMeta = (columnMeta?.percentage ?? {}) as Record<string, unknown>;
       baseConfig.type = 'percentage';
-      baseConfig.decimals = getNumberValue(columnMeta || {}, 'decimals') ?? 2;
-      baseConfig.minDecimals = 0;
-      baseConfig.maxDecimals = 2;
+      baseConfig.locale =
+        getStringValue(percentageMeta, 'locale') ||
+        getStringValue(columnMeta || {}, 'locale') ||
+        baseConfig.locale;
+      baseConfig.decimals =
+        getNumberValue(percentageMeta, 'maximumFractionDigits') ??
+        getNumberValue(columnMeta || {}, 'decimals') ??
+        2;
+      baseConfig.minDecimals =
+        getNumberValue(percentageMeta, 'minimumFractionDigits') ??
+        getNumberValue(columnMeta || {}, 'minDecimals') ??
+        0;
+      baseConfig.maxDecimals =
+        getNumberValue(percentageMeta, 'maximumFractionDigits') ??
+        getNumberValue(columnMeta || {}, 'maxDecimals') ??
+        2;
+      baseConfig.percentageFormat =
+        getStringValue(percentageMeta, 'format') === 'percentage' ? 'percentage' : 'decimal';
       baseConfig.placeholder = 'Enter percentage...';
       baseConfig.min = 0;
       baseConfig.max = 100;
       break;
+    }
 
     default:
       baseConfig.type = 'number';

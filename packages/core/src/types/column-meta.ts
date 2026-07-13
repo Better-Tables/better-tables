@@ -97,6 +97,16 @@ export interface CurrencyFormatMeta extends NumberFormatMeta {
 }
 
 /**
+ * Percentage formatting metadata interface.
+ *
+ * Extends number formatting with percentage-specific storage semantics.
+ */
+export interface PercentageFormatMeta extends NumberFormatMeta {
+  /** Whether stored values are decimal (0–1) or already percentage (0–100) */
+  format?: 'decimal' | 'percentage';
+}
+
+/**
  * Date formatting metadata interface.
  *
  * Configures how date and time values are displayed, including
@@ -229,16 +239,7 @@ export type ColumnMeta = BaseColumnMeta & {
 
   // Percentage type formatting (for builder compatibility)
   /** Percentage formatting configuration */
-  percentage?: {
-    /** Custom format string */
-    format?: string;
-    /** Locale for formatting */
-    locale?: string;
-    /** Minimum decimal places */
-    minimumFractionDigits?: number;
-    /** Maximum decimal places */
-    maximumFractionDigits?: number;
-  };
+  percentage?: PercentageFormatMeta;
 
   // Currency type formatting (for builder compatibility)
   /** Currency formatting configuration */

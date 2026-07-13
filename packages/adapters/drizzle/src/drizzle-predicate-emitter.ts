@@ -101,6 +101,22 @@ export class DrizzlePredicateEmitter
    */
   private static readonly MAX_BATCHES_PER_GROUP = 200;
 
+  private assertPresentValueType(
+    value: unknown,
+    expected: 'string' | 'number',
+    operator: string
+  ): void {
+    if (typeof value === expected) {
+      return;
+    }
+
+    throw new QueryError(`Invalid filter value type: expected ${expected}`, {
+      operator,
+      expected,
+      received: typeof value,
+    });
+  }
+
   constructor(
     schema: Record<string, AnyTableType>,
     databaseType: DatabaseDriver,
@@ -151,25 +167,20 @@ export class DrizzlePredicateEmitter
     switch (operator) {
       case 'contains': {
         const value = values[0];
-        if (typeof value !== 'string') {
-          return undefined;
-        }
+        this.assertPresentValueType(value, 'string', operator);
         return this.getCaseInsensitiveLike(column, `%${value}%`);
       }
       case 'equals':
+        this.assertPresentValueType(values[0], 'string', operator);
         return eq(column, values[0]);
       case 'startsWith': {
         const value = values[0];
-        if (typeof value !== 'string') {
-          return undefined;
-        }
+        this.assertPresentValueType(value, 'string', operator);
         return this.getCaseInsensitiveLike(column, `${value}%`);
       }
       case 'endsWith': {
         const value = values[0];
-        if (typeof value !== 'string') {
-          return undefined;
-        }
+        this.assertPresentValueType(value, 'string', operator);
         return this.getCaseInsensitiveLike(column, `%${value}`);
       }
       case 'isEmpty':
@@ -177,6 +188,7 @@ export class DrizzlePredicateEmitter
       case 'isNotEmpty':
         return and(this.createIsNotNullCondition(column), not(eq(column, '')));
       case 'notEquals':
+        this.assertPresentValueType(values[0], 'string', operator);
         return not(eq(column, values[0]));
       default:
         return undefined;
@@ -210,11 +222,12 @@ export class DrizzlePredicateEmitter
     }
 
     // Type validation: Ensure numeric values are numbers
-    if (requiresSingleValue && typeof values[0] !== 'number') {
-      return undefined;
+    if (requiresSingleValue) {
+      this.assertPresentValueType(values[0], 'number', operator);
     }
-    if (requiresTwoValues && (typeof values[0] !== 'number' || typeof values[1] !== 'number')) {
-      return undefined;
+    if (requiresTwoValues) {
+      this.assertPresentValueType(values[0], 'number', operator);
+      this.assertPresentValueType(values[1], 'number', operator);
     }
 
     switch (operator) {

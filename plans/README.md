@@ -18,21 +18,22 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 13 plans (001–007, 011–016) — verification baseline, CI
-  gating, URL hardening, type-inference stack, FilterNode through core state,
-  adapter toolkit extraction, both design docs.
-- **Gates on main**: root typecheck 10/10 turbo tasks · core 1066/0 · toolkit
-  86/86 · drizzle 490 pass / 3 skip / 3 env-dependent (need DB URLs; CI provides)
-  · CLI 127/0.
+- **Done and merged**: 14 plans (001–007, 010–017) — verification baseline, CI
+  gating, URL hardening, type-inference stack, FilterNode through core state +
+  Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design docs.
+- **Gates on main**: root typecheck · core 1077/0 · toolkit 93/0 · drizzle SQLite
+  green (env DB suites skip without URLs) · CLI 127/0 · UI 7/0.
 - **In flight**: 018 (instance API runtime — executor running).
-- **Next up**: 018 (`betterTables()`/`defineTable` runtime).
+- **Maintainer backlog sweeps (uncommitted / parallel to 018)**: CORE-02, CORE-04
+  (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
+  alias-scan slice, date-presets Biome hygiene.
+- **Next up**: finish 018 (`betterTables()`/`defineTable` runtime).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
 | 018 | `betterTables()` instance + `defineTable` runtime (the 011 design's implementation: schema-aware `t.*` path builders, `$infer`, registry from `define()`) | 014 (DONE), 011+006 designs (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13. Deferred within it: aggregates, json-path, runtime enum options, RSC bridge, plugin hooks, ui `table=` prop, app migration |
-| 010 | UI hooks correctness (fetch race, url-sync leaks/hydration stub) + first UI test harness | 001 (DONE) | **DONE** — `ui-hooks-correctness` branch |
 | 019 | Migration guide for 0.6 (assemble all changeset "what breaks" sections; required by release policy) | all 0.6 work | PLAN TO BE WRITTEN — last before publish |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lifts of the hold | **ON HOLD** (maintainer) — last item on the board |
 
@@ -79,9 +80,8 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
   directives from emitted bundles; the global banner stays until the bundler
   preserves directives or the ui entry is restructured. Recorded in plan 009.
 - **CI**: first real run happens when the git remote is restored. Lint step is
-  `continue-on-error` until biome residue hits 0 (81 errors as of the 001 merge;
-  ~10 are plan 011's `experimental/`+fixture files — add pragmas or fix when the
-  prototype is promoted).
+  `continue-on-error` until biome residue hits 0. Marketing + docs + `packages/ui`
+  are Biome-clean as of 2026-07-13; remaining residue is mostly core/cli/adapters.
 - **Typecheck exclusions (recorded debt)**: none — `apps/docs` and `apps/marketing`
   both have `typecheck` scripts; `packages/ui` now has a `bun test` harness (plan 010).
 - **Changesets accumulate for one 0.6 train** — do not partially publish.
@@ -91,33 +91,37 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 
 ## Unplanned findings backlog (audited 2026-07-12; don't re-audit)
 
-Status key: still open unless noted.
+Status key: still open unless noted. Struck / FIXED lines stay so nobody re-files.
 
 - **ADAPTER-03** (L, biggest open correctness item): manual-join data queries
   paginate over row-multiplied results on one-to-many joins — pages under-fill
   even though 003 fixed `total`. Plan after 017 (query-builder layer is now
   stable post-007).
-- **ADAPTER-05** (M): primary-table resolver `break`s on first relationship match
-  + silent first-table fallback; FK name-guessing can bind wrong columns. Note:
-  resolver now lives in the toolkit (`packages/adapters/toolkit/src/primary-table-resolver.ts`).
+- **ADAPTER-05** (M): ~~primary-table resolver `break`s on first relationship
+  match~~ — **FIXED (alias-scan slice, 2026-07-13)**: only break after crediting
+  the matching `sourceTable`. Remaining: silent first-table fallback + FK
+  name-guessing can still bind wrong columns (`relationship-detector.ts`).
+  Resolver lives in toolkit (`packages/adapters/toolkit/src/primary-table-resolver.ts`).
 - **ADAPTER-06** (M): faceted values / min-max ignore active filters and inflate
   under joins. Adapter-contract widening — post-017.
-- **ADAPTER-07** (S–M): silent per-leaf filter drops on type mismatch (fail-open).
-  Core boundary now fails closed (004/015); the adapter-side leaf behavior moved
-  verbatim into `drizzle-predicate-emitter.ts` — fix there (throw on type
-  mismatch) now that the router exists.
-- **CORE-02** (S): percentage formatter guesses decimal-vs-percent (`value > 1`
-  heuristic) — needs an explicit config flag.
+- **ADAPTER-07**: ~~silent per-leaf filter drops on type mismatch (fail-open)~~ —
+  **FIXED (2026-07-13)**: `drizzle-predicate-emitter` throws `QueryError` on
+  present-but-wrong-type values; empty/missing still `undefined` for partial UI.
+- **CORE-02**: ~~percentage formatter `value > 1` heuristic~~ — **FIXED (2026-07-13)**:
+  wires `meta.percentage.format` (`decimal` | `percentage`); default `decimal`.
 - **CORE-03** (M): dynamic row measurement leaves downstream offsets stale
   (virtualization-manager recalculates only one row).
-- **CORE-04** (M): date formatter appends a timezone label without converting;
-  `locale` config is a no-op.
+- **CORE-04** (M): ~~`locale` no-op + TZ label without conversion~~ —
+  **PARTIALLY FIXED (2026-07-13)**: locale wired through date-fns locale map;
+  misleading TZ suffix removed. Remaining: real timezone conversion (needs
+  `date-fns-tz` or equivalent) — still open.
 - **CORE-06**: ~~compression renameKeys mangles user data~~ — **FIXED in 015**
   (structural-keys-only renaming + named regression test).
-- **CORE-07** (M): `updateState` emits several `state_changed` events per bulk
-  update → refetch waterfall on hydration; needs a batching flag.
+- **CORE-07**: ~~`updateState` multi-`state_changed` refetch waterfall~~ —
+  **FIXED (2026-07-13)**: `stateUpdateBatchDepth` coalesces bulk updates to one
+  `state_changed`; per-field events preserved.
 - **CORE-08** (M): six managers duplicate subscribe/notify with drifted error
-  policy; extract an emitter base.
+  policy; extract an emitter base. Defer until 018 merges (touches managers).
 - **CORE-09** (L): virtualization offset math O(n) per lookup; prefix-sum/Fenwick
   cache. Needs 010's harness first.
 - **CORE-10** (M): `includeNull`/`supportsNull` dead in validation — null-only
@@ -129,6 +133,8 @@ Status key: still open unless noted.
 - **DX-10** (M): enable `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`
   — now actionable (005 landed); blast radius still unmeasured.
 - **From 009**: per-component subpath exports for `@better-tables/ui`.
+- **Hygiene (2026-07-13)**: date-presets `getPresetById()!` assertions removed
+  (`presetsByIds` helper) — Biome `noNonNullAssertion` clean in that file.
 
 ## Considered and rejected (so nobody re-audits)
 

@@ -1,5 +1,13 @@
-import { format, formatDistance, formatRelative } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+import { format, formatDistance, formatRelative, type Locale } from 'date-fns';
+import { de } from 'date-fns/locale/de';
+import { enGB } from 'date-fns/locale/en-GB';
+import { enUS } from 'date-fns/locale/en-US';
+import { es } from 'date-fns/locale/es';
+import { fr } from 'date-fns/locale/fr';
+import { it } from 'date-fns/locale/it';
+import { ja } from 'date-fns/locale/ja';
+import { ptBR } from 'date-fns/locale/pt-BR';
+import { zhCN } from 'date-fns/locale/zh-CN';
 
 export interface DateFormatConfig {
   format?: string;
@@ -13,14 +21,51 @@ export interface DateFormatConfig {
   };
 }
 
+const LOCALE_MAP: Record<string, Locale> = {
+  'en-US': enUS,
+  en: enUS,
+  'en-GB': enGB,
+  'de-DE': de,
+  de: de,
+  'es-ES': es,
+  es: es,
+  'fr-FR': fr,
+  fr: fr,
+  'it-IT': it,
+  it: it,
+  'ja-JP': ja,
+  ja: ja,
+  'pt-BR': ptBR,
+  'zh-CN': zhCN,
+  zh: zhCN,
+};
+
 /**
- * Format a date according to column configuration
+ * Resolve a BCP 47 locale tag to a date-fns locale object.
+ * Falls back to en-US when the locale is unrecognized.
+ */
+export function resolveDateFnsLocale(locale?: string): Locale {
+  if (!locale) {
+    return enUS;
+  }
+
+  return LOCALE_MAP[locale] ?? LOCALE_MAP[locale.split('-')[0] ?? ''] ?? enUS;
+}
+
+/**
+ * Format a date according to column configuration.
+ *
+ * Note: `timeZone` is accepted for forward compatibility but is not applied
+ * as a conversion (that requires a timezone library). Appending a bare TZ
+ * label without converting would be misleading, so it is ignored for now.
  */
 export function formatDateWithConfig(
   date: Date | null | undefined,
   config: DateFormatConfig
 ): string {
   if (!date) return '';
+
+  const locale = resolveDateFnsLocale(config.locale);
 
   try {
     // Handle relative time formatting
@@ -29,30 +74,18 @@ export function formatDateWithConfig(
       const options = config.relativeOptions;
 
       if (options?.style === 'short') {
-        return formatDistance(date, now, { addSuffix: true, locale: enUS });
+        return formatDistance(date, now, { addSuffix: true, locale });
       }
 
-      return formatRelative(date, now, { locale: enUS });
+      return formatRelative(date, now, { locale });
     }
 
     // Handle standard date formatting
     const formatString = config.format || (config.showTime ? 'PPpp' : 'PPP');
 
-    // Use date-fns format with locale support
-    let formattedDate = format(date, formatString, {
-      locale: enUS, // For now, we'll use enUS. Later we can add locale support
-    });
-
-    // Add timezone information if configured
-    if (config.timeZone && config.showTime) {
-      const timeZoneShort =
-        config.timeZone === 'UTC' ? 'UTC' : config.timeZone.split('/').pop() || config.timeZone;
-      formattedDate += ` (${timeZoneShort})`;
-    }
-
-    return formattedDate;
+    return format(date, formatString, { locale });
   } catch (_error) {
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(config.locale);
   }
 }
 
@@ -98,22 +131,23 @@ export function formatDateRange(
   if (!from) return '';
 
   const formatString = getDateRangeFormat(config);
+  const locale = resolveDateFnsLocale(config.locale);
 
   try {
     if (!to) {
-      return format(from, formatString, { locale: enUS });
+      return format(from, formatString, { locale });
     }
 
     // If same day, show only one date
     if (isSameDay(from, to)) {
-      return format(from, formatString, { locale: enUS });
+      return format(from, formatString, { locale });
     }
 
     // Different days, show range
-    return `${format(from, formatString, { locale: enUS })} - ${format(to, formatString, {
-      locale: enUS,
+    return `${format(from, formatString, { locale })} - ${format(to, formatString, {
+      locale,
     })}`;
   } catch (_error) {
-    return `${from.toLocaleDateString()}${to ? ` - ${to.toLocaleDateString()}` : ''}`;
+    return `${from.toLocaleDateString(config.locale)}${to ? ` - ${to.toLocaleDateString(config.locale)}` : ''}`;
   }
 }

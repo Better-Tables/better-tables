@@ -171,6 +171,35 @@ describe('PrimaryTableResolver', () => {
 
       expect(primaryTable).toBe('surveys');
     });
+
+    it('should not stop scanning when a matching alias belongs to a different source table', () => {
+      // Duplicate alias "owner" under two source tables. Object key order puts
+      // the wrong table first so a premature break would under-count surveys.
+      const relationshipsWithCollision: RelationshipMap = {
+        'assignments.owner': {
+          from: 'assignments',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'userId',
+          cardinality: 'one' as const,
+        },
+        'surveys.owner': {
+          from: 'surveys',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'userId',
+          cardinality: 'one' as const,
+        },
+      };
+
+      const resolver = new PrimaryTableResolver(schema, relationshipsWithCollision);
+      // slug+status+owner.email => surveys has 3 matches; assignments only 1
+      // (owner). A premature break after assignments.owner would leave surveys
+      // with only 2 and could pick the wrong table under other column mixes.
+      const primaryTable = resolver.resolve(['slug', 'status', 'owner.email']);
+
+      expect(primaryTable).toBe('surveys');
+    });
   });
 
   describe('Edge Cases', () => {

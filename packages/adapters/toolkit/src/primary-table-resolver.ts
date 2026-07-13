@@ -186,8 +186,10 @@ export class PrimaryTableResolver<TTable = unknown> {
               const sourceTable = relKey.split('.')[0];
               if (sourceTable === tableName) {
                 count++;
+                // Only stop once we've credited this table — a matching alias
+                // under a different source table must not abort the scan.
+                break;
               }
-              break;
             }
           }
         }

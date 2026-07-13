@@ -297,49 +297,55 @@ export function createCustomPreset(
  * Get common presets for different use cases
  */
 export function getCommonPresets(): DatePreset[] {
-  return [
-    getPresetById('today')!,
-    getPresetById('yesterday')!,
-    getPresetById('last-7-days')!,
-    getPresetById('last-30-days')!,
-    getPresetById('this-week')!,
-    getPresetById('this-month')!,
-    getPresetById('last-week')!,
-    getPresetById('last-month')!,
-  ].filter((preset): preset is DatePreset => preset !== undefined);
+  return presetsByIds([
+    'today',
+    'yesterday',
+    'last-7-days',
+    'last-30-days',
+    'this-week',
+    'this-month',
+    'last-week',
+    'last-month',
+  ]);
 }
 
 /**
  * Get business-focused presets
  */
 export function getBusinessPresets(): DatePreset[] {
-  return [
-    getPresetById('today')!,
-    getPresetById('this-week')!,
-    getPresetById('this-month')!,
-    getPresetById('last-7-days')!,
-    getPresetById('last-30-days')!,
-    getPresetById('last-90-days')!,
-    getPresetById('last-week')!,
-    getPresetById('last-month')!,
-    getPresetById('this-year')!,
-    getPresetById('last-year')!,
-  ].filter(Boolean);
+  return presetsByIds([
+    'today',
+    'this-week',
+    'this-month',
+    'last-7-days',
+    'last-30-days',
+    'last-90-days',
+    'last-week',
+    'last-month',
+    'this-year',
+    'last-year',
+  ]);
 }
 
 /**
  * Get analytics-focused presets
  */
 export function getAnalyticsPresets(): DatePreset[] {
-  return [
-    getPresetById('today')!,
-    getPresetById('yesterday')!,
-    getPresetById('last-7-days')!,
-    getPresetById('last-30-days')!,
-    getPresetById('last-90-days')!,
-    getPresetById('this-month')!,
-    getPresetById('last-month')!,
-  ].filter(Boolean);
+  return presetsByIds([
+    'today',
+    'yesterday',
+    'last-7-days',
+    'last-30-days',
+    'last-90-days',
+    'this-month',
+    'last-month',
+  ]);
+}
+
+function presetsByIds(ids: readonly string[]): DatePreset[] {
+  return ids
+    .map((id) => getPresetById(id))
+    .filter((preset): preset is DatePreset => preset !== undefined);
 }
 
 /**

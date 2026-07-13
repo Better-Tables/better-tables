@@ -214,6 +214,8 @@ export class TableStateManager<TData = unknown> {
   private cachedColumnVisibility: ColumnVisibility | null = null;
   private cachedColumnOrder: ColumnOrder | null = null;
   private lastNotifiedState: TableState | null = null;
+  private stateUpdateBatchDepth = 0;
+  private pendingStateChanged = false;
 
   constructor(
     columns: ColumnDefinition<TData>[],
@@ -559,7 +561,9 @@ export class TableStateManager<TData = unknown> {
    * Useful for initialization or syncing from external sources (like URL)
    */
   updateState(updates: Partial<TableState>): void {
-    if (updates.filters !== undefined) {
+    this.stateUpdateBatchDepth++;
+    try {
+      if (updates.filters !== undefined) {
       // Tree-preserving (rule 4): TableState.filters is the real stored
       // value, so a hydrated FilterGroupNode tree (e.g. from a c2: URL)
       // must flow through unflattened. setFilterNode delegates flat arrays
@@ -651,7 +655,14 @@ export class TableStateManager<TData = unknown> {
       });
     }
 
-    this.notifyStateChanged();
+      this.notifyStateChanged();
+    } finally {
+      this.stateUpdateBatchDepth--;
+      if (this.stateUpdateBatchDepth === 0 && this.pendingStateChanged) {
+        this.pendingStateChanged = false;
+        this.flushStateChanged();
+      }
+    }
   }
 
   /**
@@ -705,7 +716,7 @@ export class TableStateManager<TData = unknown> {
    * Notify subscribers of complete state change
    * Only notifies if state has actually changed (deep equality)
    */
-  private notifyStateChanged(): void {
+  private flushStateChanged(): void {
     const currentState = this.getState();
 
     // Only notify if state has actually changed
@@ -713,6 +724,15 @@ export class TableStateManager<TData = unknown> {
       this.lastNotifiedState = currentState;
       this.notifySubscribers({ type: 'state_changed', state: currentState });
     }
+  }
+
+  private notifyStateChanged(): void {
+    if (this.stateUpdateBatchDepth > 0) {
+      this.pendingStateChanged = true;
+      return;
+    }
+
+    this.flushStateChanged();
   }
 
   // ============================================================================

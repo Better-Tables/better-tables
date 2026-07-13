@@ -15,6 +15,7 @@ import {
   getFilterValueAsNumber,
   getFormatterForType,
   getNumberFormat,
+  getPercentageFormat,
   getOperatorDefinition,
   truncateText,
 } from '@better-tables/core';
@@ -480,16 +481,16 @@ function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisp
     case 'percentage': {
       const val0 = getFilterValueAsNumber(filter, 0);
       const val1 = getFilterValueAsNumber(filter, 1);
-      const numFormat = getNumberFormat(column.meta);
+      const percentageFormat = getPercentageFormat(column.meta);
 
       if (filter.operator === 'between' || filter.operator === 'notBetween') {
         return (
           <span>
-            {formatPercentage(val0, numFormat)} - {formatPercentage(val1, numFormat)}
+            {formatPercentage(val0, percentageFormat)} - {formatPercentage(val1, percentageFormat)}
           </span>
         );
       }
-      return <span>{formatPercentage(val0, numFormat)}</span>;
+      return <span>{formatPercentage(val0, percentageFormat)}</span>;
     }
 
     case 'date': {

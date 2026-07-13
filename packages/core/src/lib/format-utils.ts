@@ -19,7 +19,8 @@ export interface CurrencyFormatConfig extends NumberFormatConfig {
 }
 
 export interface PercentageFormatConfig extends NumberFormatConfig {
-  // Inherits all number formatting options
+  /** Whether stored values are decimal (0–1) or already percentage (0–100). Default: 'decimal'. */
+  format?: 'decimal' | 'percentage';
 }
 
 /**
@@ -106,12 +107,11 @@ export function formatPercentage(
     maximumFractionDigits = 1,
     useGrouping = true,
     notation = 'standard',
+    format = 'decimal',
   } = config;
 
   try {
-    // Assume value is already in percentage form (e.g., 85 for 85%)
-    // If it's in decimal form (e.g., 0.85), multiply by 100
-    const percentValue = value > 1 ? value : value * 100;
+    const fractionForIntl = format === 'percentage' ? value / 100 : value;
 
     return new Intl.NumberFormat(locale, {
       style: 'percent',
@@ -119,7 +119,7 @@ export function formatPercentage(
       maximumFractionDigits,
       useGrouping,
       notation,
-    }).format(percentValue / 100);
+    }).format(fractionForIntl);
   } catch (_error) {
     return `${value}%`;
   }
@@ -267,10 +267,10 @@ export function getFormatterForType(
         ...((meta?.currencyFormat as Record<string, unknown>) || {}),
       });
     case 'percentage':
-      return formatPercentage(
-        typeof value === 'number' ? value : null,
-        meta?.numberFormat as Record<string, unknown>
-      );
+      return formatPercentage(typeof value === 'number' ? value : null, {
+        ...((meta?.numberFormat as Record<string, unknown>) || {}),
+        ...((meta?.percentage as Record<string, unknown>) || {}),
+      });
     case 'email':
       return formatEmail(typeof value === 'string' ? value : null);
     case 'url':

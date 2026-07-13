@@ -480,7 +480,7 @@ describe('FilterHandler - JSONB Support', () => {
     const relationshipManager = new RelationshipManager(schema, {});
     const handler = new FilterHandler(schema, relationshipManager, 'postgres');
 
-    it('should return undefined for non-string values in text operators', () => {
+    it('should throw for non-string values in text operators', () => {
       const filter: FilterState = {
         columnId: 'survey.title',
         operator: 'contains',
@@ -488,13 +488,10 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'text',
       };
 
-      // buildFilterCondition now returns undefined for type mismatches
-      // This allows callers to handle invalid inputs gracefully
-      const condition = handler.buildFilterCondition(filter, 'surveys');
-      expect(condition).toBeUndefined();
+      expect(() => handler.buildFilterCondition(filter, 'surveys')).toThrow(QueryError);
     });
 
-    it('should return undefined for non-number values in number operators', () => {
+    it('should throw for non-number values in number operators', () => {
       const filter: FilterState = {
         columnId: 'survey.count',
         operator: 'greaterThan',
@@ -502,10 +499,7 @@ describe('FilterHandler - JSONB Support', () => {
         type: 'number',
       };
 
-      // buildFilterCondition now returns undefined for type mismatches
-      // This allows callers to handle invalid inputs gracefully
-      const condition = handler.buildFilterCondition(filter, 'surveys');
-      expect(condition).toBeUndefined();
+      expect(() => handler.buildFilterCondition(filter, 'surveys')).toThrow(QueryError);
     });
 
     it('should accept valid string values for text operators', () => {

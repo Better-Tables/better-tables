@@ -12,6 +12,7 @@ import type {
   CurrencyFormatMeta,
   DateFormatMeta,
   NumberFormatMeta,
+  PercentageFormatMeta,
   TextFormatMeta,
 } from '../types/column-meta';
 
@@ -68,6 +69,18 @@ export function getCurrencyFormat(meta?: ColumnMeta): CurrencyFormatMeta {
   return {
     ...meta?.numberFormat,
     ...meta?.currencyFormat,
+  };
+}
+
+/**
+ * Safely get percentage format metadata from column metadata.
+ *
+ * Merges number format defaults with percentage-specific settings.
+ */
+export function getPercentageFormat(meta?: ColumnMeta): PercentageFormatMeta {
+  return {
+    ...meta?.numberFormat,
+    ...meta?.percentage,
   };
 }
 

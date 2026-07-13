@@ -648,6 +648,29 @@ describe('TableStateManager', () => {
       manager = new TableStateManager(mockColumns);
     });
 
+    it('should emit only one state_changed event during bulk updateState', () => {
+      manager.setTotal(100);
+      manager.subscribe(mockSubscriber);
+
+      manager.updateState({
+        filters: [
+          {
+            columnId: 'name',
+            type: 'text' as const,
+            operator: 'equals' as const,
+            values: ['John'],
+          },
+        ],
+        pagination: { page: 2, limit: 10, totalPages: 10, hasNext: true, hasPrev: true },
+        sorting: [{ columnId: 'age', direction: 'asc' as const }],
+      });
+
+      const stateChangedEvents = mockSubscriber.mock.calls.filter(
+        (call) => call[0].type === 'state_changed'
+      );
+      expect(stateChangedEvents).toHaveLength(1);
+    });
+
     it('should update state with partial updates', () => {
       // Set total first so page 3 is valid
       manager.setTotal(100);

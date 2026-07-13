@@ -6,6 +6,7 @@ import {
   getDateFormat,
   getNumberFormat,
   getOptionColors,
+  getPercentageFormat,
   getTextFormat,
 } from '../../src/utils/meta-accessors';
 
@@ -134,6 +135,28 @@ describe('Meta Accessors', () => {
 
       expect(format).toEqual({
         locale: 'en-US',
+      });
+    });
+  });
+
+  describe('getPercentageFormat', () => {
+    it('should merge numberFormat and percentage settings', () => {
+      const meta: ColumnMeta = {
+        numberFormat: {
+          locale: 'en-US',
+          useGrouping: true,
+        },
+        percentage: {
+          format: 'percentage',
+          maximumFractionDigits: 1,
+        },
+      };
+
+      expect(getPercentageFormat(meta)).toEqual({
+        locale: 'en-US',
+        useGrouping: true,
+        format: 'percentage',
+        maximumFractionDigits: 1,
       });
     });
   });
