@@ -36,14 +36,27 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   changeset + MIGRATION §11). User fix-ups (React-19 pin supersession,
   ui `unbundle: true` killing the global "use client" banner) verified
   coherent — 41/41 dist files carry per-file directives.
-- **In flight**: 020-ORDER fix (`fix-fanout-order-reconciliation`), 029
-  marketing showcase (`marketing-showcase`, from WIP at `b1300d7`).
+- **020-ORDER fix MERGED (2026-07-13)**: phase-2 fan-out rows now stably
+  reordered to phase-1's authoritative key order (O(n) key→index map; phase-2
+  ORDER BY kept for intra-group order). 3 regression tests (multi-column repro,
+  tie, empty-sort — the latter two lock the contract; they pass pre-fix on
+  SQLite only by scan-order luck and guard pg/mysql).
+- **INFRA (2026-07-13, diagnosed during review)**: bun ≥1.3.11's isolated
+  linker (adopted by the bun.lock regen at `e8a677d`) races its own
+  node_modules re-linking against turbo-spawned `bun run` tasks — tsc reads
+  workspace symlinks mid-relink and fails with bogus TS2307s (flaky root
+  typecheck). Fixed by `bunfig.toml` pinning `linker = "hoisted"` + clean
+  reinstall. Separately: `apps/marketing` typecheck is bare `tsc --noEmit`
+  and can be poisoned by a stale `.next/types/validator.ts` referencing
+  deleted routes — `rm -rf apps/marketing/.next` clears it; consider
+  prepending `next typegen` like apps/docs (backlog).
+- **In flight**: 029 marketing showcase (`marketing-showcase`, from WIP at
+  `b1300d7`).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 020-ORDER | Fan-out pagination: reorder phase-2 groups by phase-1 key order (multi-column-sort / tie / empty-sort inconsistency) | 020 (merged) | IN PROGRESS — surgical executor dispatched 2026-07-13 |
 | 029 | Marketing showcase examples as DX dogfood (4 example pages + `plans/findings/029-dx-findings.md`) | 018–028 merged | IN PROGRESS — builds on maintainer WIP (`marketing-examples-wip` @ `b1300d7`); every workaround logged as a library finding |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
