@@ -3,7 +3,7 @@
 > **Type-safe, database-agnostic table library for React** with advanced filtering, sorting, and virtual scrolling. Stop writing boilerplate. Start shipping features.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
+[![React](https://img.shields.io/badge/React-19+-blue.svg)](https://reactjs.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -67,14 +67,21 @@ No manual query building. No JOIN syntax to memorize. Just define your columns, 
 bun add @better-tables/core
 
 # Choose an adapter
-bun add @better-tables/adapters-drizzle  # or @better-tables/adapters-rest
+bun add @better-tables/adapters-drizzle
 ```
 
+The UI components aren't published to npm — they're copied directly into your project with the CLI (shadcn-style), so you own and can customize the source:
+
+```bash
+bunx better-tables init
+```
+
+`init` requires an existing [shadcn/ui](https://ui.shadcn.com) setup (`components.json`) and copies the table/filter components, hooks, and stores into your project (default: `components/better-tables-ui/`), rewriting imports to match your project's aliases. See [`@better-tables/cli`](packages/cli/README.md) for options.
+
 ### Your First Table
- 
+
 ```tsx
-// TODO: UI package will a CLI and is on the roadmap
-import { BetterTable } from '@better-tables/ui';
+import { BetterTable } from '@/components/better-tables-ui/table/table';
 import { createColumnBuilder } from '@better-tables/core';
 
 interface User {
@@ -194,16 +201,6 @@ const result = await adapter.fetchData({
 });
 ```
 
-#### REST Adapter
-```tsx
-import { RestAdapter } from '@better-tables/adapters-rest';
-
-const adapter = new RestAdapter({
-  baseUrl: '/api/users',
-  headers: { Authorization: `Bearer ${token}` },
-});
-```
-
 ### Virtual Scrolling for Large Datasets
 
 Render millions of rows efficiently with built-in virtualization.
@@ -284,25 +281,23 @@ Better Tables is built as a monorepo with clear separation of concerns:
 better-tables/
 ├── packages/
 │   ├── core/              # Type system, builders, managers
-│   ├── ui/                # React components & hooks
+│   ├── ui/                # React components & hooks (distributed via the CLI)
+│   ├── cli/               # `better-tables init` - copies ui components into your project
 │   └── adapters/          # Database adapters
-│       ├── drizzle/       # Drizzle ORM integration
-│       │   ├── relationship-detector.ts
-│       │   ├── query-builder.ts     # Automatic JOIN generation
-│       │   └── schema-inference.ts  # Detect relationships
-│       ├── memory/        # In-memory adapter (testing)
-│       └── rest/         # REST API adapter (coming soon)
-├── apps/
-│   └── demo/             # Live demo application
-└── docs/                 # Comprehensive documentation
+│       └── drizzle/       # Drizzle ORM integration
+│           ├── relationship-detector.ts
+│           ├── query-builder.ts     # Automatic JOIN generation
+│           └── schema-inference.ts  # Detect relationships
+└── apps/
+    └── demo/             # Live demo application
 ```
 
 ### Package Overview
 
 - **@better-tables/core** - Type-safe builders, managers, and utilities
-- **@better-tables/ui** - Production-ready React components with shadcn/ui
+- **@better-tables/ui** - Production-ready React components with shadcn/ui, copied into your project via the CLI
+- **@better-tables/cli** - `better-tables init` - copies and wires up the UI components
 - **@better-tables/adapters-drizzle** - **Automatic relationship detection and JOIN generation**
-- **@better-tables/adapters-memory** - In-memory adapter for testing and demos
 
 ### How Automatic Relationships Work
 
@@ -327,25 +322,13 @@ Each package is independently versioned and can be used standalone or together.
 
 ## 📖 Documentation
 
-- **[Getting Started](docs/GETTING_STARTED.md)** - Installation and basic setup
-- **[User Guide](docs/core/USER_GUIDE.md)** - Complete feature reference
-- **[Architecture](docs/ARCHITECTURE.md)** - Design decisions and system overview
-- **[API Reference](docs/core/TYPES_API_REFERENCE.md)** - Complete API documentation
-- **[Contributing](docs/CONTRIBUTING.md)** - How to contribute to Better Tables
-
-### Package Documentation
-
 - **[@better-tables/core](packages/core/README.md)** - Core package with builders and managers
 - **[@better-tables/ui](packages/ui/README.md)** - React components and hooks
+- **[@better-tables/cli](packages/cli/README.md)** - The `init` command and its options
 - **[@better-tables/adapters-drizzle](packages/adapters/drizzle/README.md)** - Drizzle ORM adapter
+  - [Advanced Usage Guide](packages/adapters/drizzle/docs/ADVANCED_USAGE.md)
+- **[URL State Sync](packages/ui/docs/URL_SYNC.md)** - Framework-agnostic URL synchronization
 - **[Demo App](apps/demo/README.md)** - Complete working example
-
-### Quick Links
-
-- [Column Builders Guide](docs/core/COLUMN_BUILDERS_GUIDE.md)
-- [Adapters Architecture](docs/adapters/ADAPTERS_ARCHITECTURE.md)
-- [Filter Components Reference](docs/ui/FILTER_COMPONENTS_REFERENCE.md)
-- [State Management](docs/STATE_MANAGEMENT_ARCHITECTURE.md)
 
 ---
 
@@ -456,7 +439,7 @@ Better Tables is in active development, and we'd love your help! Whether you're 
 - **Performance**: Optimization for even larger datasets
 - **Accessibility**: WCAG compliance improvements
 
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
+See the "How to Contribute" steps above, and open an issue first for larger changes.
 
 ---
 
@@ -491,7 +474,6 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 - [ ] Advanced analytics and aggregations
 - [ ] Plugin system for custom features
 - [ ] Official examples for Remix, Vite, CRA
-- [ ] UI package CLI for component generation
 
 ---
 
@@ -500,11 +482,15 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 | Package | Status | Description |
 |---------|--------|-------------|
 | `@better-tables/core` | ✅ Ready | Core functionality and types |
-| `@better-tables/ui` | ✅ Ready | React components and hooks |
+| `@better-tables/ui` | ✅ Ready | React components and hooks, distributed via the CLI (not on npm) |
+| `@better-tables/cli` | ✅ Ready | `better-tables init` - copies UI components into your project |
 | `@better-tables/adapters-drizzle` | ✅ Ready | Drizzle ORM integration |
-| `@better-tables/adapters-memory` | ✅ Ready | In-memory testing adapter |
-| `@better-tables/adapters-rest` | 🚧 In Progress | REST API adapter |
-| `@better-tables/pro` | 📋 Planned | Premium features |
+
+### Roadmap (not yet started)
+
+- REST API adapter
+- In-memory adapter for testing and demos
+- A premium/pro features package
 
 ---
 

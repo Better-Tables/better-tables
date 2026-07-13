@@ -21,6 +21,45 @@
 - **Category**: dx / docs
 - **Planned at**: commit `55dfd01`, 2026-07-12
 
+## Deferred until plan 007
+
+Finish these after plan 007 merges (007 owns root `tsconfig.json` and
+`packages/adapters/drizzle/package.json`). Checklist:
+
+- [ ] **Step 2 — prune phantom tsconfig paths**: remove `@better-tables/memory` and
+  `@better-tables/pro` (and any other non-existent package paths) from root
+  `tsconfig.json` `paths`. Verify:
+  `grep -nE "adapters-rest|better-tables/pro|@better-tables/memory" tsconfig.json` → 0.
+- [ ] **Step 5 — drizzle dependency classes**: move `drizzle-orm` / `better-sqlite3`
+  out of `dependencies` into the correct peer/devDep slots per the plan body.
+  Verify: they are **not** in `dependencies`. Add/adjust changeset if needed.
+- [ ] **Step 7 remainder — drizzle `sideEffects`**: set `"sideEffects": false` on
+  `packages/adapters/drizzle/package.json` (core+ui already done). Confirm no
+  bare side-effect imports under that package's `src/`.
+- [ ] Re-run Done-criteria greps that still fail today (tsconfig phantoms, drizzle
+  deps, drizzle `sideEffects`), then mark this plan DONE in `plans/README.md`.
+
+Do **not** touch those files on `dx-hygiene-sweep` while 007 is in flight.
+
+## Step 7 outcome (2026-07-13)
+
+- `"sideEffects": false` landed on `packages/core/package.json` and
+  `packages/ui/package.json` (drizzle still deferred, see above). No bare
+  side-effect or CSS imports found in either package's `src/`.
+- **Banner removal reverted — blocker recorded.** Removing the global
+  `banner: { js: '"use client";' }` from `packages/ui/tsdown.config.ts` and
+  relying on the 45 existing per-file `'use client'` directives causes
+  rolldown (via tsdown v0.16.6) to drop the directive from the emitted
+  `dist/index.mjs` / `dist/index.cjs` entirely — it survives only in the
+  `.map` files, not the actual bundle. Confirmed via `grep -c "use client"
+  dist/index.mjs dist/index.cjs` → 0 with the banner removed, vs. 1/1 with
+  it restored. Per the plan's STOP condition, the banner removal was
+  reverted; `packages/ui` ships with the global banner unchanged. Do not
+  retry this sub-change without confirming a tsdown/rolldown fix for
+  directive-preserving output, or restructuring the entry so files
+  requiring `"use client"` build as separate outputs.
+
+
 ## Why this matters
 
 The first five minutes of a new user's experience currently fail: the README quick-start imports a package that is `"private": true` and not on npm, links to a `docs/` directory that doesn't exist, and advertises `memory`/`rest`/`pro` packages that aren't in the repo. The flagship CLI onboarding command prints nothing — it exits code 1 with no message on every failure path. The Drizzle adapter forces every consumer (including Postgres users) to compile the native `better-sqlite3` addon and bundles its own copy of `drizzle-orm`, and the UI package defeats tree-shaking and RSC usage. For a project whose stated goal is "the best DX in the world," these are the cheapest, highest-visibility wins in the repo.
