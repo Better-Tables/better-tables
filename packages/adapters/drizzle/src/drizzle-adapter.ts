@@ -60,12 +60,16 @@ import type {
   ExportResult,
   FetchDataParams,
   FetchDataResult,
+  FilterGroupNode,
+  FilterNode,
   FilterOperator,
   FilterOption,
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
+import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import { collectFilterLeaves } from './filter-handler';
 import { getOperationsFactory } from './operations';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
@@ -465,15 +469,25 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       // Merge columns that need to be fetched for computed fields
       const finalColumns = [...columnsWithoutComputed, ...columnsToFetch];
 
-      // Handle computed field filtering
-      let processedFilters = [...(this.requireFlatFilters(params.filters) || [])];
+      // Handle computed field filtering. `params.filters` may be a flat
+      // FilterState[] (implicit AND) or a FilterGroupNode tree (plan 017);
+      // normalizeIncomingFilters validates/normalizes a tree at this public
+      // API boundary (depth cap, dropping malformed nodes) and leaves a flat
+      // array untouched. Computed-field filter substitution below only
+      // understands the flat shape (computed fields are not real columns, so
+      // matching/replacing them inside an arbitrary AND/OR tree is out of
+      // scope for this plan) — it's skipped entirely when filters is a tree.
+      let processedFilters: FilterState[] | FilterGroupNode =
+        this.normalizeIncomingFilters(params.filters) ?? [];
       const computedFieldFilters: Array<{ filter: FilterState; config: ComputedFieldConfig }> = [];
       const additionalSqlConditions: (SQL | SQLWrapper)[] = [];
 
-      for (const filter of processedFilters) {
-        const computedField = tableComputedFields.find((cf) => cf.field === filter.columnId);
-        if (computedField?.filter || computedField?.filterSql) {
-          computedFieldFilters.push({ filter, config: computedField });
+      if (Array.isArray(processedFilters)) {
+        for (const filter of processedFilters) {
+          const computedField = tableComputedFields.find((cf) => cf.field === filter.columnId);
+          if (computedField?.filter || computedField?.filterSql) {
+            computedFieldFilters.push({ filter, config: computedField });
+          }
         }
       }
 
@@ -547,11 +561,14 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
           }
         }
 
-        // Remove computed field filters and add replacements
-        processedFilters = processedFilters.filter(
-          (f) => !computedFieldFilters.some((cff) => cff.filter === f)
-        );
-        processedFilters.push(...replacementFilters);
+        // Remove computed field filters and add replacements. Only reached
+        // when processedFilters is a flat array (computedFieldFilters is
+        // only ever populated in that branch above).
+        if (Array.isArray(processedFilters)) {
+          processedFilters = processedFilters
+            .filter((f) => !computedFieldFilters.some((cff) => cff.filter === f))
+            .concat(replacementFilters);
+        }
 
         // Update cache params with processed filters
         cacheParams.filters = processedFilters;
@@ -1214,10 +1231,16 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       features,
       supportedColumnTypes,
       supportedOperators,
-      // Truthful capability flag (design core-contract-v2.md §1.5): filter
-      // groups are rejected, not translated, until plan 017 lands. Paired
-      // with the requireFlatFilters guard in fetchData/getJoinCount.
-      supportsFilterGroups: false,
+      // Truthful capability flag (design core-contract-v2.md §1.5, plan 017):
+      // the adapter translates FilterNode/FilterGroupNode trees to real
+      // AND/OR SQL (base-query-builder.ts's applyFilters ->
+      // FilterHandler.buildTreeCondition). maxGroupDepth mirrors core's own
+      // default nesting cap (utils/type-guards.ts) and is enforced again on
+      // entry in normalizeIncomingFilters -- defense in depth over core's
+      // URL-boundary normalization, since fetchData is a public API callers
+      // hit directly with unnormalized trees.
+      supportsFilterGroups: true,
+      maxGroupDepth: 3,
       ...customMeta,
     };
   }
@@ -1325,29 +1348,83 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
 
   /**
-   * Reject-by-default guard for the widened `FetchDataParams.filters`
-   * (`FilterState[] | FilterGroupNode`, contract v2,
-   * `plans/design/core-contract-v2.md` §1.5): this adapter does not yet
-   * translate AND/OR filter-group trees (`meta.supportsFilterGroups` is
-   * `false`), and silently flattening a group into an implicit AND would
-   * return a WRONG (narrower) result set with no signal -- so a group input
-   * is rejected loudly instead. Group translation lands in a follow-up plan
-   * (plan 017), which replaces this guard with a recursive walk.
+   * Depth of a {@link FilterNode}'s group nesting: a leaf is depth 0; a group
+   * whose children are all leaves is depth 1; each further level of nested
+   * groups adds 1. Mirrors the depth-counting convention core's own
+   * `isFilterNodeShape`/`normalizeFilterNode` use (`utils/type-guards.ts`,
+   * design §1.2 -- root group is depth 1, one nested group is depth 2, ...).
    *
-   * @param filters - The raw `FetchDataParams.filters` value
-   * @returns The flat filter array unchanged (or `undefined` when absent)
-   * @throws {QueryError} If `filters` is a `FilterGroupNode` tree
+   * Used by {@link normalizeIncomingFilters} to detect an over-deep tree on
+   * the RAW input, before `normalizeFilterNode` would otherwise silently
+   * prune it -- see that method's docs for why a loud reject beats a silent
+   * drop here.
    */
-  private requireFlatFilters(
+  private computeGroupDepth(node: FilterNode): number {
+    if (!isFilterGroupNode(node) || !Array.isArray(node.children)) {
+      return 0;
+    }
+    let maxChildDepth = 0;
+    for (const child of node.children) {
+      const childDepth = this.computeGroupDepth(child);
+      if (childDepth > maxChildDepth) {
+        maxChildDepth = childDepth;
+      }
+    }
+    return 1 + maxChildDepth;
+  }
+
+  /**
+   * Validate and normalize the widened `FetchDataParams.filters`
+   * (`FilterState[] | FilterGroupNode`, contract v2,
+   * `plans/design/core-contract-v2.md` §1.5) at this public API boundary
+   * (plan 017).
+   *
+   * @description
+   * `fetchData` is called directly by callers with unnormalized trees --
+   * core's URL-boundary normalization (`normalizeFilterNode` in
+   * `FilterManager`/`TableStateManager`) does not run for programmatic API
+   * calls. Two failure modes need defense in depth, not the same treatment:
+   *
+   * - **Over-deep nesting** (beyond this adapter's advertised
+   *   `maxGroupDepth`): core's own `normalizeFilterNode` would silently PRUNE
+   *   the over-deep subtree, changing the result set with no signal. That's
+   *   the right call for untrusted URL input (design §1.4's fail-closed
+   *   table), but wrong for a public API boundary the caller controls
+   *   directly -- so depth is checked FIRST, on the raw tree, and rejected
+   *   loudly with a `QueryError` naming the cap.
+   * - **Everything else `normalizeFilterNode` handles** (unknown `logic`,
+   *   non-array `children`, invalid leaves, empty/single-child groups):
+   *   delegated to core's normalization unchanged, once depth is known to be
+   *   within bounds.
+   *
+   * A flat `FilterState[]` (or `undefined`) is returned unchanged -- it
+   * can't violate depth (no nesting) and fetchData never normalized flat
+   * arrays before this plan either.
+   *
+   * @throws {QueryError} If a `FilterGroupNode` tree nests deeper than
+   *   `meta.maxGroupDepth`
+   */
+  private normalizeIncomingFilters(
     filters: FetchDataParams['filters']
-  ): FilterState[] | undefined {
+  ): FilterState[] | FilterGroupNode | undefined {
     if (filters === undefined || Array.isArray(filters)) {
       return filters;
     }
-    throw new QueryError(
-      'Filter groups are not yet supported by the Drizzle adapter (supportsFilterGroups: false); pass a flat FilterState[]. Group translation lands in a follow-up plan.',
-      { supportsFilterGroups: false }
-    );
+
+    const maxGroupDepth = this.meta.maxGroupDepth ?? 3;
+    const depth = this.computeGroupDepth(filters);
+    if (depth > maxGroupDepth) {
+      throw new QueryError(
+        `Filter group nesting depth ${depth} exceeds this adapter's maxGroupDepth of ${maxGroupDepth}`,
+        { depth, maxGroupDepth }
+      );
+    }
+
+    const normalized = normalizeFilterNode(filters);
+    if (normalized === null) {
+      return [];
+    }
+    return isFilterGroupNode(normalized) ? normalized : [normalized];
   }
 
   private getJoinCount(
@@ -1370,13 +1447,16 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       .filter((sort) => !computedFieldNames.includes(sort.columnId))
       .map((sort) => ({ columnId: sort.columnId }));
 
+    // Flatten tree filters to leaves so a leaf nested inside a group still
+    // contributes its JOIN to the count -- must agree with buildCompleteQuery's
+    // own context (base-query-builder.ts), or `total` and page contents would
+    // diverge under OR queries (plan 017 emphasis: count/data agreement).
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: columnsForContext,
-        filters:
-          this.requireFlatFilters(params.filters)?.map((filter) => ({
-            columnId: filter.columnId,
-          })) || [],
+        filters: collectFilterLeaves(params.filters).map((filter) => ({
+          columnId: filter.columnId,
+        })),
         sorts: sortsForContext,
       },
       primaryTable

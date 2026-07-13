@@ -16,7 +16,7 @@ import {
   getPrimaryKeyMap,
   quoteIdentifier as quoteIdentifierRaw,
 } from '@better-tables/adapters-toolkit';
-import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
+import type { FilterGroupNode, FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import {
   and,
@@ -32,7 +32,7 @@ import {
   sql,
   sum,
 } from 'drizzle-orm';
-import { FilterHandler } from '../filter-handler';
+import { collectFilterLeaves, FilterHandler } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
   AggregateFunction,
@@ -465,30 +465,43 @@ export abstract class BaseQueryBuilder {
   /**
    * Apply filters to query
    *
-   * NOTE(plan-017): this flat collect-then-and(...) is the seam where the
-   * recursive AND/OR filter-group walk from the contract-v2 design doc
-   * (plans/design/core-contract-v2.md §1.5) will slot in: a FilterNode tree
-   * replaces the flat FilterState[] here, leaves resolve through
-   * FilterHandler.buildFilterCondition, and groups combine recursively via
-   * and()/or() by node logic. The router/emitter split (plan 007 step 4)
-   * already keeps condition COMBINATION at this layer, with leaf predicate
-   * construction behind the PredicateEmitter interface.
+   * Handles both shapes `FetchDataParams.filters` accepts (design
+   * `plans/design/core-contract-v2.md` §1.5, plan 017): a flat `FilterState[]`
+   * (implicit AND — the existing per-filter path via
+   * `FilterHandler.handleCrossTableFilters`, unchanged) or a `FilterGroupNode`
+   * tree, which recurses through `FilterHandler.buildTreeCondition` and
+   * combines child conditions via `and()`/`or()` by each node's `logic`. The
+   * router/emitter split (plan 007 step 4) keeps condition COMBINATION at
+   * this layer either way, with leaf predicate construction behind the
+   * `PredicateEmitter` interface.
    */
   applyFilters(
     query: QueryBuilderWithJoins,
-    filters: FilterState[],
+    filters: FilterState[] | FilterGroupNode,
     primaryTable: string,
     additionalConditions?: (SQL | SQLWrapper)[]
   ): QueryBuilderWithJoins {
     const allConditions: (SQL | SQLWrapper)[] = [];
 
-    // Add conditions from regular filters
-    if (filters && filters.length > 0) {
-      const { conditions } = this.filterHandler.handleCrossTableFilters(filters, primaryTable);
-      const validConditions = conditions.filter(
-        (condition): condition is SQL | SQLWrapper => condition !== undefined
-      );
-      allConditions.push(...validConditions);
+    // Add conditions from regular filters. `filters` is falsy-tolerant
+    // (null/undefined) for the same reason the pre-plan-017 flat path was --
+    // callers historically pass `filters || []` and some (including this
+    // class's own test suite) still pass a bare `null`.
+    if (filters) {
+      if (Array.isArray(filters)) {
+        if (filters.length > 0) {
+          const { conditions } = this.filterHandler.handleCrossTableFilters(filters, primaryTable);
+          const validConditions = conditions.filter(
+            (condition): condition is SQL | SQLWrapper => condition !== undefined
+          );
+          allConditions.push(...validConditions);
+        }
+      } else {
+        const condition = this.filterHandler.buildTreeCondition(filters, primaryTable);
+        if (condition !== undefined) {
+          allConditions.push(condition);
+        }
+      }
     }
 
     // Add additional SQL conditions (e.g., from computed field filterSql)
@@ -772,7 +785,7 @@ export abstract class BaseQueryBuilder {
    */
   buildCompleteQuery(params: {
     columns?: string[];
-    filters?: FilterState[];
+    filters?: FilterState[] | FilterGroupNode;
     sorting?: SortingParams[];
     pagination?: PaginationParams;
     primaryTable: string;
@@ -795,10 +808,15 @@ export abstract class BaseQueryBuilder {
         ?.filter((sort) => !computedFieldNames.includes(sort.columnId))
         .map((sort) => ({ columnId: sort.columnId })) || [];
 
+    // Join planning must see every leaf's columnId, including ones nested
+    // inside a FilterGroupNode tree (plan 017) — collectFilterLeaves flattens
+    // either shape so a leaf buried in a group still contributes its JOIN.
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],
-        filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
+        filters: collectFilterLeaves(params.filters).map((filter) => ({
+          columnId: filter.columnId,
+        })),
         sorts: sortsForContext,
       },
       params.primaryTable
