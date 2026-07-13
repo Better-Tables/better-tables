@@ -11,7 +11,10 @@
  * @since 1.0.0 (expanded to support all MySQL drivers in 1.1.0)
  */
 
-import { generateAlias } from '@better-tables/adapters-toolkit';
+import {
+  generateAlias,
+  quoteIdentifier as quoteIdentifierRaw,
+} from '@better-tables/adapters-toolkit';
 import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { MySqlColumn, MySqlTable } from 'drizzle-orm/mysql-core';
 import type { RelationshipManager } from '../relationship-manager';
@@ -382,7 +385,7 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
    * Quote SQL identifier for MySQL (uses backticks)
    */
   protected quoteIdentifier(identifier: string): SQL {
-    return sql.raw(`\`${identifier}\``);
+    return sql.raw(quoteIdentifierRaw(identifier, '`'));
   }
 
   buildMinMaxQuery<TColumnId extends string>(

@@ -29,4 +29,4 @@ export { SchemaError } from './types';
 export { generateAlias, generatePathAlias, generatePathKey } from './utils/alias-generator';
 export { calculateLevenshteinDistance } from './utils/levenshtein';
 export { getPrimaryKeyInfo, getPrimaryKeyMap } from './utils/schema-introspection';
-export { escapeSqlIdentifier } from './utils/sql-utils';
+export { escapeSqlIdentifier, quoteIdentifier } from './utils/sql-utils';

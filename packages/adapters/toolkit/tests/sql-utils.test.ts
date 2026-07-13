@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { escapeSqlIdentifier } from '../src/utils/sql-utils';
+import { escapeSqlIdentifier, quoteIdentifier } from '../src/utils/sql-utils';
 
 describe('escapeSqlIdentifier', () => {
   describe('Default quote character (double quote)', () => {
@@ -107,6 +107,36 @@ describe('escapeSqlIdentifier', () => {
       const malicious = 'name"; DROP TABLE users; --';
       const escaped = escapeSqlIdentifier(malicious);
       expect(escaped).toBe('name""; DROP TABLE users; --');
+    });
+  });
+});
+
+describe('quoteIdentifier', () => {
+  describe('PostgreSQL / SQLite (double-quote dialects)', () => {
+    it('wraps a plain identifier in double quotes', () => {
+      expect(quoteIdentifier('user_name', '"')).toBe('"user_name"');
+    });
+
+    it('doubles an embedded double quote and wraps the result', () => {
+      // ADAPTER-04: escaping and wrapping are now a single call — this is
+      // the case that used to depend on the *caller* pre-escaping with the
+      // right quote char before calling the dialect's quoteIdentifier.
+      expect(quoteIdentifier('user"name', '"')).toBe('"user""name"');
+    });
+  });
+
+  describe('MySQL (backtick dialect)', () => {
+    it('wraps a plain identifier in backticks', () => {
+      expect(quoteIdentifier('user_name', '`')).toBe('`user_name`');
+    });
+
+    it('doubles an embedded backtick and wraps the result', () => {
+      expect(quoteIdentifier('user`name', '`')).toBe('`user``name`');
+    });
+
+    it('does not double an embedded double quote when quoting with backticks', () => {
+      // Only the dialect's own quote character gets escaped.
+      expect(quoteIdentifier('user"name', '`')).toBe('`user"name`');
     });
   });
 });

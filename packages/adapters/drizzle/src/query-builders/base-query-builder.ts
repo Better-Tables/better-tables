@@ -12,7 +12,6 @@
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import {
   calculateLevenshteinDistance,
-  escapeSqlIdentifier,
   generateAlias,
   generatePathKey,
   getPrimaryKeyMap,
@@ -211,12 +210,12 @@ export abstract class BaseQueryBuilder {
       if (computedField?.__resolvedSortSql !== undefined) {
         // The SQL expression is already in SELECT with an alias matching the field name
         // We reference it by the field name (which matches the alias)
-        // Use database-specific identifier quoting (delegated to subclasses)
-        // Note: The alias comes from a validated computed field name, not user input.
-        // The escaping prevents issues if the field name contains quote characters.
+        // Use database-specific identifier quoting (delegated to subclasses).
+        // Note: The alias comes from a validated computed field name, not user
+        // input. Escaping now happens inside quoteIdentifier() itself (ADAPTER-04)
+        // so it can never be skipped or done with the wrong dialect's quote char.
         const alias = sort.columnId;
-        const escapedAlias = escapeSqlIdentifier(alias);
-        const orderByExpression = this.quoteIdentifier(escapedAlias);
+        const orderByExpression = this.quoteIdentifier(alias);
         return sort.direction === 'desc' ? desc(orderByExpression) : asc(orderByExpression);
       }
 

@@ -13,7 +13,10 @@
  * @since 1.0.0 (expanded to support all PostgreSQL drivers in 1.1.0)
  */
 
-import { generateAlias } from '@better-tables/adapters-toolkit';
+import {
+  generateAlias,
+  quoteIdentifier as quoteIdentifierRaw,
+} from '@better-tables/adapters-toolkit';
 import {
   and,
   count,
@@ -720,7 +723,7 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
    * Quote SQL identifier for PostgreSQL (uses double quotes)
    */
   protected quoteIdentifier(identifier: string): SQL {
-    return sql.raw(`"${identifier}"`);
+    return sql.raw(quoteIdentifierRaw(identifier, '"'));
   }
 
   buildMinMaxQuery<TColumnId extends string>(

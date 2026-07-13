@@ -12,7 +12,10 @@
  * @since 1.0.0 (expanded to support all SQLite drivers in 1.1.0)
  */
 
-import { generateAlias } from '@better-tables/adapters-toolkit';
+import {
+  generateAlias,
+  quoteIdentifier as quoteIdentifierRaw,
+} from '@better-tables/adapters-toolkit';
 import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { RelationshipManager } from '../relationship-manager';
@@ -423,7 +426,7 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
    * Quote SQL identifier for SQLite (uses double quotes)
    */
   protected quoteIdentifier(identifier: string): SQL {
-    return sql.raw(`"${identifier}"`);
+    return sql.raw(quoteIdentifierRaw(identifier, '"'));
   }
 
   buildMinMaxQuery<TColumnId extends string>(
