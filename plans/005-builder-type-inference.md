@@ -20,6 +20,7 @@
 - **Depends on**: 001 (CI gate — this change needs typecheck running everywhere)
 - **Category**: dx
 - **Planned at**: commit `55dfd01`, 2026-07-12
+- **Completed**: 2026-07-13 at `c830997` (+ changeset/README commit) — Steps 1, 2, 4, 5, 6 done; Step 3 skipped per plan 011 (see Step 3 note). All done criteria verified: no `ColumnDefinition<TData, any>` in `table.tsx`, no `as string` casts in the demo columns, root typecheck/build green (build excludes the pre-existing, unrelated `apps/web` docs-page failure — see Step 6 report), core test suite 1011/0 including `tests/types/builder-inference.test.ts`.
 
 ## Why this matters
 
