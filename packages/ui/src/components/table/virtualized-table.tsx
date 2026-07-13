@@ -3,7 +3,7 @@
 import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
 import { getColumnStyle } from '@better-tables/core';
 import type React from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
 import { cn } from '../../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -78,7 +78,10 @@ interface VirtualizedRowProps<T> {
     rowIndex: number
   ) => React.ReactNode;
   onRowClick?: (item: T, index: number) => void;
-  onMeasure: (height: number) => void;
+  /** Stable across parent re-renders — takes the row's own index so a
+   * single top-level callback can serve every row (see `onMeasure` in
+   * `VirtualizedTable`). */
+  onMeasure: (rowIndex: number, height: number) => void;
 }
 
 function VirtualizedRow<T>({
@@ -92,6 +95,12 @@ function VirtualizedRow<T>({
 }: VirtualizedRowProps<T>) {
   const rowRef = useRef<HTMLTableRowElement>(null);
 
+  // Ref-latch `index` so the measurement effect's only dependency is
+  // `onMeasure`. Without this, a recycled row slot's changing `index`
+  // would tear down and reconstruct the ResizeObserver on every scroll.
+  const indexRef = useRef(index);
+  indexRef.current = index;
+
   // Measure row height when content changes
   useEffect(() => {
     const row = rowRef.current;
@@ -99,14 +108,14 @@ function VirtualizedRow<T>({
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        onMeasure(entry.contentRect.height);
+        onMeasure(indexRef.current, entry.contentRect.height);
       }
     });
 
     resizeObserver.observe(row);
 
     // Initial measurement
-    onMeasure(row.offsetHeight);
+    onMeasure(indexRef.current, row.offsetHeight);
 
     return () => resizeObserver.disconnect();
   }, [onMeasure]);
@@ -139,6 +148,43 @@ function VirtualizedRow<T>({
     </TableRow>
   );
 }
+
+/**
+ * `styles.getRowStyle()` (`useVirtualization`) allocates a new object on
+ * every call, so `style` is never referentially equal across renders even
+ * when the row's actual position/height didn't change. Compare it by value
+ * instead of falling back to `React.memo`'s default shallow-by-reference
+ * check, which would otherwise re-render every row on every parent render
+ * regardless of the other props' stability.
+ */
+function areVirtualizedRowPropsEqual<T>(
+  prev: Readonly<VirtualizedRowProps<T>>,
+  next: Readonly<VirtualizedRowProps<T>>
+): boolean {
+  return (
+    prev.item === next.item &&
+    prev.index === next.index &&
+    prev.columns === next.columns &&
+    prev.renderCell === next.renderCell &&
+    prev.onRowClick === next.onRowClick &&
+    prev.onMeasure === next.onMeasure &&
+    prev.style.top === next.style.top &&
+    prev.style.left === next.style.left &&
+    prev.style.right === next.style.right &&
+    prev.style.height === next.style.height
+  );
+}
+
+/**
+ * Memoized so an unrelated parent re-render (e.g. from a scroll-adjacent
+ * state update) doesn't re-render every visible row — this only helps if
+ * `item`/`columns`/`renderCell`/`onRowClick`/`onMeasure` stay referentially
+ * stable across renders where nothing the row actually displays changed.
+ */
+const MemoizedVirtualizedRow = memo(
+  VirtualizedRow,
+  areVirtualizedRowPropsEqual
+) as typeof VirtualizedRow;
 
 /**
  * High-performance virtualized table component for large datasets
@@ -192,12 +238,17 @@ export function VirtualizedTable<T = unknown>({
   const { virtualRows, containerRef, contentRef, actions, styles, metrics, utils } =
     useVirtualization(virtualizationConfig);
 
-  // Handle row measurements for dynamic heights
-  const handleRowMeasure = (rowIndex: number) => (height: number) => {
-    if (dynamicRowHeight) {
-      actions.measureRow(rowIndex, height);
-    }
-  };
+  // Single stable measure callback shared by every row (instead of a new
+  // per-row closure on every render) so each row's ResizeObserver effect
+  // only depends on an identity that doesn't change across re-renders.
+  const onMeasure = useCallback(
+    (rowIndex: number, height: number) => {
+      if (dynamicRowHeight) {
+        actions.measureRow(rowIndex, height);
+      }
+    },
+    [dynamicRowHeight, actions]
+  );
 
   // Calculate column widths for horizontal scrolling
   const totalWidth = useMemo(() => {
@@ -312,7 +363,7 @@ export function VirtualizedTable<T = unknown>({
                 }
 
                 return (
-                  <VirtualizedRow
+                  <MemoizedVirtualizedRow
                     key={virtualRow.index}
                     item={item}
                     index={virtualRow.index}
@@ -320,7 +371,7 @@ export function VirtualizedTable<T = unknown>({
                     style={rowStyle}
                     renderCell={renderCell}
                     onRowClick={onRowClick}
-                    onMeasure={handleRowMeasure(virtualRow.index)}
+                    onMeasure={onMeasure}
                   />
                 );
               })}

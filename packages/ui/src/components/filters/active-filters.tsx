@@ -14,8 +14,8 @@ import {
   getFilterValueAsDate,
   getFilterValueAsNumber,
   getFormatterForType,
-  getPercentageFormat,
   getOperatorDefinition,
+  getPercentageFormat,
   truncateText,
 } from '@better-tables/core';
 import { Lock, X } from 'lucide-react';
@@ -69,11 +69,17 @@ function ActiveFiltersComponent<TData = unknown>({
 
           return (
             <div key={filter.columnId} className="shrink-0">
+              {/* Pass `onUpdateFilter`/`onRemoveFilter` straight through
+               * instead of wrapping them in a per-filter arrow — a fresh
+               * closure here on every render would defeat
+               * `MemoizedFilterBadge` even when the caller's callbacks are
+               * themselves stable. `FilterBadge` takes `filter.columnId`
+               * itself and forwards it to the (single, stable) handler. */}
               <MemoizedFilterBadge
                 filter={filter}
                 column={column}
-                onUpdate={(updates) => onUpdateFilter(filter.columnId, updates)}
-                onRemove={() => onRemoveFilter(filter.columnId)}
+                onUpdate={onUpdateFilter}
+                onRemove={onRemoveFilter}
                 isProtected={isProtected}
                 disabled={disabled}
               />
@@ -91,8 +97,10 @@ export const ActiveFilters = React.memo(ActiveFiltersComponent) as typeof Active
 interface FilterBadgeProps<TData = unknown> {
   filter: FilterState;
   column: ColumnDefinition<TData>;
-  onUpdate: (updates: Partial<FilterState>) => void;
-  onRemove: () => void;
+  /** Takes the target filter's `columnId` so a single stable handler can
+   * serve every badge (see `ActiveFiltersComponent`). */
+  onUpdate: (columnId: string, updates: Partial<FilterState>) => void;
+  onRemove: (columnId: string) => void;
   isProtected: boolean;
   disabled?: boolean;
 }
@@ -255,7 +263,7 @@ function FilterBadge<TData = unknown>({
           <FilterOperatorSelect
             column={column}
             value={filter.operator}
-            onChange={(operator) => onUpdate({ operator })}
+            onChange={(operator) => onUpdate(filter.columnId, { operator })}
             disabled={disabled || isProtected}
           />
           {isProtected && (
@@ -290,9 +298,9 @@ function FilterBadge<TData = unknown>({
               <FilterValueInput
                 filter={filter}
                 column={column}
-                onChange={(values) => onUpdate({ values })}
-                onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
-                onOperatorChange={(operator) => onUpdate({ operator })}
+                onChange={(values) => onUpdate(filter.columnId, { values })}
+                onIncludeNullChange={(includeNull) => onUpdate(filter.columnId, { includeNull })}
+                onOperatorChange={(operator) => onUpdate(filter.columnId, { operator })}
                 disabled={disabled || isProtected}
               />
               {isProtected && (
@@ -319,9 +327,9 @@ function FilterBadge<TData = unknown>({
               <FilterValueInput
                 filter={filter}
                 column={column}
-                onChange={(values) => onUpdate({ values })}
-                onIncludeNullChange={(includeNull) => onUpdate({ includeNull })}
-                onOperatorChange={(operator) => onUpdate({ operator })}
+                onChange={(values) => onUpdate(filter.columnId, { values })}
+                onIncludeNullChange={(includeNull) => onUpdate(filter.columnId, { includeNull })}
+                onOperatorChange={(operator) => onUpdate(filter.columnId, { operator })}
                 disabled={disabled || isProtected}
               />
               {isProtected && (
@@ -344,7 +352,7 @@ function FilterBadge<TData = unknown>({
         <Button
           variant="ghost"
           className="h-full rounded-none rounded-r-lg px-2 py-1.5 hover:bg-muted"
-          onClick={onRemove}
+          onClick={() => onRemove(filter.columnId)}
           disabled={disabled}
           aria-label={`Remove ${column.displayName} filter`}
         >

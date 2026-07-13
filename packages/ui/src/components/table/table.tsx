@@ -17,7 +17,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   useTableColumnOrder,
   useTableColumnVisibility,
@@ -142,6 +142,134 @@ export interface BetterTableProps<TData = unknown>
    */
   isFilterProtected?: (filter: FilterState) => boolean;
 }
+
+/** Ref-latch a frequently-changing callback/value prop so a `useEffect` (or
+ * memoized callback) depending on it only needs `[ref]`/no deps at all,
+ * rather than re-running whenever the caller passes a new function
+ * identity for the same logical callback. */
+function useLatest<T>(value: T): React.RefObject<T> {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+interface TableRowComponentProps<TData> {
+  row: TData;
+  rowId: string;
+  index: number;
+  isSelected: boolean;
+  visibleColumns: ColumnDefinition<TData, unknown>[];
+  shouldShowRowSelection: boolean;
+  clickable: boolean;
+  onActivate: (row: TData) => void;
+  onToggleSelection: (rowId: string, selected: boolean) => void;
+}
+
+function TableRowComponent<TData>({
+  row,
+  rowId,
+  index,
+  isSelected,
+  visibleColumns,
+  shouldShowRowSelection,
+  clickable,
+  onActivate,
+  onToggleSelection,
+}: TableRowComponentProps<TData>) {
+  return (
+    <TableRow
+      className={cn(isSelected && 'bg-muted/50', clickable && 'cursor-pointer')}
+      onClick={() => onActivate(row)}
+      onKeyDown={(e) => {
+        if (clickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onActivate(row);
+        }
+      }}
+      tabIndex={clickable ? 0 : undefined}
+      role={clickable ? 'button' : undefined}
+      aria-label={clickable ? `Row ${index + 1}: Click to view details` : undefined}
+    >
+      {shouldShowRowSelection && (
+        <TableCell
+          className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
+          style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={(checked) => onToggleSelection(rowId, checked === true)}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.map((column) => {
+        const value = column.accessor(row);
+
+        return (
+          <TableCell
+            key={column.id}
+            className={cn(
+              column.align === 'center' && 'text-center',
+              column.align === 'right' && 'text-right'
+            )}
+          >
+            {column.cellRenderer
+              ? column.cellRenderer({
+                  value,
+                  row,
+                  column,
+                  rowIndex: index,
+                })
+              : (() => {
+                  const formatted = getFormatterForType(column.type, value, column.meta);
+                  const truncateConfig = column.meta?.truncate as
+                    | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                    | undefined;
+
+                  // Show tooltip for truncated text if showTooltip is enabled
+                  if (truncateConfig?.showTooltip && value != null) {
+                    const originalValue = String(value);
+                    const maxLen = truncateConfig.maxLength || 50;
+                    const isTruncated = originalValue.length > maxLen;
+
+                    if (isTruncated) {
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span className="cursor-help truncate max-w-full inline-block" />
+                            }
+                          >
+                            {formatted}
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <div className="wrap-break-word whitespace-pre-wrap text-pretty">
+                              {originalValue}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                  }
+
+                  return <span>{formatted}</span>;
+                })()}
+          </TableCell>
+        );
+      })}
+    </TableRow>
+  );
+}
+
+/**
+ * Memoized so a state change affecting one row (e.g. selection) doesn't
+ * re-render every other row. This only bails out when `row`/`visibleColumns`
+ * stay referentially stable across renders where nothing the row displays
+ * changed — see `BetterTable` for how `onActivate`/`onToggleSelection` are
+ * kept stable via `useCallback` (ref-latched for `onActivate`, so an
+ * unstable `onRowClick`/`rowConfig.onClick` from the consumer doesn't
+ * defeat the memoization either).
+ */
+const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
 
 export function BetterTable<TData = unknown>({
   // Core table config (minus adapter)
@@ -308,30 +436,41 @@ export function BetterTable<TData = unknown>({
     }
   }, [store, totalCount]);
 
-  // Call optional callbacks when state changes
-  useEffect(() => {
-    onFiltersChange?.(filters);
-  }, [filters, onFiltersChange]);
+  // Call optional callbacks when state changes. Each callback is
+  // ref-latched so the bridge effect's only dependency is the VALUE that
+  // changed — an unstable inline callback identity from the consumer (e.g.
+  // `onFiltersChange={(f) => ...}` recreated every parent render) no longer
+  // refires the bridge on its own.
+  const onFiltersChangeRef = useLatest(onFiltersChange);
+  const onSortingChangeRef = useLatest(onSortingChange);
+  const onPaginationChangeRef = useLatest(onPaginationChange);
+  const onPageChangeRef = useLatest(onPageChange);
+  const onPageSizeChangeRef = useLatest(onPageSizeChange);
+  const onSelectionChangeRef = useLatest(onSelectionChange);
 
   useEffect(() => {
-    onSortingChange?.(sortingState);
-  }, [sortingState, onSortingChange]);
+    onFiltersChangeRef.current?.(filters);
+  }, [filters, onFiltersChangeRef]);
 
   useEffect(() => {
-    onPaginationChange?.(pagination);
-  }, [pagination, onPaginationChange]);
+    onSortingChangeRef.current?.(sortingState);
+  }, [sortingState, onSortingChangeRef]);
 
   useEffect(() => {
-    onPageChange?.(pagination.page);
-  }, [pagination.page, onPageChange]);
+    onPaginationChangeRef.current?.(pagination);
+  }, [pagination, onPaginationChangeRef]);
 
   useEffect(() => {
-    onPageSizeChange?.(pagination.limit);
-  }, [pagination.limit, onPageSizeChange]);
+    onPageChangeRef.current?.(pagination.page);
+  }, [pagination.page, onPageChangeRef]);
 
   useEffect(() => {
-    onSelectionChange?.(selectedRows);
-  }, [selectedRows, onSelectionChange]);
+    onPageSizeChangeRef.current?.(pagination.limit);
+  }, [pagination.limit, onPageSizeChangeRef]);
+
+  useEffect(() => {
+    onSelectionChangeRef.current?.(selectedRows);
+  }, [selectedRows, onSelectionChangeRef]);
 
   // Auto-show/hide columns based on filters
   const previousFiltersRef = React.useRef<FilterState[]>([]);
@@ -354,22 +493,25 @@ export function BetterTable<TData = unknown>({
       (col) => !currentFilteredColumns.has(col)
     );
 
-    // Show newly filtered columns
-    if (newlyFilteredColumns.length > 0) {
-      const newVisibility = { ...columnVisibility };
+    // Show newly filtered columns and/or hide columns that had filters
+    // removed (only if not in defaultVisibleColumns). Read the CURRENT
+    // visibility straight from the store instead of the subscribed
+    // `columnVisibility` above, and deliberately leave it out of this
+    // effect's deps — the store's `setColumnVisibility` action only takes a
+    // plain object (no functional-updater form), so reading fresh state at
+    // fire-time is how this effect avoids depending on the very value it
+    // writes. Depending on `columnVisibility` here previously made this
+    // effect re-fire on its own `setColumnVisibility` call.
+    if (newlyFilteredColumns.length > 0 || unfilteredColumns.length > 0) {
+      const newVisibility = { ...store.getState().columnVisibility };
       for (const columnId of newlyFilteredColumns) {
         newVisibility[columnId] = true;
       }
-      setColumnVisibility(newVisibility);
-    }
-
-    // Hide columns that had filters removed (only if not in defaultVisibleColumns)
-    if (unfilteredColumns.length > 0 && defaultVisibleColumns) {
-      const newVisibility = { ...columnVisibility };
-      for (const columnId of unfilteredColumns) {
-        // Only hide if it's not in defaultVisibleColumns
-        if (!defaultVisibleColumns.includes(columnId)) {
-          newVisibility[columnId] = false;
+      if (defaultVisibleColumns) {
+        for (const columnId of unfilteredColumns) {
+          if (!defaultVisibleColumns.includes(columnId)) {
+            newVisibility[columnId] = false;
+          }
         }
       }
       setColumnVisibility(newVisibility);
@@ -377,13 +519,7 @@ export function BetterTable<TData = unknown>({
 
     // Update ref for next comparison
     previousFiltersRef.current = filters;
-  }, [
-    autoShowFilteredColumns,
-    filters,
-    columnVisibility,
-    setColumnVisibility,
-    defaultVisibleColumns,
-  ]);
+  }, [autoShowFilteredColumns, filters, defaultVisibleColumns, setColumnVisibility, store]);
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
@@ -445,6 +581,21 @@ export function BetterTable<TData = unknown>({
     },
     [data, getRowId, selectAll, clearSelection]
   );
+
+  // Row activation (click/Enter/Space) bridges to two parent-supplied
+  // callbacks. Ref-latch both so this stays a single stable callback across
+  // renders — passed straight into `MemoizedTableRow`, whose memoization
+  // would otherwise be defeated by a fresh `onClick` closure every render.
+  const onRowClickRef = useLatest(onRowClick);
+  const rowConfigOnClickRef = useLatest(rowConfig?.onClick);
+  const handleRowActivate = useCallback(
+    (row: TData) => {
+      onRowClickRef.current?.(row);
+      rowConfigOnClickRef.current?.(row);
+    },
+    [onRowClickRef, rowConfigOnClickRef]
+  );
+  const rowsClickable = Boolean(onRowClick || rowConfig?.onClick);
 
   // Clear filters handler
   const handleClearFilters = useCallback(() => {
@@ -801,101 +952,18 @@ export function BetterTable<TData = unknown>({
               const isSelected = selectedRows.has(rowId);
 
               return (
-                <TableRow
+                <MemoizedTableRow
                   key={rowId}
-                  className={cn(isSelected && 'bg-muted/50', onRowClick && 'cursor-pointer')}
-                  onClick={() => {
-                    onRowClick?.(row);
-                    rowConfig?.onClick?.(row);
-                  }}
-                  onKeyDown={(e) => {
-                    if (onRowClick || rowConfig?.onClick) {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onRowClick?.(row);
-                        rowConfig?.onClick?.(row);
-                      }
-                    }
-                  }}
-                  tabIndex={onRowClick || rowConfig?.onClick ? 0 : undefined}
-                  role={onRowClick || rowConfig?.onClick ? 'button' : undefined}
-                  aria-label={
-                    onRowClick || rowConfig?.onClick
-                      ? `Row ${index + 1}: Click to view details`
-                      : undefined
-                  }
-                >
-                  {shouldShowRowSelection && (
-                    <TableCell
-                      className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
-                      style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleRowSelection(rowId, checked === true)}
-                      />
-                    </TableCell>
-                  )}
-                  {visibleColumns.map((column) => {
-                    const value = column.accessor(row);
-
-                    return (
-                      <TableCell
-                        key={column.id}
-                        className={cn(
-                          column.align === 'center' && 'text-center',
-                          column.align === 'right' && 'text-right'
-                        )}
-                      >
-                        {column.cellRenderer
-                          ? column.cellRenderer({
-                              value,
-                              row,
-                              column,
-                              rowIndex: index,
-                            })
-                          : (() => {
-                              const formatted = getFormatterForType(
-                                column.type,
-                                value,
-                                column.meta
-                              );
-                              const truncateConfig = column.meta?.truncate as
-                                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
-                                | undefined;
-
-                              // Show tooltip for truncated text if showTooltip is enabled
-                              if (truncateConfig?.showTooltip && value != null) {
-                                const originalValue = String(value);
-                                const maxLen = truncateConfig.maxLength || 50;
-                                const isTruncated = originalValue.length > maxLen;
-
-                                if (isTruncated) {
-                                  return (
-                                    <Tooltip>
-                                      <TooltipTrigger
-                                        render={
-                                          <span className="cursor-help truncate max-w-full inline-block" />
-                                        }
-                                      >
-                                        {formatted}
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="max-w-xs">
-                                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
-                                          {originalValue}
-                                        </div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                }
-                              }
-
-                              return <span>{formatted}</span>;
-                            })()}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
+                  row={row}
+                  rowId={rowId}
+                  index={index}
+                  isSelected={isSelected}
+                  visibleColumns={visibleColumns}
+                  shouldShowRowSelection={shouldShowRowSelection}
+                  clickable={rowsClickable}
+                  onActivate={handleRowActivate}
+                  onToggleSelection={handleRowSelection}
+                />
               );
             })}
           </TableBody>
