@@ -17,7 +17,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   useTableColumnOrder,
   useTableColumnVisibility,
@@ -143,6 +143,16 @@ export interface BetterTableProps<TData = unknown>
   isFilterProtected?: (filter: FilterState) => boolean;
 }
 
+/** Ref-latch a frequently-changing callback/value prop so a `useEffect` (or
+ * memoized callback) depending on it only needs `[ref]`/no deps at all,
+ * rather than re-running whenever the caller passes a new function
+ * identity for the same logical callback. */
+function useLatest<T>(value: T): React.RefObject<T> {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
 interface TableRowComponentProps<TData> {
   row: TData;
   rowId: string;
@@ -255,7 +265,9 @@ function TableRowComponent<TData>({
  * re-render every other row. This only bails out when `row`/`visibleColumns`
  * stay referentially stable across renders where nothing the row displays
  * changed — see `BetterTable` for how `onActivate`/`onToggleSelection` are
- * kept stable via `useCallback`.
+ * kept stable via `useCallback` (ref-latched for `onActivate`, so an
+ * unstable `onRowClick`/`rowConfig.onClick` from the consumer doesn't
+ * defeat the memoization either).
  */
 const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
 
@@ -424,30 +436,41 @@ export function BetterTable<TData = unknown>({
     }
   }, [store, totalCount]);
 
-  // Call optional callbacks when state changes
-  useEffect(() => {
-    onFiltersChange?.(filters);
-  }, [filters, onFiltersChange]);
+  // Call optional callbacks when state changes. Each callback is
+  // ref-latched so the bridge effect's only dependency is the VALUE that
+  // changed — an unstable inline callback identity from the consumer (e.g.
+  // `onFiltersChange={(f) => ...}` recreated every parent render) no longer
+  // refires the bridge on its own.
+  const onFiltersChangeRef = useLatest(onFiltersChange);
+  const onSortingChangeRef = useLatest(onSortingChange);
+  const onPaginationChangeRef = useLatest(onPaginationChange);
+  const onPageChangeRef = useLatest(onPageChange);
+  const onPageSizeChangeRef = useLatest(onPageSizeChange);
+  const onSelectionChangeRef = useLatest(onSelectionChange);
 
   useEffect(() => {
-    onSortingChange?.(sortingState);
-  }, [sortingState, onSortingChange]);
+    onFiltersChangeRef.current?.(filters);
+  }, [filters, onFiltersChangeRef]);
 
   useEffect(() => {
-    onPaginationChange?.(pagination);
-  }, [pagination, onPaginationChange]);
+    onSortingChangeRef.current?.(sortingState);
+  }, [sortingState, onSortingChangeRef]);
 
   useEffect(() => {
-    onPageChange?.(pagination.page);
-  }, [pagination.page, onPageChange]);
+    onPaginationChangeRef.current?.(pagination);
+  }, [pagination, onPaginationChangeRef]);
 
   useEffect(() => {
-    onPageSizeChange?.(pagination.limit);
-  }, [pagination.limit, onPageSizeChange]);
+    onPageChangeRef.current?.(pagination.page);
+  }, [pagination.page, onPageChangeRef]);
 
   useEffect(() => {
-    onSelectionChange?.(selectedRows);
-  }, [selectedRows, onSelectionChange]);
+    onPageSizeChangeRef.current?.(pagination.limit);
+  }, [pagination.limit, onPageSizeChangeRef]);
+
+  useEffect(() => {
+    onSelectionChangeRef.current?.(selectedRows);
+  }, [selectedRows, onSelectionChangeRef]);
 
   // Auto-show/hide columns based on filters
   const previousFiltersRef = React.useRef<FilterState[]>([]);
@@ -470,22 +493,25 @@ export function BetterTable<TData = unknown>({
       (col) => !currentFilteredColumns.has(col)
     );
 
-    // Show newly filtered columns
-    if (newlyFilteredColumns.length > 0) {
-      const newVisibility = { ...columnVisibility };
+    // Show newly filtered columns and/or hide columns that had filters
+    // removed (only if not in defaultVisibleColumns). Read the CURRENT
+    // visibility straight from the store instead of the subscribed
+    // `columnVisibility` above, and deliberately leave it out of this
+    // effect's deps — the store's `setColumnVisibility` action only takes a
+    // plain object (no functional-updater form), so reading fresh state at
+    // fire-time is how this effect avoids depending on the very value it
+    // writes. Depending on `columnVisibility` here previously made this
+    // effect re-fire on its own `setColumnVisibility` call.
+    if (newlyFilteredColumns.length > 0 || unfilteredColumns.length > 0) {
+      const newVisibility = { ...store.getState().columnVisibility };
       for (const columnId of newlyFilteredColumns) {
         newVisibility[columnId] = true;
       }
-      setColumnVisibility(newVisibility);
-    }
-
-    // Hide columns that had filters removed (only if not in defaultVisibleColumns)
-    if (unfilteredColumns.length > 0 && defaultVisibleColumns) {
-      const newVisibility = { ...columnVisibility };
-      for (const columnId of unfilteredColumns) {
-        // Only hide if it's not in defaultVisibleColumns
-        if (!defaultVisibleColumns.includes(columnId)) {
-          newVisibility[columnId] = false;
+      if (defaultVisibleColumns) {
+        for (const columnId of unfilteredColumns) {
+          if (!defaultVisibleColumns.includes(columnId)) {
+            newVisibility[columnId] = false;
+          }
         }
       }
       setColumnVisibility(newVisibility);
@@ -493,13 +519,7 @@ export function BetterTable<TData = unknown>({
 
     // Update ref for next comparison
     previousFiltersRef.current = filters;
-  }, [
-    autoShowFilteredColumns,
-    filters,
-    columnVisibility,
-    setColumnVisibility,
-    defaultVisibleColumns,
-  ]);
+  }, [autoShowFilteredColumns, filters, defaultVisibleColumns, setColumnVisibility, store]);
 
   // Get row ID function from rowConfig or use default
   const getRowId = useMemo(() => {
@@ -563,17 +583,17 @@ export function BetterTable<TData = unknown>({
   );
 
   // Row activation (click/Enter/Space) bridges to two parent-supplied
-  // callbacks, wrapped in a single stable callback — passed straight into
-  // `MemoizedTableRow`, whose memoization would otherwise be defeated by a
-  // fresh `onClick` closure every render. Stable as long as `onRowClick`/
-  // `rowConfig.onClick` themselves are (ref-latched in UI-08 for the case
-  // where they aren't).
+  // callbacks. Ref-latch both so this stays a single stable callback across
+  // renders — passed straight into `MemoizedTableRow`, whose memoization
+  // would otherwise be defeated by a fresh `onClick` closure every render.
+  const onRowClickRef = useLatest(onRowClick);
+  const rowConfigOnClickRef = useLatest(rowConfig?.onClick);
   const handleRowActivate = useCallback(
     (row: TData) => {
-      onRowClick?.(row);
-      rowConfig?.onClick?.(row);
+      onRowClickRef.current?.(row);
+      rowConfigOnClickRef.current?.(row);
     },
-    [onRowClick, rowConfig?.onClick]
+    [onRowClickRef, rowConfigOnClickRef]
   );
   const rowsClickable = Boolean(onRowClick || rowConfig?.onClick);
 

@@ -42,8 +42,8 @@ describe('BetterTable bridge-effect churn (UI-08)', () => {
   });
 
   it(
-    'BEFORE FIX baseline: an unrelated parent re-render with a fresh inline ' +
-      'onFiltersChange identity refires the bridge effect even though filters did not change',
+    'AFTER FIX: an unrelated parent re-render with a fresh inline ' +
+      'onFiltersChange identity does NOT refire the bridge effect when filters did not change',
     () => {
       const calls: number[] = [];
       onFiltersChangeSpy = (_filters, bumpKey) => calls.push(bumpKey);
@@ -55,15 +55,16 @@ describe('BetterTable bridge-effect churn (UI-08)', () => {
       // a different bumpKey), but the table's `filters` state hasn't changed.
       rerender(<Wrapper bumpKey={1} />);
 
-      // Pre-fix: the bridge effect's deps include the callback itself, so a
-      // fresh identity alone refires it with the (unchanged) filters.
-      expect(calls).toEqual([0, 1]);
+      // The bridge effect's only dependency is `filters` now — the callback
+      // itself is read from a ref, so a fresh identity alone must not refire
+      // it. If it were still buggy this would be `[0, 1]`.
+      expect(calls).toEqual([0]);
     }
   );
 
   it(
-    'BEFORE FIX baseline: swapping the filtered column in one update clobbers ' +
-      'the auto-show visibility change for the other column',
+    'AFTER FIX: swapping the filtered column in one update shows the newly-filtered ' +
+      'column AND hides the unfiltered one, without clobbering either change',
     () => {
       const tableId = 'auto-show-baseline';
       render(
@@ -95,15 +96,11 @@ describe('BetterTable bridge-effect churn (UI-08)', () => {
 
       // The correct end state is BOTH: column a explicitly shown (it's newly
       // filtered) AND column b explicitly hidden (its filter was removed, and
-      // it's not in defaultVisibleColumns).
-      //
-      // Pre-fix: the auto-show effect makes two separate `setColumnVisibility`
-      // calls in the same run, each spreading from the SAME stale
-      // `columnVisibility` closure — the second call (for hiding column b)
-      // clobbers the first call's `a: true`, since `setColumnVisibility`
-      // replaces the whole object. Column a's visibility change is lost.
+      // it's not in defaultVisibleColumns). The fix folds both changes into
+      // ONE `setColumnVisibility` call built from a single fresh read of
+      // `store.getState().columnVisibility`, so neither clobbers the other.
       expect(store.getState().columnVisibility.b).toBe(false);
-      expect(store.getState().columnVisibility.a).not.toBe(true);
+      expect(store.getState().columnVisibility.a).toBe(true);
     }
   );
 });
