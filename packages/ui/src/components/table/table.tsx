@@ -45,16 +45,19 @@ import { TableProviders } from './table-providers';
  * Data fetching is handled by parent component
  * State is now managed internally with Zustand
  */
-// Type for columns with mixed value types (e.g., string, number, Date, boolean)
-// TypeScript cannot express a heterogeneous generic array, so we use 'any' here
-
-// biome-ignore lint/suspicious/noExplicitAny: Need to accept columns with mixed value types
-type MixedColumnDefinition<TData> = ColumnDefinition<TData, any>;
-
 export interface BetterTableProps<TData = unknown>
   extends Omit<TableConfig<TData>, 'adapter' | 'columns'> {
-  /** Column definitions - may have mixed value types (string, number, Date, etc.) */
-  columns: MixedColumnDefinition<TData>[];
+  /**
+   * Column definitions with mixed value types (string, number, Date, etc.).
+   *
+   * `ColumnDefinition` is invariant in its value type, so a heterogeneous array
+   * of differently-typed columns is not directly assignable to
+   * `ColumnDefinition<TData, unknown>[]`. Build the array with
+   * `defineColumns<TData>()([...])` from `@better-tables/core`, which infers each
+   * column's value type independently and erases it to `unknown` in one audited
+   * place.
+   */
+  columns: ColumnDefinition<TData, unknown>[];
 
   /** Table data */
   data: TData[];

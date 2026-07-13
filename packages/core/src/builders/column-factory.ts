@@ -116,6 +116,58 @@ export function createColumnBuilder<TData = unknown>(): ColumnFactory<TData> {
 }
 
 /**
+ * Collect a heterogeneous set of built columns into an array typed for the
+ * table boundary, erasing each column's individual value type to `unknown`.
+ *
+ * A `ColumnDefinition<TData, V>` is *invariant* in `V`: `accessor` returns `V`
+ * (covariant) while `cellRenderer`/`filter`/`validation` consume `V`
+ * (contravariant). Because of this, a heterogeneous array such as
+ * `[ColumnDefinition<TData, string>, ColumnDefinition<TData, number>]` is **not**
+ * assignable to `ColumnDefinition<TData, unknown>[]` — there is no single value
+ * type that is simultaneously a supertype (for `accessor`) and a subtype (for
+ * `cellRenderer`) of every column's value type. See plan 005 / Step 5.
+ *
+ * `defineColumns` sidesteps this by inferring each column's value type
+ * *independently* (via a per-element tuple constraint) so every column is
+ * type-checked against its own `V` at the call site, then performs the value-type
+ * erasure to `unknown` in this single, audited place. Each element is still
+ * verified to be a `ColumnDefinition<TData, …>`, so passing anything that is not
+ * a column is a compile error — no `any` is involved.
+ *
+ * Usage is curried so `TData` is specified explicitly while each column's value
+ * type stays inferred:
+ *
+ * @example
+ * ```typescript
+ * const cb = createColumnBuilder<User>();
+ *
+ * export const userColumns = defineColumns<User>()([
+ *   cb.text().id('name').displayName('Name').accessor((u) => u.name).build(),
+ *   cb.number().id('age').displayName('Age').accessor((u) => u.age).build(),
+ *   cb.option().id('role').displayName('Role')
+ *     .accessor((u) => u.role)
+ *     .options([{ value: 'admin', label: 'Admin' }])
+ *     .build(),
+ * ]);
+ * // userColumns: ColumnDefinition<User, unknown>[]
+ * ```
+ *
+ * @template TData - The type of row data shared by every column
+ * @returns A collector that accepts the tuple of built columns and returns the
+ * value-type-erased array ready to hand to `<BetterTable columns={…} />`.
+ */
+export function defineColumns<TData>() {
+  return <const TColumns extends readonly unknown[]>(
+    columns: readonly [...{ [K in keyof TColumns]: ColumnDefinition<TData, TColumns[K]> }]
+  ): ColumnDefinition<TData, unknown>[] => {
+    // Single, audited erasure: each element was individually verified above to be
+    // a ColumnDefinition<TData, …>; we widen its value type to `unknown` here so
+    // the heterogeneous set can flow through the invariant table boundary.
+    return columns as unknown as ColumnDefinition<TData, unknown>[];
+  };
+}
+
+/**
  * Global column factory function (not type-safe).
  *
  * Provides a global factory instance for cases where type safety is not needed

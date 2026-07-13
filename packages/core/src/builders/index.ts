@@ -25,6 +25,7 @@ export {
   createColumnBuilder,
   createColumnBuilders,
   createTypedColumnBuilder,
+  defineColumns,
   quickColumn,
   typed,
   validateColumns,

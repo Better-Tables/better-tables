@@ -1,10 +1,10 @@
-import { createColumnBuilder } from '@better-tables/core';
+import { createColumnBuilder, defineColumns } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
 import type { UserWithRelations } from '../db/schema';
 
 const cb = createColumnBuilder<UserWithRelations>();
 
-export const userColumns = [
+export const userColumns = defineColumns<UserWithRelations>()([
   // Direct user columns
   cb
     .text()
@@ -55,8 +55,8 @@ export const userColumns = [
         viewer: 'bg-gray-100 text-gray-800',
       };
       return (
-        <Badge className={colors[value as string] || ''} variant="outline">
-          {value as string}
+        <Badge className={colors[value] || ''} variant="outline">
+          {value}
         </Badge>
       );
     })
@@ -83,8 +83,8 @@ export const userColumns = [
         suspended: 'bg-red-100 text-red-800',
       };
       return (
-        <Badge className={colors[value as string] || ''} variant="outline">
-          {value as string}
+        <Badge className={colors[value] || ''} variant="outline">
+          {value}
         </Badge>
       );
     })
@@ -120,7 +120,7 @@ export const userColumns = [
       if (!value) return <span className="text-muted-foreground">-</span>;
 
       // Validate URL to prevent XSS attacks
-      const url = value as string;
+      const url = value;
       const isValidUrl = (url: string): boolean => {
         try {
           const parsedUrl = new URL(url);
@@ -171,7 +171,7 @@ export const userColumns = [
           rel="noopener noreferrer"
           className="text-primary hover:underline"
         >
-          @{value as string}
+          @{value}
         </a>
       );
     })
@@ -179,7 +179,7 @@ export const userColumns = [
 
   // Note: Computed columns are not yet supported by the adapter
   // These would need to be implemented as virtual columns or handled differently
-];
+]);
 
 // Default visible columns for the demo
 export const defaultVisibleColumns = [
