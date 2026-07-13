@@ -1,3 +1,4 @@
+import { TZDate, tzOffset } from '@date-fns/tz';
 import { format, formatDistance, formatRelative, type Locale } from 'date-fns';
 import { de } from 'date-fns/locale/de';
 import { enGB } from 'date-fns/locale/en-GB';
@@ -52,12 +53,41 @@ export function resolveDateFnsLocale(locale?: string): Locale {
   return LOCALE_MAP[locale] ?? LOCALE_MAP[locale.split('-')[0] ?? ''] ?? enUS;
 }
 
+const warnedUnknownTimeZones = new Set<string>();
+
+/**
+ * Convert `date` into a `TZDate` anchored to `timeZone` so that date-fns
+ * `format`/`formatRelative` calls read wall-clock fields (year/month/day/
+ * hour) in that zone instead of the host system's local zone.
+ *
+ * Soft-fails on an unrecognized IANA name: this is a render path, so it must
+ * never throw. An unknown zone logs one `console.warn` (deduped per zone
+ * name for the process lifetime) and returns `date` unconverted.
+ */
+function toZonedDate(date: Date, timeZone?: string): Date {
+  if (!timeZone) return date;
+
+  if (Number.isNaN(tzOffset(timeZone, date))) {
+    if (!warnedUnknownTimeZones.has(timeZone)) {
+      warnedUnknownTimeZones.add(timeZone);
+      // biome-ignore lint: Intentional warning logging for unknown timezone soft-fail
+      console.warn(
+        `[better-tables] Unknown IANA time zone "${timeZone}"; rendering without timezone conversion.`
+      );
+    }
+    return date;
+  }
+
+  return TZDate.tz(timeZone, date);
+}
+
 /**
  * Format a date according to column configuration.
  *
- * Note: `timeZone` is accepted for forward compatibility but is not applied
- * as a conversion (that requires a timezone library). Appending a bare TZ
- * label without converting would be misleading, so it is ignored for now.
+ * `timeZone` (an IANA name, e.g. `'America/New_York'`) is applied as a real
+ * conversion via `@date-fns/tz`'s `TZDate` — the formatted output reflects
+ * wall-clock time in that zone, not the viewer's local zone. An unrecognized
+ * zone name soft-fails to unconverted rendering (see `toZonedDate`).
  */
 export function formatDateWithConfig(
   date: Date | null | undefined,
@@ -74,16 +104,25 @@ export function formatDateWithConfig(
       const options = config.relativeOptions;
 
       if (options?.style === 'short') {
+        // Elapsed-time distances ("3 hours ago") are timezone-invariant —
+        // the duration between two instants doesn't change with the zone
+        // used to read their calendar fields, so no conversion is needed.
         return formatDistance(date, now, { addSuffix: true, locale });
       }
 
-      return formatRelative(date, now, { locale });
+      // Unlike formatDistance, formatRelative picks calendar-relative
+      // phrasing ("today", "yesterday", "last Friday at 2:30 PM") that
+      // depends on which calendar day each instant falls on — that IS
+      // zone-sensitive, so both anchors must be converted together.
+      return formatRelative(toZonedDate(date, config.timeZone), toZonedDate(now, config.timeZone), {
+        locale,
+      });
     }
 
     // Handle standard date formatting
     const formatString = config.format || (config.showTime ? 'PPpp' : 'PPP');
 
-    return format(date, formatString, { locale });
+    return format(toZonedDate(date, config.timeZone), formatString, { locale });
   } catch (_error) {
     return date.toLocaleDateString(config.locale);
   }
@@ -132,19 +171,24 @@ export function formatDateRange(
 
   const formatString = getDateRangeFormat(config);
   const locale = resolveDateFnsLocale(config.locale);
+  const zonedFrom = toZonedDate(from, config.timeZone);
 
   try {
     if (!to) {
-      return format(from, formatString, { locale });
+      return format(zonedFrom, formatString, { locale });
     }
 
-    // If same day, show only one date
-    if (isSameDay(from, to)) {
-      return format(from, formatString, { locale });
+    const zonedTo = toZonedDate(to, config.timeZone);
+
+    // Same-day check must happen on the zoned values too — a range that
+    // spans a UTC day boundary can collapse to a single day (or vice versa)
+    // once both ends are read in the configured zone.
+    if (isSameDay(zonedFrom, zonedTo)) {
+      return format(zonedFrom, formatString, { locale });
     }
 
     // Different days, show range
-    return `${format(from, formatString, { locale })} - ${format(to, formatString, {
+    return `${format(zonedFrom, formatString, { locale })} - ${format(zonedTo, formatString, {
       locale,
     })}`;
   } catch (_error) {
