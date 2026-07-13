@@ -1064,11 +1064,12 @@ export interface QueryMetadata {
  *
  * @since 1.1.0
  */
-export type FilterTablesFromSchema<TSchema> = TSchema extends Record<string, unknown>
-  ? {
-      [K in keyof TSchema as TSchema[K] extends AnyTableType ? K : never]: TSchema[K];
-    }
-  : Record<string, AnyTableType>;
+export type FilterTablesFromSchema<TSchema> =
+  TSchema extends Record<string, unknown>
+    ? {
+        [K in keyof TSchema as TSchema[K] extends AnyTableType ? K : never]: TSchema[K];
+      }
+    : Record<string, AnyTableType>;
 
 /**
  * Extract the union of all inferred select models from a filtered schema.

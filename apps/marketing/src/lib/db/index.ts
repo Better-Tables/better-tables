@@ -61,12 +61,9 @@ export async function getDatabase() {
     // Verify data was seeded
     const userCount = await db.select().from(schema.users).limit(1);
     if (userCount.length === 0) {
-      console.warn('Warning: Database seeded but no users found. Seed may have failed silently.');
     } else {
-      console.log(`Database seeded successfully. Found ${userCount.length} user(s) in sample.`);
     }
-  } catch (error) {
-    console.error('Error seeding database:', error);
+  } catch (_error) {
     // Don't throw - allow the app to continue even if seeding fails
     // The table will just show empty data
   }

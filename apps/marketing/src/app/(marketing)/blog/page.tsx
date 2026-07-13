@@ -1,10 +1,10 @@
-import BlogCard from "@/components/blog-card";
-import { getBlogPosts } from "@/lib/blog";
-import { siteConfig } from "@/lib/config";
-import { constructMetadata } from "@/lib/utils";
+import BlogCard from '@/components/blog-card';
+import { getBlogPosts } from '@/lib/blog';
+import { siteConfig } from '@/lib/config';
+import { constructMetadata } from '@/lib/utils';
 
 export const metadata = constructMetadata({
-  title: "Blog",
+  title: 'Blog',
   description: `Latest news and updates from ${siteConfig.name}.`,
 });
 
@@ -19,9 +19,7 @@ export default async function Blog() {
     <>
       <div className="mx-auto w-full max-w-screen-xl px-2.5 lg:px-20 mt-24">
         <div className="text-center py-16">
-          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
-            Articles
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Articles</h1>
           <p className="mt-4 text-xl text-muted-foreground">
             Latest news and updates from {siteConfig.name}
           </p>

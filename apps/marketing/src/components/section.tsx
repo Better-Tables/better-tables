@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import FlickeringGrid from "@/components/ui/flickering-grid";
-import { cn } from "@/lib/utils";
-import React, { forwardRef, useRef } from "react";
+import type React from 'react';
+import { forwardRef, useRef } from 'react';
+import FlickeringGrid from '@/components/ui/flickering-grid';
+import { cn } from '@/lib/utils';
 
 interface SectionProps {
   id?: string;
@@ -11,37 +12,27 @@ interface SectionProps {
   description?: string;
   children?: React.ReactNode;
   className?: string;
-  align?: "left" | "center" | "right";
+  align?: 'left' | 'center' | 'right';
 }
 
 const Section = forwardRef<HTMLElement, SectionProps>(
-  (
-    { id, title, subtitle, description, children, className, align },
-    forwardedRef
-  ) => {
+  ({ id, title, subtitle, description, children, className, align }, forwardedRef) => {
     const internalRef = useRef<HTMLElement>(null);
     const ref = forwardedRef || internalRef;
-    const sectionId = title ? title.toLowerCase().replace(/\s+/g, "-") : id;
+    const _sectionId = title ? title.toLowerCase().replace(/\s+/g, '-') : id;
     const alignmentClass =
-      align === "left"
-        ? "text-left"
-        : align === "right"
-        ? "text-right"
-        : "text-center";
+      align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
 
     return (
       <section id={id} ref={ref}>
         <div
-          className={cn(
-            "relative mx-auto container max-w-[var(--container-max-width)]",
-            className
-          )}
+          className={cn('relative mx-auto container max-w-[var(--container-max-width)]', className)}
         >
           {(title || subtitle || description) && (
             <div
               className={cn(
                 alignmentClass,
-                "relative mx-auto border-x border-t overflow-hidden p-2 py-8 md:p-12"
+                'relative mx-auto border-x border-t overflow-hidden p-2 py-8 md:p-12'
               )}
             >
               {title && (
@@ -53,12 +44,8 @@ const Section = forwardRef<HTMLElement, SectionProps>(
               {subtitle && (
                 <h3
                   className={cn(
-                    "mx-0 mt-4 max-w-lg text-5xl text-balance font-bold sm:max-w-none sm:text-4xl md:text-5xl lg:text-6xl leading-[1.2] tracking-tighter text-foreground lowercase",
-                    align === "center"
-                      ? "mx-auto"
-                      : align === "right"
-                      ? "ml-auto"
-                      : ""
+                    'mx-0 mt-4 max-w-lg text-5xl text-balance font-bold sm:max-w-none sm:text-4xl md:text-5xl lg:text-6xl leading-[1.2] tracking-tighter text-foreground lowercase',
+                    align === 'center' ? 'mx-auto' : align === 'right' ? 'ml-auto' : ''
                   )}
                 >
                   {subtitle}
@@ -67,12 +54,8 @@ const Section = forwardRef<HTMLElement, SectionProps>(
               {description && (
                 <p
                   className={cn(
-                    "mt-6 text-lg leading-8 text-muted-foreground text-balance max-w-2xl",
-                    align === "center"
-                      ? "mx-auto"
-                      : align === "right"
-                      ? "ml-auto"
-                      : ""
+                    'mt-6 text-lg leading-8 text-muted-foreground text-balance max-w-2xl',
+                    align === 'center' ? 'mx-auto' : align === 'right' ? 'ml-auto' : ''
                   )}
                 >
                   {description}
@@ -96,6 +79,6 @@ const Section = forwardRef<HTMLElement, SectionProps>(
   }
 );
 
-Section.displayName = "Section";
+Section.displayName = 'Section';
 
 export { Section };

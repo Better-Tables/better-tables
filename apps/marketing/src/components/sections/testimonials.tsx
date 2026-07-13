@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { Section } from "@/components/section";
-import { Button } from "@/components/ui/button";
-import { siteConfig } from "@/lib/config";
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { Section } from '@/components/section';
+import { Button } from '@/components/ui/button';
+import { siteConfig } from '@/lib/config';
+import { cn } from '@/lib/utils';
 
 export function Testimonials() {
   const [showAll, setShowAll] = useState(false);
@@ -22,7 +22,7 @@ export function Testimonials() {
             className="absolute bottom-12 left-1/2 -translate-x-1/2 border h-10 w-fit px-5 flex items-center justify-center z-10"
             onClick={() => setShowAll(!showAll)}
           >
-            {showAll ? "Show less" : "See more"}
+            {showAll ? 'Show less' : 'See more'}
           </Button>
 
           {siteConfig.testimonials.map((testimonial, index) => (
@@ -32,9 +32,9 @@ export function Testimonials() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.05 }}
               className={cn(
-                "flex flex-col border-b break-inside-avoid border-l",
-                "transition-colors hover:bg-secondary/20",
-                !showAll && index >= initialDisplayCount && "hidden"
+                'flex flex-col border-b break-inside-avoid border-l',
+                'transition-colors hover:bg-secondary/20',
+                !showAll && index >= initialDisplayCount && 'hidden'
               )}
             >
               <div className="px-4 py-5 sm:p-6 flex-grow">
@@ -47,12 +47,8 @@ export function Testimonials() {
                     />
                   )}
                   <div>
-                    <h3 className="text-lg font-medium text-foreground">
-                      {testimonial.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {testimonial.company}
-                    </p>
+                    <h3 className="text-lg font-medium text-foreground">{testimonial.name}</h3>
+                    <p className="text-sm text-muted-foreground">{testimonial.company}</p>
                   </div>
                 </div>
                 <p>{testimonial.text}</p>

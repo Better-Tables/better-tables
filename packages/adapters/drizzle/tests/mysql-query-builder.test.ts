@@ -59,7 +59,6 @@ describe('MySQLQueryBuilder', () => {
       relationshipManager = new RelationshipManager(schema, relationships);
 
       // Initialize query builder with mock database
-      // @ts-expect-error - Mock database for unit tests, type mismatch expected
       queryBuilder = new MySQLQueryBuilder(mockDb, schema, relationshipManager);
     });
 
@@ -99,7 +98,6 @@ describe('MySQLQueryBuilder', () => {
 
         const arrayRelationshipManager = new RelationshipManager(testSchema, arrayRelationships);
         const arrayQueryBuilder = new MySQLQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           mockDb as unknown as MySql2Database<typeof testSchema>,
           testSchema,
           arrayRelationshipManager
@@ -204,7 +202,6 @@ describe('MySQLQueryBuilder', () => {
         const schemaWithJson = { surveys: surveysUnit };
         const jsonRelationshipManager = new RelationshipManager(schemaWithJson, {});
         const jsonQueryBuilder = new MySQLQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           mockDb as unknown as MySql2Database<typeof schemaWithJson>,
           schemaWithJson,
           jsonRelationshipManager
@@ -398,7 +395,6 @@ describe('MySQLQueryBuilder', () => {
       relationshipManager = new RelationshipManager(schema, relationships);
 
       // Initialize query builder
-      // @ts-expect-error - Type mismatch between test schema and actual schema types
       queryBuilder = new MySQLQueryBuilder(db, schema, relationshipManager);
     });
 
@@ -594,7 +590,6 @@ describe('MySQLQueryBuilder', () => {
         };
 
         const arrayRelationshipManager = new RelationshipManager(testSchema, arrayRelationships);
-        // @ts-expect-error - Type mismatch between test schema and actual schema types
         const arrayQueryBuilder = new MySQLQueryBuilder(db, testSchema, arrayRelationshipManager);
 
         const context = arrayRelationshipManager.buildQueryContext(

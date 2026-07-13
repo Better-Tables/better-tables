@@ -1,24 +1,23 @@
-"use client";
+'use client';
 
-import { Icons } from "@/components/icons";
-import { Section } from "@/components/section";
-import { BorderText } from "@/components/ui/border-number";
-import Link from "next/link";
+import { Icons } from '@/components/icons';
+import { Section } from '@/components/section';
+import { BorderText } from '@/components/ui/border-number';
 
 const stats = [
   {
-    title: "6",
-    subtitle: "Filter Types",
+    title: '6',
+    subtitle: 'Filter Types',
     icon: <Icons.github className="h-5 w-5" />,
   },
   {
-    title: "20+",
-    subtitle: "Filter Operators",
+    title: '20+',
+    subtitle: 'Filter Operators',
     icon: <Icons.discord className="h-5 w-5" />,
   },
   {
-    title: "0",
-    subtitle: "Boilerplate Required",
+    title: '0',
+    subtitle: 'Boilerplate Required',
     icon: <Icons.npm className="h-5 w-5" />,
   },
 ];
@@ -30,7 +29,7 @@ export function Statistics() {
         className="border-x border-t"
         style={{
           backgroundImage:
-            "radial-gradient(circle at bottom center, hsl(var(--secondary) / 0.4), hsl(var(--background)))",
+            'radial-gradient(circle at bottom center, hsl(var(--secondary) / 0.4), hsl(var(--background)))',
         }}
       >
         <div className="grid grid-cols-1 sm:grid-cols-3">
@@ -59,9 +58,7 @@ export function Statistics() {
                 <BorderText text={stat.title} />
                 <div className="flex items-center justify-center gap-2 mt-2">
                   {stat.icon}
-                  <p className="text-sm text-muted-foreground">
-                    {stat.subtitle}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{stat.subtitle}</p>
                 </div>
               </div>
             </div>

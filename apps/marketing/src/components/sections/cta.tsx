@@ -1,5 +1,5 @@
-import { Section } from "@/components/section";
-import { Button } from "@/components/ui/button";
+import { Section } from '@/components/section';
+import { Button } from '@/components/ui/button';
 
 export function CTA() {
   return (

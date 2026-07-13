@@ -1,6 +1,6 @@
-import { Icons } from "@/components/icons";
-import { BorderText } from "@/components/ui/border-number";
-import { siteConfig } from "@/lib/config";
+import { Icons } from '@/components/icons';
+import { BorderText } from '@/components/ui/border-number';
+import { siteConfig } from '@/lib/config';
 
 export function Footer() {
   return (
@@ -8,9 +8,7 @@ export function Footer() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-x-2">
           <Icons.logo className="h-5 w-5" />
-          <h2 className="text-lg font-bold text-foreground">
-            {siteConfig.name}
-          </h2>
+          <h2 className="text-lg font-bold text-foreground">{siteConfig.name}</h2>
         </div>
 
         <div className="flex gap-x-2">

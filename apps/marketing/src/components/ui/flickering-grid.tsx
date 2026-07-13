@@ -1,12 +1,7 @@
-"use client";
+'use client';
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface FlickeringGridProps {
   squareSize?: number;
@@ -24,7 +19,7 @@ const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   squareSize = 4,
   gridGap = 6,
   flickerChance = 0.3,
-  color = "rgb(0, 0, 0)",
+  color = 'rgb(0, 0, 0)',
   width,
   height,
   className,
@@ -37,13 +32,13 @@ const FlickeringGrid: React.FC<FlickeringGridProps> = ({
 
   const memoizedColor = useMemo(() => {
     const toRGBA = (color: string) => {
-      if (typeof window === "undefined") {
+      if (typeof window === 'undefined') {
         return `rgba(0, 0, 0,`;
       }
-      const canvas = document.createElement("canvas");
+      const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 1;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return "rgba(255, 0, 0,";
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return 'rgba(255, 0, 0,';
       ctx.fillStyle = color;
       ctx.fillRect(0, 0, 1, 1);
       const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data);
@@ -94,7 +89,7 @@ const FlickeringGrid: React.FC<FlickeringGridProps> = ({
       dpr: number
     ) => {
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "transparent";
+      ctx.fillStyle = 'transparent';
       ctx.fillRect(0, 0, width, height);
 
       for (let i = 0; i < cols; i++) {
@@ -118,7 +113,7 @@ const FlickeringGrid: React.FC<FlickeringGridProps> = ({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let animationFrameId: number;

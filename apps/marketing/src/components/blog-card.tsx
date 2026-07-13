@@ -1,15 +1,9 @@
-import { Post } from "@/lib/blog";
-import { formatDate } from "@/lib/utils";
-import Image from "next/image";
-import Link from "next/link";
+import Image from 'next/image';
+import Link from 'next/link';
+import type { Post } from '@/lib/blog';
+import { formatDate } from '@/lib/utils';
 
-export default function BlogCard({
-  data,
-  priority,
-}: {
-  data: Post;
-  priority?: boolean;
-}) {
+export default function BlogCard({ data, priority }: { data: Post; priority?: boolean }) {
   return (
     <Link
       href={`/blog/${data.slug}`}
@@ -27,10 +21,7 @@ export default function BlogCard({
       )}
       {!data.image && <div className="bg-gray-200 h-[180px] mb-4 rounded" />}
       <p className="my-2">
-        <time
-          dateTime={data.publishedAt}
-          className="text-xs text-muted-foreground"
-        >
+        <time dateTime={data.publishedAt} className="text-xs text-muted-foreground">
           {formatDate(data.publishedAt)}
         </time>
       </p>

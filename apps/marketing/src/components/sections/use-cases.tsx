@@ -1,8 +1,6 @@
-"use client";
+'use client';
 
-import { Section } from "@/components/section";
-import OrbitingCircles from "@/components/ui/orbiting-circles";
-import { cubicBezier, motion } from "framer-motion";
+import { cubicBezier, motion } from 'framer-motion';
 import {
   AlertTriangleIcon,
   BrainCircuitIcon,
@@ -15,7 +13,9 @@ import {
   SquareTerminal,
   UserSearch,
   XCircleIcon,
-} from "lucide-react";
+} from 'lucide-react';
+import { Section } from '@/components/section';
+import OrbitingCircles from '@/components/ui/orbiting-circles';
 
 const containerVariants = {
   initial: {},
@@ -33,17 +33,17 @@ export function Card1() {
       transition: {
         delay: 0.05,
         duration: 0.2,
-        ease: "linear",
+        ease: 'linear',
       },
     },
     whileHover: {
       scale: 0.8,
       boxShadow:
-        "rgba(245,40,145,0.35) 0px 20px 70px -10px, rgba(36,42,66,0.04) 0px 10px 24px -8px, rgba(36,42,66,0.06) 0px 1px 4px -1px",
+        'rgba(245,40,145,0.35) 0px 20px 70px -10px, rgba(36,42,66,0.04) 0px 10px 24px -8px, rgba(36,42,66,0.06) 0px 1px 4px -1px',
       transition: {
         delay: 0.05,
         duration: 0.2,
-        ease: "linear",
+        ease: 'linear',
       },
     },
   };
@@ -54,18 +54,18 @@ export function Card1() {
       transition: {
         delay: 0,
         duration: 0.2,
-        ease: "linear",
+        ease: 'linear',
       },
     },
     whileHover: {
       y: -55,
       scale: 0.87,
       boxShadow:
-        "rgba(39,127,245,0.15) 0px 20px 70px -10px, rgba(36,42,66,0.04) 0px 10px 24px -8px, rgba(36,42,66,0.06) 0px 1px 4px -1px",
+        'rgba(39,127,245,0.15) 0px 20px 70px -10px, rgba(36,42,66,0.04) 0px 10px 24px -8px, rgba(36,42,66,0.06) 0px 1px 4px -1px',
       transition: {
         delay: 0,
         duration: 0.2,
-        ease: "linear",
+        ease: 'linear',
       },
     },
   };
@@ -77,7 +77,7 @@ export function Card1() {
       transition: {
         delay: 0.05,
         duration: 0.2,
-        ease: "linear",
+        ease: 'linear',
       },
     },
     whileHover: {
@@ -85,11 +85,11 @@ export function Card1() {
       opacity: 1,
       scale: 1,
       boxShadow:
-        "rgba(39,245,76,0.15) 10px 20px 70px -20px, rgba(36,42,66,0.04) 0px 10px 24px -8px, rgba(36,42,66,0.06) 0px 1px 4px -1px",
+        'rgba(39,245,76,0.15) 10px 20px 70px -20px, rgba(36,42,66,0.04) 0px 10px 24px -8px, rgba(36,42,66,0.06) 0px 1px 4px -1px',
       transition: {
         delay: 0.05,
         duration: 0.2,
-        ease: "easeInOut",
+        ease: 'easeInOut',
       },
     },
   };
@@ -123,9 +123,7 @@ export function Card1() {
               <div className="flex flex-col gap-y-2">
                 <div className="h-2 w-32 rounded-full bg-neutral-800/50 dark:bg-neutral-200/80"></div>
                 <div className="h-2 w-48 rounded-full bg-slate-400/50"></div>
-                <div className="text-xs text-neutral-500">
-                  User management table
-                </div>
+                <div className="text-xs text-neutral-500">User management table</div>
               </div>
             </motion.div>
             <motion.div
@@ -139,9 +137,7 @@ export function Card1() {
                 <div className="h-2 w-32 rounded-full bg-neutral-800/50 dark:bg-neutral-200/80"></div>
                 <div className="h-2 w-48 rounded-full bg-slate-400/50"></div>
                 <div className="h-2 w-20 rounded-full bg-slate-400/50"></div>
-                <div className="text-xs text-neutral-500">
-                  Cross-table filtering
-                </div>
+                <div className="text-xs text-neutral-500">Cross-table filtering</div>
               </div>
             </motion.div>
             <motion.div
@@ -156,17 +152,13 @@ export function Card1() {
                 <div className="h-2 w-48 rounded-full bg-slate-400/50"></div>
                 <div className="h-2 w-20 rounded-full bg-slate-400/50"></div>
                 <div className="h-2 w-48 rounded-full bg-slate-400/50"></div>
-                <div className="text-xs text-neutral-500">
-                  Automatic JOIN queries
-                </div>
+                <div className="text-xs text-neutral-500">Automatic JOIN queries</div>
               </div>
             </motion.div>
           </div>
         </div>
         <div className="flex flex-col gap-y-1 px-5 pb-4 items-start w-full">
-          <h2 className="font-semibold tracking-tight text-lg">
-            Admin Dashboards
-          </h2>
+          <h2 className="font-semibold tracking-tight text-lg">Admin Dashboards</h2>
           <p className="text-sm text-muted-foreground">
             Complex data tables with relationships, filtering, and real-time updates.
           </p>
@@ -180,9 +172,9 @@ const Card2 = () => {
   const logs = [
     {
       id: 1,
-      type: "product",
-      timestamp: "SKU-12345",
-      message: "Wireless Headphones - $99.99",
+      type: 'product',
+      timestamp: 'SKU-12345',
+      message: 'Wireless Headphones - $99.99',
       icon: (
         <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
           <InfoIcon className="h-5 w-5 text-white" />
@@ -191,9 +183,9 @@ const Card2 = () => {
     },
     {
       id: 2,
-      type: "category",
-      timestamp: "Electronics",
-      message: "Filter by category and price range",
+      type: 'category',
+      timestamp: 'Electronics',
+      message: 'Filter by category and price range',
       icon: (
         <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
           <DatabaseIcon className="h-5 w-5 text-white" />
@@ -202,9 +194,9 @@ const Card2 = () => {
     },
     {
       id: 3,
-      type: "inventory",
-      timestamp: "Stock: 42",
-      message: "Real-time inventory tracking",
+      type: 'inventory',
+      timestamp: 'Stock: 42',
+      message: 'Real-time inventory tracking',
       icon: (
         <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center">
           <BrainCircuitIcon className="h-5 w-5 text-white" />
@@ -213,9 +205,9 @@ const Card2 = () => {
     },
     {
       id: 4,
-      type: "sales",
-      timestamp: "$1,234.56",
-      message: "Total sales this month",
+      type: 'sales',
+      timestamp: '$1,234.56',
+      message: 'Total sales this month',
       icon: (
         <div className="h-8 w-8 rounded-full bg-yellow-500 flex items-center justify-center">
           <AlertTriangleIcon className="h-5 w-5 text-white" />
@@ -224,9 +216,9 @@ const Card2 = () => {
     },
     {
       id: 5,
-      type: "orders",
-      timestamp: "Order #789",
-      message: "Customer relationship data",
+      type: 'orders',
+      timestamp: 'Order #789',
+      message: 'Customer relationship data',
       icon: (
         <div className="h-8 w-8 rounded-full bg-red-500 flex items-center justify-center">
           <XCircleIcon className="h-5 w-5 text-white" />
@@ -272,7 +264,7 @@ const Card2 = () => {
                   }),
                 }}
                 transition={{
-                  type: "spring",
+                  type: 'spring',
                   damping: 40,
                   stiffness: 600,
                 }}
@@ -289,9 +281,7 @@ const Card2 = () => {
           </motion.div>
         </div>
         <div className="flex flex-col gap-y-1 px-5 pb-4 items-start w-full">
-          <h2 className="font-semibold tracking-tight text-lg">
-            E-commerce Platforms
-          </h2>
+          <h2 className="font-semibold tracking-tight text-lg">E-commerce Platforms</h2>
           <p className="text-sm text-muted-foreground">
             Product catalogs with advanced filtering, inventory management, and sales tracking.
           </p>
@@ -336,9 +326,7 @@ const Card3 = () => {
           </div>
         </div>
         <div className="flex flex-col gap-y-1 px-5 pb-4 items-start w-full">
-          <h2 className="font-semibold tracking-tight text-lg">
-            Analytics Dashboards
-          </h2>
+          <h2 className="font-semibold tracking-tight text-lg">Analytics Dashboards</h2>
           <p className="text-sm text-muted-foreground">
             Large datasets with virtual scrolling, real-time updates, and shareable filtered views.
           </p>

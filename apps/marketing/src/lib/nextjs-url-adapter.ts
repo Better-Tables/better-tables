@@ -40,4 +40,3 @@ export function useNextjsUrlAdapter(): UrlSyncAdapter {
     [router, searchParams]
   );
 }
-
