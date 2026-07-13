@@ -38,12 +38,12 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 | 020 | Fix page under-fill on one-to-many joins (ADAPTER-03) | 007/017 (DONE) | PLANNED — P1, wave 1 |
 | 023 | Shared subscription emitter for six managers (CORE-08) | 018 (DONE) | PLANNED — wave 1 (parallel: core managers) |
 | 028 | Real timezone conversion (CORE-04 remainder) | — | PLANNED — wave 1 (parallel: core lib); has a builder-default STOP gate |
-| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2 |
+| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2; maintainer 2026-07-13: rides 0.6, breaking allowed for the better end design (guide section in-branch if broken) |
 | 024 | Virtualization offsets: stale positions + O(n) scans (CORE-03/09) | **023 merged** (same file) | PLANNED — wave 2 |
 | 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | PLANNED — wave 2 (parallel: ui only) |
 | 022 | Relationship/primary-table inference fails loudly (ADAPTER-05 rem.) | 007 (DONE) | PLANNED — wave 2/3 (disjoint files from 020/021) |
 | 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3; blast radius measured: core 78+28 errors |
-| 027 | Null-filter semantics: includeNull/supportsNull in validation (CORE-10) | **MAINTAINER DECISION** (Option A/B in the plan) | PLANNED — **decision gate**; decide while 0.6 is open |
+| 027 | Null-filter semantics: includeNull satisfies value requirement (CORE-10) | 023 merged (same file, disjoint region) | PLANNED — **Option A chosen (maintainer 2026-07-13)**, dispatchable; wave 2 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
 Wave logic: within a wave, plans touch disjoint files and can run in parallel
@@ -141,9 +141,10 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
 - **CORE-09** (L): virtualization offset math O(n) per lookup; prefix-sum/Fenwick
   cache. **PLANNED as 024** (with CORE-03; lazy prefix + dirty watermark).
 - **CORE-10** (M): `includeNull`/`supportsNull` dead in validation — null-only
-  filters can't pass strict mode. **PLANNED as 027 — DECISION GATE**: maintainer
-  picks Option A (includeNull satisfies value requirement, recommended) or B
-  (null-only stays isEmpty's job) in the plan file before dispatch.
+  filters can't pass strict mode. **PLANNED as 027 — Option A chosen
+  (maintainer 2026-07-13)**: includeNull satisfies the value requirement;
+  supportsNull gains its first real job (rejecting includeNull on valueCount-0
+  operators).
 - **UI-05/06/08** (M each): render perf — unmemoized rows/cells; VirtualizedTable
   recreates per-row ResizeObservers every render; auto-show + callback-bridge
   effect churn. **PLANNED as 025** (includes building the render-count harness —

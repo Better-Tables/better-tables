@@ -53,19 +53,24 @@ two ways that matter most for a filtering UI.
 
 ## Design
 
-1. **Contract (additive)** — add an optional params argument in
-   `packages/core/src/types/adapter.ts`:
+1. **Contract** — add a params argument in `packages/core/src/types/adapter.ts`:
    ```ts
    interface FacetQueryParams {
      filters?: FilterState[] | FilterGroupNode;
    }
    getFacetedValues(columnId: string, params?: FacetQueryParams): Promise<Map<string, number>>;
-   // same optional param on getMinMaxValues and getFilterOptions
+   // same param on getMinMaxValues and getFilterOptions
    ```
-   Adding an optional parameter keeps existing third-party adapter
-   implementations structurally assignable — this is NOT a breaking change and
-   does not need a migration-guide section. Changeset: `minor`
-   (new capability), joins the 0.6 train.
+   **Maintainer decision (2026-07-13)**: this rides the 0.6 train, and breaking
+   signature changes are AUTHORIZED where they produce the better end design —
+   do not contort the contract to preserve 0.5 assignability. The optional
+   param above is the floor (it happens to keep old implementations
+   assignable); if during implementation a cleaner shape is clearly better
+   (e.g. a single consistent params object across all three methods, or
+   consolidating the three into one facet-query method), take it. If the
+   change ends up breaking, add a section to MIGRATION.md in the same branch
+   (the guide is structured for appends). Changeset: `minor` (0.x breaking
+   slot per release policy).
 2. **Self-exclusion semantics** (the standard faceting convention): when
    computing facets for column X, apply all active filters EXCEPT leaves that
    target column X — so multi-select faceting on the filtered column still
@@ -88,7 +93,10 @@ two ways that matter most for a filtering UI.
 ## Steps
 
 1. Contract change + docstrings (self-exclusion semantics spelled out) + core
-   typecheck.
+   typecheck. If you chose a breaking shape, write the MIGRATION.md section in
+   this step, with a compile-checked example added to
+   `packages/core/tests/types/migration-guide-examples.test.ts` (the guide's
+   drift-alarm file — follow its existing pattern).
    **Verify**: `cd packages/core && bun run typecheck && bun test` green.
 2. Drizzle: filtered + self-excluded + distinct-guarded builders. Unit tests
    on the builders (SQLite).
@@ -116,7 +124,7 @@ Branch `filter-aware-facets` from main (post-020 merge). Commits: (1) contract,
 
 ## Done criteria
 
-- [ ] Optional `FacetQueryParams` on all three contract methods; existing implementations still assignable (prove with a type test)
+- [ ] `FacetQueryParams` threaded through the facet contract methods; if the shape is breaking, MIGRATION.md section + compile-checked example added in the same branch
 - [ ] Self-exclusion semantics implemented + documented + tested for flat AND tree filter input
 - [ ] Facet counts distinct-guarded under joins (row-set proof)
 - [ ] Call sites pass live filter state (or gaps reported)
@@ -125,9 +133,6 @@ Branch `filter-aware-facets` from main (post-020 merge). Commits: (1) contract,
 
 ## STOP conditions
 
-- The optional-param addition breaks type-compatibility of any existing
-  adapter implementation in-repo (it shouldn't — investigate before
-  proceeding, report if real).
 - Self-exclusion pruning of a `FilterGroupNode` is ambiguous for some shape
   (e.g. a NOT-like construct appears that the pruning rule doesn't cover) —
   report the shape, don't invent semantics.

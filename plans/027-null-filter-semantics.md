@@ -1,8 +1,7 @@
 # Plan 027: Decide and implement null-filter semantics (CORE-10)
 
-> **DECISION GATE — do not dispatch until the maintainer picks an option
-> below.** The rest of the plan is written for Option A; if B is chosen the
-> implementation shrinks to docs + validation-error copy.
+> **DECISION RESOLVED (2026-07-13): the maintainer chose Option A.** The plan
+> is dispatchable as written.
 >
 > **Executor instructions** (post-decision): Follow this plan step by step.
 > Run every verification command. Touch only in-scope files. On any STOP
@@ -42,9 +41,9 @@ Note: the manager's own add/update/set paths call `validateFilter` with
 validation (adapters, server-side checks, future strict mode), not today's
 default UI flow. That's why this is a semantics decision, not a hotfix.
 
-## Options for the maintainer
+## Decision: Option A (maintainer, 2026-07-13)
 
-- **Option A (recommended)** — *includeNull satisfies the value requirement*:
+- **Option A (CHOSEN)** — *includeNull satisfies the value requirement*:
   a filter with `includeNull: true` and empty `values` is VALID; its meaning
   is "match null rows only" (the router already effectively degrades to
   `IS NULL` when there's no main condition — verify and test, don't assume).
@@ -53,14 +52,9 @@ default UI flow. That's why this is a semantics decision, not a hotfix.
   `supportsNull` to identify them, which gives `supportsNull` its first real
   job. Rationale: matches what the UI already lets users express; fail-closed
   nothing; the wire format already carries it.
-- **Option B** — *null-only is the isEmpty operator's job*: validation stays
-  as-is; `includeNull` REQUIRES at least the operator's valueCount; the UI
-  include-unknown control gets disabled until values are present; docs state
-  "use isEmpty for null-only". Cheaper, but makes the existing UI checkbox a
-  trap state.
-
-Maintainer records the choice by replacing this section's heading with
-"Decision: Option _ (date)" and committing.
+- **Option B (rejected)** — *null-only is the isEmpty operator's job*: kept
+  here for the record; it would have made the existing UI checkbox a trap
+  state.
 
 ## Steps (Option A)
 
