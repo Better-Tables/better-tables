@@ -812,7 +812,9 @@ export class DataTransformer<TTable = unknown> {
       // Extract only columns that are present in the record (requested columns)
       // Instead of extracting all columns, only extract what's actually in the record
       const relatedTableSchema = this.schema[realTableName];
-      const relatedColumns = relatedTableSchema ? this.schemaPort.getColumnNames(relatedTableSchema) : [];
+      const relatedColumns = relatedTableSchema
+        ? this.schemaPort.getColumnNames(relatedTableSchema)
+        : [];
 
       for (const col of relatedColumns) {
         const flatKey = generateAlias(relationshipPath, col);

@@ -14,6 +14,14 @@
  */
 
 export { DataTransformer } from './data-transformer';
+export {
+  computeDatePeriodRange,
+  type DatePeriod,
+  type DatePeriodRange,
+  FilterRouter,
+  FilterRouterError,
+  type PredicateEmitter,
+} from './filter-router';
 export { PrimaryTableResolver, type RelationshipMapLike } from './primary-table-resolver';
 export type {
   AggregateColumn,

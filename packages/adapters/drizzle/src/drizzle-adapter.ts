@@ -50,6 +50,7 @@
  * @since 1.0.0
  */
 
+import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import type {
   AdapterFeatures,
   AdapterMeta,
@@ -65,8 +66,6 @@ import type {
   TableAdapter,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
-
-import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import { getOperationsFactory } from './operations';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
@@ -87,7 +86,11 @@ import type {
   TableWithId,
 } from './types';
 import { QueryError, SchemaError } from './types';
-import { getColumnNames, getForeignKeyColumns, getPrimaryKeyColumns } from './utils/drizzle-schema-utils';
+import {
+  getColumnNames,
+  getForeignKeyColumns,
+  getPrimaryKeyColumns,
+} from './utils/drizzle-schema-utils';
 import { filterTablesFromSchema } from './utils/schema-extractor';
 
 /**
