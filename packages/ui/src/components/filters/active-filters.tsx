@@ -14,7 +14,6 @@ import {
   getFilterValueAsDate,
   getFilterValueAsNumber,
   getFormatterForType,
-  getNumberFormat,
   getPercentageFormat,
   getOperatorDefinition,
   truncateText,
