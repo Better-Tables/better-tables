@@ -34,7 +34,7 @@ language, this policy wins.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001  | CI gates every package (typecheck, lint, tests) | P1 | S | 012+013 (DONE) | DONE (2026-07-13: reviewer APPROVED, merged to local main — paths cover all packages, Bun pinned 1.3.1, static-checks job w/ non-blocking lint, test-cli job, test-summary gates all four. First real CI run happens when the remote is restored) |
-| 002  | Stop mutations targeting the first schema table | P1 | M | — (001 rec.) | TODO |
+| 002  | Stop mutations targeting the first schema table | P1 | M | — | IN PROGRESS (executor dispatched 2026-07-13 from `0bf6c24`) |
 | 003  | Fix join count inflation on MySQL/SQLite | P1 | S | — | TODO |
 | 004  | Validate URL-deserialized state, fail closed | P1 | M | baseline (merged) | DONE (2026-07-13: reviewer APPROVED — `isFilterStateShape` boundary guard, fail-closed drops w/ value-free warnings, pagination clamping, 7 new tests (core 1007/0); merged to local main at `ce9f1ea`) |
 | 005  | Builder type inference end-to-end | P1 | L | 001 (DONE) | DONE (2026-07-13: merged to local main at `97cd354` — accessor/options infer real value types end-to-end, `defineColumns` replaces the `any` erasure at `BetterTable`, zero `as string` casts left in the demo; step 3 skipped per plan 011; changeset for `@better-tables/core`/`@better-tables/ui` minor) |
@@ -45,6 +45,7 @@ language, this policy wins.
 | 010  | UI hooks correctness + first UI test harness | P2 | L | 001 | TODO |
 | 011  | Design: Better-Auth-style config + path-typed table definitions | P1 | L (design) | — (co-evolves with 006; informs 005 step 3) | DONE (2026-07-12: reviewer APPROVED, merged to local main at `a82dd7a` on maintainer instruction. Perf gate: 199k instantiations / 1.03s, 10× under budget. Design content awaiting maintainer read — 5 open questions at the end of the doc. 005 step 3 skip-condition active pending maintainer approval of the design direction) |
 | 012  | Repair verification baseline (lockfile sync, CLI/commander-14 fix) | P0 | M | — | DONE (2026-07-13: absorbed into 013's branch via cherry-pick; merged to local main at `e30ba00`) |
+| 014  | Literal-preserving `.id()` (registry keystone) | P1 | S–M | 005 (DONE) | IN PROGRESS (executor dispatched 2026-07-13 from `0bf6c24`; unblocks contract-v2 implementation + defineTable) |
 | 013  | Finish verification baseline (typecheck green, script unification, turbo, lint) | P0 | M–L | 012 commits (cherry-picked) | DONE (2026-07-13: reviewer APPROVED after re-running all gates — frozen install 0, root turbo typecheck 8/8, per-package typecheck 0×4, core 984/cli 127/drizzle-SQLite suites green, lint 162→71 errors; merged to local main at `e30ba00`. One REVISE round + two session-limit resumes along the way) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
