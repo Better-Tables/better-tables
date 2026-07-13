@@ -24,10 +24,7 @@
       "@better-tables/core": ["./packages/core/src"],
       "@better-tables/ui": ["./packages/ui/src"],
       "@better-tables/adapters-toolkit": ["./packages/adapters/toolkit/src"],
-      "@better-tables/drizzle": ["./packages/adapters/drizzle/src"],
-      "@better-tables/rest": ["./packages/adapters/rest/src"],
-      "@better-tables/memory": ["./packages/adapters/memory/src"],
-      "@better-tables/pro": ["./packages/pro/src"]
+      "@better-tables/drizzle": ["./packages/adapters/drizzle/src"]
     }
   },
   "exclude": ["node_modules", "dist", "build", ".next"]
