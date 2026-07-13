@@ -25,9 +25,10 @@ export const tickets = sqliteTable('support_tickets', {
   customerId: integer('customer_id')
     .notNull()
     .references(() => customers.id),
-  assigneeId: integer('assignee_id')
-    .notNull()
-    .references(() => assignees.id),
+  // Nullable: an unassigned ticket is valid data, and is what the
+  // null-only-filter showcase (assignee.name includeNull:true, no values --
+  // plan 027) filters for.
+  assigneeId: integer('assignee_id').references(() => assignees.id),
   slaBreached: integer('sla_breached', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
@@ -51,10 +52,31 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
   }),
 }));
 
+/**
+ * Standalone, denormalized bulk dataset for the `big-board` virtualization
+ * example (10k+ rows). Deliberately NOT joined to `customers`/`assignees` --
+ * the point of this table is row COUNT and dynamic row height (an
+ * expandable `description`), not relationship filtering (that's what
+ * `tickets` is for); keeping it separate also means seeding 10k+ synthetic
+ * rows here never changes the curated 20-ticket dataset the other three
+ * examples describe and count on screen.
+ */
+export const bulkTickets = sqliteTable('support_tickets_bulk', {
+  id: integer('id').primaryKey(),
+  subject: text('subject').notNull(),
+  status: text('status', { enum: ['open', 'pending', 'resolved', 'escalated'] }).notNull(),
+  priority: text('priority', { enum: ['low', 'medium', 'high', 'urgent'] }).notNull(),
+  customerName: text('customer_name').notNull(),
+  assigneeName: text('assignee_name').notNull(),
+  description: text('description').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 export const supportSchema = {
   customers,
   assignees,
   tickets,
+  bulkTickets,
 };
 
 export const supportRelationsSchema = {
@@ -66,6 +88,7 @@ export const supportRelationsSchema = {
 export type SupportCustomer = typeof customers.$inferSelect;
 export type SupportAssignee = typeof assignees.$inferSelect;
 export type SupportTicket = typeof tickets.$inferSelect;
+export type BulkTicket = typeof bulkTickets.$inferSelect;
 
 export type TicketWithRelations = SupportTicket & {
   customer?: SupportCustomer | null;

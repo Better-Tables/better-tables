@@ -1,6 +1,7 @@
 import type { FetchDataResult, FilterGroupNode, FilterState, SortingState } from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
-import { getSupportAdapter } from './adapter';
+import { allTicketColumnIds } from './columns';
+import { getSupportTables } from './db';
 import type { TicketWithRelations } from './schema';
 
 export interface FetchTicketsParams {
@@ -32,11 +33,23 @@ export async function fetchTickets({
   const flatFilters = flattenFilters(filters);
 
   try {
-    const adapter = await getSupportAdapter();
-    const result = (await adapter.fetchData({
+    const supportTables = await getSupportTables();
+    const result = (await supportTables.database.fetchData({
       pagination: { page, limit },
       filters,
       sorting,
+      // DX-FINDING-9: omitting `primaryTable` on this multi-table schema
+      // silently returns `customers` rows (the first table in schema key
+      // order) instead of tickets, with only a console.warn -- see
+      // plans/findings/029-dx-findings.md #9.
+      primaryTable: 'tickets',
+      // DX-FINDING-10: a relation (customer/assignee) is silently ABSENT
+      // from result rows unless its dot-path is named here, even though
+      // filtering/sorting by it works without it -- see
+      // plans/findings/029-dx-findings.md #10. Every column id is passed
+      // (not just the default-visible ones) because column visibility
+      // toggling is client-side only, with no refetch.
+      columns: allTicketColumnIds,
     })) as FetchDataResult<TicketWithRelations>;
 
     return {

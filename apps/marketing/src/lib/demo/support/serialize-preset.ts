@@ -1,37 +1,21 @@
-import type { FilterGroupNode, FilterState, SortingState } from '@better-tables/core';
-import { serializeFiltersToURL } from '@better-tables/core';
-import LZString from 'lz-string';
+import { serializeTableStateToUrl } from '@better-tables/core';
 import type { SupportScenarioPreset } from './relationship-trail';
 
-function serializeSortingToUrl(sorting: SortingState): string {
-  const shortened = sorting.map((item) => ({
-    c: item.columnId,
-    d: item.direction,
-  }));
-  const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(shortened));
-  return `c:${compressed}`;
-}
-
+/**
+ * DX-FINDING-3: the WIP originally hand-rolled sorting compression with the
+ * `lz-string` package (not installed -- compile error) because
+ * `serializeFiltersToURL` only covers filters. `@better-tables/core` already
+ * exports `serializeTableStateToUrl`, which serializes filters + sorting (+
+ * pagination/columnVisibility/columnOrder) together using the package's OWN
+ * built-in compression -- no external dependency needed. See
+ * plans/findings/029-dx-findings.md #3.
+ */
 export function serializeSupportPresetToUrl(
   preset: Pick<SupportScenarioPreset, 'filters' | 'sorting'>
 ): Record<string, string | null> {
-  const params: Record<string, string | null> = {
-    page: '1',
-    limit: '10',
-  };
-
-  const isEmptyArray = Array.isArray(preset.filters) && preset.filters.length === 0;
-  params.filters = isEmptyArray ? null : serializeFiltersToURL(preset.filters);
-
-  if (preset.sorting && preset.sorting.length > 0) {
-    params.sorting = serializeSortingToUrl(preset.sorting);
-  } else {
-    params.sorting = null;
-  }
-
-  return params;
-}
-
-export function isRelationshipFilter(filter: FilterState | FilterGroupNode): filter is FilterState {
-  return 'columnId' in filter;
+  return serializeTableStateToUrl({
+    filters: preset.filters,
+    sorting: preset.sorting ?? [],
+    pagination: { page: 1, limit: 10, totalPages: 0, hasNext: false, hasPrev: false },
+  });
 }
