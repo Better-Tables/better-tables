@@ -39,8 +39,8 @@
  */
 
 import { FilterRouter, FilterRouterError } from '@better-tables/adapters-toolkit';
-import type { ColumnType, FilterOperator, FilterState } from '@better-tables/core';
-import { validateOperatorValues } from '@better-tables/core';
+import type { ColumnType, FilterGroupNode, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
+import { flattenFilterNode, validateOperatorValues } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import { and, or, sql } from 'drizzle-orm';
 import { DrizzlePredicateEmitter } from './drizzle-predicate-emitter';
@@ -54,6 +54,31 @@ import type {
   FilterHandlerHooks,
 } from './types';
 import { QueryError } from './types';
+
+/**
+ * Collect every {@link FilterState} leaf out of a `filters` value that may be
+ * a flat implicit-AND array or a {@link FilterGroupNode} tree (plan 017).
+ *
+ * @description
+ * Used wherever a caller needs the full, order-preserving set of columns a
+ * filters value actually references — regardless of AND/OR nesting — most
+ * importantly for JOIN planning (`RelationshipManager.buildQueryContext`
+ * needs every leaf's `columnId`, or joins required by a leaf buried inside a
+ * group would be silently missing from the query). A bare array is returned
+ * unchanged (already leaves); a tree is flattened via core's
+ * `flattenFilterNode`.
+ */
+export function collectFilterLeaves(
+  filters: FilterState[] | FilterGroupNode | undefined
+): FilterState[] {
+  if (filters === undefined) {
+    return [];
+  }
+  if (Array.isArray(filters)) {
+    return filters;
+  }
+  return flattenFilterNode(filters);
+}
 
 /**
  * Filter handler that maps Better Tables filter operators to Drizzle conditions.
@@ -220,6 +245,69 @@ export class FilterHandler {
   }
 
   /**
+   * Validate and build a single filter leaf's condition (plan 017 extracted
+   * this from {@link handleCrossTableFilters}'s loop body so both the flat
+   * path and {@link buildTreeCondition}'s recursive walk share one leaf
+   * contract). Returns `undefined` to mean "skip this leaf" — either because
+   * core/adapter validation rejects it (silently, to tolerate partial filter
+   * states from the UI) or because {@link buildFilterCondition} itself found
+   * no condition to build (e.g. empty values).
+   *
+   * @throws {Error} Wraps any resolution/build error with the offending
+   *   `columnId`, surfacing it instead of silently swallowing it.
+   */
+  private buildLeafCondition(
+    filter: FilterState,
+    primaryTable: string
+  ): SQL | SQLWrapper | undefined {
+    try {
+      // Validate filter values before processing
+      const validationResult = validateOperatorValues(filter.operator, filter.values, filter.type);
+      if (validationResult !== true) {
+        // Check if the operator is supported by this adapter even if core doesn't recognize it
+        // Only check adapter support if we have a valid filter type
+        // Without a type, we can't safely determine which operators are supported
+        let isSupportedByAdapter = false;
+        if (filter.type) {
+          const supportedOperators = this.getSupportedOperators(filter.type);
+          isSupportedByAdapter = supportedOperators.includes(filter.operator);
+        }
+
+        // If operator is supported by adapter, allow it even if core validation fails
+        // This handles cases like notEquals for text columns, where core only defines it for numbers
+        if (isSupportedByAdapter) {
+          // Operator is supported by adapter, proceed with building condition
+          // But first ensure values are valid to avoid runtime errors (e.g. undefined operands)
+          const expectedCount = this.getExpectedValueCount(filter.operator);
+          const hasValidValues =
+            expectedCount === 0 || (filter.values && filter.values.length >= expectedCount);
+
+          if (!hasValidValues || (expectedCount > 0 && filter.values.some((v) => v === undefined))) {
+            // Skip invalid filters silently - this allows for partial filter states in UI
+            return undefined;
+          }
+        } else if (typeof validationResult === 'string') {
+          // Operator is not supported by adapter or validation failed
+          // We skip these silently to allow for partial states
+          return undefined;
+        } else {
+          // Skip invalid filters silently for value validation errors
+          return undefined;
+        }
+      }
+
+      const condition = this.buildFilterCondition(filter, primaryTable);
+      // undefined means empty/invalid filter - treat the same as "skip"
+      return condition !== undefined && condition !== null ? condition : undefined;
+    } catch (error) {
+      // Re-throw the error to surface the issue instead of silently ignoring it
+      throw new Error(
+        `Invalid filter configuration for column '${filter.columnId}': ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
    * Handle cross-table filters
    */
   handleCrossTableFilters(
@@ -233,88 +321,48 @@ export class FilterHandler {
     const requiredJoins = new Set<string>();
 
     for (const filter of filters) {
-      try {
-        // Validate filter values before processing
-        const validationResult = validateOperatorValues(
-          filter.operator,
-          filter.values,
-          filter.type
-        );
-        if (validationResult !== true) {
-          // Check if the operator is supported by this adapter even if core doesn't recognize it
-          // Only check adapter support if we have a valid filter type
-          // Without a type, we can't safely determine which operators are supported
-          let isSupportedByAdapter = false;
-          if (filter.type) {
-            const supportedOperators = this.getSupportedOperators(filter.type);
-            isSupportedByAdapter = supportedOperators.includes(filter.operator);
-          }
-
-          // If operator is supported by adapter, allow it even if core validation fails
-          // This handles cases like notEquals for text columns, where core only defines it for numbers
-          if (isSupportedByAdapter) {
-            // Operator is supported by adapter, proceed with building condition
-            // But first ensure values are valid to avoid runtime errors (e.g. undefined operands)
-            const expectedCount = this.getExpectedValueCount(filter.operator);
-            const hasValidValues =
-              expectedCount === 0 || (filter.values && filter.values.length >= expectedCount);
-
-            if (
-              !hasValidValues ||
-              (expectedCount > 0 && filter.values.some((v) => v === undefined))
-            ) {
-              // Skip invalid filters silently - this allows for partial filter states in UI
-              continue;
-            }
-          } else if (typeof validationResult === 'string') {
-            // Operator is not supported by adapter or validation failed
-            // We skip these silently to allow for partial states
-            continue;
-          } else {
-            // Skip invalid filters silently for value validation errors
-            continue;
-          }
-        }
-
-        const columnPath = this.relationshipManager.resolveColumnPath(
-          filter.columnId,
-          primaryTable
-        );
-
-        if (columnPath.isNested && columnPath.relationshipPath) {
-          // Add required joins
-          for (const relationship of columnPath.relationshipPath) {
-            requiredJoins.add(relationship.to);
-          }
-        }
-
-        const condition = this.buildFilterCondition(filter, primaryTable);
-        // Only add condition if it's defined (undefined means empty/invalid filter)
-        if (condition !== undefined && condition !== null) {
-          conditions.push(condition);
-        }
-      } catch (error) {
-        // Re-throw the error to surface the issue instead of silently ignoring it
-        throw new Error(
-          `Invalid filter configuration for column '${filter.columnId}': ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
+      const condition = this.buildLeafCondition(filter, primaryTable);
+      if (condition === undefined) {
+        continue;
       }
+
+      const columnPath = this.relationshipManager.resolveColumnPath(filter.columnId, primaryTable);
+      if (columnPath.isNested && columnPath.relationshipPath) {
+        // Add required joins
+        for (const relationship of columnPath.relationshipPath) {
+          requiredJoins.add(relationship.to);
+        }
+      }
+
+      conditions.push(condition);
     }
 
     return { conditions, requiredJoins };
   }
 
   /**
-   * Build compound filter conditions
+   * Recursively translate a {@link FilterNode} — a filter leaf or a nested
+   * AND/OR {@link FilterGroupNode} — into a single combined SQL condition
+   * (plan 017; design `plans/design/core-contract-v2.md` §1.5).
    *
-   * NOTE(plan-017): this flat and()/or() over per-filter leaf conditions —
-   * together with `applyFilters` in base-query-builder.ts — is where the
-   * recursive AND/OR filter-group walk from the contract-v2 design doc
-   * (plans/design/core-contract-v2.md §1.5) will slot in: a group node's
-   * children each resolve to a condition via `buildFilterCondition` (leaves)
-   * or recursion (subgroups), then combine with and()/or() by node logic.
-   * The router/emitter split underneath is already shaped for it — the
-   * router owns condition COMBINATION, the emitter owns leaf predicates.
+   * @description
+   * Delegates node classification (leaf vs. group) and AND/OR combination to
+   * the toolkit's `FilterRouter.buildNodeCondition`, supplying
+   * {@link buildLeafCondition} as the leaf resolver so cross-table column
+   * resolution, JSONB extraction, and the existing validate/skip semantics
+   * apply identically inside a group as they do for a flat `FilterState[]`.
+   *
+   * @returns `undefined` when the tree has no surviving conditions (e.g. an
+   *   empty group, or every leaf resolved to `undefined`)
+   */
+  buildTreeCondition(node: FilterNode, primaryTable: string): SQL | SQLWrapper | undefined {
+    return this.router.buildNodeCondition(node, (leaf) =>
+      this.buildLeafCondition(leaf, primaryTable)
+    );
+  }
+
+  /**
+   * Build compound filter conditions
    */
   buildCompoundConditions(
     filters: FilterState[],

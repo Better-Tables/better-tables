@@ -23,8 +23,8 @@
  * single leaf predicate or combines predicates the router hands it.
  */
 
-import type { ColumnType, FilterOperator } from '@better-tables/core';
-import { getOperatorDefinition, validateOperatorValues } from '@better-tables/core';
+import type { ColumnType, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
+import { getOperatorDefinition, isFilterGroupNode, validateOperatorValues } from '@better-tables/core';
 
 /**
  * Thrown by {@link FilterRouter.mapOperatorToCondition} when an operator
@@ -235,16 +235,13 @@ export class FilterRouter<TColumn, TPredicate> {
    * multiple leaves) is ROUTER responsibility — the emitter only ever
    * builds or combines the predicates it's handed.
    *
-   * NOTE(plan-017): today `values`/`operator` always describe a single flat
-   * `FilterState` leaf, and callers combine multiple filters with a flat
-   * `and(...)` one level up (see `FilterHandler.handleCrossTableFilters` /
-   * `buildCompoundConditions` in the Drizzle package, and
-   * `base-query-builder.ts`'s `applyFilters`). Plan 017's recursive AND/OR
-   * filter-group walk slots in at that same "combine multiple leaves"
-   * layer — it doesn't change this method's leaf-emission contract at all,
-   * since a filter *group* is just a node whose children are recursively
-   * resolved to conditions and then combined via `emitter.and`/`emitter.or`,
-   * exactly like this method already does for the `includeNull` branch.
+   * `values`/`operator` always describe a single flat `FilterState` leaf;
+   * combining multiple leaves (including a `FilterGroupNode`'s children) is
+   * the router's {@link FilterRouter.buildNodeCondition}, which recurses over
+   * a `FilterNode` tree and combines child conditions via
+   * `emitter.and`/`emitter.or` — exactly like this method already does for
+   * the `includeNull` branch. This method's leaf-emission contract is
+   * unchanged by that (plan 017).
    *
    * @throws {FilterRouterError} If the operator matches no known category
    */
@@ -307,6 +304,53 @@ export class FilterRouter<TColumn, TPredicate> {
     // When includeNull is true, we want: (main_condition OR column IS NULL)
     // For other cases (shouldn't happen, but defensive), use AND
     return includeNull ? this.emitter.or(...conditions) : this.emitter.and(...conditions);
+  }
+
+  /**
+   * Recursively translate a {@link FilterNode} — a filter leaf or a nested
+   * AND/OR {@link FilterGroupNode} — into a single combined predicate
+   * (plan 017).
+   *
+   * @description
+   * ORM-agnostic half of the group-translation walk: this method owns
+   * classifying a node as leaf vs. group and combining child conditions with
+   * `emitter.and`/`emitter.or`, per the router/emitter split documented on
+   * {@link mapOperatorToCondition}. It never resolves a column or constructs
+   * a leaf predicate itself — that's dialect-specific (column path
+   * resolution, cross-table joins, JSONB extraction, ...), so leaf
+   * resolution is supplied by the caller as `leafCondition`. This keeps the
+   * walk generic over any adapter's own leaf-building logic (e.g. Drizzle's
+   * `FilterHandler.buildFilterCondition`) without adding methods to
+   * {@link PredicateEmitter}.
+   *
+   * Empty groups (all children resolved to `undefined`) collapse to
+   * `undefined`; single-survivor groups collapse to the survivor (no
+   * pointless `and()`/`or()` wrapper of one condition) — mirrors
+   * `mapOperatorToCondition`'s own single/empty-condition handling above.
+   *
+   * @param node - A filter leaf or group node to translate
+   * @param leafCondition - Resolves a single filter leaf to a predicate (or
+   *   `undefined` for an empty/invalid leaf, e.g. no values)
+   */
+  buildNodeCondition(
+    node: FilterNode,
+    leafCondition: (leaf: FilterState) => TPredicate | undefined
+  ): TPredicate | undefined {
+    if (isFilterGroupNode(node)) {
+      const parts = node.children
+        .map((child) => this.buildNodeCondition(child, leafCondition))
+        .filter((condition): condition is TPredicate => condition !== undefined);
+
+      if (parts.length === 0) {
+        return undefined;
+      }
+      if (parts.length === 1) {
+        return parts[0];
+      }
+      return node.logic === 'or' ? this.emitter.or(...parts) : this.emitter.and(...parts);
+    }
+
+    return leafCondition(node);
   }
 
   /**
