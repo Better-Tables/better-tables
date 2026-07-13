@@ -173,7 +173,6 @@ describe('Utility Types', () => {
         value: 'John',
         column: { id: 'name', displayName: 'Name' },
         rowIndex: 0,
-        table: undefined,
       };
 
       expectTypeOf(props.row).toEqualTypeOf<User>();

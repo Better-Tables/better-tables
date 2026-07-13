@@ -12,7 +12,10 @@
     "types": ["node", "bun"],
     "moduleResolution": "bundler",
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    // Deliberate: matches adapters/toolkit + adapters/drizzle + core + ui (plan 026, DX-10).
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]

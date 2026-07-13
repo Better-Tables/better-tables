@@ -141,7 +141,7 @@ describe('FilterManager', () => {
 
       const manager = new FilterManager(mockColumns, initialFilters);
       expect(manager.getFilters()).toHaveLength(1);
-      expect(manager.getFilters()[0].columnId).toBe('name');
+      expect(manager.getFilters()[0]?.columnId).toBe('name');
     });
   });
 
@@ -207,7 +207,7 @@ describe('FilterManager', () => {
       filterManager.addFilter(filter);
       filterManager.updateFilter('name', { values: ['Jane'] });
 
-      expect(filterManager.getFilters()[0].values).toEqual(['Jane']);
+      expect(filterManager.getFilters()[0]?.values).toEqual(['Jane']);
     });
 
     it('should clear all filters', () => {
@@ -304,10 +304,10 @@ describe('FilterManager', () => {
       const numberFilters = filterManager.getFiltersByType('number');
 
       expect(textFilters).toHaveLength(1);
-      expect(textFilters[0].columnId).toBe('name');
+      expect(textFilters[0]?.columnId).toBe('name');
 
       expect(numberFilters).toHaveLength(1);
-      expect(numberFilters[0].columnId).toBe('age');
+      expect(numberFilters[0]?.columnId).toBe('age');
     });
   });
 
@@ -729,8 +729,8 @@ describe('FilterManager', () => {
       newManager.deserialize(json);
 
       expect(newManager.getFilters()).toHaveLength(2);
-      expect(newManager.getFilters()[0].columnId).toBe('name');
-      expect(newManager.getFilters()[1].columnId).toBe('age');
+      expect(newManager.getFilters()[0]?.columnId).toBe('name');
+      expect(newManager.getFilters()[1]?.columnId).toBe('age');
     });
 
     it('should handle deserialization errors', () => {
@@ -822,10 +822,7 @@ describe('FilterManager', () => {
     const tree: FilterGroupNode = {
       kind: 'group',
       logic: 'and',
-      children: [
-        statusLeaf,
-        { kind: 'group', logic: 'or', children: [nameLeaf, ageLeaf] },
-      ],
+      children: [statusLeaf, { kind: 'group', logic: 'or', children: [nameLeaf, ageLeaf] }],
     };
 
     it('flat regression: setFilters(flat) -> getFilters() behaves exactly as before', () => {
@@ -892,7 +889,7 @@ describe('FilterManager', () => {
       filterManager.setFilterNode(tree);
 
       expect(subscriber).toHaveBeenCalledTimes(1);
-      expect(subscriber.mock.calls[0][0]).toEqual({
+      expect(subscriber.mock.calls[0]?.[0]).toEqual({
         type: 'filters_replaced',
         filters: tree,
       });

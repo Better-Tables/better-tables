@@ -106,12 +106,14 @@ export function createTableStore(initialState: TableStoreInitialState) {
   const manager = new TableStateManager(
     initialState.columns,
     {
-      filters: initialState.filters,
-      pagination: initialState.pagination,
-      sorting: initialState.sorting,
-      selectedRows: initialState.selectedRows,
-      columnVisibility: initialState.columnVisibility,
-      columnOrder: initialState.columnOrder,
+      ...(initialState.filters !== undefined && { filters: initialState.filters }),
+      ...(initialState.pagination !== undefined && { pagination: initialState.pagination }),
+      ...(initialState.sorting !== undefined && { sorting: initialState.sorting }),
+      ...(initialState.selectedRows !== undefined && { selectedRows: initialState.selectedRows }),
+      ...(initialState.columnVisibility !== undefined && {
+        columnVisibility: initialState.columnVisibility,
+      }),
+      ...(initialState.columnOrder !== undefined && { columnOrder: initialState.columnOrder }),
     },
     initialState.config
   );

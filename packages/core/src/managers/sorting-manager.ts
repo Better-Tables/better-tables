@@ -361,8 +361,9 @@ export class SortingManager<TData = unknown> extends Subscribable<SortingManager
    */
   updateSort(columnId: string, direction: SortDirection): void {
     const index = this.sortingState.findIndex((s) => s.columnId === columnId);
-    if (index >= 0) {
-      const sort = { ...this.sortingState[index], direction };
+    const existing = index >= 0 ? this.sortingState[index] : undefined;
+    if (existing !== undefined) {
+      const sort = { ...existing, direction };
       this.sortingState[index] = sort;
       this.notify({ type: 'sort_updated', columnId, sort });
       this.notify({
@@ -631,8 +632,10 @@ export class SortingManager<TData = unknown> extends Subscribable<SortingManager
       this.clearSorting();
     } else if (!this.config.multiSort && this.sortingState.length > 1) {
       // Keep only the first sort if multi-sort is disabled
-      const firstSort = this.sortingState[0];
-      this.setSorting([firstSort]);
+      const [firstSort] = this.sortingState;
+      if (firstSort !== undefined) {
+        this.setSorting([firstSort]);
+      }
     } else if (this.sortingState.length > (this.config.maxSortColumns || 1)) {
       // Trim to max columns
       this.setSorting(this.sortingState.slice(0, this.config.maxSortColumns || 1));

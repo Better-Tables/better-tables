@@ -414,8 +414,8 @@ export function autoGroupFilters<TData = unknown>(
       groups.push({
         id: groupLabel.toLowerCase().replace(/\s+/g, '-'),
         label: groupLabel,
-        icon,
         columns: columnIds,
+        ...(icon !== undefined && { icon }),
       });
     }
   }

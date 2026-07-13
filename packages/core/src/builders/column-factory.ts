@@ -344,9 +344,7 @@ export function validateColumns(columns: ColumnDefinition[]): {
   const errors: string[] = [];
   const usedIds = new Set<string>();
 
-  for (let i = 0; i < columns.length; i++) {
-    const column = columns[i];
-
+  for (const [i, column] of columns.entries()) {
     // Check required fields
     if (!column.id) {
       errors.push(`Column at index ${i} is missing required 'id' field`);

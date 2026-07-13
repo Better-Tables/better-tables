@@ -352,8 +352,8 @@ describe('SelectionManager', () => {
     it('should get selected rows', () => {
       const selectedRows = manager.getSelectedRows();
       expect(selectedRows).toHaveLength(2);
-      expect(selectedRows[0].name).toBe('Alice');
-      expect(selectedRows[1].name).toBe('Bob');
+      expect(selectedRows[0]?.name).toBe('Alice');
+      expect(selectedRows[1]?.name).toBe('Bob');
     });
 
     it('should get selection count', () => {

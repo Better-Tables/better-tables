@@ -103,8 +103,8 @@ export function FilterValueInput<TData = unknown>({
             filter={filter}
             column={column}
             onChange={onChange}
-            onOperatorChange={onOperatorChange}
             disabled={disabled}
+            {...(onOperatorChange !== undefined && { onOperatorChange })}
           />
         );
 

@@ -208,6 +208,52 @@ function getBooleanValue(
   return typeof value === 'boolean' ? value : defaultValue;
 }
 
+// Mutable working copy of `NumberInputConfig` where every field is a plain
+// `T | undefined` rather than an *optional* `T`. This lets the builder below
+// freely reassign fields (including back to `undefined`) without tripping
+// `exactOptionalPropertyTypes`, which only constrains `?:` properties. The
+// final `buildNumberInputConfig` step re-applies exactness via conditional
+// spread when producing the real `NumberInputConfig`.
+interface NumberInputConfigDraft {
+  type: 'number' | 'currency' | 'percentage';
+  locale: string;
+  currency: string | undefined;
+  decimals: number | undefined;
+  minDecimals: number | undefined;
+  maxDecimals: number | undefined;
+  useGrouping: boolean;
+  prefix: string | undefined;
+  suffix: string | undefined;
+  allowNegative: boolean;
+  allowDecimal: boolean;
+  placeholder: string | undefined;
+  min: number | undefined;
+  max: number | undefined;
+  step: number | undefined;
+  percentageFormat: 'decimal' | 'percentage' | undefined;
+}
+
+function buildNumberInputConfig(draft: NumberInputConfigDraft): NumberInputConfig {
+  return {
+    type: draft.type,
+    locale: draft.locale,
+    useGrouping: draft.useGrouping,
+    allowNegative: draft.allowNegative,
+    allowDecimal: draft.allowDecimal,
+    ...(draft.currency !== undefined && { currency: draft.currency }),
+    ...(draft.decimals !== undefined && { decimals: draft.decimals }),
+    ...(draft.minDecimals !== undefined && { minDecimals: draft.minDecimals }),
+    ...(draft.maxDecimals !== undefined && { maxDecimals: draft.maxDecimals }),
+    ...(draft.prefix !== undefined && { prefix: draft.prefix }),
+    ...(draft.suffix !== undefined && { suffix: draft.suffix }),
+    ...(draft.placeholder !== undefined && { placeholder: draft.placeholder }),
+    ...(draft.min !== undefined && { min: draft.min }),
+    ...(draft.max !== undefined && { max: draft.max }),
+    ...(draft.step !== undefined && { step: draft.step }),
+    ...(draft.percentageFormat !== undefined && { percentageFormat: draft.percentageFormat }),
+  };
+}
+
 /**
  * Get input configuration based on column type and metadata
  */
@@ -215,82 +261,90 @@ export function getNumberInputConfig(
   columnType: string,
   columnMeta?: Record<string, unknown>
 ): NumberInputConfig {
-  const baseConfig: NumberInputConfig = {
+  const draft: NumberInputConfigDraft = {
     type: 'number',
     locale: 'en-US',
+    currency: undefined,
+    decimals: undefined,
+    minDecimals: undefined,
+    maxDecimals: undefined,
+    useGrouping: true,
+    prefix: undefined,
+    suffix: undefined,
     allowNegative: true,
     allowDecimal: true,
-    useGrouping: true,
+    placeholder: undefined,
+    min: undefined,
+    max: undefined,
+    step: undefined,
+    percentageFormat: undefined,
   };
 
   // Column type specific configuration
   switch (columnType) {
     case 'currency':
-      baseConfig.type = 'currency';
-      baseConfig.currency = getStringValue(columnMeta || {}, 'currency') || 'USD';
-      baseConfig.decimals = getNumberValue(columnMeta || {}, 'decimals') ?? 2;
-      baseConfig.minDecimals = 2;
-      baseConfig.maxDecimals = 2;
-      baseConfig.placeholder = 'Enter amount...';
+      draft.type = 'currency';
+      draft.currency = getStringValue(columnMeta || {}, 'currency') || 'USD';
+      draft.decimals = getNumberValue(columnMeta || {}, 'decimals') ?? 2;
+      draft.minDecimals = 2;
+      draft.maxDecimals = 2;
+      draft.placeholder = 'Enter amount...';
       break;
 
     case 'percentage': {
       const percentageMeta = (columnMeta?.percentage ?? {}) as Record<string, unknown>;
-      baseConfig.type = 'percentage';
-      baseConfig.locale =
+      draft.type = 'percentage';
+      draft.locale =
         getStringValue(percentageMeta, 'locale') ||
         getStringValue(columnMeta || {}, 'locale') ||
-        baseConfig.locale;
-      baseConfig.decimals =
+        draft.locale;
+      draft.decimals =
         getNumberValue(percentageMeta, 'maximumFractionDigits') ??
         getNumberValue(columnMeta || {}, 'decimals') ??
         2;
-      baseConfig.minDecimals =
+      draft.minDecimals =
         getNumberValue(percentageMeta, 'minimumFractionDigits') ??
         getNumberValue(columnMeta || {}, 'minDecimals') ??
         0;
-      baseConfig.maxDecimals =
+      draft.maxDecimals =
         getNumberValue(percentageMeta, 'maximumFractionDigits') ??
         getNumberValue(columnMeta || {}, 'maxDecimals') ??
         2;
-      baseConfig.percentageFormat =
+      draft.percentageFormat =
         getStringValue(percentageMeta, 'format') === 'percentage' ? 'percentage' : 'decimal';
-      baseConfig.placeholder = 'Enter percentage...';
-      baseConfig.min = 0;
-      baseConfig.max = 100;
+      draft.placeholder = 'Enter percentage...';
+      draft.min = 0;
+      draft.max = 100;
       break;
     }
 
     default:
-      baseConfig.type = 'number';
-      baseConfig.decimals = getNumberValue(columnMeta || {}, 'decimals');
-      baseConfig.minDecimals = getNumberValue(columnMeta || {}, 'minDecimals');
-      baseConfig.maxDecimals = getNumberValue(columnMeta || {}, 'maxDecimals');
-      baseConfig.placeholder = 'Enter number...';
+      draft.type = 'number';
+      draft.decimals = getNumberValue(columnMeta || {}, 'decimals');
+      draft.minDecimals = getNumberValue(columnMeta || {}, 'minDecimals');
+      draft.maxDecimals = getNumberValue(columnMeta || {}, 'maxDecimals');
+      draft.placeholder = 'Enter number...';
       break;
   }
 
   // Override with column metadata
   if (columnMeta) {
-    return {
-      ...baseConfig,
-      locale: getStringValue(columnMeta, 'locale') || baseConfig.locale,
-      currency: getStringValue(columnMeta, 'currency') || baseConfig.currency,
-      decimals: getNumberValue(columnMeta, 'decimals') ?? baseConfig.decimals,
-      minDecimals: getNumberValue(columnMeta, 'minDecimals') ?? baseConfig.minDecimals,
-      maxDecimals: getNumberValue(columnMeta, 'maxDecimals') ?? baseConfig.maxDecimals,
-      useGrouping: getBooleanValue(columnMeta, 'useGrouping') ?? baseConfig.useGrouping,
-      prefix: getStringValue(columnMeta, 'prefix') || baseConfig.prefix,
-      suffix: getStringValue(columnMeta, 'suffix') || baseConfig.suffix,
-      allowNegative: getBooleanValue(columnMeta, 'allowNegative') ?? baseConfig.allowNegative,
-      allowDecimal: getBooleanValue(columnMeta, 'allowDecimal') ?? baseConfig.allowDecimal,
-      min: getNumberValue(columnMeta, 'min') ?? baseConfig.min,
-      max: getNumberValue(columnMeta, 'max') ?? baseConfig.max,
-      step: getNumberValue(columnMeta, 'step') ?? baseConfig.step,
-    };
+    draft.locale = getStringValue(columnMeta, 'locale') || draft.locale;
+    draft.currency = getStringValue(columnMeta, 'currency') || draft.currency;
+    draft.decimals = getNumberValue(columnMeta, 'decimals') ?? draft.decimals;
+    draft.minDecimals = getNumberValue(columnMeta, 'minDecimals') ?? draft.minDecimals;
+    draft.maxDecimals = getNumberValue(columnMeta, 'maxDecimals') ?? draft.maxDecimals;
+    draft.useGrouping = getBooleanValue(columnMeta, 'useGrouping') ?? draft.useGrouping;
+    draft.prefix = getStringValue(columnMeta, 'prefix') || draft.prefix;
+    draft.suffix = getStringValue(columnMeta, 'suffix') || draft.suffix;
+    draft.allowNegative = getBooleanValue(columnMeta, 'allowNegative') ?? draft.allowNegative;
+    draft.allowDecimal = getBooleanValue(columnMeta, 'allowDecimal') ?? draft.allowDecimal;
+    draft.min = getNumberValue(columnMeta, 'min') ?? draft.min;
+    draft.max = getNumberValue(columnMeta, 'max') ?? draft.max;
+    draft.step = getNumberValue(columnMeta, 'step') ?? draft.step;
   }
 
-  return baseConfig;
+  return buildNumberInputConfig(draft);
 }
 
 /**

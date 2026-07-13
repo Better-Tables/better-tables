@@ -211,7 +211,7 @@ export class DateColumnBuilder<
         'isThisYear',
       ],
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;

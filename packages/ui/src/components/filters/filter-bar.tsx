@@ -296,7 +296,6 @@ export function FilterBar<TData = unknown>({
             <div className="shrink-0">
               <FilterDropdown
                 columns={availableColumns}
-                groups={showGroups ? effectiveGroups : undefined}
                 onSelect={handleAddFilter}
                 open={isDropdownOpen}
                 onOpenChange={setIsDropdownOpen}
@@ -305,6 +304,7 @@ export function FilterBar<TData = unknown>({
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 disabled={disabled}
+                {...(showGroups && effectiveGroups !== undefined && { groups: effectiveGroups })}
               >
                 <FilterButton
                   hasFilters={hasFilters}
@@ -324,9 +324,9 @@ export function FilterBar<TData = unknown>({
                 filters={filters}
                 onUpdateFilter={handleUpdateFilter}
                 onRemoveFilter={handleRemoveFilter}
-                isFilterProtected={isFilterProtected}
                 disabled={disabled}
-                className={theme?.activeFilters}
+                {...(isFilterProtected !== undefined && { isFilterProtected })}
+                {...(theme?.activeFilters !== undefined && { className: theme.activeFilters })}
               />
             )}
           </div>
@@ -352,10 +352,10 @@ export function FilterBar<TData = unknown>({
             columns={columns}
             columnVisibility={columnVisibility}
             onToggleVisibility={onToggleColumnVisibility}
-            columnOrder={columnOrder}
-            onResetColumnOrder={onResetColumnOrder}
             enableReordering={enableColumnReordering}
             disabled={disabled}
+            {...(columnOrder !== undefined && { columnOrder })}
+            {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
           />
         )}
       </div>

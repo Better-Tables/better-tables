@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { VirtualizationManager } from '../../src/managers/virtualization-manager';
 import type { ScrollInfo, VirtualizationConfig } from '../../src/types/virtualization';
+import { assertDefined } from '../../src/utils/assert-defined';
 
 describe('VirtualizationManager', () => {
   let manager: VirtualizationManager;
@@ -129,8 +130,8 @@ describe('VirtualizationManager', () => {
 
       // Should include overscan (2 before + visible + 2 after)
       expect(virtualRows.length).toBe(14); // 2 + 10 + 2
-      expect(virtualRows[0].index).toBe(2); // overscan before
-      expect(virtualRows[virtualRows.length - 1].index).toBe(15); // overscan after
+      expect(virtualRows[0]?.index).toBe(2); // overscan before
+      expect(virtualRows.at(-1)?.index).toBe(15); // overscan after
     });
   });
 
@@ -568,7 +569,9 @@ describe('VirtualizationManager', () => {
       expect(rows.length).toBeGreaterThan(1);
 
       for (let i = 1; i < rows.length; i++) {
-        expect(rows[i].start).toBe(rows[i - 1].end);
+        const row = assertDefined(rows[i], `rows[${i}] missing`);
+        const prevRow = assertDefined(rows[i - 1], `rows[${i - 1}] missing`);
+        expect(row.start).toBe(prevRow.end);
       }
     });
   });

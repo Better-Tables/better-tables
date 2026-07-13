@@ -215,12 +215,12 @@ export function VirtualizedTable<T = unknown>({
       defaultRowHeight: rowHeight,
       dynamicRowHeight,
       containerHeight: typeof height === 'number' ? height : 400,
-      containerWidth: typeof width === 'number' ? width : undefined,
+      ...(typeof width === 'number' && { containerWidth: width }),
       overscan: 5,
       smoothScrolling: true,
       ...virtualization,
-      onScroll,
-      onViewportChange,
+      ...(onScroll !== undefined && { onScroll }),
+      ...(onViewportChange !== undefined && { onViewportChange }),
     }),
     [
       data.length,
@@ -369,8 +369,8 @@ export function VirtualizedTable<T = unknown>({
                     index={virtualRow.index}
                     columns={columns}
                     style={rowStyle}
-                    renderCell={renderCell}
-                    onRowClick={onRowClick}
+                    {...(renderCell !== undefined && { renderCell })}
+                    {...(onRowClick !== undefined && { onRowClick })}
                     onMeasure={onMeasure}
                   />
                 );
@@ -395,7 +395,7 @@ export function VirtualizedTable<T = unknown>({
           <span>
             Visible:{' '}
             {virtualRows.length > 0
-              ? `${virtualRows[0].index}-${virtualRows[virtualRows.length - 1].index}`
+              ? `${virtualRows[0]?.index}-${virtualRows[virtualRows.length - 1]?.index}`
               : 'None'}
           </span>
         </div>

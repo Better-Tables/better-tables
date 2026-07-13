@@ -4,6 +4,7 @@
 // export * from './sort-comparator';
 // export * from './export-utils';
 // export * from './validation';
+export * from './assert-defined';
 export * from './auto-group-filters';
 export * from './column-order';
 export * from './column-visibility';

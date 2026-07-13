@@ -507,8 +507,6 @@ function FilterValueDisplay<TData = unknown>({ filter, column }: FilterValueDisp
         locale: 'en-US',
         showTime: column.filter?.includeTime || false,
         showRelative: false,
-        timeZone: undefined,
-        relativeOptions: undefined,
       };
 
       const startDate = getFilterValueAsDate(filter, 0);

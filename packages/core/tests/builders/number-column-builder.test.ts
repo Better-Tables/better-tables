@@ -423,10 +423,11 @@ describe('NumberColumnBuilder Enhancements', () => {
         .id('price')
         .displayName('Price')
         .accessor((product) => product.price)
+        // Omitting these (rather than passing `undefined` explicitly) is the
+        // exactOptionalPropertyTypes-correct way to express "use the default";
+        // `.format()` treats the two identically (see number-column-builder.ts).
         .format({
           locale: 'en-US',
-          minimumFractionDigits: undefined,
-          maximumFractionDigits: undefined,
         })
         .build();
 

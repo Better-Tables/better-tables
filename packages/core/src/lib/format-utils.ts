@@ -343,7 +343,7 @@ export function getFormatterForType(
       if (meta?.truncate && typeof meta.truncate === 'object') {
         const truncateConfig = meta.truncate as { maxLength?: number; suffix?: string };
         return truncateText(transformed, truncateConfig.maxLength || 50, {
-          suffix: truncateConfig.suffix,
+          ...(truncateConfig.suffix !== undefined && { suffix: truncateConfig.suffix }),
         });
       }
 

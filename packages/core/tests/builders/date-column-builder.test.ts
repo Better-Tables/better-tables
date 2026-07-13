@@ -190,7 +190,7 @@ describe('DateColumnBuilder', () => {
       };
       expect(dateFormat?.showRelative).toBe(true);
       expect(config.validation).toHaveLength(1);
-      expect(config.validation?.[0].id).toBe('required');
+      expect(config.validation?.[0]?.id).toBe('required');
     });
   });
 
