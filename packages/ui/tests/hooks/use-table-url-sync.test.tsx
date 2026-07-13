@@ -1,4 +1,3 @@
-import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   clearAllTableStores,
@@ -6,6 +5,7 @@ import {
   getTableStore,
   type UrlSyncConfig,
 } from '@better-tables/core';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { useTableUrlSync } from '../../src/hooks/use-table-url-sync';
 import { createFakeUrlAdapter, mockColumns, urlFilterForName } from '../helpers/url-sync';
 
@@ -36,7 +36,11 @@ describe('useTableUrlSync', () => {
 
     await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
 
-    const store = getTableStore(TABLE_ID)!;
+    const store = getTableStore(TABLE_ID);
+    expect(store).toBeDefined();
+    if (!store) {
+      throw new Error('Expected table store');
+    }
     const callsBeforeChange = setParamsCalls.length;
 
     act(() => {
@@ -72,7 +76,7 @@ describe('useTableUrlSync', () => {
 
     const store = getTableStore(TABLE_ID);
     expect(store).toBeDefined();
-    const filters = store!.getState().manager.getFilters();
+    const filters = store?.getState().manager.getFilters();
     expect(filters).toHaveLength(1);
     expect(filters[0]?.values).toEqual(['late-store']);
   });
@@ -82,7 +86,7 @@ describe('useTableUrlSync', () => {
     const { adapter } = createFakeUrlAdapter();
     let subscribeCount = 0;
 
-    const manager = getTableStore(TABLE_ID)!.getState().manager;
+    const manager = getTableStore(TABLE_ID)?.getState().manager;
     const originalSubscribe = manager.subscribe.bind(manager);
     manager.subscribe = (listener) => {
       subscribeCount += 1;

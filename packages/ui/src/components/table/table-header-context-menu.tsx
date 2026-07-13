@@ -112,9 +112,7 @@ export function TableHeaderContextMenu<TData = unknown>({
     <ContextMenu>
       <ContextMenuTrigger
         render={
-          React.isValidElement(children)
-            ? children
-            : <div className="contents">{children}</div>
+          React.isValidElement(children) ? children : <div className="contents">{children}</div>
         }
       />
       <ContextMenuContent className="w-56">

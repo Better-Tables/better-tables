@@ -163,9 +163,7 @@ export function OptionFilterInput<TData = unknown>({
                       {allowsMultiple ? (
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() =>
-                            handleToggleOption(option.value, !isSelected)
-                          }
+                          onCheckedChange={() => handleToggleOption(option.value, !isSelected)}
                         />
                       ) : (
                         <Check

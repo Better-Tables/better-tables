@@ -26,12 +26,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Separator } from '../ui/separator';
 import { FilterOperatorSelect } from './filter-operator-select';
+import { filterTypeAccent, filterTypeIconTone, getFilterTypeFamily } from './filter-type-styles';
 import { FilterValueInput } from './filter-value-input';
-import {
-  filterTypeAccent,
-  filterTypeIconTone,
-  getFilterTypeFamily,
-} from './filter-type-styles';
 
 export interface ActiveFiltersProps<TData = unknown> {
   /** Column definitions */

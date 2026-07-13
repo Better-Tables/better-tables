@@ -1,6 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'bun:test';
 import type { FetchDataParams, FilterState } from '@better-tables/core';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useTableData } from '../../src/hooks/use-table-data';
 import { createDeferredFetchAdapter, makeFetchResult } from '../helpers/stub-adapter';
 
@@ -28,6 +28,18 @@ function latestCallForFilters(
   return undefined;
 }
 
+function requireLatestCall(
+  calls: ReturnType<typeof createDeferredFetchAdapter>['calls'],
+  filters: FilterState[]
+) {
+  const call = latestCallForFilters(calls, filters);
+  expect(call).toBeDefined();
+  if (!call) {
+    throw new Error(`Expected fetch call for filters ${JSON.stringify(filters)}`);
+  }
+  return call;
+}
+
 describe('useTableData', () => {
   it('uses the newest fetch result when an older request resolves later (race)', async () => {
     const { adapter, calls } = createDeferredFetchAdapter();
@@ -47,8 +59,8 @@ describe('useTableData', () => {
       expect(latestCallForFilters(calls, filterB)).toBeDefined();
     });
 
-    const fastCall = latestCallForFilters(calls, filterB)!;
-    const slowCall = latestCallForFilters(calls, filterA)!;
+    const fastCall = requireLatestCall(calls, filterB);
+    const slowCall = requireLatestCall(calls, filterA);
 
     await act(async () => {
       fastCall.deferred.resolve(makeFetchResult([{ id: 'bob' }]));
@@ -75,7 +87,7 @@ describe('useTableData', () => {
       expect(latestCallForFilters(calls, filterA)).toBeDefined();
     });
 
-    const firstCall = latestCallForFilters(calls, filterA)!;
+    const firstCall = requireLatestCall(calls, filterA);
     expect(firstCall.params.signal).toBeInstanceOf(AbortSignal);
     expect(firstCall.params.signal?.aborted).toBe(false);
 
@@ -85,7 +97,7 @@ describe('useTableData', () => {
       expect(latestCallForFilters(calls, filterB)).toBeDefined();
     });
 
-    const secondCall = latestCallForFilters(calls, filterB)!;
+    const secondCall = requireLatestCall(calls, filterB);
     expect(secondCall.params.signal).toBeInstanceOf(AbortSignal);
     expect(firstCall.params.signal?.aborted).toBe(true);
     expect(secondCall.params.signal?.aborted).toBe(false);
@@ -107,7 +119,7 @@ describe('useTableData', () => {
       expect(latestCallForFilters(calls, filterA)).toBeDefined();
     });
 
-    const inFlight = latestCallForFilters(calls, filterA)!;
+    const inFlight = requireLatestCall(calls, filterA);
     unmount();
 
     await act(async () => {

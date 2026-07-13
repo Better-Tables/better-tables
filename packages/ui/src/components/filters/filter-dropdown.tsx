@@ -484,13 +484,15 @@ export function FilterDropdown<TData = unknown>({
         <DialogTrigger
           disabled={disabled}
           render={
-            React.isValidElement(children)
-              ? React.cloneElement(children, {
-                  tabIndex: disabled ? -1 : 0,
-                  onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
-                  ...keyboardNavigation.ariaAttributes,
-                } as React.HTMLAttributes<HTMLElement>)
-              : <Button disabled={disabled} />
+            React.isValidElement(children) ? (
+              React.cloneElement(children, {
+                tabIndex: disabled ? -1 : 0,
+                onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
+                ...keyboardNavigation.ariaAttributes,
+              } as React.HTMLAttributes<HTMLElement>)
+            ) : (
+              <Button disabled={disabled} />
+            )
           }
         />
         <DialogContent className="max-w-sm backdrop-blur-xs">
@@ -510,13 +512,15 @@ export function FilterDropdown<TData = unknown>({
       <PopoverTrigger
         disabled={disabled}
         render={
-          React.isValidElement(children)
-            ? React.cloneElement(children, {
-                tabIndex: disabled ? -1 : 0,
-                onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
-                ...keyboardNavigation.ariaAttributes,
-              } as React.HTMLAttributes<HTMLElement>)
-            : <Button disabled={disabled} />
+          React.isValidElement(children) ? (
+            React.cloneElement(children, {
+              tabIndex: disabled ? -1 : 0,
+              onKeyDown: createMergedKeyboardHandler(getExistingOnKeyDown(children)),
+              ...keyboardNavigation.ariaAttributes,
+            } as React.HTMLAttributes<HTMLElement>)
+          ) : (
+            <Button disabled={disabled} />
+          )
         }
       />
       <PopoverContent className="w-[320px] p-0" align="start">

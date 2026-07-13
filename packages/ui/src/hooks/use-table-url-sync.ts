@@ -63,13 +63,7 @@ function useStableUrlSyncConfig(config: UrlSyncConfig): UrlSyncConfig {
       columnVisibility: config.columnVisibility,
       columnOrder: config.columnOrder,
     }),
-    [
-      config.filters,
-      config.pagination,
-      config.sorting,
-      config.columnVisibility,
-      config.columnOrder,
-    ]
+    [config.filters, config.pagination, config.sorting, config.columnVisibility, config.columnOrder]
   );
 }
 
@@ -97,9 +91,7 @@ function hydrateFromUrl(store: TableStore, config: UrlSyncConfig, adapter: UrlSy
   const deserialized = deserializeTableStateFromUrl(urlParams);
   const updates: Parameters<typeof manager.updateState>[0] = {};
 
-  const hasFilters = Array.isArray(deserialized.filters)
-    ? deserialized.filters.length > 0
-    : true;
+  const hasFilters = Array.isArray(deserialized.filters) ? deserialized.filters.length > 0 : true;
   if (config.filters && hasFilters) {
     updates.filters = deserialized.filters;
   }
@@ -192,9 +184,6 @@ export function useTableUrlSync(
       if (tryHydrate() || attempts >= HYDRATION_MAX_ATTEMPTS) {
         clearInterval(intervalId);
         if (attempts >= HYDRATION_MAX_ATTEMPTS && !getTableStore(tableId)) {
-          console.warn(
-            `useTableUrlSync: table store "${tableId}" not found after ${HYDRATION_MAX_ATTEMPTS} hydration attempts`
-          );
         }
       }
     }, HYDRATION_RETRY_MS);
