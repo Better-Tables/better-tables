@@ -29,6 +29,9 @@ export const COMPRESSION_KEY_MAP: Record<string, string> = {
   includeNull: 'n',
   meta: 'm',
   direction: 'd', // For sorting state
+  kind: 'k', // For FilterGroupNode (contract v2)
+  logic: 'l', // For FilterGroupNode (contract v2)
+  children: 'h', // For FilterGroupNode ('g' would read as "group"; 'h' avoids any future group -> g)
 };
 
 /**
@@ -44,10 +47,34 @@ export const DECOMPRESSION_KEY_MAP: Record<string, string> = Object.fromEntries(
 );
 
 /**
+ * Keys whose VALUE is user-authored data, never a structural field to
+ * rename into. `renameKeys` still renames these keys themselves (e.g.
+ * `meta` -> `m`, `values` -> `v` on compress; `m` -> `meta`, `v` -> `values`
+ * on decompress), but must never descend into what they CONTAIN.
+ *
+ * This is CORE-06: blind recursion into `meta`/`values` silently mangles
+ * user data whose own keys happen to collide with a short code -- e.g. a
+ * `meta` object with a key literally named `kind`, `c`, or `children` would
+ * be rewritten on decompression, or a JSON filter's `values` (which may hold
+ * arbitrary objects, `values: (object | string)[]`) could have its own keys
+ * renamed. Adding `kind`/`logic`/`children` to the key map (above) widens
+ * this collision surface, which is why the wire-format version bump is the
+ * moment to fix it (`plans/design/core-contract-v2.md` §1.3).
+ *
+ * Includes both the long and short spellings so the same denylist works on
+ * both the compress pass (keys are long: `meta`, `values`) and the
+ * decompress pass (keys are already short: `m`, `v`).
+ */
+const OPAQUE_VALUE_KEYS = new Set(['meta', 'm', 'values', 'v']);
+
+/**
  * Recursively rename object keys using the provided key map.
  *
  * Traverses nested objects and arrays to apply key transformations
- * throughout the entire data structure.
+ * throughout the entire data structure -- except the VALUE of a `meta` or
+ * `values` key, which is user-authored data and is passed through
+ * untouched (CORE-06, see {@link OPAQUE_VALUE_KEYS}). The key itself is
+ * still renamed; only descent into its contents is skipped.
  *
  * @param obj - Object to transform
  * @param keyMap - Mapping of old keys to new keys
@@ -65,7 +92,7 @@ export function renameKeys(obj: unknown, keyMap: Record<string, string>): unknow
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const newKey = keyMap[key] ?? key;
-    result[newKey] = renameKeys(value, keyMap);
+    result[newKey] = OPAQUE_VALUE_KEYS.has(key) ? value : renameKeys(value, keyMap);
   }
 
   return result;
@@ -76,10 +103,16 @@ export function renameKeys(obj: unknown, keyMap: Record<string, string>): unknow
  *
  * This is the single source of truth for compression in the Better Tables
  * ecosystem. It applies key shortening first, then lz-string compression
- * (which is already URL-safe). Always returns compressed data with "c:" prefix.
+ * (which is already URL-safe). Always returns compressed data prefixed with
+ * `prefix` (default `"c:"`).
  *
  * @param data - Data to compress and encode
- * @returns Compressed and encoded string with "c:" prefix, or empty string on failure
+ * @param prefix - Prefix to stamp on the returned string (default `"c:"`).
+ * Plan 015's `c2:` filter wire format is the one caller that overrides this
+ * -- every other caller (sorting, column visibility, column order) keeps the
+ * default so their format is unaffected by the filter-group version bump.
+ * @returns Compressed and encoded string with the given prefix, or empty
+ * string on failure
  *
  * @example
  * ```typescript
@@ -88,7 +121,7 @@ export function renameKeys(obj: unknown, keyMap: Record<string, string>): unknow
  * // Returns: "c:..." (lz-string compressed with key shortening)
  * ```
  */
-export function compressAndEncode(data: unknown): string {
+export function compressAndEncode(data: unknown, prefix = 'c:'): string {
   try {
     const json = JSON.stringify(data);
 
@@ -104,7 +137,7 @@ export function compressAndEncode(data: unknown): string {
       return '';
     }
 
-    return `c:${compressed}`;
+    return `${prefix}${compressed}`;
   } catch {
     // Fallback to empty string if compression fails
     return '';
@@ -117,7 +150,9 @@ export function compressAndEncode(data: unknown): string {
  * This is the single source of truth for decompression in the Better Tables
  * ecosystem. It decompresses lz-string compressed data and restores key names.
  *
- * @param encoded - Encoded string (must start with "c:" prefix)
+ * @param encoded - Encoded string (must start with `prefix`)
+ * @param prefix - Prefix `encoded` must start with (default `"c:"`), stripped
+ * before decompression. See {@link compressAndEncode}'s `prefix` doc.
  * @returns Decoded data (parsed from JSON) or null if decompression fails
  *
  * @example
@@ -126,14 +161,14 @@ export function compressAndEncode(data: unknown): string {
  * // Returns: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['john'] }]
  * ```
  */
-export function decompressAndDecode<T = unknown>(encoded: string): T | null {
+export function decompressAndDecode<T = unknown>(encoded: string, prefix = 'c:'): T | null {
   try {
-    // Must start with "c:" prefix
-    if (!encoded.startsWith('c:')) {
+    // Must start with the expected prefix
+    if (!encoded.startsWith(prefix)) {
       return null;
     }
 
-    const compressed = encoded.slice(2);
+    const compressed = encoded.slice(prefix.length);
     // Decompress with lz-string
     const decompressed = LZString.decompressFromEncodedURIComponent(compressed);
     if (!decompressed) {
