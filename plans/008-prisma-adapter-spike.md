@@ -1,5 +1,12 @@
 # Plan 008: Prisma adapter spike — prove the toolkit seams with a second ORM (design/spike)
 
+> **ON HOLD (maintainer directive, 2026-07-13)**: no Prisma IMPLEMENTATION until
+> everything else in the plan set is done. Abstracting/redesigning the Drizzle
+> side to be provider-ready (plan 007's toolkit, the `PredicateEmitter`/
+> `SchemaPort` seams, plan 017's group translation) proceeds as planned — this
+> plan is the last item on the board, not cancelled. Do not dispatch until the
+> maintainer lifts the hold in `plans/README.md`.
+
 > **Executor instructions**: This is a SPIKE plan. The deliverable is a working
 > proof-of-concept package plus a findings document — NOT a production-ready
 > adapter. Follow the steps, run every verification command, and honor the
