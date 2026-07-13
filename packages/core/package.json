@@ -29,6 +29,7 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
+    "@date-fns/tz": "catalog:",
     "date-fns": "catalog:",
     "lz-string": "catalog:",
     "zustand": "catalog:"
