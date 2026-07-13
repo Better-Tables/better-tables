@@ -93,10 +93,16 @@ export interface FilterConfig<TValue = unknown> {
 
 /**
  * Filter option for select-based filters
+ *
+ * @template V - The literal type of the option's `value` (defaults to `string`,
+ * which keeps every existing non-generic usage compiling unchanged). Passing a
+ * `const`-inferred array of options to `OptionColumnBuilder.options()` /
+ * `MultiOptionColumnBuilder.options()` narrows `V` to the literal union of the
+ * option values, so it flows through to the column's value type.
  */
-export interface FilterOption {
+export interface FilterOption<V extends string = string> {
   /** Option value */
-  value: string;
+  value: V;
   /** Display label */
   label: string;
   /** Optional color indicator */

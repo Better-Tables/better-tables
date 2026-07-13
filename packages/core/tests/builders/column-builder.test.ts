@@ -263,7 +263,7 @@ describe('Column Builder System', () => {
     it('should create an option column builder', () => {
       const builder = new OptionColumnBuilder<TestUser>();
 
-      const options = [
+      const options: { value: 'active' | 'inactive'; label: string; color: string }[] = [
         { value: 'active', label: 'Active', color: 'green' },
         { value: 'inactive', label: 'Inactive', color: 'red' },
       ];

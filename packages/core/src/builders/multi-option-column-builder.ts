@@ -46,11 +46,15 @@ export class MultiOptionColumnBuilder<
    *
    * Rebinds the builder's value type to the accessor's return type, so
    * subsequent chained methods see the narrowed string array type.
+   * Constraining `V` to the current `TValue` (rather than plain `string[]`)
+   * means that if `.options()` was already called, an accessor whose return
+   * type isn't assignable to the option elements' literal union array is a
+   * compile error — mismatches surface regardless of call order.
    *
    * @param accessor - Function that extracts the column value from row data
    * @returns A `MultiOptionColumnBuilder` rebound to the accessor's return type
    */
-  override accessor<V extends string[]>(
+  override accessor<V extends TValue>(
     accessor: (data: TData) => V
   ): MultiOptionColumnBuilder<TData, V> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
@@ -63,9 +67,11 @@ export class MultiOptionColumnBuilder<
    * Configures the available options for multi-select filtering
    * with validation, search capabilities, and selection limits.
    *
-   * @param options - Array of available filter options
+   * @param options - Array of available filter options. `V` is the *element* type
+   * (each option's `value`), inferred as a `const` literal union (TS >= 5.0) so it
+   * doesn't widen to `string`. The returned builder's value type is rebound to `V[]`.
    * @param config - Multi-option configuration settings
-   * @returns This builder instance for method chaining
+   * @returns A `MultiOptionColumnBuilder` rebound to `V[]`, the array of the option values
    *
    * @example
    * ```typescript
@@ -87,13 +93,13 @@ export class MultiOptionColumnBuilder<
    *   .build();
    * ```
    */
-  options(
-    options: FilterOption[],
+  options<const V extends TValue[number]>(
+    options: ReadonlyArray<FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
       /** Custom validation for option values */
-      validation?: (value: string[]) => boolean | string;
+      validation?: (value: V[]) => boolean | string;
       /** Whether to allow searching through options (default: true) */
       searchable?: boolean;
       /** Placeholder text for the option selector */
@@ -103,7 +109,7 @@ export class MultiOptionColumnBuilder<
       /** Minimum number of selections required */
       minSelections?: number;
     } = {}
-  ): this {
+  ): MultiOptionColumnBuilder<TData, V[]> {
     const {
       includeNull = false,
       validation,
@@ -113,7 +119,7 @@ export class MultiOptionColumnBuilder<
       minSelections,
     } = config;
 
-    const filterConfig: FilterConfig<string[]> = {
+    const filterConfig: FilterConfig<V[]> = {
       operators: [
         'includes',
         'excludes',
@@ -122,7 +128,7 @@ export class MultiOptionColumnBuilder<
         'excludesAny',
         'excludesAll',
       ],
-      options,
+      options: [...options],
       includeNull,
       validation,
     };
@@ -138,7 +144,7 @@ export class MultiOptionColumnBuilder<
         minSelections,
       },
     };
-    return this;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
   }
 
   /**
@@ -180,7 +186,7 @@ export class MultiOptionColumnBuilder<
    *
    * @param optionsLoader - Function that returns a promise of options
    * @param config - Async multi-option configuration settings
-   * @returns This builder instance for method chaining
+   * @returns A `MultiOptionColumnBuilder` rebound to `V[]`, the array of the option values
    *
    * @example
    * ```typescript
@@ -200,13 +206,13 @@ export class MultiOptionColumnBuilder<
    *   .build();
    * ```
    */
-  asyncOptions(
-    optionsLoader: () => Promise<FilterOption[]>,
+  asyncOptions<V extends TValue[number]>(
+    optionsLoader: () => Promise<FilterOption<V>[]>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
       /** Custom validation for option values */
-      validation?: (value: string[]) => boolean | string;
+      validation?: (value: V[]) => boolean | string;
       /** Whether to allow searching through options (default: true) */
       searchable?: boolean;
       /** Placeholder text for the option selector */
@@ -218,7 +224,7 @@ export class MultiOptionColumnBuilder<
       /** Minimum number of selections required */
       minSelections?: number;
     } = {}
-  ): this {
+  ): MultiOptionColumnBuilder<TData, V[]> {
     const {
       includeNull = false,
       validation,
@@ -229,7 +235,7 @@ export class MultiOptionColumnBuilder<
       minSelections,
     } = config;
 
-    const filterConfig: FilterConfig<string[]> = {
+    const filterConfig: FilterConfig<V[]> = {
       operators: [
         'includes',
         'excludes',
@@ -255,7 +261,7 @@ export class MultiOptionColumnBuilder<
         minSelections,
       },
     };
-    return this;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
   }
 
   /**
@@ -266,7 +272,7 @@ export class MultiOptionColumnBuilder<
    *
    * @param tags - Array of available tag options
    * @param config - Tags configuration settings
-   * @returns This builder instance for method chaining
+   * @returns A `MultiOptionColumnBuilder` rebound to the array of the tag values
    *
    * @example
    * ```typescript
@@ -287,8 +293,8 @@ export class MultiOptionColumnBuilder<
    *   .build();
    * ```
    */
-  tags(
-    tags: FilterOption[],
+  tags<const V extends TValue[number]>(
+    tags: ReadonlyArray<FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
@@ -301,7 +307,7 @@ export class MultiOptionColumnBuilder<
       /** Minimum number of tags required */
       minTags?: number;
     } = {}
-  ): this {
+  ): MultiOptionColumnBuilder<TData, V[]> {
     const {
       includeNull = false,
       searchable = true,
@@ -324,14 +330,16 @@ export class MultiOptionColumnBuilder<
         showCount: true,
       },
     };
-    return this;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
   }
 
   /**
    * Configure as categories column (hierarchical)
+   *
+   * @returns A `MultiOptionColumnBuilder` rebound to the array of the category values
    */
-  categories(
-    categories: FilterOption[],
+  categories<const V extends TValue[number]>(
+    categories: ReadonlyArray<FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
@@ -342,7 +350,7 @@ export class MultiOptionColumnBuilder<
       /** Maximum number of categories allowed */
       maxCategories?: number;
     } = {}
-  ): this {
+  ): MultiOptionColumnBuilder<TData, V[]> {
     const { includeNull = false, searchable = true, showHierarchy = true, maxCategories } = config;
 
     this.options(categories, {
@@ -358,14 +366,16 @@ export class MultiOptionColumnBuilder<
         showIcons: true,
       },
     };
-    return this;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
   }
 
   /**
    * Configure as roles/permissions column
+   *
+   * @returns A `MultiOptionColumnBuilder` rebound to the array of the role values
    */
-  roles(
-    roles: FilterOption[],
+  roles<const V extends TValue[number]>(
+    roles: ReadonlyArray<FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
@@ -376,7 +386,7 @@ export class MultiOptionColumnBuilder<
       /** Maximum number of roles allowed */
       maxRoles?: number;
     } = {}
-  ): this {
+  ): MultiOptionColumnBuilder<TData, V[]> {
     const { includeNull = false, searchable = true, showDescriptions = true, maxRoles } = config;
 
     this.options(roles, { includeNull, searchable, maxSelections: maxRoles });
@@ -388,7 +398,7 @@ export class MultiOptionColumnBuilder<
         showBadges: true,
       },
     };
-    return this;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
   }
 
   /**

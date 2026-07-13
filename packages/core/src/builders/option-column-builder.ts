@@ -10,6 +10,13 @@
 import type { FilterConfig, FilterOption } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
+/** Default priority levels used by `.priority()` when called with no arguments. */
+const DEFAULT_PRIORITIES = [
+  { value: 'low', label: 'Low', color: 'gray', order: 1 },
+  { value: 'medium', label: 'Medium', color: 'yellow', order: 2 },
+  { value: 'high', label: 'High', color: 'red', order: 3 },
+] as const;
+
 /**
  * Option column builder for single-select dropdown columns.
  *
@@ -45,12 +52,16 @@ export class OptionColumnBuilder<
    * Set the data accessor function.
    *
    * Rebinds the builder's value type to the accessor's return type, so
-   * subsequent chained methods see the narrowed string type.
+   * subsequent chained methods see the narrowed string type. Constraining
+   * `V` to the current `TValue` (rather than plain `string`) means that if
+   * `.options()` was already called, an accessor whose return type isn't
+   * assignable to the option values' literal union is a compile error —
+   * mismatches surface regardless of call order.
    *
    * @param accessor - Function that extracts the column value from row data
    * @returns An `OptionColumnBuilder` rebound to the accessor's return type
    */
-  override accessor<V extends string>(accessor: (data: TData) => V): OptionColumnBuilder<TData, V> {
+  override accessor<V extends TValue>(accessor: (data: TData) => V): OptionColumnBuilder<TData, V> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
     return this as unknown as OptionColumnBuilder<TData, V>;
   }
@@ -61,9 +72,11 @@ export class OptionColumnBuilder<
    * Configures the available options for single-select filtering
    * with validation, search capabilities, and placeholder text.
    *
-   * @param options - Array of available filter options
+   * @param options - Array of available filter options. Passed as a `const`-inferred
+   * array (TS >= 5.0), so literal option values narrow the returned builder's value
+   * type without needing an `as const` at the call site.
    * @param config - Option configuration settings
-   * @returns This builder instance for method chaining
+   * @returns An `OptionColumnBuilder` rebound to the union of the option values
    *
    * @example
    * ```typescript
@@ -83,24 +96,24 @@ export class OptionColumnBuilder<
    *   .build();
    * ```
    */
-  options(
-    options: FilterOption[],
+  options<const V extends TValue>(
+    options: ReadonlyArray<FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
       /** Custom validation for option values */
-      validation?: (value: string) => boolean | string;
+      validation?: (value: V) => boolean | string;
       /** Whether to allow searching through options (default: true) */
       searchable?: boolean;
       /** Placeholder text for the option selector */
       placeholder?: string;
     } = {}
-  ): this {
+  ): OptionColumnBuilder<TData, V> {
     const { includeNull = false, validation, searchable = true, placeholder } = config;
 
-    const filterConfig: FilterConfig<string> = {
+    const filterConfig: FilterConfig<V> = {
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
-      options,
+      options: [...options],
       includeNull,
       validation,
     };
@@ -114,7 +127,7 @@ export class OptionColumnBuilder<
         values: options,
       },
     };
-    return this;
+    return this as unknown as OptionColumnBuilder<TData, V>;
   }
 
   /**
@@ -152,7 +165,7 @@ export class OptionColumnBuilder<
    *
    * @param optionsLoader - Function that returns a promise of options
    * @param config - Async option configuration settings
-   * @returns This builder instance for method chaining
+   * @returns An `OptionColumnBuilder` rebound to the union of the option values
    *
    * @example
    * ```typescript
@@ -171,13 +184,13 @@ export class OptionColumnBuilder<
    *   .build();
    * ```
    */
-  asyncOptions(
-    optionsLoader: () => Promise<FilterOption[]>,
+  asyncOptions<V extends TValue>(
+    optionsLoader: () => Promise<FilterOption<V>[]>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
       /** Custom validation for option values */
-      validation?: (value: string) => boolean | string;
+      validation?: (value: V) => boolean | string;
       /** Whether to allow searching through options (default: true) */
       searchable?: boolean;
       /** Placeholder text for the option selector */
@@ -185,7 +198,7 @@ export class OptionColumnBuilder<
       /** Loading placeholder text */
       loadingPlaceholder?: string;
     } = {}
-  ): this {
+  ): OptionColumnBuilder<TData, V> {
     const {
       includeNull = false,
       validation,
@@ -194,7 +207,7 @@ export class OptionColumnBuilder<
       loadingPlaceholder = 'Loading options...',
     } = config;
 
-    const filterConfig: FilterConfig<string> = {
+    const filterConfig: FilterConfig<V> = {
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
       includeNull,
       validation,
@@ -211,15 +224,17 @@ export class OptionColumnBuilder<
         optionsLoader,
       },
     };
-    return this;
+    return this as unknown as OptionColumnBuilder<TData, V>;
   }
 
   /**
    * Configure as status column with predefined status options
+   *
+   * @returns An `OptionColumnBuilder` rebound to the union of the status values
    */
-  status(
-    statuses: Array<{
-      value: string;
+  status<const V extends TValue>(
+    statuses: ReadonlyArray<{
+      value: V;
       label: string;
       color: string;
     }>,
@@ -227,12 +242,12 @@ export class OptionColumnBuilder<
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
       /** Default status value */
-      defaultValue?: string;
+      defaultValue?: V;
     } = {}
-  ): this {
+  ): OptionColumnBuilder<TData, V> {
     const { includeNull = false, defaultValue } = config;
 
-    const statusOptions: FilterOption[] = statuses.map((status) => ({
+    const statusOptions: FilterOption<V>[] = statuses.map((status) => ({
       value: status.value,
       label: status.label,
       color: status.color,
@@ -247,33 +262,38 @@ export class OptionColumnBuilder<
         showBadge: true,
       },
     };
-    return this;
+    return this as unknown as OptionColumnBuilder<TData, V>;
   }
 
   /**
    * Configure as priority column with predefined priority options
+   *
+   * @returns An `OptionColumnBuilder` rebound to the union of the priority values
+   * (or unchanged `TValue` when called with no arguments, since no new literal
+   * information is provided in that case)
    */
-  priority(
-    priorities: Array<{
-      value: string;
+  priority<const V extends TValue = TValue>(
+    priorities: ReadonlyArray<{
+      value: V;
       label: string;
       color: string;
       order: number;
-    }> = [
-      { value: 'low', label: 'Low', color: 'gray', order: 1 },
-      { value: 'medium', label: 'Medium', color: 'yellow', order: 2 },
-      { value: 'high', label: 'High', color: 'red', order: 3 },
-    ],
+    }> = DEFAULT_PRIORITIES as unknown as ReadonlyArray<{
+      value: V;
+      label: string;
+      color: string;
+      order: number;
+    }>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
       /** Default priority value */
-      defaultValue?: string;
+      defaultValue?: V;
     } = {}
-  ): this {
+  ): OptionColumnBuilder<TData, V> {
     const { includeNull = false, defaultValue } = config;
 
-    const priorityOptions: FilterOption[] = priorities
+    const priorityOptions: FilterOption<V>[] = [...priorities]
       .sort((a, b) => a.order - b.order)
       .map((priority) => ({
         value: priority.value,
@@ -292,14 +312,16 @@ export class OptionColumnBuilder<
         sortByOrder: true,
       },
     };
-    return this;
+    return this as unknown as OptionColumnBuilder<TData, V>;
   }
 
   /**
    * Configure as category column
+   *
+   * @returns An `OptionColumnBuilder` rebound to the union of the category values
    */
-  category(
-    categories: FilterOption[],
+  category<const V extends TValue>(
+    categories: ReadonlyArray<FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
@@ -308,7 +330,7 @@ export class OptionColumnBuilder<
       /** Whether to show category icons (default: true) */
       showIcons?: boolean;
     } = {}
-  ): this {
+  ): OptionColumnBuilder<TData, V> {
     const { includeNull = false, searchable = true, showIcons = true } = config;
 
     this.options(categories, { includeNull, searchable });
@@ -319,7 +341,7 @@ export class OptionColumnBuilder<
         showIcons,
       },
     };
-    return this;
+    return this as unknown as OptionColumnBuilder<TData, V>;
   }
 
   /**
