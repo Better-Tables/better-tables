@@ -9,7 +9,7 @@
 
 import type { ColumnType } from './column';
 import type { DataEvent } from './common';
-import type { FilterOperator, FilterOption, FilterState } from './filter';
+import type { FilterGroupNode, FilterOperator, FilterOption, FilterState } from './filter';
 import type { PaginationParams } from './pagination';
 import type { SortingParams } from './sorting';
 
@@ -39,8 +39,17 @@ export interface FetchDataParams {
   /** Sorting configuration for data ordering */
   sorting?: SortingParams[];
 
-  /** Filter conditions for data filtering */
-  filters?: FilterState[];
+  /**
+   * Filter conditions for data filtering.
+   *
+   * A bare `FilterState[]` means **implicit AND** (the ergonomic default for
+   * the overwhelmingly common "a few ANDed filters" case). A
+   * {@link FilterGroupNode} is how a caller expresses OR or nesting (design
+   * `plans/design/core-contract-v2.md` §1.1). Core canonicalizes a bare
+   * array to `{ kind: 'group', logic: 'and', children: [...] }` before
+   * dispatch so adapters only ever have to handle one shape.
+   */
+  filters?: FilterState[] | FilterGroupNode;
 
   /** Global search query */
   search?: string;
@@ -424,6 +433,21 @@ export interface AdapterMeta {
 
   /** Filter operators supported for each column type */
   supportedOperators: Record<ColumnType, FilterOperator[]>;
+
+  /**
+   * Whether the adapter can execute {@link FilterGroupNode} trees (nested
+   * AND/OR). Optional so existing adapters compile unchanged; absence means
+   * "no group support" (design §1.2). Enforcement (rejecting unsupported
+   * group payloads) is a downstream plan -- this field is types-only here.
+   */
+  supportsFilterGroups?: boolean;
+
+  /**
+   * Maximum filter-group nesting depth the adapter accepts. Optional;
+   * defaults to 3 when `supportsFilterGroups` is true (design §1.2, mirrors
+   * plan 011's `Paths<T>` depth cap).
+   */
+  maxGroupDepth?: number;
 }
 
 /**

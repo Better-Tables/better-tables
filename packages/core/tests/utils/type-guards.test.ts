@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'bun:test';
-import type { FilterState } from '../../src/types/filter';
+import { describe, expect, it, mock } from 'bun:test';
+import type { FilterGroupNode, FilterState } from '../../src/types/filter';
 import {
   assertFilterValueType,
   isBooleanFilterState,
@@ -7,6 +7,8 @@ import {
   isDateFilterState,
   isDateFilterValues,
   isDateLike,
+  isFilterGroupNode,
+  isFilterNodeShape,
   isFilterValuesOfType,
   isJsonFilterState,
   isMultiOptionFilterState,
@@ -16,7 +18,18 @@ import {
   isTextFilterState,
   isTextFilterValues,
   isValidDate,
+  normalizeFilterNode,
 } from '../../src/utils/type-guards';
+
+function withSilencedWarn<T>(fn: () => T): T {
+  const originalWarn = console.warn;
+  console.warn = mock(() => {});
+  try {
+    return fn();
+  } finally {
+    console.warn = originalWarn;
+  }
+}
 
 describe('Type Guards', () => {
   describe('Filter State Type Guards', () => {
@@ -370,6 +383,227 @@ describe('Type Guards', () => {
 
       it('should return false for boolean', () => {
         expect(isDateLike(true)).toBe(false);
+      });
+    });
+  });
+
+  describe('Filter Group Guards (plan 015 -- contract v2 Step 1)', () => {
+    const leaf = (columnId: string, values: unknown[] = ['x']): FilterState =>
+      ({ columnId, type: 'text', operator: 'contains', values }) as FilterState;
+
+    describe('isFilterGroupNode', () => {
+      it('should return true for a group node', () => {
+        const group: FilterGroupNode = { kind: 'group', logic: 'and', children: [leaf('a')] };
+        expect(isFilterGroupNode(group)).toBe(true);
+      });
+
+      it('should return false for a filter leaf', () => {
+        expect(isFilterGroupNode(leaf('a'))).toBe(false);
+      });
+
+      it('should return false for non-object input', () => {
+        expect(isFilterGroupNode(null)).toBe(false);
+        expect(isFilterGroupNode(undefined)).toBe(false);
+        expect(isFilterGroupNode('group')).toBe(false);
+        expect(isFilterGroupNode(42)).toBe(false);
+      });
+    });
+
+    describe('isFilterNodeShape', () => {
+      it('should accept a valid leaf', () => {
+        expect(isFilterNodeShape(leaf('status'))).toBe(true);
+      });
+
+      it('should accept a nested (AND (OR)) tree within depth 3', () => {
+        const tree = {
+          kind: 'group',
+          logic: 'and',
+          children: [
+            leaf('status'),
+            { kind: 'group', logic: 'or', children: [leaf('role'), leaf('role2')] },
+          ],
+        };
+        expect(isFilterNodeShape(tree)).toBe(true);
+      });
+
+      it('should reject a group with unknown logic', () => {
+        const group = { kind: 'group', logic: 'xor', children: [leaf('a')] };
+        expect(isFilterNodeShape(group)).toBe(false);
+      });
+
+      it('should reject an empty group', () => {
+        const group = { kind: 'group', logic: 'and', children: [] };
+        expect(isFilterNodeShape(group)).toBe(false);
+      });
+
+      it('should reject a group with non-array children', () => {
+        const group = { kind: 'group', logic: 'and', children: 'not-an-array' };
+        expect(isFilterNodeShape(group)).toBe(false);
+      });
+
+      it('should reject an invalid leaf', () => {
+        expect(isFilterNodeShape({ columnId: 'x' })).toBe(false);
+      });
+
+      it('should accept a group nested exactly at the default max depth (3 group levels: root -> nested -> one more nested)', () => {
+        const depth3 = {
+          kind: 'group', // depth 1 (root)
+          logic: 'and',
+          children: [
+            {
+              kind: 'group', // depth 2
+              logic: 'and',
+              children: [
+                {
+                  kind: 'group', // depth 3
+                  logic: 'and',
+                  children: [leaf('deep')],
+                },
+              ],
+            },
+          ],
+        };
+        expect(isFilterNodeShape(depth3)).toBe(true);
+      });
+
+      it('should reject a group nested beyond the default max depth (a 4th group level)', () => {
+        const depth4 = {
+          kind: 'group', // depth 1 (root)
+          logic: 'and',
+          children: [
+            {
+              kind: 'group', // depth 2
+              logic: 'and',
+              children: [
+                {
+                  kind: 'group', // depth 3
+                  logic: 'and',
+                  children: [
+                    {
+                      kind: 'group', // depth 4 -- over the cap
+                      logic: 'and',
+                      children: [leaf('deep')],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+        expect(isFilterNodeShape(depth4)).toBe(false);
+      });
+    });
+
+    describe('normalizeFilterNode', () => {
+      it('should pass through a valid leaf unchanged', () => {
+        const filter = leaf('status');
+        expect(normalizeFilterNode(filter)).toEqual(filter);
+      });
+
+      it('should pass through a valid multi-child group unchanged', () => {
+        const group: FilterGroupNode = {
+          kind: 'group',
+          logic: 'or',
+          children: [leaf('a'), leaf('b')],
+        };
+        expect(normalizeFilterNode(group)).toEqual(group);
+      });
+
+      it('should unwrap a single-child group to its sole child', () => {
+        withSilencedWarn(() => {
+          const group = { kind: 'group', logic: 'and', children: [leaf('solo')] };
+          expect(normalizeFilterNode(group)).toEqual(leaf('solo'));
+        });
+      });
+
+      it('should drop an empty group and warn (value-free)', () => {
+        withSilencedWarn(() => {
+          const warnSpy = mock(() => {});
+          console.warn = warnSpy;
+          const group = { kind: 'group', logic: 'and', children: [] };
+          expect(normalizeFilterNode(group)).toBeNull();
+          expect(warnSpy).toHaveBeenCalled();
+        });
+      });
+
+      it('should drop a group with unknown logic and warn', () => {
+        withSilencedWarn(() => {
+          const warnSpy = mock(() => {});
+          console.warn = warnSpy;
+          const group = { kind: 'group', logic: 'xor', children: [leaf('a')] };
+          expect(normalizeFilterNode(group)).toBeNull();
+          expect(warnSpy).toHaveBeenCalled();
+        });
+      });
+
+      it('should drop an invalid leaf and cascade to dropping its now-empty parent group', () => {
+        withSilencedWarn(() => {
+          const group = {
+            kind: 'group',
+            logic: 'and',
+            children: [{ columnId: 'broken' }], // missing type/operator/values
+          };
+          expect(normalizeFilterNode(group)).toBeNull();
+        });
+      });
+
+      it('should drop an invalid child but keep valid siblings (unwrapping the survivor)', () => {
+        withSilencedWarn(() => {
+          const group = {
+            kind: 'group',
+            logic: 'and',
+            children: [leaf('good'), { kind: 'group', logic: 'xor', children: [leaf('bad')] }],
+          };
+          // The 'xor' child is dropped; one valid child remains -> unwrapped.
+          expect(normalizeFilterNode(group)).toEqual(leaf('good'));
+        });
+      });
+
+      it('should drop an over-deep subtree (fail closed) rather than throwing', () => {
+        withSilencedWarn(() => {
+          const depth4 = {
+            kind: 'group', // depth 1 (root)
+            logic: 'and',
+            children: [
+              {
+                kind: 'group', // depth 2
+                logic: 'and',
+                children: [
+                  {
+                    kind: 'group', // depth 3
+                    logic: 'and',
+                    children: [
+                      { kind: 'group', logic: 'and', children: [leaf('deep')] }, // depth 4 -- over the cap
+                    ],
+                  },
+                ],
+              },
+            ],
+          };
+          expect(() => normalizeFilterNode(depth4)).not.toThrow();
+          expect(normalizeFilterNode(depth4)).toBeNull();
+        });
+      });
+
+      it('should never include values in a warning message (value-free convention)', () => {
+        withSilencedWarn(() => {
+          const messages: string[] = [];
+          console.warn = mock((msg: string) => {
+            messages.push(msg);
+          });
+          // Invalid (missing operator) so it is dropped and a warning fires;
+          // the sensitive value must not leak into the warning text.
+          const result = normalizeFilterNode({
+            columnId: 'secret',
+            type: 'text',
+            values: ['super-secret-value'],
+          });
+          expect(result).toBeNull();
+          expect(messages.length).toBeGreaterThan(0);
+          for (const msg of messages) {
+            expect(msg).not.toContain('super-secret-value');
+          }
+        });
       });
     });
   });

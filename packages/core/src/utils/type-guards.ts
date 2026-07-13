@@ -3,6 +3,8 @@ import type {
   BooleanFilterState,
   CustomFilterState,
   DateFilterState,
+  FilterGroupNode,
+  FilterNode,
   FilterState,
   JsonFilterState,
   MultiOptionFilterState,
@@ -77,6 +79,153 @@ export function isFilterStateShape(value: unknown): value is FilterState {
   }
 
   return true;
+}
+
+/**
+ * Default maximum {@link FilterGroupNode} nesting depth. Mirrors plan 011's
+ * `Paths<T>` depth cap (`experimental/table-def-v1.ts`) -- one "3" to reason
+ * about across the whole contract (design §1.2). A group at depth 1 (the
+ * root) may nest a group at depth 2, which may nest one more at depth 3;
+ * anything past that fails closed.
+ */
+const DEFAULT_MAX_GROUP_DEPTH = 3;
+
+/**
+ * Shape guard: is this node a boolean AND/OR {@link FilterGroupNode} (as
+ * opposed to a filter leaf)? Structural only -- `kind === 'group'` -- no
+ * `FilterState` member has a top-level `kind`, so this is a collision-free
+ * discriminant (design §1.1). Callers needing full recursive validation
+ * should use {@link isFilterNodeShape}.
+ */
+export function isFilterGroupNode(value: unknown): value is FilterGroupNode {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Record<string, unknown>).kind === 'group'
+  );
+}
+
+/**
+ * Recursive shape guard for untrusted input (e.g. a decompressed `c2:` URL
+ * payload) that validates the minimal structural contract of a
+ * {@link FilterNode} -- a filter leaf or a nested AND/OR group -- without
+ * assuming the input has already been typed.
+ *
+ * A group node is valid only if: it is within `maxDepth` nesting (default
+ * {@link DEFAULT_MAX_GROUP_DEPTH}, fail closed on over-deep trees per design
+ * §1.2/§1.3), its `logic` is `'and'`/`'or'`, its `children` is a non-empty
+ * array, and every child recursively validates. A leaf delegates to
+ * {@link isFilterStateShape} verbatim -- one leaf contract, reused.
+ *
+ * This guard only reports validity; it does not repair a tree (e.g. drop an
+ * invalid child and keep the rest). Use {@link normalizeFilterNode} for
+ * fail-closed, cascading normalization of untrusted input.
+ */
+export function isFilterNodeShape(
+  value: unknown,
+  depth = 1,
+  maxDepth = DEFAULT_MAX_GROUP_DEPTH
+): value is FilterNode {
+  if (isFilterGroupNode(value)) {
+    if (depth > maxDepth) {
+      return false;
+    }
+
+    if (value.logic !== 'and' && value.logic !== 'or') {
+      return false;
+    }
+
+    if (!Array.isArray(value.children) || value.children.length === 0) {
+      return false;
+    }
+
+    return value.children.every((child) => isFilterNodeShape(child, depth + 1, maxDepth));
+  }
+
+  return isFilterStateShape(value);
+}
+
+/**
+ * Normalize an untrusted {@link FilterNode} candidate, fail closed and
+ * consistent with plan 004's `deserializeFiltersFromURL` convention (design
+ * §1.4):
+ *
+ * | Condition | Action |
+ * |---|---|
+ * | Empty group (0 children, or 0 after dropping invalid children) | Drop the group |
+ * | Single-child group | Unwrap -- replace the group with its sole child |
+ * | Unknown `logic` (not `'and'`/`'or'`) | Drop the node |
+ * | Non-array `children` | Drop the node |
+ * | Depth beyond `maxDepth` | Drop the over-deep subtree (not the whole payload) |
+ * | Invalid leaf (`isFilterStateShape` false) | Drop the leaf |
+ *
+ * Normalization runs bottom-up (children are normalized before their
+ * parent's emptiness is checked) so a dropped invalid leaf can cascade into
+ * "now-empty group -> drop" in one pass. Warnings stay value-free (never log
+ * `values`), matching `deserializeFiltersFromURL`'s existing convention.
+ *
+ * @returns The normalized node, or `null` when nothing in the subtree
+ * survives.
+ */
+export function normalizeFilterNode(
+  node: unknown,
+  depth = 1,
+  maxDepth = DEFAULT_MAX_GROUP_DEPTH
+): FilterNode | null {
+  if (isFilterGroupNode(node)) {
+    if (depth > maxDepth) {
+      // biome-ignore lint: Intentional warning logging for dropped invalid filter groups
+      console.warn(
+        `[better-tables] Dropped filter group: nesting exceeds max depth ${maxDepth}.`
+      );
+      return null;
+    }
+
+    if (node.logic !== 'and' && node.logic !== 'or') {
+      // biome-ignore lint: Intentional warning logging for dropped invalid filter groups
+      console.warn('[better-tables] Dropped filter group: unknown logic.');
+      return null;
+    }
+
+    if (!Array.isArray(node.children)) {
+      // biome-ignore lint: Intentional warning logging for dropped invalid filter groups
+      console.warn('[better-tables] Dropped filter group: children is not an array.');
+      return null;
+    }
+
+    const normalizedChildren = node.children
+      .map((child) => normalizeFilterNode(child, depth + 1, maxDepth))
+      .filter((child): child is FilterNode => child !== null);
+
+    if (normalizedChildren.length === 0) {
+      // biome-ignore lint: Intentional warning logging for dropped invalid filter groups
+      console.warn('[better-tables] Dropped empty filter group.');
+      return null;
+    }
+
+    if (normalizedChildren.length === 1) {
+      // and/or of one thing is that thing -- unwrap the singleton.
+      return normalizedChildren[0];
+    }
+
+    return { kind: 'group', logic: node.logic, children: normalizedChildren };
+  }
+
+  if (isFilterStateShape(node)) {
+    return node;
+  }
+
+  const columnId =
+    node &&
+    typeof node === 'object' &&
+    typeof (node as { columnId?: unknown }).columnId === 'string'
+      ? (node as { columnId: string }).columnId
+      : '<unknown>';
+  // biome-ignore lint: Intentional warning logging for dropped invalid filters
+  console.warn(
+    `[better-tables] Dropped invalid filter node for column "${columnId}": entry does not match the expected filter or group shape.`
+  );
+  return null;
 }
 
 /**

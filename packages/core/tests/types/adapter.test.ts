@@ -8,6 +8,7 @@ import type {
   ExportResult,
   FetchDataParams,
   FetchDataResult,
+  FilterGroupNode,
   FilterState,
   TableAdapter,
 } from '../../src/types';
@@ -140,7 +141,22 @@ describe('Adapter Types', () => {
       expectTypeOf(params.sorting).toMatchTypeOf<
         Array<{ columnId: string; direction: 'asc' | 'desc' }> | undefined
       >();
-      expectTypeOf(params.filters).toMatchTypeOf<FilterState[] | undefined>();
+      expectTypeOf(params.filters).toMatchTypeOf<FilterState[] | FilterGroupNode | undefined>();
+    });
+
+    it('accepts a FilterGroupNode as the top-level filters shape (design §1.1)', () => {
+      const params: FetchDataParams = {
+        filters: {
+          kind: 'group',
+          logic: 'or',
+          children: [
+            { columnId: 'status', type: 'option', operator: 'is', values: ['active'] },
+            { columnId: 'status', type: 'option', operator: 'is', values: ['pending'] },
+          ],
+        },
+      };
+
+      expectTypeOf(params.filters).toMatchTypeOf<FilterState[] | FilterGroupNode | undefined>();
     });
   });
 

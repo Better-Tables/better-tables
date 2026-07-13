@@ -2,18 +2,30 @@ import { describe, expect, expectTypeOf, it } from 'bun:test';
 import {
   type ColumnDefLike,
   type ColumnRegistry,
-  type FilterNode,
   type FilterStateFor,
-  isFilterGroupNode,
   type RegistryFromRow,
   type TableAdapterV2,
 } from '../../src/types/experimental/contract-v2';
-import type { FilterState } from '../../src/types/filter';
+import { isFilterGroupNode } from '../../src/utils/type-guards';
+import type { FilterNode, FilterState } from '../../src/types/filter';
 
 /**
  * Type-level acceptance tests for the plan 006 "core contract v2" prototype
- * (`src/types/experimental/contract-v2.ts`). See
- * `plans/design/core-contract-v2.md` for the design these validate.
+ * (`src/types/experimental/contract-v2.ts`) and, per plan 015, the PROMOTED
+ * production `FilterNode`/`FilterGroupNode`/`isFilterGroupNode` that Step 1
+ * of that prototype became. See `plans/design/core-contract-v2.md` for the
+ * design these validate.
+ *
+ * Step 1 (recursive AND/OR filter groups) now exercises the production
+ * types from `types/filter.ts` and the production guard from
+ * `utils/type-guards.ts` directly -- promotion rule from plan 015: "the
+ * registry/adapter-generic types stay experimental", so Step 2 (typed column
+ * registry) below still imports from `types/experimental/contract-v2`
+ * unchanged. Because the production `FilterState` is the real
+ * discriminated union (`type` is mandatory on every member), the leaf
+ * literals below carry an explicit `type` field that the prototype's
+ * simplified `FilterStateFor` did not require -- see that file's own
+ * "SIMPLIFICATION" doc comment, which anticipated this.
  *
  * Every negative case is pinned with `@ts-expect-error`, so a regression that
  * ACCEPTS the bad shape fails the build (the directive becomes unused).
@@ -35,13 +47,13 @@ describe('contract-v2 prototype (plan 006)', () => {
         kind: 'group',
         logic: 'and',
         children: [
-          { columnId: 'status', operator: 'isAnyOf', values: ['active'] },
+          { columnId: 'status', type: 'option', operator: 'isAnyOf', values: ['active'] },
           {
             kind: 'group',
             logic: 'or',
             children: [
-              { columnId: 'role', operator: 'isAnyOf', values: ['admin'] },
-              { columnId: 'role', operator: 'isAnyOf', values: ['editor'] },
+              { columnId: 'role', type: 'option', operator: 'isAnyOf', values: ['admin'] },
+              { columnId: 'role', type: 'option', operator: 'isAnyOf', values: ['editor'] },
             ],
           },
         ],
@@ -58,7 +70,12 @@ describe('contract-v2 prototype (plan 006)', () => {
     });
 
     it('narrows a leaf as NOT a group via isFilterGroupNode', () => {
-      const leaf: FilterNode = { columnId: 'status', operator: 'equals', values: ['x'] };
+      const leaf: FilterNode = {
+        columnId: 'status',
+        type: 'text',
+        operator: 'equals',
+        values: ['x'],
+      };
       expect(isFilterGroupNode(leaf)).toBe(false);
     });
 
