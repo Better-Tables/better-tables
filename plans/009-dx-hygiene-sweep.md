@@ -27,6 +27,24 @@
 - Step 5: drizzle-orm/better-sqlite3 dependency class fixes (007 edits drizzle package.json)
 - Step 7 partial: drizzle `sideEffects` / any drizzle package.json touch — do core+ui only until 007 lands
 
+## Step 7 outcome (2026-07-13)
+
+- `"sideEffects": false` landed on `packages/core/package.json` and
+  `packages/ui/package.json` (drizzle still deferred, see above). No bare
+  side-effect or CSS imports found in either package's `src/`.
+- **Banner removal reverted — blocker recorded.** Removing the global
+  `banner: { js: '"use client";' }` from `packages/ui/tsdown.config.ts` and
+  relying on the 45 existing per-file `'use client'` directives causes
+  rolldown (via tsdown v0.16.6) to drop the directive from the emitted
+  `dist/index.mjs` / `dist/index.cjs` entirely — it survives only in the
+  `.map` files, not the actual bundle. Confirmed via `grep -c "use client"
+  dist/index.mjs dist/index.cjs` → 0 with the banner removed, vs. 1/1 with
+  it restored. Per the plan's STOP condition, the banner removal was
+  reverted; `packages/ui` ships with the global banner unchanged. Do not
+  retry this sub-change without confirming a tsdown/rolldown fix for
+  directive-preserving output, or restructuring the entry so files
+  requiring `"use client"` build as separate outputs.
+
 
 ## Why this matters
 
