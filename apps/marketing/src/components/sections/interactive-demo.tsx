@@ -1,7 +1,15 @@
 import type { FetchDataResult } from '@better-tables/core';
-import { flattenFilterNode, isFilterGroupNode, parseTableSearchParams } from '@better-tables/core';
+import {
+  flattenFilterNode,
+  isFilterGroupNode,
+  parseTableSearchParams,
+} from '@better-tables/core';
+import Link from 'next/link';
 import { Section } from '@/components/section';
+import { buttonVariants } from '@/components/ui/button';
+import { getAdapter } from '@/lib/adapter';
 import type { UserWithRelations } from '@/lib/db/schema';
+import { cn } from '@/lib/utils';
 import { UsersTableClient } from './users-table-client';
 
 interface InteractiveDemoProps {
@@ -15,64 +23,75 @@ interface InteractiveDemoProps {
 
 export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
   const params = await searchParams;
-
   const tableParams = parseTableSearchParams(params, {
     page: 1,
     limit: 10,
   });
 
   const { page, limit, filters: filterNode, sorting } = tableParams;
-  const filters = isFilterGroupNode(filterNode) ? flattenFilterNode(filterNode) : filterNode;
+  const initialFilters = isFilterGroupNode(filterNode)
+    ? flattenFilterNode(filterNode)
+    : filterNode;
 
-  // Fetch data from API route
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const url = new URL('/api/users', baseUrl);
-  url.searchParams.set('page', page.toString());
-  url.searchParams.set('limit', limit.toString());
-  if (filters.length > 0) {
-    url.searchParams.set('filters', JSON.stringify(filters));
-  }
-  if (sorting.length > 0) {
-    url.searchParams.set('sorting', JSON.stringify(sorting));
-  }
+  let error: string | null = null;
+  let result: FetchDataResult<UserWithRelations> = {
+    data: [],
+    total: 0,
+    pagination: {
+      page,
+      limit,
+      totalPages: 0,
+      hasNext: false,
+      hasPrev: false,
+    },
+  };
 
-  let result: FetchDataResult<UserWithRelations>;
   try {
-    const response = await fetch(url.toString(), {
-      cache: 'no-store',
-    });
-    result = await response.json();
-  } catch {
-    result = {
-      data: [],
-      total: 0,
-      pagination: {
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false,
-      },
-    };
+    const adapter = await getAdapter();
+    result = (await adapter.fetchData({
+      pagination: { page, limit },
+      filters: filterNode,
+      sorting,
+    })) as FetchDataResult<UserWithRelations>;
+  } catch (caught) {
+    error = caught instanceof Error ? caught.message : 'Failed to load users';
   }
 
   return (
     <Section id="interactive-demo">
       <div className="border-x border-t">
         <div className="p-6 lg:p-12">
-          <div className="mb-6">
-            <h3 className="text-2xl font-bold mb-2">Try Better Tables Live</h3>
-            <p className="text-muted-foreground">
-              Experience the power of automatic relationship filtering. Filter across joined tables
-              without writing a single JOIN query. The adapter handles everything automatically.
-            </p>
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h3 className="text-2xl font-bold mb-2">Try Better Tables Live</h3>
+              <p className="text-muted-foreground max-w-2xl">
+                Experience automatic relationship filtering on a seeded user directory. Filter across
+                joined profile fields without writing a single JOIN query.
+              </p>
+            </div>
+            <Link
+              href="/examples/relationship-filtering"
+              className={cn(buttonVariants({ variant: 'outline' }), 'shrink-0')}
+            >
+              Open full support example
+            </Link>
           </div>
+
+          {error ? (
+            <div
+              role="alert"
+              className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              Could not load demo data: {error}
+            </div>
+          ) : null}
+
           <div className="w-full">
             <UsersTableClient
-              data={result.data || []}
-              totalCount={result.total || 0}
+              data={result.data ?? []}
+              totalCount={result.total ?? 0}
               initialPagination={
-                result.pagination || {
+                result.pagination ?? {
                   page: 1,
                   limit: 10,
                   totalPages: 1,
@@ -81,7 +100,7 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
                 }
               }
               initialSorting={sorting}
-              initialFilters={filters}
+              initialFilters={initialFilters}
             />
           </div>
         </div>

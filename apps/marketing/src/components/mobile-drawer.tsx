@@ -36,7 +36,13 @@ export function MobileDrawer() {
           </Link>
           <DrawerDescription>{siteConfig.description}</DrawerDescription>
         </DrawerHeader>
-        <DrawerFooter>
+        <DrawerFooter className="gap-3">
+          <Link
+            href="/examples"
+            className={cn(buttonVariants({ variant: 'outline' }), 'rounded-full')}
+          >
+            Examples
+          </Link>
           <Link
             href="#"
             className={cn(buttonVariants({ variant: 'default' }), 'rounded-full text-white')}

@@ -15,7 +15,10 @@ export function Header() {
           <Icons.logo className="w-auto" />
           <span className="font-semibold text-lg">{siteConfig.name}</span>
         </Link>
-        <div className="hidden lg:block">
+        <div className="hidden lg:flex items-center gap-6">
+          <Link href="/examples" className="text-sm text-muted-foreground hover:text-foreground">
+            Examples
+          </Link>
           <Link
             href="#"
             className={cn(
