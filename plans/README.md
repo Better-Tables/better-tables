@@ -27,14 +27,30 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **Next up**: 019 (migration guide — the last release-policy obligation before 0.6).
+- **Next up**: 019 (migration guide — the last release-policy obligation before 0.6),
+  then the 020–028 backlog wave (plans written 2026-07-13, none dispatched yet).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
 | 019 | Migration guide for 0.6 (MIGRATION.md + compile-checked examples + release runbook) | all 0.6 work (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13 |
-| 008 | Prisma adapter spike (read path) | 007 (DONE), lifts of the hold | **ON HOLD** (maintainer) — last item on the board |
+| 020 | Fix page under-fill on one-to-many joins (ADAPTER-03) | 007/017 (DONE) | PLANNED — P1, wave 1 |
+| 023 | Shared subscription emitter for six managers (CORE-08) | 018 (DONE) | PLANNED — wave 1 (parallel: core managers) |
+| 028 | Real timezone conversion (CORE-04 remainder) | — | PLANNED — wave 1 (parallel: core lib); has a builder-default STOP gate |
+| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2 |
+| 024 | Virtualization offsets: stale positions + O(n) scans (CORE-03/09) | **023 merged** (same file) | PLANNED — wave 2 |
+| 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | PLANNED — wave 2 (parallel: ui only) |
+| 022 | Relationship/primary-table inference fails loudly (ADAPTER-05 rem.) | 007 (DONE) | PLANNED — wave 2/3 (disjoint files from 020/021) |
+| 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3; blast radius measured: core 78+28 errors |
+| 027 | Null-filter semantics: includeNull/supportsNull in validation (CORE-10) | **MAINTAINER DECISION** (Option A/B in the plan) | PLANNED — **decision gate**; decide while 0.6 is open |
+| 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
+
+Wave logic: within a wave, plans touch disjoint files and can run in parallel
+worktrees; across waves the arrow is a same-file merge dependency, not a design
+dependency. 021's contract change is ADDITIVE (optional param) — no
+migration-guide impact; 027 Option A and 028 both have possible 0.6-guide
+touchpoints flagged in their plans.
 
 Open questions awaiting the maintainer (from the merged design docs):
 table-definition-dx.md (a) path-types placement, (c) depth cap default,
@@ -95,44 +111,53 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
 
 - **ADAPTER-03** (L, biggest open correctness item): manual-join data queries
   paginate over row-multiplied results on one-to-many joins — pages under-fill
-  even though 003 fixed `total`. Plan after 017 (query-builder layer is now
-  stable post-007).
+  even though 003 fixed `total`. **PLANNED as 020.**
 - **ADAPTER-05** (M): ~~primary-table resolver `break`s on first relationship
   match~~ — **FIXED (alias-scan slice, 2026-07-13)**: only break after crediting
   the matching `sourceTable`. Remaining: silent first-table fallback + FK
   name-guessing can still bind wrong columns (`relationship-detector.ts`).
   Resolver lives in toolkit (`packages/adapters/toolkit/src/primary-table-resolver.ts`).
+  **Remainder PLANNED as 022.**
 - **ADAPTER-06** (M): faceted values / min-max ignore active filters and inflate
-  under joins. Adapter-contract widening — post-017.
+  under joins. **PLANNED as 021** (contract widening is additive — optional param).
 - **ADAPTER-07**: ~~silent per-leaf filter drops on type mismatch (fail-open)~~ —
   **FIXED (2026-07-13)**: `drizzle-predicate-emitter` throws `QueryError` on
   present-but-wrong-type values; empty/missing still `undefined` for partial UI.
 - **CORE-02**: ~~percentage formatter `value > 1` heuristic~~ — **FIXED (2026-07-13)**:
   wires `meta.percentage.format` (`decimal` | `percentage`); default `decimal`.
 - **CORE-03** (M): dynamic row measurement leaves downstream offsets stale
-  (virtualization-manager recalculates only one row).
+  (virtualization-manager recalculates only one row). **PLANNED as 024** (with CORE-09).
 - **CORE-04** (M): ~~`locale` no-op + TZ label without conversion~~ —
   **PARTIALLY FIXED (2026-07-13)**: locale wired through date-fns locale map;
   misleading TZ suffix removed. Remaining: real timezone conversion (needs
-  `date-fns-tz` or equivalent) — still open.
+  `date-fns-tz` or equivalent) — **remainder PLANNED as 028** (`@date-fns/tz`).
 - **CORE-06**: ~~compression renameKeys mangles user data~~ — **FIXED in 015**
   (structural-keys-only renaming + named regression test).
 - **CORE-07**: ~~`updateState` multi-`state_changed` refetch waterfall~~ —
   **FIXED (2026-07-13)**: `stateUpdateBatchDepth` coalesces bulk updates to one
   `state_changed`; per-field events preserved.
 - **CORE-08** (M): six managers duplicate subscribe/notify with drifted error
-  policy; extract an emitter base. Defer until 018 merges (touches managers).
+  policy; extract an emitter base. **PLANNED as 023** (018 merged — unblocked).
 - **CORE-09** (L): virtualization offset math O(n) per lookup; prefix-sum/Fenwick
-  cache. Needs 010's harness first.
+  cache. **PLANNED as 024** (with CORE-03; lazy prefix + dirty watermark).
 - **CORE-10** (M): `includeNull`/`supportsNull` dead in validation — null-only
-  filters can't pass strict mode. Semantics decision for 0.6 (006 shipped without
-  it; decide before the migration guide freezes behavior).
+  filters can't pass strict mode. **PLANNED as 027 — DECISION GATE**: maintainer
+  picks Option A (includeNull satisfies value requirement, recommended) or B
+  (null-only stays isEmpty's job) in the plan file before dispatch.
 - **UI-05/06/08** (M each): render perf — unmemoized rows/cells; VirtualizedTable
   recreates per-row ResizeObservers every render; auto-show + callback-bridge
-  effect churn. Need 010's harness for safe memoization.
+  effect churn. **PLANNED as 025** (includes building the render-count harness —
+  none exists in the repo).
 - **DX-10** (M): enable `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`
-  — now actionable (005 landed); blast radius still unmeasured.
-- **From 009**: per-component subpath exports for `@better-tables/ui`.
+  — **PLANNED as 026**; blast radius measured 2026-07-13: core 78 + 28 errors
+  (src+tests); adapters already run both flags.
+- **From 009**: per-component subpath exports for `@better-tables/ui`. Still
+  unplanned (needs a tsdown multi-entry decision; both core and ui currently
+  export a single `.` entry).
+- **Experimental prototype** (`packages/core/src/types/experimental/`): verified
+  2026-07-13 — test-only, NOT in the build (`tsdown` entry is `src/index.ts`,
+  which never imports it; only `tests/types/*.test.ts` do). No cleanup needed;
+  keep as the seed for the future tuple-derived registry (018's `ColumnId` flag).
 - **Hygiene (2026-07-13)**: date-presets `getPresetById()!` assertions removed
   (`presetsByIds` helper) — Biome `noNonNullAssertion` clean in that file.
 
