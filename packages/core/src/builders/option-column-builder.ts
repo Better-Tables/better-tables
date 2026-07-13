@@ -132,7 +132,7 @@ export class OptionColumnBuilder<
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
       options: [...options],
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
@@ -227,7 +227,7 @@ export class OptionColumnBuilder<
     const filterConfig: FilterConfig<V> = {
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;

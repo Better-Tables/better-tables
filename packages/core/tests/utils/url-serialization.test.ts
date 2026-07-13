@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import type { FilterState, PaginationState, SortingState } from '@/types';
+import { assertDefined } from '../../src/utils/assert-defined';
 import {
   deserializeTableStateFromUrl,
   serializeTableStateToUrl,
@@ -181,7 +182,7 @@ describe('deserializeTableStateFromUrl', () => {
     // the union return type accordingly, per plan 015.
     const stateFilters = state.filters as FilterState[];
     expect(stateFilters).toHaveLength(1);
-    expect(stateFilters[0]).toMatchObject(filters[0]);
+    expect(stateFilters[0]).toMatchObject(assertDefined(filters[0], 'fixture missing filter'));
   });
 
   it('should deserialize pagination from URL parameters', () => {
@@ -215,7 +216,7 @@ describe('deserializeTableStateFromUrl', () => {
     const state = deserializeTableStateFromUrl(params);
 
     expect(state.sorting).toHaveLength(1);
-    expect(state.sorting[0]).toMatchObject(sorting[0]);
+    expect(state.sorting[0]).toMatchObject(assertDefined(sorting[0], 'fixture missing sort'));
   });
 
   it('should deserialize compressed column visibility from URL parameter', () => {
@@ -317,7 +318,9 @@ describe('round-trip serialization', () => {
     // the union return type accordingly, per plan 015.
     const deserializedFilters = deserialized.filters as FilterState[];
     expect(deserializedFilters).toHaveLength(1);
-    expect(deserializedFilters[0]).toMatchObject(original.filters[0]);
+    expect(deserializedFilters[0]).toMatchObject(
+      assertDefined(original.filters[0], 'fixture missing filter')
+    );
   });
 
   it('should serialize and deserialize complete state correctly', () => {
@@ -450,7 +453,9 @@ describe('compression', () => {
       // the union return type accordingly, per plan 015.
       const deserializedFilters = deserialized.filters as FilterState[];
       expect(deserializedFilters).toHaveLength(4);
-      expect(deserializedFilters[0]).toMatchObject(largeFilters[0]);
+      expect(deserializedFilters[0]).toMatchObject(
+        assertDefined(largeFilters[0], 'fixture missing filter')
+      );
     }
   });
 
@@ -482,8 +487,12 @@ describe('compression', () => {
       // the union return type accordingly, per plan 015.
       const deserializedFilters = deserialized.filters as FilterState[];
       expect(deserializedFilters).toHaveLength(2);
-      expect(deserializedFilters[0]).toMatchObject(filters[0]);
-      expect(deserializedFilters[1]).toMatchObject(filters[1]);
+      expect(deserializedFilters[0]).toMatchObject(
+        assertDefined(filters[0], 'fixture missing filter')
+      );
+      expect(deserializedFilters[1]).toMatchObject(
+        assertDefined(filters[1], 'fixture missing filter')
+      );
     }
   });
 
@@ -592,10 +601,18 @@ describe('compression', () => {
     // the union return type accordingly, per plan 015.
     const deserializedFilters = deserialized.filters as FilterState[];
     expect(deserializedFilters).toHaveLength(4);
-    expect(deserializedFilters[0]).toMatchObject(original.filters[0]);
-    expect(deserializedFilters[1]).toMatchObject(original.filters[1]);
-    expect(deserializedFilters[2]).toMatchObject(original.filters[2]);
-    expect(deserializedFilters[3]).toMatchObject(original.filters[3]);
+    expect(deserializedFilters[0]).toMatchObject(
+      assertDefined(original.filters[0], 'fixture missing filter')
+    );
+    expect(deserializedFilters[1]).toMatchObject(
+      assertDefined(original.filters[1], 'fixture missing filter')
+    );
+    expect(deserializedFilters[2]).toMatchObject(
+      assertDefined(original.filters[2], 'fixture missing filter')
+    );
+    expect(deserializedFilters[3]).toMatchObject(
+      assertDefined(original.filters[3], 'fixture missing filter')
+    );
     expect(deserialized.sorting).toEqual(original.sorting);
     expect(deserialized.columnVisibility).toEqual(original.columnVisibility);
     expect(deserialized.columnOrder).toEqual(original.columnOrder);

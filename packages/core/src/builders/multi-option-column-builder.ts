@@ -145,7 +145,7 @@ export class MultiOptionColumnBuilder<
       ],
       options: [...options],
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
@@ -260,7 +260,7 @@ export class MultiOptionColumnBuilder<
         'excludesAll',
       ],
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
@@ -334,8 +334,8 @@ export class MultiOptionColumnBuilder<
     this.options(tags, {
       includeNull,
       searchable,
-      maxSelections: maxTags,
-      minSelections: minTags,
+      ...(maxTags !== undefined && { maxSelections: maxTags }),
+      ...(minTags !== undefined && { minSelections: minTags }),
     });
 
     this.config.meta = {
@@ -371,7 +371,7 @@ export class MultiOptionColumnBuilder<
     this.options(categories, {
       includeNull,
       searchable,
-      maxSelections: maxCategories,
+      ...(maxCategories !== undefined && { maxSelections: maxCategories }),
     });
 
     this.config.meta = {
@@ -404,7 +404,11 @@ export class MultiOptionColumnBuilder<
   ): MultiOptionColumnBuilder<TData, V[], TId> {
     const { includeNull = false, searchable = true, showDescriptions = true, maxRoles } = config;
 
-    this.options(roles, { includeNull, searchable, maxSelections: maxRoles });
+    this.options(roles, {
+      includeNull,
+      searchable,
+      ...(maxRoles !== undefined && { maxSelections: maxRoles }),
+    });
 
     this.config.meta = {
       ...this.config.meta,

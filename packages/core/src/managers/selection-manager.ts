@@ -144,7 +144,6 @@ export class SelectionManager<TData = unknown> extends Subscribable<SelectionMan
     super('selection manager');
     this.config = {
       mode: 'multiple',
-      maxSelections: undefined,
       preserveSelection: false,
       showSelectAll: true,
       getRowId: (row: unknown) => {
@@ -331,10 +330,11 @@ export class SelectionManager<TData = unknown> extends Subscribable<SelectionMan
       return true;
     });
 
-    if (this.config.mode === 'single' && validIds.length > 0) {
+    const [firstValidId] = validIds;
+    if (this.config.mode === 'single' && firstValidId !== undefined) {
       // Single selection - only select the first valid ID
       this.selectionState.selectedIds.clear();
-      this.selectionState.selectedIds.add(validIds[0]);
+      this.selectionState.selectedIds.add(firstValidId);
     } else {
       // Multiple selection - respect maxSelections limit
       if (this.config.maxSelections) {
@@ -613,9 +613,11 @@ export class SelectionManager<TData = unknown> extends Subscribable<SelectionMan
       this.clearSelection();
     } else if (this.config.mode === 'single' && this.selectionState.selectedIds.size > 1) {
       // Keep only the first selected item
-      const firstId = Array.from(this.selectionState.selectedIds)[0];
+      const [firstId] = this.selectionState.selectedIds;
       this.selectionState.selectedIds.clear();
-      this.selectionState.selectedIds.add(firstId);
+      if (firstId !== undefined) {
+        this.selectionState.selectedIds.add(firstId);
+      }
       this.updateSelectionState();
     } else if (
       this.config.maxSelections &&

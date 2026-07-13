@@ -122,7 +122,7 @@ export class NumberColumnBuilder<
       min,
       max,
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
@@ -338,10 +338,10 @@ export class NumberColumnBuilder<
       ...this.config.meta,
       numberFormat: {
         locale,
-        minimumFractionDigits,
-        maximumFractionDigits,
         useGrouping,
         notation,
+        ...(minimumFractionDigits !== undefined && { minimumFractionDigits }),
+        ...(maximumFractionDigits !== undefined && { maximumFractionDigits }),
       },
     };
     return this;

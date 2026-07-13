@@ -155,7 +155,7 @@ describe('TableStateManager', () => {
       manager.setFilters(filters);
 
       expect(manager.getFilters()).toHaveLength(2);
-      expect(manager.getFilters()[0].columnId).toBe('name');
+      expect(manager.getFilters()[0]?.columnId).toBe('name');
     });
 
     it('should add filter', () => {
@@ -169,7 +169,7 @@ describe('TableStateManager', () => {
       manager.addFilter(filter);
 
       expect(manager.getFilters()).toHaveLength(1);
-      expect(manager.getFilters()[0].columnId).toBe('status');
+      expect(manager.getFilters()[0]?.columnId).toBe('status');
     });
 
     it('should remove filter', () => {
@@ -189,7 +189,7 @@ describe('TableStateManager', () => {
       manager.removeFilter('name');
 
       expect(manager.getFilters()).toHaveLength(1);
-      expect(manager.getFilters()[0].columnId).toBe('age');
+      expect(manager.getFilters()[0]?.columnId).toBe('age');
     });
 
     it('should clear filters', () => {
@@ -277,7 +277,7 @@ describe('TableStateManager', () => {
       manager.setSorting(sorting);
 
       expect(manager.getSorting()).toHaveLength(2);
-      expect(manager.getSorting()[0].columnId).toBe('age');
+      expect(manager.getSorting()[0]?.columnId).toBe('age');
     });
 
     it('should toggle sort - add new sort', () => {
@@ -513,7 +513,7 @@ describe('TableStateManager', () => {
       manager.setPage(2);
 
       const calls = mockSubscriber.mock.calls;
-      expect(calls[calls.length - 1][0]).toMatchObject({ type: 'state_changed' });
+      expect(calls.at(-1)?.[0]).toMatchObject({ type: 'state_changed' });
     });
 
     it('should emit filters_changed event on filter change', () => {
@@ -768,7 +768,7 @@ describe('TableStateManager', () => {
     it('should get columns', () => {
       const columns = manager.getColumns();
       expect(columns.length).toBe(5);
-      expect(columns[0].id).toBe('id');
+      expect(columns[0]?.id).toBe('id');
     });
 
     it('should update columns', () => {
@@ -789,7 +789,7 @@ describe('TableStateManager', () => {
 
       const columns = manager.getColumns();
       expect(columns.length).toBe(6);
-      expect(columns[5].id).toBe('phone');
+      expect(columns[5]?.id).toBe('phone');
     });
 
     it('should emit columns_changed event on column update', () => {
@@ -884,11 +884,10 @@ describe('TableStateManager', () => {
       expect(filtersChangedEvents).toHaveLength(1);
       // The event carries the flat leaf view (the legacy display contract);
       // the tree itself is on getState().filters / getFilterNode().
-      expect((filtersChangedEvents[0][0] as { filters: FilterState[] }).filters).toEqual([
-        statusLeaf,
-        nameLeaf,
-        ageLeaf,
-      ]);
+      const [firstFiltersChangedCall] = filtersChangedEvents;
+      expect(
+        (firstFiltersChangedCall?.[0] as { filters: FilterState[] } | undefined)?.filters
+      ).toEqual([statusLeaf, nameLeaf, ageLeaf]);
     });
 
     it('legacy flat setFilters replaces a stored tree at the state-manager level too', () => {

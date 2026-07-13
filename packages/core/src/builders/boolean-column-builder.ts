@@ -134,7 +134,7 @@ export class BooleanColumnBuilder<
     const filterConfig: FilterConfig<boolean> = {
       operators: ['isTrue', 'isFalse', 'isNull', 'isNotNull'],
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;

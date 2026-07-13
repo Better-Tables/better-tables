@@ -427,12 +427,16 @@ describe('Meta Accessors', () => {
     });
 
     it('should handle nested undefined values safely', () => {
-      const meta: ColumnMeta = {
+      // Simulates untyped data (e.g. from a spread over a partial override)
+      // landing at runtime with an explicit `undefined` key, which
+      // `NumberFormatMeta`'s exact optional field wouldn't allow a caller to
+      // construct directly -- hence the cast rather than a widened type.
+      const meta = {
         numberFormat: {
           locale: 'en-US',
           minimumFractionDigits: undefined,
         },
-      };
+      } as unknown as ColumnMeta;
 
       const format = getNumberFormat(meta);
 

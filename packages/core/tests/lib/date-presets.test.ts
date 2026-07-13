@@ -42,10 +42,10 @@ describe('date-presets', () => {
       expect(grouped.relative).toHaveLength(2);
       expect(grouped.absolute).toHaveLength(1);
       expect(grouped.custom).toHaveLength(1);
-      expect(grouped.relative?.[0].id).toBe('today');
-      expect(grouped.relative?.[1].id).toBe('last-week');
-      expect(grouped.absolute?.[0].id).toBe('yesterday');
-      expect(grouped.custom?.[0].id).toBe('custom');
+      expect(grouped.relative?.[0]?.id).toBe('today');
+      expect(grouped.relative?.[1]?.id).toBe('last-week');
+      expect(grouped.absolute?.[0]?.id).toBe('yesterday');
+      expect(grouped.custom?.[0]?.id).toBe('custom');
     });
 
     it('should use default category for presets without category', () => {
@@ -60,7 +60,7 @@ describe('date-presets', () => {
       const grouped = getGroupedPresets(presets);
 
       expect(grouped.relative).toHaveLength(1);
-      expect(grouped.relative?.[0].id).toBe('no-category');
+      expect(grouped.relative?.[0]?.id).toBe('no-category');
     });
 
     it('should use default presets when none provided', () => {

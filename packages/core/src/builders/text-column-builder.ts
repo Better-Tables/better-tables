@@ -109,7 +109,7 @@ export class TextColumnBuilder<
       operators: ['contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'],
       debounce,
       includeNull,
-      validation,
+      ...(validation !== undefined && { validation }),
     };
 
     this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;

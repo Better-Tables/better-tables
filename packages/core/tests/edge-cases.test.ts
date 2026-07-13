@@ -403,7 +403,13 @@ describe('Edge Cases and Error Scenarios', () => {
         },
       ];
 
-      const validation = validateColumns(columns as ColumnDefinition<unknown, unknown>[]);
+      // Simulates untyped/runtime data with explicit `undefined` optional
+      // fields (e.g. from spreading a partial override) -- exactOptionalPropertyTypes
+      // makes a direct `as` cast insufficiently overlapping, so double-cast
+      // through `unknown` like `defineColumns` does for the same reason.
+      const validation = validateColumns(
+        columns as unknown as ColumnDefinition<unknown, unknown>[]
+      );
       expect(validation.valid).toBe(true);
     });
 
@@ -502,7 +508,10 @@ describe('Edge Cases and Error Scenarios', () => {
         .id('name')
         .displayName('Name')
         .accessor((d) => d.name)
-        .truncate({ maxLength: 100, suffix: undefined, showTooltip: undefined })
+        // Omitting `suffix`/`showTooltip` (rather than passing `undefined`
+        // explicitly) is the exactOptionalPropertyTypes-correct way to say
+        // "use the default"; `.truncate()` treats the two identically.
+        .truncate({ maxLength: 100 })
         .build();
 
       expect(

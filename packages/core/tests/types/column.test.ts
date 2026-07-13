@@ -8,6 +8,7 @@ import type {
   HeaderRendererProps,
   ValidationRule,
 } from '../../src/types';
+import { assertDefined } from '../../src/utils/assert-defined';
 
 describe('Column Types', () => {
   describe('ColumnDefinition', () => {
@@ -110,7 +111,8 @@ describe('Column Types', () => {
       if (!column.validation) {
         throw new Error('validation must be defined');
       }
-      expectTypeOf(column.validation[0].validate).toBeFunction();
+      const firstRule = assertDefined(column.validation[0], 'expected a validation rule');
+      expectTypeOf(firstRule.validate).toBeFunction();
     });
   });
 

@@ -59,8 +59,8 @@ describe('serializeFiltersToURL', () => {
     // All fixtures in this file are flat FilterState[] payloads (implicit
     // AND); narrow the union return type accordingly, per plan 015.
     const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
-    expect(deserialized[0].meta).toEqual(mockFilterWithMeta.meta);
-    expect(deserialized[0].includeNull).toBe(true);
+    expect(deserialized[0]?.meta).toEqual(mockFilterWithMeta.meta);
+    expect(deserialized[0]?.includeNull).toBe(true);
   });
 
   it('should handle empty filters array', () => {
@@ -146,7 +146,7 @@ describe('deserializeFiltersFromURL', () => {
     // AND); narrow the union return type accordingly, per plan 015.
     const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
-    expect(deserialized[0].includeNull).toBe(true);
+    expect(deserialized[0]?.includeNull).toBe(true);
   });
 });
 
@@ -217,11 +217,11 @@ describe('edge cases', () => {
 
     // Values should be completely unchanged
     expect(deserialized).toEqual(filtersWithKeyNames);
-    expect(deserialized[0].values[0]).toBe(
+    expect(deserialized[0]?.values[0]).toBe(
       'The type of this operator is columnId-based and uses values from meta'
     );
-    expect(deserialized[1].values[0]).toBe('includeNull in values should not be replaced');
-    expect(deserialized[2].values[0]).toBe('This text has type, operator, and columnId words');
+    expect(deserialized[1]?.values[0]).toBe('includeNull in values should not be replaced');
+    expect(deserialized[2]?.values[0]).toBe('This text has type, operator, and columnId words');
   });
 
   it('should handle nested meta values containing key names', () => {
@@ -248,8 +248,8 @@ describe('edge cases', () => {
     const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toEqual(filtersWithNestedKeyNames);
-    expect(deserialized[0].meta?.description).toBe('The type operator is used');
-    expect(deserialized[0].meta?.nested).toEqual({
+    expect(deserialized[0]?.meta?.description).toBe('The type operator is used');
+    expect(deserialized[0]?.meta?.nested).toEqual({
       info: 'columnId and values in nested meta',
       array: ['type', 'operator', 'includeNull'],
     });
@@ -313,7 +313,7 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
       }).not.toThrow();
 
       expect(deserialized).toHaveLength(1);
-      expect(deserialized[0].columnId).toBe('name');
+      expect(deserialized[0]?.columnId).toBe('name');
       expect(warnSpy).toHaveBeenCalled();
     } finally {
       console.warn = originalWarn;
@@ -333,7 +333,7 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
     const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toHaveLength(1);
-    expect(deserialized[0].columnId).toBe('name');
+    expect(deserialized[0]?.columnId).toBe('name');
   });
 
   it('drops a filter where `values` is a string, not an array', () => {
@@ -348,7 +348,7 @@ describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary va
     const deserialized = deserializeFiltersFromURL(serialized) as FilterState[];
 
     expect(deserialized).toHaveLength(1);
-    expect(deserialized[0].columnId).toBe('name');
+    expect(deserialized[0]?.columnId).toBe('name');
   });
 
   it('round-trips a completely valid payload identically (regression guard)', () => {

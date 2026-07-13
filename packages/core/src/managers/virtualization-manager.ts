@@ -19,6 +19,7 @@ import type {
   VirtualizationValidationResult,
   VirtualRowItem,
 } from '../types/virtualization';
+import { assertDefined } from '../utils/assert-defined';
 
 /**
  * Event types for virtualization manager.
@@ -499,7 +500,9 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
   private getRowStart(rowIndex: number): number {
     const clamped = Math.min(Math.max(rowIndex, 0), this.totalRows);
     this.ensureCleanTo(clamped);
-    return this.offsets[clamped];
+    // Invariant: `offsets.length === totalRows + 1` (see `resizeOffsets`), so
+    // any index in `0..totalRows` is in-bounds once clean.
+    return assertDefined(this.offsets[clamped], `offsets[${clamped}] missing after ensureCleanTo`);
   }
 
   /**
@@ -513,7 +516,13 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
     }
 
     for (let i = this.cleanUpTo; i < clampedTarget; i++) {
-      this.offsets[i + 1] = this.offsets[i] + this.getRowHeightAt(i);
+      // Invariant: indices `0..cleanUpTo` are already clean, so `offsets[i]`
+      // is defined for every `i` in this loop.
+      const prevOffset = assertDefined(
+        this.offsets[i],
+        `offsets[${i}] missing before revalidation`
+      );
+      this.offsets[i + 1] = prevOffset + this.getRowHeightAt(i);
       this.offsetFillOperations++;
     }
     this.cleanUpTo = clampedTarget;
@@ -672,7 +681,13 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
 
     this.ensureCleanTo(this.totalRows);
 
-    if (position >= this.offsets[this.totalRows]) {
+    // Invariant: `offsets.length === totalRows + 1`, so every index touched
+    // below (`0..totalRows`) is in-bounds once clean.
+    const lastOffset = assertDefined(
+      this.offsets[this.totalRows],
+      `offsets[${this.totalRows}] missing after ensureCleanTo`
+    );
+    if (position >= lastOffset) {
       return this.totalRows - 1;
     }
 
@@ -681,8 +696,11 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
-      const start = this.offsets[mid];
-      const end = this.offsets[mid + 1];
+      const start = assertDefined(this.offsets[mid], `offsets[${mid}] missing after ensureCleanTo`);
+      const end = assertDefined(
+        this.offsets[mid + 1],
+        `offsets[${mid + 1}] missing after ensureCleanTo`
+      );
 
       if (position >= start && position < end) {
         return mid;
@@ -868,8 +886,8 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
 
     return {
       valid: errors.length === 0,
-      error: errors.length > 0 ? errors.join('; ') : undefined,
-      warning: warnings.length > 0 ? warnings.join('; ') : undefined,
+      ...(errors.length > 0 && { error: errors.join('; ') }),
+      ...(warnings.length > 0 && { warning: warnings.join('; ') }),
     };
   }
 

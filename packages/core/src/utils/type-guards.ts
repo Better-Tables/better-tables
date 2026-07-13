@@ -203,7 +203,10 @@ export function normalizeFilterNode(
 
     if (normalizedChildren.length === 1) {
       // and/or of one thing is that thing -- unwrap the singleton.
-      return normalizedChildren[0];
+      const [only] = normalizedChildren;
+      if (only !== undefined) {
+        return only;
+      }
     }
 
     return { kind: 'group', logic: node.logic, children: normalizedChildren };

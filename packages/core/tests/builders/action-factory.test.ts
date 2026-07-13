@@ -185,13 +185,17 @@ describe('Action Factory', () => {
 
     it('should create independent builder instances', () => {
       const builders = createActionBuilders<TestUser>(2);
+      const [builder1, builder2] = builders;
+      if (!builder1 || !builder2) {
+        throw new Error('expected createActionBuilders(2) to return two builders');
+      }
 
-      const action1 = builders[0]
+      const action1 = builder1
         .id('action1')
         .label('Action 1')
         .handler(async () => {})
         .build();
-      const action2 = builders[1]
+      const action2 = builder2
         .id('action2')
         .label('Action 2')
         .handler(async () => {})
@@ -206,6 +210,9 @@ describe('Action Factory', () => {
       const builders = createActionBuilders<TestUser>(2);
 
       const [deleteBuilder, archiveBuilder] = builders;
+      if (!deleteBuilder || !archiveBuilder) {
+        throw new Error('expected createActionBuilders(2) to return two builders');
+      }
 
       const deleteAction = deleteBuilder
         .id('delete')
@@ -239,17 +246,17 @@ describe('Action Factory', () => {
       const builders = createActionBuilders<TestUser>(3);
 
       const actions = builders.map((builder, index) => {
-        return builder
-          .id(`action${index}`)
-          .label(`Action ${index}`)
-          .handler(handlers[index])
-          .build();
+        const handler = handlers[index];
+        if (!handler) {
+          throw new Error(`expected a handler fixture at index ${index}`);
+        }
+        return builder.id(`action${index}`).label(`Action ${index}`).handler(handler).build();
       });
 
       expect(actions).toHaveLength(3);
-      expect(actions[0].id).toBe('action0');
-      expect(actions[1].id).toBe('action1');
-      expect(actions[2].id).toBe('action2');
+      expect(actions[0]?.id).toBe('action0');
+      expect(actions[1]?.id).toBe('action1');
+      expect(actions[2]?.id).toBe('action2');
     });
   });
 

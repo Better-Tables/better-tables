@@ -115,8 +115,9 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     supportsNull: false,
     validate: (values) => {
       if (values.length !== 2) return false;
-      if (!values.every((v) => typeof v === 'number')) return false;
-      return values[0] <= values[1]; // Allow equal values for between
+      const [lower, upper] = values;
+      if (typeof lower !== 'number' || typeof upper !== 'number') return false;
+      return lower <= upper; // Allow equal values for between
     },
   },
   {
@@ -127,8 +128,9 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     supportsNull: false,
     validate: (values) => {
       if (values.length !== 2) return false;
-      if (!values.every((v) => typeof v === 'number')) return false;
-      return values[0] <= values[1]; // Allow equal values for not between
+      const [lower, upper] = values;
+      if (typeof lower !== 'number' || typeof upper !== 'number') return false;
+      return lower <= upper; // Allow equal values for not between
     },
   },
   {
@@ -193,8 +195,9 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     supportsNull: false,
     validate: (values) => {
       if (values.length !== 2) return false;
-      if (!values.every((v) => v instanceof Date)) return false;
-      return values[0] <= values[1]; // Allow same date for between
+      const [start, end] = values;
+      if (!(start instanceof Date) || !(end instanceof Date)) return false;
+      return start <= end; // Allow same date for between
     },
   },
   {
@@ -205,8 +208,9 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     supportsNull: false,
     validate: (values) => {
       if (values.length !== 2) return false;
-      if (!values.every((v) => v instanceof Date)) return false;
-      return values[0] <= values[1]; // Allow same date for not between
+      const [start, end] = values;
+      if (!(start instanceof Date) || !(end instanceof Date)) return false;
+      return start <= end; // Allow same date for not between
     },
   },
   {

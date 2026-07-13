@@ -22,8 +22,8 @@ describe('Column Visibility Utilities', () => {
     displayName: id,
     accessor: () => null,
     type: 'text',
-    defaultVisible,
-    hideable,
+    ...(defaultVisible !== undefined && { defaultVisible }),
+    ...(hideable !== undefined && { hideable }),
   });
 
   describe('getDefaultColumnVisibility', () => {
