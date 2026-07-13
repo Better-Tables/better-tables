@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error fetching table data:', error);
     return NextResponse.json(
       {
         error: 'Failed to fetch table data',

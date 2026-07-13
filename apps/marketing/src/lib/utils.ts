@@ -1,7 +1,7 @@
-import { siteConfig } from "@/lib/config";
-import { type ClassValue, clsx } from "clsx";
-import { Metadata } from "next";
-import { twMerge } from "tailwind-merge";
+import { type ClassValue, clsx } from 'clsx';
+import type { Metadata } from 'next';
+import { twMerge } from 'tailwind-merge';
+import { siteConfig } from '@/lib/config';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -14,7 +14,7 @@ export function absoluteUrl(path: string) {
 export function constructMetadata({
   title = siteConfig.name,
   description = siteConfig.description,
-  image = absoluteUrl("/og"),
+  image = absoluteUrl('/og'),
   ...props
 }: {
   title?: string;
@@ -24,7 +24,7 @@ export function constructMetadata({
 }): Metadata {
   return {
     title: {
-      template: "%s | " + siteConfig.name,
+      template: `%s | ${siteConfig.name}`,
       default: siteConfig.name,
     },
     description: description || siteConfig.description,
@@ -42,10 +42,10 @@ export function constructMetadata({
           alt: title,
         },
       ],
-      type: "website",
-      locale: "en_US",
+      type: 'website',
+      locale: 'en_US',
     },
-    icons: "/favicon.ico",
+    icons: '/favicon.ico',
     metadataBase: new URL(siteConfig.url),
     authors: [
       {
@@ -58,22 +58,22 @@ export function constructMetadata({
 }
 
 export function formatDate(date: string) {
-  let currentDate = new Date().getTime();
-  if (!date.includes("T")) {
+  const currentDate = Date.now();
+  if (!date.includes('T')) {
     date = `${date}T00:00:00`;
   }
-  let targetDate = new Date(date).getTime();
-  let timeDifference = Math.abs(currentDate - targetDate);
-  let daysAgo = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+  const targetDate = new Date(date).getTime();
+  const timeDifference = Math.abs(currentDate - targetDate);
+  const daysAgo = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
 
-  let fullDate = new Date(date).toLocaleString("en-us", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+  const fullDate = new Date(date).toLocaleString('en-us', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   });
 
   if (daysAgo < 1) {
-    return "Today";
+    return 'Today';
   } else if (daysAgo < 7) {
     return `${fullDate} (${daysAgo}d ago)`;
   } else if (daysAgo < 30) {

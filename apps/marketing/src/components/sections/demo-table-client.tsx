@@ -1,13 +1,9 @@
 'use client';
 
-import type {
-  FilterState,
-  PaginationState,
-  SortingState,
-} from '@better-tables/core';
+import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { type DemoUser, defaultVisibleColumns, demoColumns } from '@/lib/demo-columns';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
-import { demoColumns, defaultVisibleColumns, type DemoUser } from '@/lib/demo-columns';
 
 const TABLE_ID = 'demo-table';
 
@@ -65,4 +61,3 @@ export function DemoTableClient({
     />
   );
 }
-

@@ -1,24 +1,17 @@
-"use client";
+'use client';
 
-import { Icons } from "@/components/icons";
-import { MobileDrawer } from "@/components/mobile-drawer";
-import { buttonVariants } from "@/components/ui/button";
-import { easeInOutCubic } from "@/lib/animation";
-import { siteConfig } from "@/lib/config";
-import { cn } from "@/lib/utils";
-import { AnimatePresence, motion, useAnimation } from "framer-motion";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import Link from 'next/link';
+import { Icons } from '@/components/icons';
+import { MobileDrawer } from '@/components/mobile-drawer';
+import { buttonVariants } from '@/components/ui/button';
+import { siteConfig } from '@/lib/config';
+import { cn } from '@/lib/utils';
 
 export function Header() {
   return (
     <header className="sticky top-0 h-[var(--header-height)] z-50 p-0 bg-background/60 backdrop-blur">
       <div className="flex justify-between items-center container mx-auto p-2">
-        <Link
-          href="/"
-          title="brand-logo"
-          className="relative mr-6 flex items-center space-x-2"
-        >
+        <Link href="/" title="brand-logo" className="relative mr-6 flex items-center space-x-2">
           <Icons.logo className="w-auto" />
           <span className="font-semibold text-lg">{siteConfig.name}</span>
         </Link>
@@ -26,8 +19,8 @@ export function Header() {
           <Link
             href="#"
             className={cn(
-              buttonVariants({ variant: "default" }),
-              "h-8 text-primary-foreground rounded-lg group tracking-tight font-medium"
+              buttonVariants({ variant: 'default' }),
+              'h-8 text-primary-foreground rounded-lg group tracking-tight font-medium'
             )}
           >
             {siteConfig.cta}

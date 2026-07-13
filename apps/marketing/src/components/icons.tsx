@@ -1,4 +1,4 @@
-import { DiscordLogoIcon } from "@radix-ui/react-icons";
+import { DiscordLogoIcon } from '@radix-ui/react-icons';
 
 type IconProps = React.HTMLAttributes<SVGElement>;
 

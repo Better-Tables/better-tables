@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
+import type React from 'react';
+import { useState } from 'react';
 
 interface FeatureOption {
   id: number;
@@ -13,9 +14,7 @@ interface FeatureSelectorProps {
   features: FeatureOption[];
 }
 
-export const FeatureSelector: React.FC<FeatureSelectorProps> = ({
-  features,
-}) => {
+export const FeatureSelector: React.FC<FeatureSelectorProps> = ({ features }) => {
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
 
   return (
@@ -27,13 +26,11 @@ export const FeatureSelector: React.FC<FeatureSelectorProps> = ({
               key={option.id}
               onClick={() => setSelectedIndex(index)}
               className={`flex-shrink-0 w-64 md:w-full text-left p-4 mb-2 mr-2 last:mr-0 md:mr-0 rounded border border-border ${
-                selectedIndex === index ? "bg-accent/70" : "hover:bg-muted/50"
+                selectedIndex === index ? 'bg-accent/70' : 'hover:bg-muted/50'
               }`}
             >
               <h3 className="font-medium tracking-tight">{option.title}</h3>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {option.description}
-              </p>
+              <p className="text-sm text-muted-foreground line-clamp-2">{option.description}</p>
             </button>
           ))}
         </div>

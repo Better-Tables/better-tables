@@ -1,24 +1,19 @@
-import Author from "@/components/blog-author";
-import { CTA } from "@/components/sections/cta";
-import { getPost } from "@/lib/blog";
-import { siteConfig } from "@/lib/config";
-import { formatDate } from "@/lib/utils";
-import type { Metadata } from "next";
-import Image from "next/image";
-import { notFound } from "next/navigation";
-import { Suspense } from "react";
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
+import Author from '@/components/blog-author';
+import { CTA } from '@/components/sections/cta';
+import { getPost } from '@/lib/blog';
+import { siteConfig } from '@/lib/config';
+import { formatDate } from '@/lib/utils';
 
 export async function generateMetadata(props: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata | undefined> {
   const params = await props.params;
-  let post = await getPost(params.slug);
-  let {
-    title,
-    publishedAt: publishedTime,
-    summary: description,
-    image,
-  } = post.metadata;
+  const post = await getPost(params.slug);
+  const { title, publishedAt: publishedTime, summary: description, image } = post.metadata;
 
   return {
     title,
@@ -26,7 +21,7 @@ export async function generateMetadata(props: {
     openGraph: {
       title,
       description,
-      type: "article",
+      type: 'article',
       publishedTime,
       url: `${siteConfig.url}/blog/${post.slug}`,
       images: [
@@ -36,7 +31,7 @@ export async function generateMetadata(props: {
       ],
     },
     twitter: {
-      card: "summary_large_image",
+      card: 'summary_large_image',
       title,
       description,
       images: [image],
@@ -60,8 +55,8 @@ export default async function Page(props: {
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "BlogPosting",
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
             headline: post.metadata.title,
             datePublished: post.metadata.publishedAt,
             dateModified: post.metadata.publishedAt,
@@ -71,7 +66,7 @@ export default async function Page(props: {
               : `${siteConfig.url}/blog/${post.slug}/opengraph-image`,
             url: `${siteConfig.url}/blog/${post.slug}`,
             author: {
-              "@type": "Person",
+              '@type': 'Person',
               name: siteConfig.name,
             },
           }),
@@ -79,9 +74,7 @@ export default async function Page(props: {
       />
       <div className="mx-auto w-full max-w-[800px] px-4 sm:px-6 lg:px-8 space-y-4 my-12">
         <Suspense
-          fallback={
-            <div className="mb-8 w-full h-64 bg-muted animate-pulse rounded-lg"></div>
-          }
+          fallback={<div className="mb-8 w-full h-64 bg-muted animate-pulse rounded-lg"></div>}
         >
           {post.metadata.image && (
             <div className="mb-8">
@@ -96,9 +89,7 @@ export default async function Page(props: {
           )}
         </Suspense>
         <div className="flex flex-col">
-          <h1 className="title font-medium text-3xl tracking-tighter">
-            {post.metadata.title}
-          </h1>
+          <h1 className="title font-medium text-3xl tracking-tighter">{post.metadata.title}</h1>
         </div>
         <div className="flex justify-between items-center text-sm">
           <Suspense fallback={<p className="h-5" />}>
@@ -113,7 +104,7 @@ export default async function Page(props: {
           <Author
             twitterUsername={post.metadata.author}
             name={post.metadata.author}
-            image={"/author.jpg"}
+            image={'/author.jpg'}
           />
         </div>
         <article

@@ -1,6 +1,6 @@
-import { formatDate } from "@/lib/utils";
-import Image from "next/image";
-import Link from "next/link";
+import Image from 'next/image';
+import Link from 'next/link';
+import { formatDate } from '@/lib/utils';
 
 export default function Author({
   name,
@@ -30,13 +30,7 @@ export default function Author({
   if (updatedAt) {
     return (
       <div className="flex items-center space-x-3">
-        <Image
-          src={image}
-          alt={name}
-          width={36}
-          height={36}
-          className="rounded-full"
-        />
+        <Image src={image} alt={name} width={36} height={36} className="rounded-full" />
         <div className="flex flex-col">
           <p className="text-sm text-muted-foreground">Written by {name}</p>
           <time dateTime={updatedAt} className="text-sm font-light">
