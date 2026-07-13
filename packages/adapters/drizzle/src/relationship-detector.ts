@@ -54,6 +54,7 @@
 import type { Relations } from 'drizzle-orm';
 import type { AnyTableType, RelationshipMap, RelationshipPath } from './types';
 import { RelationshipError } from './types';
+import { getPrimaryKeyColumns } from './utils/drizzle-schema-utils';
 
 // Type for the actual relation object returned by Drizzle's config() function
 type DrizzleRelationConfig = {
@@ -83,6 +84,20 @@ export class RelationshipDetector {
   private relationships: Map<string, RelationshipPath> = new Map();
   private relationshipGraph: Map<string, Set<string>> = new Map();
   private schema: Record<string, unknown> | undefined;
+  /** Guards convention-guess warnings so each unique guess warns once per instance. */
+  private warnedKeys: Set<string> = new Set();
+
+  /**
+   * Emit a deduplicated warning (once per unique `key`, per detector instance).
+   */
+  private warnOnce(key: string, message: string): void {
+    if (this.warnedKeys.has(key)) {
+      return;
+    }
+    this.warnedKeys.add(key);
+    // biome-ignore lint: Intentional warning logging for unverified relationship guesses
+    console.warn(message);
+  }
   /**
    * Type guard to check if an object is a Drizzle Relations object
    */
@@ -1069,8 +1084,15 @@ export class RelationshipDetector {
       }
     }
 
-    // Strategy 3: Convention-based fallback
-    // For users->posts, try posts.userId or posts.user_id referencing users.id
+    // Strategy 3: Convention-based fallback, verified against real FK metadata.
+    // For users->posts, try posts.userId or posts.user_id referencing users.id.
+    // A bare name match is never accepted on its own -- if the candidate column
+    // carries FK metadata that CONTRADICTS the guess (references some other
+    // table), skip it; a typo'd or coincidentally-named column must not bind a
+    // join to the wrong table. If metadata CONFIRMS the guess, it's really
+    // Strategy-1-equivalent and accepted silently. Only when the column has no
+    // FK metadata at all (no signal to check) do we accept the guess -- but we
+    // warn once, since it's still a guess with no verifying signal.
     const conventionalForeignKeys = [
       `${fromTable}Id`,
       `${fromTable}_id`,
@@ -1078,17 +1100,124 @@ export class RelationshipDetector {
       `${fromTable.slice(0, -1)}_id`,
     ];
 
+    const sourcePrimaryKeyName = this.getSourcePrimaryKeyName(sourceTableSchema, sourceTableObj);
+    if (!sourcePrimaryKeyName) {
+      return { localKey: '', foreignKey: '' };
+    }
+
     for (const fkName of conventionalForeignKeys) {
-      if (fkName in targetTableObj) {
-        // Assume it references the primary key of source table
-        // Try to find 'id' column in source table
-        if ('id' in sourceTableObj) {
-          return { localKey: 'id', foreignKey: fkName };
+      const candidateColumn = targetTableObj[fkName];
+      if (!candidateColumn || typeof candidateColumn !== 'object') {
+        continue;
+      }
+
+      const refTableName = this.getColumnForeignKeyTarget(
+        targetTableObj,
+        candidateColumn as Record<string, unknown>
+      );
+      if (refTableName) {
+        if (refTableName === sourceTableDbName) {
+          // Metadata confirms the guess -- silently accept (Strategy-1-equivalent).
+          return { localKey: sourcePrimaryKeyName, foreignKey: fkName };
+        }
+        // Metadata contradicts the guess (references a different table) -- skip it.
+        continue;
+      }
+
+      // No FK metadata on this column at all -- accept the naming convention,
+      // but only after warning that it's an unverified guess.
+      this.warnOnce(
+        `strategy3:${fromTable}.${toTable}.${fkName}`,
+        `[better-tables] Guessed the relationship "${fromTable}" -> "${toTable}" via column ` +
+          `"${toTable}.${fkName}" based on naming convention alone (no foreign key metadata ` +
+          `was found to verify it). If this is wrong, add a real foreign key / .references() ` +
+          `on "${toTable}.${fkName}", or define the relationship explicitly via manual ` +
+          'relationships (mergeManualRelationships).'
+      );
+      return { localKey: sourcePrimaryKeyName, foreignKey: fkName };
+    }
+
+    return { localKey: '', foreignKey: '' };
+  }
+
+  /**
+   * Resolve the primary key column name for a source table, preferring real
+   * schema PK metadata over the historical hard-coded `'id'` assumption.
+   * Falls back to an `'id'` property check only when no PK metadata is
+   * available at all (e.g. a schema without Drizzle column metadata).
+   */
+  private getSourcePrimaryKeyName(
+    sourceTableSchema: unknown,
+    sourceTableObj: Record<string, unknown>
+  ): string | null {
+    const primaryKeyColumns = getPrimaryKeyColumns(sourceTableSchema as AnyTableType);
+    const firstPrimaryKey = primaryKeyColumns[0];
+    if (firstPrimaryKey) {
+      return firstPrimaryKey.name;
+    }
+    return 'id' in sourceTableObj ? 'id' : null;
+  }
+
+  /** Table-level inline-FK symbols across the dialects this adapter supports. */
+  private static readonly INLINE_FOREIGN_KEY_SYMBOLS = [
+    Symbol.for('drizzle:SQLiteInlineForeignKeys'),
+    Symbol.for('drizzle:PgInlineForeignKeys'),
+    Symbol.for('drizzle:MySqlInlineForeignKeys'),
+  ];
+
+  /**
+   * Determine which table (by DB name) `column` on `targetTableObj` has real
+   * FK metadata pointing at, if any. Checks both column-level metadata
+   * (symbols directly on the column -- the shape some ORMs/test mocks use)
+   * and table-level inline foreign keys matched by reference equality to
+   * `column` -- the shape real Drizzle SQLite/Postgres/MySQL columns
+   * actually use for `.references()`. Returns `null` when the column has no
+   * discoverable FK metadata at all (as opposed to metadata that points
+   * elsewhere, which is a real answer, just not the source table).
+   */
+  private getColumnForeignKeyTarget(
+    targetTableObj: Record<string, unknown>,
+    column: Record<string, unknown>
+  ): string | null {
+    const fkInfo = this.getForeignKeyInfo(column);
+    if (fkInfo) {
+      return this.getTableName(fkInfo.table);
+    }
+
+    for (const symbol of RelationshipDetector.INLINE_FOREIGN_KEY_SYMBOLS) {
+      const inlineForeignKeys = (targetTableObj as Record<symbol, unknown>)[symbol];
+      if (!Array.isArray(inlineForeignKeys)) {
+        continue;
+      }
+
+      for (const fk of inlineForeignKeys) {
+        if (!fk || typeof fk !== 'object') {
+          continue;
+        }
+        const fkObj = fk as Record<string, unknown>;
+        if (typeof fkObj.reference !== 'function') {
+          continue;
+        }
+        try {
+          const ref = (fkObj.reference as () => unknown)();
+          if (!ref || typeof ref !== 'object') {
+            continue;
+          }
+          const refObj = ref as Record<string, unknown>;
+          const localColumns = Array.isArray(refObj.columns) ? refObj.columns : [];
+          if (!localColumns.includes(column)) {
+            continue;
+          }
+          if (refObj.foreignTable) {
+            return this.getTableName(refObj.foreignTable);
+          }
+        } catch {
+          // Malformed reference() -- treat as no usable metadata from this entry.
         }
       }
     }
 
-    return { localKey: '', foreignKey: '' };
+    return null;
   }
 
   /**
