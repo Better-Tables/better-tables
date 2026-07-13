@@ -11,7 +11,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'bun:test';
-import type { FilterOperator } from '@better-tables/core';
+import type { FilterGroupNode, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
 import {
   computeDatePeriodRange,
   FilterRouter,
@@ -213,6 +213,98 @@ describe('FilterRouter', () => {
       expect(ops).toContain('isNotNull');
       expect(ops).not.toContain('between');
     });
+  });
+});
+
+describe('FilterRouter.buildNodeCondition (plan 017 group translation)', () => {
+  let emitter: StubEmitter;
+  let router: FilterRouter<StubColumn, StubPredicate>;
+
+  beforeEach(() => {
+    emitter = new StubEmitter();
+    router = new FilterRouter(emitter);
+  });
+
+  /** Minimal FilterState leaf; `values` controls whether the stub leaf resolver "matches". */
+  function leaf(columnId: string, values: unknown[] = ['x']): FilterState {
+    return { columnId, type: 'text', operator: 'contains', values } as FilterState;
+  }
+
+  /** Leaf resolver used by every test below: undefined for empty values, a tagged predicate otherwise. */
+  function leafCondition(f: FilterState): StubPredicate | undefined {
+    return f.values.length === 0 ? undefined : { kind: f.columnId, values: f.values };
+  }
+
+  it('a bare leaf node resolves via the leaf callback directly (no combinator call)', () => {
+    const node: FilterNode = leaf('a');
+    const result = router.buildNodeCondition(node, leafCondition);
+    expect(result).toEqual({ kind: 'a', values: ['x'] });
+  });
+
+  it('a two-child AND group calls emitter.and with both leaf conditions', () => {
+    const node: FilterGroupNode = {
+      kind: 'group',
+      logic: 'and',
+      children: [leaf('a'), leaf('b')],
+    };
+    const result = router.buildNodeCondition(node, leafCondition);
+    expect(result?.kind).toBe('and');
+    expect(result?.children).toHaveLength(2);
+    expect(result?.children).toEqual([
+      { kind: 'a', values: ['x'] },
+      { kind: 'b', values: ['x'] },
+    ]);
+  });
+
+  it('a two-child OR group calls emitter.or with both leaf conditions', () => {
+    const node: FilterGroupNode = {
+      kind: 'group',
+      logic: 'or',
+      children: [leaf('a'), leaf('b')],
+    };
+    const result = router.buildNodeCondition(node, leafCondition);
+    expect(result?.kind).toBe('or');
+    expect(result?.children).toHaveLength(2);
+  });
+
+  it('nested groups recurse: OR(a, AND(b, c))', () => {
+    const node: FilterGroupNode = {
+      kind: 'group',
+      logic: 'or',
+      children: [
+        leaf('a'),
+        { kind: 'group', logic: 'and', children: [leaf('b'), leaf('c')] },
+      ],
+    };
+    const result = router.buildNodeCondition(node, leafCondition);
+    expect(result?.kind).toBe('or');
+    expect(result?.children).toHaveLength(2);
+    expect(result?.children?.[0]).toEqual({ kind: 'a', values: ['x'] });
+    expect(result?.children?.[1]?.kind).toBe('and');
+    expect(result?.children?.[1]?.children).toHaveLength(2);
+  });
+
+  it('an empty group (every child resolves to undefined) collapses to undefined', () => {
+    const node: FilterGroupNode = {
+      kind: 'group',
+      logic: 'and',
+      children: [leaf('a', []), leaf('b', [])],
+    };
+    const result = router.buildNodeCondition(node, leafCondition);
+    expect(result).toBeUndefined();
+    // No and()/or() combinator call recorded (StubPredicate has no calls log
+    // for combinators, but we can assert indirectly: an actual combinator
+    // call would have produced a { kind: 'and' | 'or' } wrapper).
+  });
+
+  it('a single-survivor group collapses to the survivor, no and()/or() wrapper', () => {
+    const node: FilterGroupNode = {
+      kind: 'group',
+      logic: 'or',
+      children: [leaf('a', []), leaf('b')],
+    };
+    const result = router.buildNodeCondition(node, leafCondition);
+    expect(result).toEqual({ kind: 'b', values: ['x'] });
   });
 });
 
