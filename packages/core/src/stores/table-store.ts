@@ -4,6 +4,7 @@ import type {
   ColumnDefinition,
   ColumnOrder,
   ColumnVisibility,
+  FilterGroupNode,
   FilterState,
   PaginationState,
   SortingState,
@@ -20,7 +21,11 @@ export interface TableStoreState {
 
   // State (synced from manager)
   columns: ColumnDefinition[];
-  filters: FilterState[];
+  /**
+   * The real stored filter state (plan 016 semantic contract rule 2): a flat
+   * array (implicit AND) or a single {@link FilterGroupNode} tree.
+   */
+  filters: FilterState[] | FilterGroupNode;
   pagination: PaginationState;
   sorting: SortingState;
   selectedRows: Set<string>;
@@ -29,6 +34,12 @@ export interface TableStoreState {
 
   // Filter actions
   setFilters: (filters: FilterState[]) => void;
+  /**
+   * Tree-aware setter -- the counterpart to {@link setFilters} that
+   * preserves a {@link FilterGroupNode} tree instead of replacing it with a
+   * flat array.
+   */
+  setFilterNode: (node: FilterState[] | FilterGroupNode) => void;
   addFilter: (filter: FilterState) => void;
   removeFilter: (columnId: string) => void;
   clearFilters: () => void;
@@ -69,7 +80,7 @@ export interface TableStoreState {
  * Initial state for table store
  */
 export interface TableStoreInitialState {
-  filters?: FilterState[];
+  filters?: FilterState[] | FilterGroupNode;
   pagination?: PaginationState;
   sorting?: SortingState;
   selectedRows?: Set<string>;
@@ -172,6 +183,10 @@ export function createTableStore(initialState: TableStoreInitialState) {
         // Filter actions - delegate to manager
         setFilters: (filters: FilterState[]) => {
           get().manager.setFilters(filters);
+        },
+
+        setFilterNode: (node: FilterState[] | FilterGroupNode) => {
+          get().manager.setFilterNode(node);
         },
 
         addFilter: (filter: FilterState) => {

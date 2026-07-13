@@ -13,7 +13,7 @@ import type { ActionsConfig, TableAction } from './action';
 import type { TableAdapter } from './adapter';
 import type { ColumnDefinition } from './column';
 import type { EventHandler, IconComponent, TableTheme } from './common';
-import type { FilterGroup, FilterState } from './filter';
+import type { FilterGroup, FilterGroupNode, FilterState } from './filter';
 import type { PaginationConfig } from './pagination';
 import type { SortingConfig } from './sorting';
 
@@ -59,8 +59,11 @@ export interface TableConfig<TData = unknown> {
   /** Automatic filter grouping configuration */
   autoGroupFilters?: AutoGroupConfig;
 
-  /** Default filters to apply on initialization */
-  defaultFilters?: FilterState[];
+  /**
+   * Default filters to apply on initialization -- a flat array (implicit
+   * AND) or a single {@link FilterGroupNode} tree.
+   */
+  defaultFilters?: FilterState[] | FilterGroupNode;
 
   /** Pagination configuration and options */
   pagination?: PaginationConfig;

@@ -9,7 +9,7 @@
  */
 
 import type { ColumnDefinition, ColumnOrder, ColumnVisibility } from '../types/column';
-import type { FilterState } from '../types/filter';
+import type { FilterGroupNode, FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
 import type { SortingState } from '../types/sorting';
 import { getDefaultColumnOrder, mergeColumnOrder } from '../utils/column-order';
@@ -70,8 +70,14 @@ export interface TableStateConfig {
  * ```
  */
 export interface TableState {
-  /** Current active filters */
-  filters: FilterState[];
+  /**
+   * Current active filters -- the real stored value (plan 016 semantic
+   * contract rule 2): a flat array (implicit AND) or a single
+   * {@link FilterGroupNode} tree. Use `TableStateManager.getFilters()` for
+   * the legacy flat leaf view, or `getFilterNode()`/this field for the real
+   * value.
+   */
+  filters: FilterState[] | FilterGroupNode;
   /** Current pagination state */
   pagination: PaginationState;
   /** Current sorting configuration */
@@ -201,6 +207,7 @@ export class TableStateManager<TData = unknown> {
 
   // Caching for structural sharing
   private cachedFilters: FilterState[] | null = null;
+  private cachedFilterNode: FilterState[] | FilterGroupNode | null = null;
   private cachedPagination: PaginationState | null = null;
   private cachedSorting: SortingState | null = null;
   private cachedSelectedRows: Set<string> | null = null;
@@ -235,6 +242,9 @@ export class TableStateManager<TData = unknown> {
       // Listen to all filter events and update state
       // Invalidate cache to force new reference
       this.cachedFilters = null;
+      this.cachedFilterNode = null;
+      // filters_changed carries the flat leaf view (rule 3's legacy display
+      // accessor), not the real (possibly tree) stored value -- see getState().
       const filters = this.filterManager.getFilters();
       this.notifySubscribers({ type: 'filters_changed', filters });
       this.notifyStateChanged();
@@ -255,7 +265,10 @@ export class TableStateManager<TData = unknown> {
    */
   getState(): TableState {
     return {
-      filters: this.getFilters(),
+      // The real stored value (rule 2) -- a flat array is returned
+      // unchanged, so this is a no-op behavior change for every existing
+      // flat call path (rule 1).
+      filters: this.getFilterNode(),
       pagination: this.getPagination(),
       sorting: this.getSorting(),
       selectedRows: this.getSelectedRows(),
@@ -296,6 +309,32 @@ export class TableStateManager<TData = unknown> {
 
   setFilters(filters: FilterState[]): void {
     this.filterManager.setFilters(filters);
+  }
+
+  /**
+   * Get the real stored filter state: a flat array (implicit AND) or a
+   * single {@link FilterGroupNode} tree (plan 016 semantic contract rule 3).
+   * Unlike {@link getFilters}, this never flattens a stored tree.
+   */
+  getFilterNode(): FilterState[] | FilterGroupNode {
+    const node = this.filterManager.getFilterNode();
+
+    // Return cached reference if structurally equal (deepEqual already
+    // handles nested trees generically -- no extension needed for groups).
+    if (this.cachedFilterNode && deepEqual(this.cachedFilterNode, node)) {
+      return this.cachedFilterNode;
+    }
+
+    this.cachedFilterNode = node;
+    return node;
+  }
+
+  /**
+   * Set the real stored filter state -- the tree-aware counterpart to
+   * {@link setFilters} (plan 016 semantic contract rule 3).
+   */
+  setFilterNode(node: FilterState[] | FilterGroupNode): void {
+    this.filterManager.setFilterNode(node);
   }
 
   addFilter(filter: FilterState): void {
@@ -521,7 +560,12 @@ export class TableStateManager<TData = unknown> {
    */
   updateState(updates: Partial<TableState>): void {
     if (updates.filters !== undefined) {
-      this.filterManager.setFilters(updates.filters);
+      // Tree-preserving (rule 4): TableState.filters is the real stored
+      // value, so a hydrated FilterGroupNode tree (e.g. from a c2: URL)
+      // must flow through unflattened. setFilterNode delegates flat arrays
+      // to setFilters verbatim (rule 1), so this is a no-op behavior change
+      // for every existing flat call path.
+      this.filterManager.setFilterNode(updates.filters);
     }
 
     if (updates.pagination !== undefined) {
@@ -687,15 +731,17 @@ export class TableStateManager<TData = unknown> {
    */
   updateColumns(columns: ColumnDefinition<TData>[]): void {
     this.columns = columns;
-    // Reinitialize filter manager with new columns
-    const currentFilters = this.filterManager.getFilters();
-    this.filterManager = new FilterManager(columns, currentFilters);
+    // Reinitialize filter manager with new columns, preserving the real
+    // stored value (a tree stays a tree across a column update).
+    const currentFilterNode = this.filterManager.getFilterNode();
+    this.filterManager = new FilterManager(columns, currentFilterNode);
 
     // Re-establish subscription to new FilterManager
     this.filterManager.subscribe(() => {
       // Listen to all filter events and update state
       // Invalidate cache to force new reference
       this.cachedFilters = null;
+      this.cachedFilterNode = null;
       const filters = this.filterManager.getFilters();
       this.notifySubscribers({ type: 'filters_changed', filters });
       this.notifyStateChanged();

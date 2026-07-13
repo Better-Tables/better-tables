@@ -227,6 +227,24 @@ export function normalizeFilterNode(
 }
 
 /**
+ * Depth-first, order-preserving leaf collector for a {@link FilterNode}.
+ *
+ * Used by the state layer's legacy flat accessors (design
+ * `plans/design/core-contract-v2.md`, plan 016 semantic contract rule 3):
+ * `getFilters()` returns a stored {@link FilterGroupNode} tree's flat LEAVES
+ * for display/badge-count purposes when the real stored value is a group.
+ * This view is deliberately lossy -- the AND/OR structure is discarded -- so
+ * it must never be written back into state (that would silently destroy the
+ * group). Leaf references are returned as-is (no cloning).
+ */
+export function flattenFilterNode(node: FilterNode): FilterState[] {
+  if (isFilterGroupNode(node)) {
+    return node.children.flatMap((child) => flattenFilterNode(child));
+  }
+  return [node];
+}
+
+/**
  * Type guard for text filter states (text, email, url, phone)
  */
 export function isTextFilterState(filter: FilterState): filter is TextFilterState {

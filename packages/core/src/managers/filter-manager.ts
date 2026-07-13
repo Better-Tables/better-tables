@@ -8,13 +8,19 @@
  */
 
 import type { ColumnDefinition, ColumnType } from '../types/column';
-import type { FilterOperator, FilterOperatorDefinition, FilterState } from '../types/filter';
+import type {
+  FilterGroupNode,
+  FilterOperator,
+  FilterOperatorDefinition,
+  FilterState,
+} from '../types/filter';
 import {
   createOperatorRegistry,
   getAllOperators,
   getDefaultOperatorsForType,
   getOperatorDefinition,
 } from '../types/filter-operators';
+import { flattenFilterNode, isFilterGroupNode, normalizeFilterNode } from '../utils/type-guards';
 
 /**
  * Event types for filter manager.
@@ -50,7 +56,7 @@ export type FilterManagerEvent =
   | { type: 'filter_updated'; columnId: string; filter: FilterState }
   | { type: 'filter_removed'; columnId: string }
   | { type: 'filters_cleared' }
-  | { type: 'filters_replaced'; filters: FilterState[] };
+  | { type: 'filters_replaced'; filters: FilterState[] | FilterGroupNode };
 
 /**
  * Filter manager subscriber function type.
@@ -168,7 +174,12 @@ export interface FilterSerializationOptions {
  * ```
  */
 export class FilterManager<TData = unknown> {
-  private filters: FilterState[] = [];
+  /**
+   * The real stored filter state (plan 016 semantic contract rule 2): either
+   * a flat `FilterState[]` (implicit AND) or a single {@link FilterGroupNode}
+   * tree. Flat inputs behave byte-for-byte as before this widening (rule 1).
+   */
+  private filterNode: FilterState[] | FilterGroupNode = [];
   private columns: ColumnDefinition<TData>[] = [];
   private subscribers: FilterManagerSubscriber[] = [];
   private operatorDefinitions: Map<FilterOperator, FilterOperatorDefinition> = new Map();
@@ -181,7 +192,8 @@ export class FilterManager<TData = unknown> {
    * against the provided column definitions and emit events for state changes.
    *
    * @param columns - Array of column definitions to validate filters against
-   * @param initialFilters - Optional initial filter states
+   * @param initialFilters - Optional initial filter state: a flat array
+   * (implicit AND) or a single {@link FilterGroupNode} tree
    *
    * @example
    * ```typescript
@@ -191,19 +203,26 @@ export class FilterManager<TData = unknown> {
    * ]);
    * ```
    */
-  constructor(columns: ColumnDefinition<TData>[], initialFilters: FilterState[] = []) {
+  constructor(
+    columns: ColumnDefinition<TData>[],
+    initialFilters: FilterState[] | FilterGroupNode = []
+  ) {
     this.columns = columns;
     this.operatorDefinitions = createOperatorRegistry(getAllOperators());
-    this.setFilters(initialFilters);
+    this.setFilterNode(initialFilters);
   }
 
   /**
-   * Get current filters.
+   * Get the current filters as a flat, order-preserving leaf list.
    *
-   * Returns a copy of the current filter states. The returned array is a shallow
-   * copy to prevent external mutations while allowing safe iteration and inspection.
+   * Legacy display-view accessor (plan 016 semantic contract rule 3): when
+   * the real stored value is a flat array, this returns it unchanged (a
+   * shallow copy). When the real stored value is a {@link FilterGroupNode}
+   * tree, this returns the tree's flat LEAVES (depth-first) for
+   * display/badge-count purposes -- the AND/OR structure is not represented.
+   * Use {@link getFilterNode} to read the real (possibly tree-shaped) value.
    *
-   * @returns Array of current filter states
+   * @returns Array of current filter states (leaves)
    *
    * @example
    * ```typescript
@@ -216,12 +235,17 @@ export class FilterManager<TData = unknown> {
    * ```
    */
   getFilters(): FilterState[] {
-    return [...this.filters];
+    return this.getFlatFilters();
   }
 
   /**
-   * Set filters (replaces all existing filters)
-   * Uses lenient validation to allow incomplete filters with empty values for UI editing
+   * Set filters (replaces all existing filters).
+   *
+   * Legacy flat setter (plan 016 semantic contract rule 3): REPLACES the
+   * whole stored value with the given flat array, even if a
+   * {@link FilterGroupNode} tree was previously stored -- deterministic, no
+   * silent merging into an existing group. Uses lenient validation to allow
+   * incomplete filters with empty values for UI editing.
    */
   setFilters(filters: FilterState[]): void {
     const validFilters = filters.filter((filter) => {
@@ -233,8 +257,52 @@ export class FilterManager<TData = unknown> {
       return true;
     });
 
-    this.filters = validFilters;
+    this.filterNode = validFilters;
     this.notifySubscribers({ type: 'filters_replaced', filters: validFilters });
+  }
+
+  /**
+   * Get the real stored filter state: a flat `FilterState[]` (implicit AND)
+   * or a single {@link FilterGroupNode} tree (plan 016 semantic contract rule
+   * 3). Unlike {@link getFilters}, this never flattens a stored tree.
+   */
+  getFilterNode(): FilterState[] | FilterGroupNode {
+    return Array.isArray(this.filterNode) ? [...this.filterNode] : this.filterNode;
+  }
+
+  /**
+   * Set the real stored filter state -- the tree-aware counterpart to
+   * {@link setFilters} (plan 016 semantic contract rule 3).
+   *
+   * A flat array input is delegated to {@link setFilters} verbatim (today's
+   * exact column-aware validation path, rule 1). A {@link FilterGroupNode}
+   * input is normalized via {@link normalizeFilterNode} (design §1.4: fail
+   * closed, drop invalid/unknown-logic/empty groups, unwrap single-child
+   * groups, drop over-deep subtrees) -- reusing plan 015's normalize rules
+   * rather than reimplementing them.
+   */
+  setFilterNode(node: FilterState[] | FilterGroupNode): void {
+    if (Array.isArray(node)) {
+      this.setFilters(node);
+      return;
+    }
+
+    const normalized = normalizeFilterNode(node);
+    const finalNode: FilterState[] | FilterGroupNode =
+      normalized === null ? [] : isFilterGroupNode(normalized) ? normalized : [normalized];
+
+    this.filterNode = finalNode;
+    this.notifySubscribers({ type: 'filters_replaced', filters: finalNode });
+  }
+
+  /**
+   * Flat, order-preserving leaf view of the real stored value. Shared by
+   * every legacy per-filter method below so they keep working (read as a
+   * flat list, mutate, replace) regardless of whether the real stored value
+   * is currently flat or a tree.
+   */
+  private getFlatFilters(): FilterState[] {
+    return Array.isArray(this.filterNode) ? [...this.filterNode] : flattenFilterNode(this.filterNode);
   }
 
   /**
@@ -271,13 +339,20 @@ export class FilterManager<TData = unknown> {
       throw new Error(`Invalid filter for column ${filter.columnId}: ${validation.error}`);
     }
 
-    const existingIndex = this.filters.findIndex((f) => f.columnId === filter.columnId);
+    // Per-filter edit: operate on the flat leaf view and replace the whole
+    // stored value (rule 3's replace semantic) -- a no-op change in shape
+    // when the stored value was already flat (rule 1), but collapses a tree
+    // to flat if one was active.
+    const currentFilters = this.getFlatFilters();
+    const existingIndex = currentFilters.findIndex((f) => f.columnId === filter.columnId);
 
     if (existingIndex >= 0) {
-      this.filters[existingIndex] = filter;
+      currentFilters[existingIndex] = filter;
+      this.filterNode = currentFilters;
       this.notifySubscribers({ type: 'filter_updated', columnId: filter.columnId, filter });
     } else {
-      this.filters.push(filter);
+      currentFilters.push(filter);
+      this.filterNode = currentFilters;
       this.notifySubscribers({ type: 'filter_added', filter });
     }
   }
@@ -286,9 +361,11 @@ export class FilterManager<TData = unknown> {
    * Remove a filter by column ID
    */
   removeFilter(columnId: string): void {
-    const index = this.filters.findIndex((f) => f.columnId === columnId);
+    const currentFilters = this.getFlatFilters();
+    const index = currentFilters.findIndex((f) => f.columnId === columnId);
     if (index >= 0) {
-      this.filters.splice(index, 1);
+      currentFilters.splice(index, 1);
+      this.filterNode = currentFilters;
       this.notifySubscribers({ type: 'filter_removed', columnId });
     }
   }
@@ -298,9 +375,10 @@ export class FilterManager<TData = unknown> {
    * Uses lenient validation to allow incomplete filters with empty values for UI editing
    */
   updateFilter(columnId: string, updates: Partial<FilterState>): void {
-    const index = this.filters.findIndex((f) => f.columnId === columnId);
+    const currentFilters = this.getFlatFilters();
+    const index = currentFilters.findIndex((f) => f.columnId === columnId);
     if (index >= 0) {
-      const updatedFilter = { ...this.filters[index], ...updates } as FilterState;
+      const updatedFilter = { ...currentFilters[index], ...updates } as FilterState;
       // Use lenient validation (strict = false) to allow incomplete filters in UI state
       const validation = this.validateFilter(updatedFilter, false);
 
@@ -308,7 +386,8 @@ export class FilterManager<TData = unknown> {
         throw new Error(`Invalid filter update for column ${columnId}: ${validation.error}`);
       }
 
-      this.filters[index] = updatedFilter;
+      currentFilters[index] = updatedFilter;
+      this.filterNode = currentFilters;
       this.notifySubscribers({ type: 'filter_updated', columnId, filter: updatedFilter });
     }
   }
@@ -317,36 +396,36 @@ export class FilterManager<TData = unknown> {
    * Clear all filters
    */
   clearFilters(): void {
-    this.filters = [];
+    this.filterNode = [];
     this.notifySubscribers({ type: 'filters_cleared' });
   }
 
   /**
-   * Get filter for specific column
+   * Get filter for specific column (flat leaf view -- see {@link getFilters})
    */
   getFilter(columnId: string): FilterState | undefined {
-    return this.filters.find((f) => f.columnId === columnId);
+    return this.getFlatFilters().find((f) => f.columnId === columnId);
   }
 
   /**
-   * Check if column has active filter
+   * Check if column has active filter (flat leaf view -- see {@link getFilters})
    */
   hasFilter(columnId: string): boolean {
-    return this.filters.some((f) => f.columnId === columnId);
+    return this.getFlatFilters().some((f) => f.columnId === columnId);
   }
 
   /**
-   * Get all filtered column IDs
+   * Get all filtered column IDs (flat leaf view -- see {@link getFilters})
    */
   getFilteredColumnIds(): string[] {
-    return this.filters.map((f) => f.columnId);
+    return this.getFlatFilters().map((f) => f.columnId);
   }
 
   /**
-   * Get filters by column type
+   * Get filters by column type (flat leaf view -- see {@link getFilters})
    */
   getFiltersByType(type: ColumnType): FilterState[] {
-    return this.filters.filter((f) => f.type === type);
+    return this.getFlatFilters().filter((f) => f.type === type);
   }
 
   /**
@@ -508,11 +587,13 @@ export class FilterManager<TData = unknown> {
   }
 
   /**
-   * Serialize filters to JSON
+   * Serialize filters to JSON (flat leaf view -- see {@link getFilters}; a
+   * stored {@link FilterGroupNode} tree's AND/OR structure is not
+   * represented in this format).
    */
   serialize(options: FilterSerializationOptions = {}): string {
     const data = {
-      filters: this.filters.map((filter) => ({
+      filters: this.getFlatFilters().map((filter) => ({
         columnId: filter.columnId,
         type: filter.type,
         operator: filter.operator,
@@ -547,13 +628,14 @@ export class FilterManager<TData = unknown> {
     filtersByType: Record<ColumnType, number>;
     filtersByOperator: Record<FilterOperator, number>;
   } {
+    const flatFilters = this.getFlatFilters();
     const stats = {
-      totalFilters: this.filters.length,
+      totalFilters: flatFilters.length,
       filtersByType: {} as Record<ColumnType, number>,
       filtersByOperator: {} as Record<FilterOperator, number>,
     };
 
-    this.filters.forEach((filter) => {
+    flatFilters.forEach((filter) => {
       stats.filtersByType[filter.type] = (stats.filtersByType[filter.type] || 0) + 1;
       stats.filtersByOperator[filter.operator] =
         (stats.filtersByOperator[filter.operator] || 0) + 1;
@@ -563,9 +645,11 @@ export class FilterManager<TData = unknown> {
   }
 
   /**
-   * Clone the filter manager with the same configuration
+   * Clone the filter manager with the same configuration, preserving the
+   * real stored value (a tree stays a tree -- unlike the other legacy
+   * per-filter methods, cloning is not a flat-only operation).
    */
   clone(): FilterManager<TData> {
-    return new FilterManager(this.columns, this.filters);
+    return new FilterManager(this.columns, this.filterNode);
   }
 }
