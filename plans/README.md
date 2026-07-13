@@ -43,7 +43,7 @@ language, this policy wins.
 | 006  | Design: contract v2 — typed registry + AND/OR groups | P1 | L (design) | 005 (DONE) | DONE (2026-07-13: merged to local main at `7fbc6f2` — design doc + experimental prototype + 11 type tests; registry derives from 011 `define()`; `.id()` literal-preservation flagged as follow-up blocker) |
 | 007  | Extract ORM-agnostic adapter toolkit | P2 | L | 002, 003 (DONE) | IN PROGRESS (executor dispatched 2026-07-13 from `41b5b9d`; instructed to keep the PredicateEmitter seam group-ready for plan 017) |
 | 008  | Prisma adapter spike (read path) | P2 | L (spike) | 007 (hard), 006, 005 | TODO |
-| 009  | DX hygiene sweep (README/packaging/CLI/onboarding) | P2 | M | — (001 rec.) | TODO |
+| 009  | DX hygiene sweep (README/packaging/CLI/onboarding) | P2 | M | — (001 rec.) | IN PROGRESS (2026-07-13: executing safe subset — Steps 2/5 and drizzle packaging deferred until plan 007 merges; return note in plans/009-dx-hygiene-sweep.md) |
 | 010  | UI hooks correctness + first UI test harness | P2 | L | 001 | TODO |
 | 011  | Design: Better-Auth-style config + path-typed table definitions | P1 | L (design) | — (co-evolves with 006; informs 005 step 3) | DONE (2026-07-12: reviewer APPROVED, merged to local main at `a82dd7a` on maintainer instruction. Perf gate: 199k instantiations / 1.03s, 10× under budget. Design content awaiting maintainer read — 5 open questions at the end of the doc. 005 step 3 skip-condition active pending maintainer approval of the design direction) |
 | 012  | Repair verification baseline (lockfile sync, CLI/commander-14 fix) | P0 | M | — | DONE (2026-07-13: absorbed into 013's branch via cherry-pick; merged to local main at `e30ba00`) |

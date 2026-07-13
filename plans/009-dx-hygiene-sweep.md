@@ -21,6 +21,13 @@
 - **Category**: dx / docs
 - **Planned at**: commit `55dfd01`, 2026-07-12
 
+## Deferred until plan 007
+
+- Step 2: prune phantom tsconfig paths (007 edits root tsconfig.json)
+- Step 5: drizzle-orm/better-sqlite3 dependency class fixes (007 edits drizzle package.json)
+- Step 7 partial: drizzle `sideEffects` / any drizzle package.json touch — do core+ui only until 007 lands
+
+
 ## Why this matters
 
 The first five minutes of a new user's experience currently fail: the README quick-start imports a package that is `"private": true` and not on npm, links to a `docs/` directory that doesn't exist, and advertises `memory`/`rest`/`pro` packages that aren't in the repo. The flagship CLI onboarding command prints nothing — it exits code 1 with no message on every failure path. The Drizzle adapter forces every consumer (including Postgres users) to compile the native `better-sqlite3` addon and bundles its own copy of `drizzle-orm`, and the UI package defeats tree-shaking and RSC usage. For a project whose stated goal is "the best DX in the world," these are the cheapest, highest-visibility wins in the repo.
