@@ -612,6 +612,53 @@ describe('MySQLQueryBuilder', () => {
       });
     });
 
+    describe('MySQL-Specific Count Query (Integration)', () => {
+      it('should count distinct primary keys instead of joined rows under a one-to-many join', async () => {
+        const envConnectionString = process.env.MYSQL_TEST_URL;
+        if (!envConnectionString) {
+          return; // Skip if MySQL not available
+        }
+
+        // Fixture: user 1 has 2 posts, user 2 has 1 post, user 3 has 0 posts.
+        // A join on posts produces 4 raw rows, but there are only 3 distinct users.
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'posts.title'],
+          },
+          'users'
+        );
+
+        const countQuery = queryBuilder.buildCountQuery(context, 'users');
+
+        // Assert the generated SQL uses COUNT(DISTINCT ...) when joins are present
+        const { sql: sqlString } = (
+          countQuery as unknown as { toSQL: () => { sql: string; params: unknown[] } }
+        ).toSQL();
+        expect(sqlString.toLowerCase()).toContain('count(distinct');
+
+        const countResult = (await countQuery.execute()) as Array<{ count: number }>;
+        expect(countResult[0]?.count).toBe(3);
+      });
+
+      it('should not use count distinct when there are no joins (control case)', async () => {
+        const envConnectionString = process.env.MYSQL_TEST_URL;
+        if (!envConnectionString) {
+          return; // Skip if MySQL not available
+        }
+
+        const context = relationshipManager.buildQueryContext({}, 'users');
+        const countQuery = queryBuilder.buildCountQuery(context, 'users');
+
+        const { sql: sqlString } = (
+          countQuery as unknown as { toSQL: () => { sql: string; params: unknown[] } }
+        ).toSQL();
+        expect(sqlString.toLowerCase()).not.toContain('distinct');
+
+        const countResult = (await countQuery.execute()) as Array<{ count: number }>;
+        expect(countResult[0]?.count).toBe(3);
+      });
+    });
+
     describe('Complete Query Building (Integration)', () => {
       it('should build and execute complete query with all MySQL-specific features', async () => {
         const envConnectionString = process.env.MYSQL_TEST_URL;
