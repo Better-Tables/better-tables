@@ -24,6 +24,7 @@ read correctly. See [What did NOT change](#what-did-not-change).
 | Drizzle dependencies | `drizzle-orm` and `better-sqlite3` moved from `dependencies` to `peerDependencies` (drivers optional). Install them yourself. | [§8](#8-drizzle-drizzle-orm-and-better-sqlite3-are-now-peer-dependencies) |
 | `@better-tables/adapters-toolkit` | New package; the Drizzle adapter is restructured on top of it. Public `DrizzleAdapter`/`drizzleAdapter()` surface is unchanged — only direct instantiators of `DataTransformer` are affected. | [§9](#9-adapters-toolkit-extraction-internal-restructure) |
 | React | 19+ only. | [§10](#10-react-19) |
+| Date column `timeZone` | Now actually converts (`@date-fns/tz`) instead of being accepted-but-ignored, including the builder's pre-existing `'UTC'` default on `.format()`/`.dateTime()`/`.timeOnly()`. | [§11](#11-date-formatting-timezone-is-now-actually-applied) |
 
 ## 1. Table setup: `betterTables` + `defineTable`
 
@@ -394,6 +395,26 @@ workspace catalog has pinned `react: ^19.2.3` for a while, so every published
 peer range already resolved to React-19-only. 0.6 doesn't newly require React
 19; it's just now stated correctly. If you were somehow running on React 18
 against that mismatched claim, this is the moment to upgrade.
+
+## 11. Date formatting: `timeZone` is now actually applied
+
+Date column formatting (`DateColumnBuilder.format()`/`.dateTime()`/
+`.timeOnly()`, and the underlying `formatDateWithConfig`/`formatDateRange`
+helpers) previously accepted a `timeZone` option but silently ignored it —
+dates always rendered in the viewer's local time zone. 0.6 applies it as a
+real conversion via `@date-fns/tz`, including day-boundary-sensitive
+relative phrasing ("today", "yesterday").
+
+**This is a breaking display change**, and it reaches further than columns
+that explicitly configured `timeZone`: `.format()`, `.dateTime()`, and
+`.timeOnly()` all default `timeZone` to `'UTC'` when you don't pass one, and
+that default now converts too. If you have a date column using one of those
+three methods without an explicit `timeZone`, it will flip from rendering in
+the viewer's local time zone to rendering in UTC. To keep the old
+viewer-local behavior, don't set `timeZone` on `.dateOnly()`/`.relative()`
+(unaffected), or explicitly pass the zone you want on the others. An
+unrecognized IANA zone name doesn't throw — it warns once via
+`console.warn` and falls back to unconverted rendering.
 
 ## What did NOT change
 
