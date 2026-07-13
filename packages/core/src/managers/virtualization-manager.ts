@@ -167,7 +167,15 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
     containerWidth: 800,
   };
 
-  private rowMeasurements: Map<number, RowMeasurement> = new Map();
+  /** Measured row heights only — start/end are always derived, never stored. */
+  private rowHeights: Map<number, { height: number; measuredAt: number }> = new Map();
+  /**
+   * Prefix offsets: `offsets[i]` is the start position of row `i`;
+   * `offsets[totalRows]` is the total size. Valid for indices `<= cleanUpTo`.
+   */
+  private offsets: number[] = [0];
+  /** Offsets are valid for indices `<= cleanUpTo`; everything past it is dirty. */
+  private cleanUpTo = 0;
   private totalRows = 0;
   private totalColumns = 0;
   private resizeObserver: ResizeObserver | null = null;
@@ -211,6 +219,7 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
     this.config = { ...this.config, ...config };
     this.totalRows = totalRows;
     this.totalColumns = totalColumns;
+    this.offsets = new Array(totalRows + 1).fill(0);
     this.initializeResizeObserver();
     this.calculateTotalSize();
     this.updateVirtualItems();
@@ -294,6 +303,9 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
     this.totalColumns = totalColumns;
 
     if (prevTotalRows !== totalRows || prevTotalColumns !== totalColumns) {
+      if (prevTotalRows !== totalRows) {
+        this.resizeOffsets(totalRows);
+      }
       this.calculateTotalSize();
       this.updateVirtualItems();
       this.updatePerformanceMetrics();
@@ -301,25 +313,27 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
   }
 
   /**
-   * Measure a row's actual height
+   * Measure a row's actual height.
+   *
+   * O(1): stores the height and rewinds the dirty watermark (`cleanUpTo`) to
+   * this row's index so every downstream offset gets lazily re-derived the
+   * next time it's actually needed (see `ensureCleanTo`) — no per-row
+   * re-summing here, and no stale cached `start`/`end` can survive since
+   * they are never stored (only height + measuredAt are cached).
    */
   measureRow(rowIndex: number, height: number): void {
-    const measurement: RowMeasurement = {
-      index: rowIndex,
-      height,
-      start: 0, // Will be calculated
-      end: 0, // Will be calculated
-      estimated: false,
-      measuredAt: Date.now(),
-    };
+    const previousHeight = this.getRowHeightAt(rowIndex);
 
-    // Update measurement cache
-    this.rowMeasurements.set(rowIndex, measurement);
+    this.rowHeights.set(rowIndex, { height, measuredAt: Date.now() });
+    this.cleanUpTo = Math.min(this.cleanUpTo, rowIndex);
 
-    // Recalculate positions for this and subsequent rows
-    this.recalculateRowPositions(rowIndex);
+    const delta = height - previousHeight;
+    if (delta !== 0) {
+      // The grand total changes by exactly `delta` regardless of which
+      // downstream offsets are currently dirty — no need to walk them.
+      this.applyTotalSize(this.state.totalHeight + delta);
+    }
 
-    // Update virtual items if this affects visible range
     this.updateVirtualItems();
 
     this.notify({ type: 'row_measured', rowIndex, height });
@@ -434,86 +448,103 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
   }
 
   /**
-   * Get row measurement (either cached or estimated)
+   * Get row measurement (either cached or estimated).
+   *
+   * Always derives `start`/`end` fresh from the offsets — a cached height
+   * is never paired with a cached position, so a stale downstream position
+   * is impossible by construction.
    */
   private getRowMeasurement(rowIndex: number): RowMeasurement {
-    const cached = this.rowMeasurements.get(rowIndex);
-    if (cached) {
-      return cached;
-    }
-
-    // Calculate estimated measurement
-    const height = this.config.getRowHeight
-      ? this.config.getRowHeight(rowIndex)
-      : this.config.defaultRowHeight;
-
-    const start = this.calculateRowStart(rowIndex);
+    const cached = this.rowHeights.get(rowIndex);
+    const height = cached ? cached.height : this.getEstimatedRowHeight(rowIndex);
+    const start = this.getRowStart(rowIndex);
 
     return {
       index: rowIndex,
       height,
       start,
       end: start + height,
-      estimated: true,
-      measuredAt: Date.now(),
+      estimated: !cached,
+      measuredAt: cached ? cached.measuredAt : Date.now(),
     };
   }
 
   /**
-   * Calculate the start position of a row
+   * A row's height: its measured value if cached, otherwise the estimate
+   * from `getRowHeight`/`defaultRowHeight`. O(1) — no summation.
    */
-  private calculateRowStart(rowIndex: number): number {
-    let start = 0;
+  private getRowHeightAt(rowIndex: number): number {
+    const cached = this.rowHeights.get(rowIndex);
+    return cached ? cached.height : this.getEstimatedRowHeight(rowIndex);
+  }
 
-    for (let i = 0; i < rowIndex; i++) {
-      const measurement = this.rowMeasurements.get(i);
-      if (measurement) {
-        start += measurement.height;
-      } else {
-        const height = this.config.getRowHeight
-          ? this.config.getRowHeight(i)
-          : this.config.defaultRowHeight;
-        start += height;
-      }
-    }
-
-    return start;
+  private getEstimatedRowHeight(rowIndex: number): number {
+    return this.config.getRowHeight
+      ? this.config.getRowHeight(rowIndex)
+      : this.config.defaultRowHeight;
   }
 
   /**
-   * Recalculate positions for rows starting from a given index
+   * Get the start position of a row, lazily revalidating the offsets
+   * prefix up to this index if needed. O(1) if already clean, otherwise
+   * O(distance to `cleanUpTo`) — amortized linear across a full re-scroll.
    */
-  private recalculateRowPositions(fromIndex: number): void {
-    // Recalculate start position for the changed row and update it
-    const measurement = this.rowMeasurements.get(fromIndex);
-    if (measurement) {
-      measurement.start = this.calculateRowStart(fromIndex);
-      measurement.end = measurement.start + measurement.height;
-    }
-
-    // Recalculate total height
-    this.calculateTotalSize();
+  private getRowStart(rowIndex: number): number {
+    const clamped = Math.min(Math.max(rowIndex, 0), this.totalRows);
+    this.ensureCleanTo(clamped);
+    return this.offsets[clamped];
   }
 
   /**
-   * Calculate total height and width
+   * Extend the valid offsets prefix from `cleanUpTo` up to `target` in one
+   * linear pass. No-op if already clean to (or past) `target`.
+   */
+  private ensureCleanTo(target: number): void {
+    const clampedTarget = Math.min(Math.max(target, 0), this.totalRows);
+    if (clampedTarget <= this.cleanUpTo) {
+      return;
+    }
+
+    for (let i = this.cleanUpTo; i < clampedTarget; i++) {
+      this.offsets[i + 1] = this.offsets[i] + this.getRowHeightAt(i);
+    }
+    this.cleanUpTo = clampedTarget;
+  }
+
+  /**
+   * Resize the offsets array to match a new row count, preserving whatever
+   * prefix is still valid (growing appends dirty slack that `ensureCleanTo`
+   * fills lazily; shrinking truncates and clamps the watermark).
+   */
+  private resizeOffsets(newTotalRows: number): void {
+    const prevLength = this.offsets.length;
+    this.offsets.length = newTotalRows + 1;
+    // Newly-appended slots (on growth) start dirty; ensureCleanTo fills
+    // them from the watermark forward, but give them a defined placeholder
+    // so reads before that never see `undefined`.
+    for (let i = prevLength; i < this.offsets.length; i++) {
+      this.offsets[i] = 0;
+    }
+    this.cleanUpTo = Math.min(this.cleanUpTo, newTotalRows);
+  }
+
+  /**
+   * Calculate total height and width.
+   *
+   * Reuses the same lazy offsets machinery as `getRowStart` — one linear
+   * pass to fully revalidate (only pays for the still-dirty suffix), not a
+   * second independent O(totalRows) loop.
    */
   private calculateTotalSize(): void {
-    let totalHeight = 0;
+    this.ensureCleanTo(this.totalRows);
+    this.applyTotalSize(this.offsets[this.totalRows] ?? 0);
+  }
 
-    // Calculate total height using measured heights where available
-    for (let i = 0; i < this.totalRows; i++) {
-      const measurement = this.rowMeasurements.get(i);
-      if (measurement) {
-        totalHeight += measurement.height;
-      } else {
-        const height = this.config.getRowHeight
-          ? this.config.getRowHeight(i)
-          : this.config.defaultRowHeight;
-        totalHeight += height;
-      }
-    }
-
+  /**
+   * Apply a (already-computed) total height/width to state, emitting
+   * `total_size_changed` only when it actually changed.
+   */
+  private applyTotalSize(totalHeight: number): void {
     const totalWidth = this.config.horizontalVirtualization
       ? this.totalColumns * (this.config.defaultColumnWidth || 150)
       : this.config.containerWidth || 800;
@@ -622,24 +653,33 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
   }
 
   /**
-   * Find row index by scroll position using binary search
+   * Find row index by scroll position using binary search over the
+   * offsets prefix. True O(log n) per lookup: the prefix is revalidated
+   * (up to `totalRows`) at most once per invalidation, then every probe is
+   * a plain array read — no `getRowMeasurement`/map lookup per probe.
    */
   private findRowIndexByPosition(position: number): number {
+    if (this.totalRows === 0) return 0;
     if (position <= 0) return 0;
-    if (position >= this.state.totalHeight) return this.totalRows - 1;
 
-    // Binary search for the row at this position
+    this.ensureCleanTo(this.totalRows);
+
+    if (position >= this.offsets[this.totalRows]) {
+      return this.totalRows - 1;
+    }
+
     let low = 0;
     let high = this.totalRows - 1;
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
-      const measurement = this.getRowMeasurement(mid);
+      const start = this.offsets[mid];
+      const end = this.offsets[mid + 1];
 
-      if (position >= measurement.start && position < measurement.end) {
+      if (position >= start && position < end) {
         return mid;
       }
-      if (position < measurement.start) {
+      if (position < start) {
         high = mid - 1;
       } else {
         low = mid + 1;
@@ -661,8 +701,7 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
 
           if (!Number.isNaN(rowIndex)) {
             const height = entry.contentRect.height;
-            const previousMeasurement = this.rowMeasurements.get(rowIndex);
-            const previousHeight = previousMeasurement?.height || this.config.defaultRowHeight;
+            const previousHeight = this.getRowHeightAt(rowIndex);
 
             if (Math.abs(height - previousHeight) > 1) {
               // Only update if significant change
@@ -770,6 +809,11 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
       prevConfig.containerWidth !== this.config.containerWidth ||
       prevConfig.defaultColumnWidth !== this.config.defaultColumnWidth
     ) {
+      if (prevConfig.defaultRowHeight !== this.config.defaultRowHeight) {
+        // Every unmeasured row's estimated height just changed — the whole
+        // offsets prefix is dirty, not just from some row index onward.
+        this.cleanUpTo = 0;
+      }
       this.calculateTotalSize();
       this.updateVirtualItems();
     }
@@ -884,7 +928,8 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
    * Reset all measurements and recalculate
    */
   reset(): void {
-    this.rowMeasurements.clear();
+    this.rowHeights.clear();
+    this.cleanUpTo = 0;
     this.calculateTotalSize();
     this.updateVirtualItems();
   }
@@ -898,7 +943,7 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
       this.resizeObserver = null;
     }
     this.clearSubscribers();
-    this.rowMeasurements.clear();
+    this.rowHeights.clear();
   }
 
   /**
@@ -929,9 +974,13 @@ export class VirtualizationManager extends Subscribable<VirtualizationManagerEve
     const cloned = new VirtualizationManager(this.config, this.totalRows, this.totalColumns);
 
     // Copy measurements
-    this.rowMeasurements.forEach((measurement, index) => {
-      cloned.rowMeasurements.set(index, { ...measurement });
+    this.rowHeights.forEach((measurement, index) => {
+      cloned.rowHeights.set(index, { ...measurement });
     });
+    // The cloned offsets/total were computed for an empty cache — force a
+    // full revalidation now that measurements were copied over.
+    cloned.cleanUpTo = 0;
+    cloned.calculateTotalSize();
 
     // Copy state
     cloned.state = {
