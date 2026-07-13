@@ -24,14 +24,13 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Gates on main**: root typecheck 10/10 turbo tasks · core 1066/0 · toolkit
   86/86 · drizzle 490 pass / 3 skip / 3 env-dependent (need DB URLs; CI provides)
   · CLI 127/0.
-- **In flight**: 017 (Drizzle FilterNode translation — executor running).
+- **In flight**: nothing — AND/OR is complete end-to-end (URL → state → adapter → SQL).
 - **Next up**: 018 (`betterTables()`/`defineTable` runtime), 010 (UI hooks).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 017 | Drizzle FilterNode translation (recursive and()/or() walk at the commented seams; flip `supportsFilterGroups` to true; invert the rejection test) | 007+016 (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13 |
 | 018 | `betterTables()` instance + `defineTable` runtime (the 011 design's implementation: schema-aware `t.*` path builders, `$infer`, registry from `define()`) | 014 (DONE), 011+006 designs (DONE) | PLAN TO BE WRITTEN |
 | 010 | UI hooks correctness (fetch race, url-sync leaks/hydration stub) + first UI test harness | 001 (DONE) | TODO — plan ready to dispatch |
 | 019 | Migration guide for 0.6 (assemble all changeset "what breaks" sections; required by release policy) | all 0.6 work | PLAN TO BE WRITTEN — last before publish |
@@ -60,14 +59,16 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 009 | DX hygiene sweep | `f46baa0` + completion merge | README truth, React 19+ badge, CLI output restored, `sideEffects` everywhere, phantom tsconfig paths pruned, drizzle deps → peers (consumers stop compiling better-sqlite3) |
 | 015 | FilterNode core + `c2:` wire format | `39ba6d3` | Types/guards/normalize, versioned URL format w/ `c:` read fallback, CORE-06 killed — landed via 016's chain |
 | 016 | FilterNode state layer | `39ba6d3` | Tree-preserving state + URL sync, flat UI unchanged, drizzle reject-guard (§1.5), core 1066/0 |
-| 007 | Extract adapters-toolkit | post-`39ba6d3` merge | Toolkit born (86 tests); filter-handler 2169→388 (router/emitter, zero test edits); dialects −855 lines; ADAPTER-04 fixed |
+| 007 | Extract adapters-toolkit | `81ca876` | Toolkit born (86 tests); filter-handler 2169→388 (router/emitter, zero test edits); dialects −855 lines; ADAPTER-04 fixed |
+| 017 | Drizzle FilterNode group translation | post-`dde0070` merge | Placement (a): generic walk in toolkit router (Prisma inherits it); joins fed from all tree leaves; count/data agreement proven by paginated walk; `supportsFilterGroups: true`, depth cap 3; 7 row-set integration tests |
 
 ## Carry-forward notes for the 0.6 release
 
-- **Group URLs vs Drizzle (until 017)**: a group `c2:` URL hydrates state fine but
-  the Drizzle adapter rejects it loudly at fetch (`QueryError`,
-  `supportsFilterGroups: false`). 017 flips this; its test to invert is
-  `tests/filter-group-rejection.test.ts` ("plan 017 flips this").
+- ~~Group URLs vs Drizzle~~ — RESOLVED by 017: groups translate to real AND/OR
+  SQL. Known scoped gap: computed-field filter substitution is skipped for TREE
+  inputs (flagged in code comments; a computed-field leaf inside a group resolves
+  as a regular column and errors loudly) — backlog item for the computed-fields
+  owner.
 - **Toolkit version nuance**: package.json says 0.1.0 AND a minor changeset exists →
   `changeset version` publishes 0.2.0. Set package.json to 0.0.0 pre-release if
   0.1.0 is wanted as the first published version.
