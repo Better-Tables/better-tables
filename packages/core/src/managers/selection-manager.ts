@@ -7,6 +7,7 @@
  * @module managers/selection-manager
  */
 
+import { Subscribable } from '../lib/subscribable';
 import type {
   SelectionConfig,
   SelectionMode,
@@ -107,7 +108,7 @@ export type SelectionManagerSubscriber = (event: SelectionManagerEvent) => void;
  * const selectedUsers = selectionManager.getSelectedRows();
  * ```
  */
-export class SelectionManager<TData = unknown> {
+export class SelectionManager<TData = unknown> extends Subscribable<SelectionManagerEvent> {
   private selectionState: SelectionState = {
     selectedIds: new Set<string>(),
     allSelected: false,
@@ -115,7 +116,6 @@ export class SelectionManager<TData = unknown> {
     mode: 'multiple',
   };
   private availableRows: TData[] = [];
-  private subscribers: SelectionManagerSubscriber[] = [];
   private config: SelectionConfig = {};
 
   /**
@@ -141,6 +141,7 @@ export class SelectionManager<TData = unknown> {
    * ```
    */
   constructor(config: SelectionConfig = {}, availableRows: TData[] = []) {
+    super('selection manager');
     this.config = {
       mode: 'multiple',
       maxSelections: undefined,
@@ -220,7 +221,7 @@ export class SelectionManager<TData = unknown> {
       if (filteredIds.size !== this.selectionState.selectedIds.size) {
         this.selectionState.selectedIds = filteredIds;
         this.updateSelectionState();
-        this.notifySubscribers({ type: 'selection_replaced', selectedIds: filteredIds });
+        this.notify({ type: 'selection_replaced', selectedIds: filteredIds });
       }
     }
 
@@ -268,7 +269,7 @@ export class SelectionManager<TData = unknown> {
     this.updateSelectionState();
 
     if (!wasSelected) {
-      this.notifySubscribers({ type: 'row_selected', rowId, selected: true });
+      this.notify({ type: 'row_selected', rowId, selected: true });
     }
   }
 
@@ -279,7 +280,7 @@ export class SelectionManager<TData = unknown> {
     if (this.selectionState.selectedIds.has(rowId)) {
       this.selectionState.selectedIds.delete(rowId);
       this.updateSelectionState();
-      this.notifySubscribers({ type: 'row_selected', rowId, selected: false });
+      this.notify({ type: 'row_selected', rowId, selected: false });
     }
   }
 
@@ -311,7 +312,7 @@ export class SelectionManager<TData = unknown> {
       this.selectRow(rowId);
     }
 
-    this.notifySubscribers({ type: 'selection_toggled', rowId, selected: !isSelected });
+    this.notify({ type: 'selection_toggled', rowId, selected: !isSelected });
   }
 
   /**
@@ -351,7 +352,7 @@ export class SelectionManager<TData = unknown> {
         }
 
         this.updateSelectionState();
-        this.notifySubscribers({ type: 'rows_selected', rowIds: idsToSelect, selected: true });
+        this.notify({ type: 'rows_selected', rowIds: idsToSelect, selected: true });
         return;
       }
 
@@ -362,7 +363,7 @@ export class SelectionManager<TData = unknown> {
     }
 
     this.updateSelectionState();
-    this.notifySubscribers({ type: 'rows_selected', rowIds: validIds, selected: true });
+    this.notify({ type: 'rows_selected', rowIds: validIds, selected: true });
   }
 
   /**
@@ -377,7 +378,7 @@ export class SelectionManager<TData = unknown> {
     this.updateSelectionState();
 
     if (deselectedIds.length > 0) {
-      this.notifySubscribers({ type: 'rows_selected', rowIds: deselectedIds, selected: false });
+      this.notify({ type: 'rows_selected', rowIds: deselectedIds, selected: false });
     }
   }
 
@@ -429,7 +430,7 @@ export class SelectionManager<TData = unknown> {
     }
 
     this.updateSelectionState();
-    this.notifySubscribers({ type: 'all_selected', selected: true });
+    this.notify({ type: 'all_selected', selected: true });
   }
 
   /**
@@ -438,7 +439,7 @@ export class SelectionManager<TData = unknown> {
   deselectAll(): void {
     this.selectionState.selectedIds.clear();
     this.updateSelectionState();
-    this.notifySubscribers({ type: 'all_selected', selected: false });
+    this.notify({ type: 'all_selected', selected: false });
   }
 
   /**
@@ -447,7 +448,7 @@ export class SelectionManager<TData = unknown> {
   clearSelection(): void {
     this.selectionState.selectedIds.clear();
     this.updateSelectionState();
-    this.notifySubscribers({ type: 'selection_cleared' });
+    this.notify({ type: 'selection_cleared' });
   }
 
   /**
@@ -625,66 +626,6 @@ export class SelectionManager<TData = unknown> {
       this.selectionState.selectedIds = new Set(ids.slice(0, this.config.maxSelections));
       this.updateSelectionState();
     }
-  }
-
-  /**
-   * Subscribe to selection changes.
-   *
-   * Registers a callback function to be called whenever selection state changes.
-   * Returns an unsubscribe function to remove the subscription.
-   *
-   * @param callback - Function to call when selection changes
-   * @returns Unsubscribe function to remove the subscription
-   *
-   * @example
-   * ```typescript
-   * const unsubscribe = selectionManager.subscribe((event) => {
-   *   switch (event.type) {
-   *     case 'row_selected':
-   *       console.log(`Row ${event.rowId} ${event.selected ? 'selected' : 'deselected'}`);
-   *       updateRowVisualState(event.rowId, event.selected);
-   *       break;
-   *     case 'all_selected':
-   *       console.log(`All rows ${event.selected ? 'selected' : 'deselected'}`);
-   *       updateSelectAllButton(event.selected);
-   *       break;
-   *     case 'selection_cleared':
-   *       console.log('Selection was cleared');
-   *       updateSelectionSummary();
-   *       break;
-   *     case 'selection_replaced':
-   *       console.log(`Selection replaced with ${event.selectedIds.size} rows`);
-   *       updateBulkActions();
-   *       break;
-   *   }
-   * });
-   *
-   * // Later, unsubscribe
-   * unsubscribe();
-   * ```
-   */
-  subscribe(callback: SelectionManagerSubscriber): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index >= 0) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Notify all subscribers of selection changes
-   */
-  private notifySubscribers(event: SelectionManagerEvent): void {
-    this.subscribers.forEach((callback) => {
-      try {
-        callback(event);
-      } catch (error) {
-        // biome-ignore lint: Intentional error logging for subscriber errors
-        console.error('Error in selection manager subscriber:', error);
-      }
-    });
   }
 
   /**

@@ -78,7 +78,10 @@ describe('Subscribable', () => {
     expect(() => emitter.fire(1)).not.toThrow();
 
     expect(sibling).toHaveBeenCalledTimes(1);
-    expect(consoleSpy).toHaveBeenCalledWith('Error in widget manager subscriber:', expect.any(Error));
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error in widget manager subscriber:',
+      expect.any(Error)
+    );
 
     console.error = originalError;
   });

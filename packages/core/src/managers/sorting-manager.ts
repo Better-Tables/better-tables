@@ -7,6 +7,7 @@
  * @module managers/sorting-manager
  */
 
+import { Subscribable } from '../lib/subscribable';
 import type { ColumnDefinition } from '../types/column';
 import type { SortDirection, SortingConfig, SortingParams, SortingState } from '../types/sorting';
 
@@ -122,10 +123,9 @@ export interface SortingValidationResult {
  * console.log('Sort direction:', sortingManager.getSortDirection('name'));
  * ```
  */
-export class SortingManager<TData = unknown> {
+export class SortingManager<TData = unknown> extends Subscribable<SortingManagerEvent> {
   private sortingState: SortingState = [];
   private columns: ColumnDefinition<TData>[] = [];
-  private subscribers: SortingManagerSubscriber[] = [];
   private config: SortingConfig = {};
 
   /**
@@ -157,6 +157,7 @@ export class SortingManager<TData = unknown> {
     config: SortingConfig = {},
     initialSort: SortingState = []
   ) {
+    super('sorting manager');
     this.columns = columns;
     this.config = {
       enabled: true,
@@ -231,7 +232,7 @@ export class SortingManager<TData = unknown> {
       : validSorts.slice(0, 1);
 
     this.sortingState = limitedSorts;
-    this.notifySubscribers({ type: 'sorts_replaced', sorts: limitedSorts });
+    this.notify({ type: 'sorts_replaced', sorts: limitedSorts });
   }
 
   /**
@@ -318,27 +319,27 @@ export class SortingManager<TData = unknown> {
     if (existingIndex >= 0) {
       // Update existing sort
       this.sortingState[existingIndex] = sort;
-      this.notifySubscribers({ type: 'sort_updated', columnId, sort });
+      this.notify({ type: 'sort_updated', columnId, sort });
     } else {
       // Add new sort
       if (!this.config.multiSort) {
         // Single sort mode - replace all
         this.sortingState = [sort];
-        this.notifySubscribers({ type: 'sorts_replaced', sorts: [sort] });
+        this.notify({ type: 'sorts_replaced', sorts: [sort] });
       } else {
         // Multi-sort mode - add to list
         if (this.sortingState.length >= (this.config.maxSortColumns || 1)) {
           // Remove oldest sort if at limit
           const removedSort = this.sortingState.shift();
           if (removedSort) {
-            this.notifySubscribers({
+            this.notify({
               type: 'sort_removed',
               columnId: removedSort.columnId,
             });
           }
         }
         this.sortingState.push(sort);
-        this.notifySubscribers({ type: 'sort_added', sort });
+        this.notify({ type: 'sort_added', sort });
       }
     }
   }
@@ -363,8 +364,8 @@ export class SortingManager<TData = unknown> {
     if (index >= 0) {
       const sort = { ...this.sortingState[index], direction };
       this.sortingState[index] = sort;
-      this.notifySubscribers({ type: 'sort_updated', columnId, sort });
-      this.notifySubscribers({
+      this.notify({ type: 'sort_updated', columnId, sort });
+      this.notify({
         type: 'direction_toggled',
         columnId,
         direction,
@@ -390,7 +391,7 @@ export class SortingManager<TData = unknown> {
     const index = this.sortingState.findIndex((s) => s.columnId === columnId);
     if (index >= 0) {
       this.sortingState.splice(index, 1);
-      this.notifySubscribers({ type: 'sort_removed', columnId });
+      this.notify({ type: 'sort_removed', columnId });
     }
   }
 
@@ -408,7 +409,7 @@ export class SortingManager<TData = unknown> {
    */
   clearSorting(): void {
     this.sortingState = [];
-    this.notifySubscribers({ type: 'sorts_cleared' });
+    this.notify({ type: 'sorts_cleared' });
   }
 
   /**
@@ -476,7 +477,7 @@ export class SortingManager<TData = unknown> {
 
     // Apply the new order with preserved directions
     this.sortingState = reorderedSorts;
-    this.notifySubscribers({ type: 'sorts_replaced', sorts: reorderedSorts });
+    this.notify({ type: 'sorts_replaced', sorts: reorderedSorts });
   }
 
   /**
@@ -610,62 +611,6 @@ export class SortingManager<TData = unknown> {
     }
 
     return { valid: true };
-  }
-
-  /**
-   * Subscribe to sorting changes.
-   *
-   * Registers a callback function to be called whenever sorting state changes.
-   * Returns an unsubscribe function to remove the subscription.
-   *
-   * @param callback - Function to call when sorting changes
-   * @returns Unsubscribe function to remove the subscription
-   *
-   * @example
-   * ```typescript
-   * const unsubscribe = sortingManager.subscribe((event) => {
-   *   switch (event.type) {
-   *     case 'sort_added':
-   *       console.log(`Sort added for ${event.sort.columnId}`);
-   *       break;
-   *     case 'sort_updated':
-   *       console.log(`Sort updated for ${event.columnId}`);
-   *       break;
-   *     case 'sort_removed':
-   *       console.log(`Sort removed for ${event.columnId}`);
-   *       break;
-   *     case 'sorts_cleared':
-   *       console.log('All sorts cleared');
-   *       break;
-   *     case 'direction_toggled':
-   *       console.log(`Direction toggled for ${event.columnId} to ${event.direction}`);
-   *       break;
-   *   }
-   * });
-   *
-   * // Later, unsubscribe
-   * unsubscribe();
-   * ```
-   */
-  subscribe(callback: SortingManagerSubscriber): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index >= 0) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Notify all subscribers of sorting changes
-   */
-  private notifySubscribers(event: SortingManagerEvent): void {
-    for (const callback of this.subscribers) {
-      try {
-        callback(event);
-      } catch (_error) {}
-    }
   }
 
   /**

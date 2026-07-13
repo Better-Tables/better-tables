@@ -8,6 +8,7 @@
  * @module managers/table-state-manager
  */
 
+import { Subscribable } from '../lib/subscribable';
 import type { ColumnDefinition, ColumnOrder, ColumnVisibility } from '../types/column';
 import type { FilterGroupNode, FilterState } from '../types/filter';
 import type { PaginationConfig, PaginationState } from '../types/pagination';
@@ -195,14 +196,13 @@ export type TableStateSubscriber = (event: TableStateEvent) => void;
  * console.log('Complete table state:', state);
  * ```
  */
-export class TableStateManager<TData = unknown> {
+export class TableStateManager<TData = unknown> extends Subscribable<TableStateEvent> {
   private filterManager: FilterManager<TData>;
   private paginationManager: PaginationManager;
   private sorting: SortingState = [];
   private selectedRows: Set<string> = new Set();
   private columnVisibility: ColumnVisibility = {};
   private columnOrder: ColumnOrder = [];
-  private subscribers: TableStateSubscriber[] = [];
   private columns: ColumnDefinition<TData>[];
 
   // Caching for structural sharing
@@ -222,6 +222,7 @@ export class TableStateManager<TData = unknown> {
     initialState: Partial<TableState> = {},
     config: TableStateConfig = {}
   ) {
+    super('table state manager');
     this.columns = columns;
 
     // Initialize sub-managers
@@ -248,7 +249,7 @@ export class TableStateManager<TData = unknown> {
       // filters_changed carries the flat leaf view (rule 3's legacy display
       // accessor), not the real (possibly tree) stored value -- see getState().
       const filters = this.filterManager.getFilters();
-      this.notifySubscribers({ type: 'filters_changed', filters });
+      this.notify({ type: 'filters_changed', filters });
       this.notifyStateChanged();
     });
 
@@ -256,7 +257,7 @@ export class TableStateManager<TData = unknown> {
       // Invalidate cache to force new reference
       this.cachedPagination = null;
       const pagination = this.paginationManager.getPagination();
-      this.notifySubscribers({ type: 'pagination_changed', pagination });
+      this.notify({ type: 'pagination_changed', pagination });
       this.notifyStateChanged();
     });
   }
@@ -405,7 +406,7 @@ export class TableStateManager<TData = unknown> {
     this.sorting = sorting;
     // Invalidate cache to force new reference
     this.cachedSorting = null;
-    this.notifySubscribers({ type: 'sorting_changed', sorting: this.sorting });
+    this.notify({ type: 'sorting_changed', sorting: this.sorting });
     this.notifyStateChanged();
   }
 
@@ -457,7 +458,7 @@ export class TableStateManager<TData = unknown> {
     this.selectedRows = new Set(rows);
     // Invalidate cache to force new reference
     this.cachedSelectedRows = null;
-    this.notifySubscribers({ type: 'selection_changed', selectedRows: this.selectedRows });
+    this.notify({ type: 'selection_changed', selectedRows: this.selectedRows });
     this.notifyStateChanged();
   }
 
@@ -500,7 +501,7 @@ export class TableStateManager<TData = unknown> {
     this.columnVisibility = { ...visibility };
     // Invalidate cache to force new reference
     this.cachedColumnVisibility = null;
-    this.notifySubscribers({ type: 'visibility_changed', columnVisibility: this.columnVisibility });
+    this.notify({ type: 'visibility_changed', columnVisibility: this.columnVisibility });
     this.notifyStateChanged();
   }
 
@@ -540,7 +541,7 @@ export class TableStateManager<TData = unknown> {
     this.columnOrder = mergeColumnOrder(this.columns, order);
     // Invalidate cache to force new reference
     this.cachedColumnOrder = null;
-    this.notifySubscribers({ type: 'order_changed', columnOrder: this.columnOrder });
+    this.notify({ type: 'order_changed', columnOrder: this.columnOrder });
     this.notifyStateChanged();
   }
 
@@ -548,7 +549,7 @@ export class TableStateManager<TData = unknown> {
     // Reset to default order based on column definitions
     this.columnOrder = getDefaultColumnOrder(this.columns);
     this.cachedColumnOrder = null;
-    this.notifySubscribers({ type: 'order_changed', columnOrder: this.columnOrder });
+    this.notify({ type: 'order_changed', columnOrder: this.columnOrder });
     this.notifyStateChanged();
   }
 
@@ -628,18 +629,18 @@ export class TableStateManager<TData = unknown> {
 
     if (updates.sorting !== undefined) {
       this.sorting = updates.sorting;
-      this.notifySubscribers({ type: 'sorting_changed', sorting: this.sorting });
+      this.notify({ type: 'sorting_changed', sorting: this.sorting });
     }
 
     if (updates.selectedRows !== undefined) {
       this.selectedRows = new Set(updates.selectedRows);
-      this.notifySubscribers({ type: 'selection_changed', selectedRows: this.selectedRows });
+      this.notify({ type: 'selection_changed', selectedRows: this.selectedRows });
     }
 
     if (updates.columnVisibility !== undefined) {
       this.columnVisibility = { ...updates.columnVisibility };
       this.cachedColumnVisibility = null;
-      this.notifySubscribers({
+      this.notify({
         type: 'visibility_changed',
         columnVisibility: this.columnVisibility,
       });
@@ -649,7 +650,7 @@ export class TableStateManager<TData = unknown> {
       // Normalize and validate the incoming order to ensure it's valid
       this.columnOrder = mergeColumnOrder(this.columns, updates.columnOrder);
       this.cachedColumnOrder = null;
-      this.notifySubscribers({
+      this.notify({
         type: 'order_changed',
         columnOrder: this.columnOrder,
       });
@@ -687,32 +688,6 @@ export class TableStateManager<TData = unknown> {
   // ============================================================================
 
   /**
-   * Subscribe to state changes
-   */
-  subscribe(callback: TableStateSubscriber): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index >= 0) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Notify all subscribers of state changes
-   */
-  private notifySubscribers(event: TableStateEvent): void {
-    this.subscribers.forEach((callback) => {
-      try {
-        callback(event);
-      } catch {
-        // Silently ignore errors in subscribers
-      }
-    });
-  }
-
-  /**
    * Notify subscribers of complete state change
    * Only notifies if state has actually changed (deep equality)
    */
@@ -722,7 +697,7 @@ export class TableStateManager<TData = unknown> {
     // Only notify if state has actually changed
     if (!this.lastNotifiedState || !deepEqual(this.lastNotifiedState, currentState)) {
       this.lastNotifiedState = currentState;
-      this.notifySubscribers({ type: 'state_changed', state: currentState });
+      this.notify({ type: 'state_changed', state: currentState });
     }
   }
 
@@ -763,12 +738,12 @@ export class TableStateManager<TData = unknown> {
       this.cachedFilters = null;
       this.cachedFilterNode = null;
       const filters = this.filterManager.getFilters();
-      this.notifySubscribers({ type: 'filters_changed', filters });
+      this.notify({ type: 'filters_changed', filters });
       this.notifyStateChanged();
     });
 
     // Notify subscribers that columns have changed
     // Cast to match the event type which expects ColumnDefinition[]
-    this.notifySubscribers({ type: 'columns_changed', columns: columns as ColumnDefinition[] });
+    this.notify({ type: 'columns_changed', columns: columns as ColumnDefinition[] });
   }
 }
