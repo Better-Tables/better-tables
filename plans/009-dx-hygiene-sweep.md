@@ -23,9 +23,23 @@
 
 ## Deferred until plan 007
 
-- Step 2: prune phantom tsconfig paths (007 edits root tsconfig.json)
-- Step 5: drizzle-orm/better-sqlite3 dependency class fixes (007 edits drizzle package.json)
-- Step 7 partial: drizzle `sideEffects` / any drizzle package.json touch — do core+ui only until 007 lands
+Finish these after plan 007 merges (007 owns root `tsconfig.json` and
+`packages/adapters/drizzle/package.json`). Checklist:
+
+- [ ] **Step 2 — prune phantom tsconfig paths**: remove `@better-tables/memory` and
+  `@better-tables/pro` (and any other non-existent package paths) from root
+  `tsconfig.json` `paths`. Verify:
+  `grep -nE "adapters-rest|better-tables/pro|@better-tables/memory" tsconfig.json` → 0.
+- [ ] **Step 5 — drizzle dependency classes**: move `drizzle-orm` / `better-sqlite3`
+  out of `dependencies` into the correct peer/devDep slots per the plan body.
+  Verify: they are **not** in `dependencies`. Add/adjust changeset if needed.
+- [ ] **Step 7 remainder — drizzle `sideEffects`**: set `"sideEffects": false` on
+  `packages/adapters/drizzle/package.json` (core+ui already done). Confirm no
+  bare side-effect imports under that package's `src/`.
+- [ ] Re-run Done-criteria greps that still fail today (tsconfig phantoms, drizzle
+  deps, drizzle `sideEffects`), then mark this plan DONE in `plans/README.md`.
+
+Do **not** touch those files on `dx-hygiene-sweep` while 007 is in flight.
 
 ## Step 7 outcome (2026-07-13)
 
