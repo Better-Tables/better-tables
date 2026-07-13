@@ -64,9 +64,11 @@ for optional MySQL/Postgres integration tests).
   (`drizzle-orm`/`better-sqlite3` should move out of `dependencies`) and its
   `sideEffects` field are deferred until plan 007 (adapter toolkit
   extraction) lands, to avoid merge conflicts. See `plans/009-dx-hygiene-sweep.md`.
-- `packages/ui`'s global `"use client"` tsdown banner could not be replaced
-  by per-file directives — rolldown drops the leading directive from the
-  built output. See plan 009's Step 7 outcome note before retrying.
+- `packages/ui` builds with tsdown **`unbundle: true`** (ESM file-to-file) so
+  per-file `'use client'` directives survive. Do not reintroduce a global
+  `"use client"` banner or a single bundled UI entry without re-checking
+  directive preservation. Subpath exports remain unplanned (see
+  `plans/README.md`).
 - Per-component subpath exports for `@better-tables/ui` (follow-up, not
   planned — see `plans/README.md`).
 

@@ -92,9 +92,11 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
   0.1.0 is wanted as the first published version.
 - **mysql-operations intentionally un-deduped** (no RETURNING support — documented
   dialect difference, not drift).
-- **`"use client"` banner blocker (from 009)**: tsdown/rolldown drops per-file
-  directives from emitted bundles; the global banner stays until the bundler
-  preserves directives or the ui entry is restructured. Recorded in plan 009.
+- **`"use client"` banner blocker (from 009)**: ~~tsdown/rolldown drops per-file
+  directives from emitted bundles; the global banner stays~~ — **FIXED
+  (2026-07-13)**: `@better-tables/ui` builds with tsdown `unbundle: true`
+  (ESM file-to-file); per-file `'use client'` preserved (41 files); global
+  banner removed.
 - **CI**: first real run happens when the git remote is restored. Lint step is
   `continue-on-error` until biome residue hits 0. Marketing + docs + `packages/ui`
   are Biome-clean as of 2026-07-13; remaining residue is mostly core/cli/adapters.
