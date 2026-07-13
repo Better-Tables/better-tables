@@ -12,7 +12,7 @@
  * @since 1.0.0 (expanded to support all SQLite drivers in 1.1.0)
  */
 
-import { count, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
+import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
@@ -211,13 +211,26 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
     }
 
     const sqliteTable = this.asSQLiteTable(primaryTableSchema);
-    const baseQuery = this.db.select({ count: count() }).from(sqliteTable);
+    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+
+    // If there are joins, count distinct primary keys to avoid inflated counts
+    // TODO(plan-007): hoist shared count logic into BaseQueryBuilder
+    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
+    const hasJoins = joinOrder.length > 0;
+
+    const baseQuery =
+      hasJoins && primaryKeyInfo
+        ? (() => {
+            // Use count distinct on primary key to avoid counting duplicate rows from joins
+            const sqlitePkColumn = this.asSQLiteColumn(primaryKeyInfo.column);
+            return this.db.select({ count: countDistinct(sqlitePkColumn) }).from(sqliteTable);
+          })()
+        : this.db.select({ count: count() }).from(sqliteTable);
+
     let query:
       | ReturnType<typeof baseQuery.leftJoin>
       | ReturnType<typeof baseQuery.innerJoin>
       | typeof baseQuery = baseQuery;
-
-    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
 
     for (const relationship of joinOrder) {
       const targetTable = this.schema[relationship.to];

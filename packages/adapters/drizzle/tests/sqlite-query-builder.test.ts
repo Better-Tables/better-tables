@@ -538,6 +538,33 @@ describe('SQLiteQueryBuilder', () => {
       });
     });
 
+    describe('SQLite-Specific Count Query (Integration)', () => {
+      it('should count distinct primary keys instead of joined rows under a one-to-many join', async () => {
+        // Fixture: user 1 has 2 posts, user 2 has 1 post, user 3 has 0 posts.
+        // A join on posts produces 4 raw rows, but there are only 3 distinct users.
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'posts.title'],
+          },
+          'users'
+        );
+
+        const countQuery = queryBuilder.buildCountQuery(context, 'users');
+        const countResult = (await countQuery.execute()) as Array<{ count: number }>;
+
+        expect(countResult[0]?.count).toBe(3);
+      });
+
+      it('should count all rows when there are no joins (control case)', async () => {
+        const context = relationshipManager.buildQueryContext({}, 'users');
+
+        const countQuery = queryBuilder.buildCountQuery(context, 'users');
+        const countResult = (await countQuery.execute()) as Array<{ count: number }>;
+
+        expect(countResult[0]?.count).toBe(3);
+      });
+    });
+
     describe('Complete Query Building (Integration)', () => {
       it('should build and execute complete query with all SQLite-specific features', async () => {
         const { dataQuery, countQuery, columnMetadata } = queryBuilder.buildCompleteQuery({
