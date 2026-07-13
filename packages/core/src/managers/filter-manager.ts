@@ -477,6 +477,25 @@ export class FilterManager<TData = unknown> extends Subscribable<FilterManagerEv
       };
     }
 
+    // `includeNull: true` on an operator whose own condition already
+    // expresses "null/empty" (isEmpty, isNull - see `supportsNull` on the
+    // operator definition) is redundant/contradictory: reject it rather
+    // than silently ignoring it (Option A, CORE-10).
+    if (filter.includeNull && operatorDef.supportsNull) {
+      return {
+        valid: false,
+        error: `includeNull cannot be combined with operator ${filter.operator}, which already matches null values`,
+      };
+    }
+
+    // `includeNull: true` with empty `values` expresses "match null rows
+    // only" and satisfies the value requirement below for operators that
+    // otherwise need at least one value (Option A, CORE-10). This does not
+    // apply to valueCount-0 operators (handled by the `supportsNull` check
+    // above and the no-values check below), since includeNull only ever
+    // adds meaning by substituting for missing values.
+    const nullOnlyIntent = filter.includeNull === true && filter.values.length === 0;
+
     // Validate operator value requirements
     if (operatorDef.valueCount === 0 && filter.values.length > 0) {
       return { valid: false, error: `Operator ${filter.operator} requires no values` };
@@ -484,8 +503,12 @@ export class FilterManager<TData = unknown> extends Subscribable<FilterManagerEv
 
     if (
       typeof operatorDef.valueCount === 'number' &&
+      operatorDef.valueCount > 0 &&
       filter.values.length !== operatorDef.valueCount
     ) {
+      if (nullOnlyIntent) {
+        return { valid: true };
+      }
       // In lenient mode, allow incomplete filters with fewer values for UI editing
       // but still reject filters with too many values
       if (!strict && filter.values.length < operatorDef.valueCount) {
@@ -501,6 +524,9 @@ export class FilterManager<TData = unknown> extends Subscribable<FilterManagerEv
     }
 
     if (operatorDef.valueCount === 'variable' && filter.values.length === 0) {
+      if (nullOnlyIntent) {
+        return { valid: true };
+      }
       // In lenient mode, allow incomplete filters with empty values for UI editing
       if (!strict) {
         return { valid: true, warning: 'Filter incomplete - needs at least one value' };

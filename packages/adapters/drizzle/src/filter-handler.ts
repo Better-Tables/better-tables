@@ -279,8 +279,16 @@ export class FilterHandler {
           // Operator is supported by adapter, proceed with building condition
           // But first ensure values are valid to avoid runtime errors (e.g. undefined operands)
           const expectedCount = this.getExpectedValueCount(filter.operator);
+          // includeNull: true with empty values means "match null rows only"
+          // (Option A, CORE-10) - it satisfies the value requirement here the
+          // same way core's `validateFilter` treats it, so the leaf reaches
+          // `buildFilterCondition` -> the router's IS NULL degradation
+          // instead of being silently dropped.
+          const nullOnlyIntent = filter.includeNull === true && filter.values.length === 0;
           const hasValidValues =
-            expectedCount === 0 || (filter.values && filter.values.length >= expectedCount);
+            expectedCount === 0 ||
+            nullOnlyIntent ||
+            (filter.values && filter.values.length >= expectedCount);
 
           if (!hasValidValues || (expectedCount > 0 && filter.values.some((v) => v === undefined))) {
             // Skip invalid filters silently - this allows for partial filter states in UI

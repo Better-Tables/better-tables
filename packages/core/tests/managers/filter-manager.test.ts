@@ -429,6 +429,90 @@ describe('FilterManager', () => {
       expect(result.valid).toBe(false);
       expect(result.error).toContain('requires no values');
     });
+
+    // Option A (CORE-10): includeNull satisfies the value requirement for
+    // operators that otherwise need at least one value - a filter with
+    // includeNull: true and empty values means "match null rows only".
+    describe('includeNull semantics (CORE-10, Option A)', () => {
+      it('should accept a null-only filter (includeNull + empty values) in strict mode', () => {
+        const filter: FilterState = {
+          columnId: 'age',
+          type: 'number',
+          operator: 'greaterThan',
+          values: [],
+          includeNull: true,
+        };
+
+        const result = filterManager.validateFilter(filter, true);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should accept a null-only filter for a variable-value operator in strict mode', () => {
+        const filter: FilterState = {
+          columnId: 'status',
+          type: 'option',
+          operator: 'isAnyOf',
+          values: [],
+          includeNull: true,
+        };
+
+        const result = filterManager.validateFilter(filter, true);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should accept includeNull combined with a satisfying values array in strict mode', () => {
+        const filter: FilterState = {
+          columnId: 'age',
+          type: 'number',
+          operator: 'greaterThan',
+          values: [25],
+          includeNull: true,
+        };
+
+        const result = filterManager.validateFilter(filter, true);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should reject includeNull on an operator that already matches null (isNull)', () => {
+        const filter: FilterState = {
+          columnId: 'age',
+          type: 'number',
+          operator: 'isNull',
+          values: [],
+          includeNull: true,
+        };
+
+        const result = filterManager.validateFilter(filter, true);
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('includeNull');
+      });
+
+      it('should still reject plain empty values (no includeNull) in strict mode', () => {
+        const filter: FilterState = {
+          columnId: 'age',
+          type: 'number',
+          operator: 'greaterThan',
+          values: [],
+        };
+
+        const result = filterManager.validateFilter(filter, true);
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('requires exactly 1 values');
+      });
+
+      it('should still reject plain empty values for a variable-value operator (no includeNull) in strict mode', () => {
+        const filter: FilterState = {
+          columnId: 'status',
+          type: 'option',
+          operator: 'isAnyOf',
+          values: [],
+        };
+
+        const result = filterManager.validateFilter(filter, true);
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('requires at least one value');
+      });
+    });
   });
 
   describe('operator management', () => {
