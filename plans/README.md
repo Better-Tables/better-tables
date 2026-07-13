@@ -18,12 +18,12 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 18 plans (001–007, 010–019, 023, 028) — verification baseline, CI
-  gating, URL hardening, type-inference stack, FilterNode through core state +
-  Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design
-  docs, instance API, migration guide, real timezone conversion, shared
-  manager emitter.
-- **Gates on main**: root typecheck 11/11 · core 1107/0 · toolkit 93/0 · drizzle
+- **Done and merged**: 19 plans (001–007, 010–019, 022–023, 028) — verification
+  baseline, CI gating, URL hardening, type-inference stack, FilterNode through
+  core state + Drizzle AND/OR, adapter toolkit extraction, UI hooks harness,
+  both design docs, instance API, migration guide, real timezone conversion,
+  shared manager emitter, loud relationship inference.
+- **Gates on main**: root typecheck 11/11 · core 1107/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
   pre-publish steps are the maintainer runbook at the bottom of `MIGRATION.md`
@@ -31,7 +31,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: 020, 022, 025. **Dispatching**: 024/027 (post-023). **Next**: 021←020; 026←023+024.
+- **In flight**: 020, 025, 024, 027. **Next**: 021←020; 026←023+024.
 
 ## Outstanding
 
@@ -41,7 +41,6 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 | 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2; rides 0.6 |
 | 024 | Virtualization offsets: stale positions + O(n) scans (CORE-03/09) | 023 (DONE) | IN FLIGHT — wave 2 |
 | 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
-| 022 | Relationship/primary-table inference fails loudly (ADAPTER-05 rem.) | 007 (DONE) | IN FLIGHT — wave 2/3 |
 | 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3 |
 | 027 | Null-filter semantics: includeNull satisfies value requirement (CORE-10) | 023 (DONE) | IN FLIGHT — Option A; wave 2 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
@@ -82,6 +81,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 019 | 0.5→0.6 migration guide | merged 2026-07-13 | MIGRATION.md (10 breaking surfaces, not-changed section, capabilities closer, maintainer runbook); every example compile-checked in CI (core 16 tests + drizzle 5, old APIs pinned dead via @ts-expect-error, 0.5 examples verified against the `@better-tables/core@0.5.3` tag); changeset audit found ZERO gaps; core suite 1077→1098 |
 | 028 | Real timezone conversion | `d06fee9` | `@date-fns/tz` TZDate conversion in formatDateWithConfig/range; UTC builder default honored (MIGRATION §11); soft-fail unknown zones; core 1104/0 |
 | 023 | Shared subscription emitter | `f657c6c` | `Subscribable` base; six managers migrated; log-never-swallow + snapshot notify; core 1107/0 |
+| 022 | Relationship inference honesty | merged 2026-07-13 | Zero-match throws SchemaError + suggestions; Strategy 3 FK-verified; toolkit 96/0 |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -116,11 +116,8 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
   paginate over row-multiplied results on one-to-many joins — pages under-fill
   even though 003 fixed `total`. **PLANNED as 020.**
 - **ADAPTER-05** (M): ~~primary-table resolver `break`s on first relationship
-  match~~ — **FIXED (alias-scan slice, 2026-07-13)**: only break after crediting
-  the matching `sourceTable`. Remaining: silent first-table fallback + FK
-  name-guessing can still bind wrong columns (`relationship-detector.ts`).
-  Resolver lives in toolkit (`packages/adapters/toolkit/src/primary-table-resolver.ts`).
-  **Remainder PLANNED as 022.**
+  match~~ — **FIXED (alias-scan slice + 022)**: zero-match throws; Strategy 3
+  FK-verified; no-columns warns once.
 - **ADAPTER-06** (M): faceted values / min-max ignore active filters and inflate
   under joins. **PLANNED as 021** (contract widening is additive — optional param).
 - **ADAPTER-07**: ~~silent per-leaf filter drops on type mismatch (fail-open)~~ —
