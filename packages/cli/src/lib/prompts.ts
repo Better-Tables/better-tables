@@ -61,16 +61,18 @@ export async function select<T extends string>(
     // biome-ignore lint: CLI prompts require console output
     console.log(`  ${index + 1}. ${option.label}`);
   });
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     rl.question('\nEnter your choice (number): ', (answer) => {
       rl.close();
       const index = parseInt(answer.trim(), 10) - 1;
-      if (index >= 0 && index < options.length && options[index]) {
-        resolve(options[index].value);
-      } else {
-        // Default to first option if invalid input
-        resolve(options[0].value);
+      // Default to first option if invalid input; options.length > 0 is
+      // guaranteed by the guard above, so the fallback is always defined.
+      const chosen = options[index] ?? options[0];
+      if (!chosen) {
+        reject(new Error('select() invariant violated: no options available'));
+        return;
       }
+      resolve(chosen.value);
     });
   });
 }

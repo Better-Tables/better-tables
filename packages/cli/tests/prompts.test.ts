@@ -233,13 +233,13 @@ describe('prompts', () => {
 
     it('should return all conflict resolution options', async () => {
       const options = ['overwrite', 'skip', 'overwrite-all', 'skip-all'] as const;
-      for (let i = 0; i < options.length; i++) {
+      for (const [i, expected] of options.entries()) {
         const promise = resolveFileConflict('/path/to/file.ts');
         const callback = (mockQuestion as unknown as { callback?: (answer: string) => void })
           .callback;
         if (callback) callback(String(i + 1));
         const result = await promise;
-        expect(result).toBe(options[i]);
+        expect(result).toBe(expected);
       }
     });
   });
