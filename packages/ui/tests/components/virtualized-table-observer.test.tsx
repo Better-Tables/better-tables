@@ -22,35 +22,30 @@ function makeRows(count: number): Row[] {
 // manager's defaults. Assert against that count rather than hardcoding it,
 // so this test isn't coupled to virtualization internals (plan 024).
 describe('VirtualizedTable ResizeObserver construction (UI-06)', () => {
+  it('AFTER FIX: constructs exactly one row observer per visible row on mount, plus one container observer', () => {
+    const ro = installResizeObserverMock();
+    const rows = makeRows(50);
+    const { container } = render(<VirtualizedTable data={rows} columns={columns} />);
+    const visibleRows = container.querySelectorAll('tbody tr').length;
+
+    // The stable single `onMeasure` callback (ref-latched inside
+    // `useVirtualization`) means the dimension-measurement effect firing
+    // after mount no longer tears down and reconstructs every row's
+    // ResizeObserver — mount produces exactly one construction per visible
+    // row, plus one for the container itself.
+    expect(visibleRows).toBeGreaterThan(0);
+    expect(ro.constructionCount()).toBe(visibleRows + 1);
+
+    ro.restore();
+  });
+
   it(
-    'BEFORE FIX baseline: constructs one row observer per visible row on mount, ' +
-      'plus one container observer',
+    'AFTER FIX: observer construction count does not grow across parent re-renders, ' +
+      'even with fresh inline callback props',
     () => {
       const ro = installResizeObserverMock();
       const rows = makeRows(50);
-      const { container } = render(<VirtualizedTable data={rows} columns={columns} />);
-      const visibleRows = container.querySelectorAll('tbody tr').length;
-
-      // Pre-fix baseline: mount alone triggers more than
-      // `visibleRows + 1` constructions, because the unstable per-row
-      // `onMeasure` closure factory (`handleRowMeasure`) is rebuilt whenever
-      // `VirtualizedTable` re-renders for ANY reason (including the
-      // dimension-measurement effect firing once after mount), tearing down
-      // and reconstructing every row's ResizeObserver.
-      expect(visibleRows).toBeGreaterThan(0);
-      expect(ro.constructionCount()).toBeGreaterThan(visibleRows + 1);
-
-      ro.restore();
-    }
-  );
-
-  it(
-    'BEFORE FIX baseline: observer constructions grow with each parent re-render, ' +
-      'even when re-rendered with equivalent (but referentially fresh) props',
-    () => {
-      const ro = installResizeObserverMock();
-      const rows = makeRows(50);
-      const { container, rerender } = render(
+      const { rerender } = render(
         <VirtualizedTable
           data={rows}
           columns={columns}
@@ -58,7 +53,6 @@ describe('VirtualizedTable ResizeObserver construction (UI-06)', () => {
           onViewportChange={() => {}}
         />
       );
-      const visibleRows = container.querySelectorAll('tbody tr').length;
       const afterMount = ro.constructionCount();
 
       rerender(
@@ -81,11 +75,12 @@ describe('VirtualizedTable ResizeObserver construction (UI-06)', () => {
       );
       const afterRerender2 = ro.constructionCount();
 
-      // Pre-fix: every re-render reconstructs every visible row's observer
-      // because `handleRowMeasure(virtualRow.index)` returns a new function
-      // identity each render, and that identity is the row effect's only dep.
-      expect(afterRerender1).toBeGreaterThanOrEqual(afterMount + visibleRows);
-      expect(afterRerender2).toBeGreaterThanOrEqual(afterRerender1 + visibleRows);
+      // Neither the row-level `onMeasure` nor the manager subscription in
+      // `useVirtualization` depend on caller-supplied callback identity
+      // anymore, so re-rendering the parent — even with brand-new inline
+      // `onScroll`/`onViewportChange` — must not construct any new observers.
+      expect(afterRerender1).toBe(afterMount);
+      expect(afterRerender2).toBe(afterMount);
 
       ro.restore();
     }

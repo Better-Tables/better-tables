@@ -186,6 +186,18 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
     manager.setEnabled(enabled);
   }, [manager, enabled]);
 
+  // Ref-latch the caller-supplied callbacks so the subscription effect
+  // below only depends on `manager` — an unstable `onScroll`/
+  // `onViewportChange`/`onRowMeasured` identity (e.g. an inline arrow
+  // function passed by the caller on every render) no longer tears down
+  // and recreates the manager subscription.
+  const onScrollRef = useRef(onScroll);
+  onScrollRef.current = onScroll;
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
+  const onRowMeasuredRef = useRef(onRowMeasured);
+  onRowMeasuredRef.current = onRowMeasured;
+
   // Subscribe to manager events
   useEffect(() => {
     const unsubscribe = manager.subscribe((event) => {
@@ -193,7 +205,7 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
         case 'scroll':
           setState(manager.getState());
           setMetrics(manager.getPerformanceMetrics());
-          onScroll?.(event.scrollInfo);
+          onScrollRef.current?.(event.scrollInfo);
           break;
 
         case 'virtual_items_changed':
@@ -202,13 +214,13 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
           break;
 
         case 'viewport_changed':
-          onViewportChange?.(event.startIndex, event.endIndex);
+          onViewportChangeRef.current?.(event.startIndex, event.endIndex);
           break;
 
         case 'row_measured':
           setState(manager.getState());
           setMetrics(manager.getPerformanceMetrics());
-          onRowMeasured?.(event.rowIndex, event.height);
+          onRowMeasuredRef.current?.(event.rowIndex, event.height);
           break;
 
         case 'total_size_changed':
@@ -220,7 +232,7 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
     });
 
     return unsubscribe;
-  }, [manager, onScroll, onViewportChange, onRowMeasured]);
+  }, [manager]);
 
   // Handle scroll events from the container
   const handleScroll = useCallback(
