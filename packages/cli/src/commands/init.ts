@@ -1,8 +1,8 @@
-import { join, normalize, resolve } from 'node:path';
+import { normalize, resolve } from 'node:path';
 import { Command } from 'commander';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
-import { getAliasPrefix, getConfig } from '../lib/config';
+import { getConfig } from '../lib/config';
 import { type CopyResult, copyAllFiles } from '../lib/file-operations';
 import {
   detectNextJS,
@@ -131,7 +131,7 @@ export function initCommand(): Command {
     if (!configResult) {
       process.exit(1);
     }
-    const { config, resolvedPaths, isTypeScript } = configResult;
+    const { config, resolvedPaths } = configResult;
     // Step 5: Check shadcn components
     if (!options.skipShadcn) {
       const componentStatus = getComponentStatus(resolvedPaths);
@@ -154,7 +154,6 @@ export function initCommand(): Command {
       }
     } else {
     }
-    const _componentsBasePath = join(resolvedPaths.components, componentsPath);
     let shouldCopy = true;
     if (!skipPrompts) {
       shouldCopy = await confirm('Proceed with copying files?', true);
@@ -172,7 +171,6 @@ export function initCommand(): Command {
       process.exit(1);
     }
     // Summary
-    const _successful = results.filter((r) => r.success && !r.skipped).length;
     const skipped = results.filter((r) => r.skipped).length;
     const failed = results.filter((r) => !r.success).length;
     if (Object.keys(categories).length === 0) {
@@ -187,7 +185,6 @@ export function initCommand(): Command {
       for (const _result of failedResults) {
       }
     }
-    const _aliasPrefix = getAliasPrefix(config);
   });
   return command;
 }
