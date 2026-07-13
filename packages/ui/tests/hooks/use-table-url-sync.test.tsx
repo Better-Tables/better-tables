@@ -76,7 +76,10 @@ describe('useTableUrlSync', () => {
 
     const store = getTableStore(TABLE_ID);
     expect(store).toBeDefined();
-    const filters = store?.getState().manager.getFilters();
+    if (!store) {
+      throw new Error('Expected table store');
+    }
+    const filters = store.getState().manager.getFilters();
     expect(filters).toHaveLength(1);
     expect(filters[0]?.values).toEqual(['late-store']);
   });
@@ -86,7 +89,12 @@ describe('useTableUrlSync', () => {
     const { adapter } = createFakeUrlAdapter();
     let subscribeCount = 0;
 
-    const manager = getTableStore(TABLE_ID)?.getState().manager;
+    const tableStore = getTableStore(TABLE_ID);
+    expect(tableStore).toBeDefined();
+    if (!tableStore) {
+      throw new Error('Expected table store');
+    }
+    const manager = tableStore.getState().manager;
     const originalSubscribe = manager.subscribe.bind(manager);
     manager.subscribe = (listener) => {
       subscribeCount += 1;
