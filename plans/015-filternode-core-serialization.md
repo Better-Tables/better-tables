@@ -127,7 +127,7 @@ Extend `tests/utils/filter-serialization.test.ts` and the type-guards suite:
 
 Minor `@better-tables/core`: FilterNode types, `c2:` wire format (old `c:` URLs still readable), CORE-06 fix, optional adapter capability fields — body as migration-guide input (URL format change is invisible to users; the `filters` widening is additive for adapter authors).
 
-**Verify**: root `bun run typecheck` 8/8; `bun run build --filter=@better-tables/core --filter=@better-tables/ui --filter=@better-tables/demo` exit 0; `ls .changeset/`
+**Verify**: root `bun run typecheck` 8/8; `bun run build --filter=@better-tables/core --filter=@better-tables/ui --filter=@better-tables/site` exit 0; `ls .changeset/`
 
 ## Test plan
 

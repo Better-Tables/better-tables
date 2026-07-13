@@ -35,8 +35,8 @@ Script names — **reviewer-verified 2026-07-12** via grep across all package.js
 - `packages/ui`: BOTH (lines 23, 27)
 - `packages/cli`: ONLY `"type-check"` (line 31)
 - `packages/adapters/drizzle`: ONLY `"type-check"` (line 27)
-- `apps/demo`: only `"typecheck"` (line 10)
-- `apps/web`, `apps/marketing`: NEITHER
+- `apps/marketing`: only `"typecheck"` (line 10)
+- `apps/docs`, `apps/marketing`: NEITHER
 
 Per-package typecheck failures — **as reported by the 012 executor** (verify each yourself before fixing; counts may shift slightly):
 
@@ -80,7 +80,7 @@ Environment facts from the 012 run you will also hit:
 - PRODUCTION source visibility changes (making private/protected members public so tests compile is an API change — STOP condition instead)
 - `biome.json` rule changes
 - Any dependency version change other than deduplicating `@types/react`/`csstype`
-- Fixing `apps/web`/`apps/marketing` type errors if they have them — those apps get a typecheck script ONLY if it passes; otherwise exclude and document (same rule as 012)
+- Fixing `apps/docs`/`apps/marketing` type errors if they have them — those apps get a typecheck script ONLY if it passes; otherwise exclude and document (same rule as 012)
 
 ## Git workflow
 
@@ -103,7 +103,7 @@ Environment facts from the 012 run you will also hit:
 
 ### Step 1: Unify script names
 
-Every `packages/*` and `apps/*` package.json gets exactly one `"typecheck": "tsc --noEmit"`; delete every `"type-check"` entry. Exception: do NOT add the script to `apps/web`/`apps/marketing` yet — that's Step 6's conditional. First `grep -rn "type-check" --include="*.json" --include="*.yml" --include="*.md" .` (excluding node_modules) to confirm nothing references the hyphenated name; if CI/docs reference it, update those references in the same commit and say so.
+Every `packages/*` and `apps/*` package.json gets exactly one `"typecheck": "tsc --noEmit"`; delete every `"type-check"` entry. Exception: do NOT add the script to `apps/docs`/`apps/marketing` yet — that's Step 6's conditional. First `grep -rn "type-check" --include="*.json" --include="*.yml" --include="*.md" .` (excluding node_modules) to confirm nothing references the hyphenated name; if CI/docs reference it, update those references in the same commit and say so.
 
 **Verify**: `grep -rn '"type-check"' packages apps --include=package.json` → 0 matches; `grep -c '"typecheck"' packages/core/package.json` → 1.
 
@@ -133,9 +133,9 @@ Diagnose the duplicate: `bun why @types/react` (or grep `bun.lock` for `@types/r
 
 ### Step 6: Turbo wiring
 
-Add `"typecheck": { "outputs": [] }` to `turbo.json` tasks (add `"dependsOn": ["^build"]` only if a package's typecheck provably needs a dependency's `dist` — try without first). Root script → `"typecheck": "turbo run typecheck"`. For `apps/web` and `apps/marketing`: add the script, run it; if an app fails on pre-existing errors, REMOVE its script again and record the app + first ~10 errors in NOTES (excluded-by-omission, same rule as 012).
+Add `"typecheck": { "outputs": [] }` to `turbo.json` tasks (add `"dependsOn": ["^build"]` only if a package's typecheck provably needs a dependency's `dist` — try without first). Root script → `"typecheck": "turbo run typecheck"`. For `apps/docs` and `apps/marketing`: add the script, run it; if an app fails on pre-existing errors, REMOVE its script again and record the app + first ~10 errors in NOTES (excluded-by-omission, same rule as 012).
 
-**Verify**: `bun run typecheck` (root) → exit 0; turbo output lists a typecheck task for all four packages + `apps/demo` (+ web/marketing if included).
+**Verify**: `bun run typecheck` (root) → exit 0; turbo output lists a typecheck task for all four packages + `apps/marketing` (+ web/marketing if included).
 
 ### Step 7: Lint sweep
 

@@ -55,18 +55,8 @@ export async function getDatabase() {
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`);
 
-  // Seed the database with thousands of users
-  try {
-    await seedDatabase(db);
-    // Verify data was seeded
-    const userCount = await db.select().from(schema.users).limit(1);
-    if (userCount.length === 0) {
-    } else {
-    }
-  } catch (_error) {
-    // Don't throw - allow the app to continue even if seeding fails
-    // The table will just show empty data
-  }
+  // Seed the database
+  await seedDatabase(db);
 
   // Store instances
   dbInstance = db;

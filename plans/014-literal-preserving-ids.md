@@ -61,7 +61,7 @@ All verified at `0bf6c24` (post-005; the 005 inference pattern is the template t
 | Typecheck core | `cd packages/core && bun run typecheck` | exit 0          |
 | Typecheck repo | `bun run typecheck` (root, turbo)  | exit 0, 8/8 tasks   |
 | Tests     | `cd packages/core && bun test`           | 1022 baseline + new, 0 fail |
-| Build     | `bun run build --filter=@better-tables/core --filter=@better-tables/ui --filter=@better-tables/demo` | exit 0 (full root build hits the recorded apps/web debt — out of scope) |
+| Build     | `bun run build --filter=@better-tables/core --filter=@better-tables/ui --filter=@better-tables/site` | exit 0 (full root build hits the recorded apps/docs debt — out of scope) |
 
 ## Scope
 

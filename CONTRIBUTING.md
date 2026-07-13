@@ -53,9 +53,7 @@ changeset (it's private, distributed via the CLI, not versioned on npm).
 
 ## Before opening a PR
 
-- [ ] `bun run typecheck` passes (root, or scoped with `--filter=<pkg>` if
-      `apps/web`'s pre-existing, unrelated failure blocks the root run —
-      see `CLAUDE.md`)
+- [ ] `bun run typecheck` passes (root, or scoped with `--filter=<pkg>`)
 - [ ] `bun run test` passes for every package you touched
 - [ ] `cd packages/<pkg> && bun run lint` is clean (don't run the root
       `lint` script to "just check" — it auto-fixes unsafely across the

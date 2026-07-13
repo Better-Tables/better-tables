@@ -1,8 +1,8 @@
 import type { FetchDataResult } from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode, parseTableSearchParams } from '@better-tables/core';
 import { Section } from '@/components/section';
-import type { DemoUser } from '@/lib/demo-columns';
-import { DemoTableClient } from './demo-table-client';
+import type { UserWithRelations } from '@/lib/db/schema';
+import { UsersTableClient } from './users-table-client';
 
 interface InteractiveDemoProps {
   searchParams: Promise<{
@@ -28,7 +28,7 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
 
   // Fetch data from API route
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const url = new URL('/api/demo-table', baseUrl);
+  const url = new URL('/api/users', baseUrl);
   url.searchParams.set('page', page.toString());
   url.searchParams.set('limit', limit.toString());
   if (filters.length > 0) {
@@ -38,7 +38,7 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
     url.searchParams.set('sorting', JSON.stringify(sorting));
   }
 
-  let result: FetchDataResult<DemoUser>;
+  let result: FetchDataResult<UserWithRelations>;
   try {
     const response = await fetch(url.toString(), {
       cache: 'no-store',
@@ -70,7 +70,7 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
             </p>
           </div>
           <div className="w-full">
-            <DemoTableClient
+            <UsersTableClient
               data={result.data || []}
               totalCount={result.total || 0}
               initialPagination={

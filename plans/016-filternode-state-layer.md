@@ -39,10 +39,10 @@ Plan 015 landed FilterNode types, guards, and the `c2:` wire format in core — 
 - **015's branch** (cherry-pick base): `bb1b063` (types + guards), `3c034a5` (compression/CORE-06), `01761a7` (c2: serialization), `f6f2197` (tests). Core on that branch: 1054 pass / 0 fail; core typecheck/build 0. Its changeset was left uncommitted — Step 0 recreates it (full text below).
 - **The two breaks** (from 015's STOP report, verify yourself after Step 0 by running root `bun run typecheck`):
   - `packages/ui/src/hooks/use-table-url-sync.ts:111-112` — `deserialized.filters.length` and `updates.filters = deserialized.filters` where `updates: Partial<TableState>` and `TableState.filters: FilterState[]`.
-  - `apps/demo/app/page.tsx:65,106` — `filters.length` and `initialFilters={filters}` typed flat.
+  - `apps/marketing/src/components/sections/interactive-demo.tsx:65,106` — `filters.length` and `initialFilters={filters}` typed flat.
 - **The state layer today** (all flat): `packages/core/src/managers/filter-manager.ts` (`private filters: FilterState[]` at `:171`, `setFilters`/`getFilters`); `packages/core/src/managers/table-state-manager.ts` (`TableState.filters: FilterState[]` around `:74`, plus `filters_changed` events and plan-004's clamping logic — don't disturb it); `packages/core/src/stores/table-store.ts` (`filters: FilterState[]` at `:23`, `setFilters` at `:31/:173`); `packages/core/src/types/table.ts` `defaultFilters?: FilterState[]` (`:63`); `packages/core/src/types/factory.ts` `filters?: FilterState[]` (`:54`).
 - **Available primitives from 015**: `FilterNode`/`FilterGroupNode` (types/filter.ts), `isFilterGroupNode`, `normalizeFilterNode` (utils/type-guards.ts). Design §1.4's normalize rules are already implemented — reuse, don't reimplement.
-- Suites: core 1054/0 on the 015 base; ui has no tests (typecheck is its gate); demo gates via root typecheck + `bun run build --filter=@better-tables/demo`.
+- Suites: core 1054/0 on the 015 base; ui has no tests (typecheck is its gate); demo gates via root typecheck + `bun run build --filter=@better-tables/site`.
 
 ## The semantic contract to implement (from design §1.6 — verify against the full section text; if the doc contradicts this summary, the DOC wins, report it)
 
@@ -60,7 +60,7 @@ Plan 015 landed FilterNode types, guards, and the `c2:` wire format in core — 
 | Typecheck | `bun run typecheck` (root)               | exit 0, 8/8 (THE gate 015 failed) |
 | Core tests | `cd packages/core && bun test`          | 1054 baseline + new, 0 fail |
 | UI typecheck | `cd packages/ui && bun run typecheck` | exit 0              |
-| Demo build | `bun run build --filter=@better-tables/demo` | exit 0         |
+| Demo build | `bun run build --filter=@better-tables/site` | exit 0         |
 
 ## Scope
 
@@ -71,7 +71,7 @@ Plan 015 landed FilterNode types, guards, and the `c2:` wire format in core — 
 - `packages/core/src/types/table.ts`, `types/factory.ts` (the `filters` field types)
 - `packages/core/src/utils/state-change-detection.ts` / `equality.ts` (only if tree equality forces a mechanical extension — report if used)
 - `packages/ui/src/hooks/use-table-url-sync.ts` (the two broken lines' fix, tree-preserving)
-- `apps/demo/app/page.tsx` (narrow or widen its usage — smallest correct change)
+- `apps/marketing/src/components/sections/interactive-demo.tsx` (narrow or widen its usage — smallest correct change)
 - `packages/core/tests/managers/*.test.ts` (extend), `packages/core/tests/stores/*` if present
 - `.changeset/filternode-state-layer.md` (minor `@better-tables/core` + `@better-tables/ui`)
 
@@ -123,9 +123,9 @@ Apply the semantic contract's rules 1–3 across filter-manager, table-state-man
 ### Step 2: Fix the two consumers
 
 - `use-table-url-sync.ts:111-112`: handle both shapes — `Array.isArray(deserialized.filters) ? .length : 1` for the has-filters check (or use the new accessor), and assign through the widened `TableState.filters`. The hook must pass a hydrated TREE through to state unflattened (rule 4).
-- `apps/demo/app/page.tsx:65,106`: smallest correct change — the demo passes URL-parsed filters into a client component; narrow with `Array.isArray` (legacy `c:` and flat `c2:` payloads give arrays; a group URL in the demo may simply render the flat-leaves view per rule 3 — pick the smallest change that compiles AND doesn't crash on a group URL, document the choice).
+- `apps/marketing/src/components/sections/interactive-demo.tsx:65,106`: smallest correct change — the demo passes URL-parsed filters into a client component; narrow with `Array.isArray` (legacy `c:` and flat `c2:` payloads give arrays; a group URL in the demo may simply render the flat-leaves view per rule 3 — pick the smallest change that compiles AND doesn't crash on a group URL, document the choice).
 
-**Verify**: `cd packages/ui && bun run typecheck` → 0; `bun run build --filter=@better-tables/demo` → 0; root `bun run typecheck` → 8/8 (015's failed gate now passes)
+**Verify**: `cd packages/ui && bun run typecheck` → 0; `bun run build --filter=@better-tables/site` → 0; root `bun run typecheck` → 8/8 (015's failed gate now passes)
 
 ### Step 3: Tests
 
@@ -144,7 +144,7 @@ Extend the manager suites (`tests/managers/filter-manager.test.ts`, `table-state
 
 `.changeset/filternode-state-layer.md` (minor core + ui): state layer accepts/preserves FilterNode; legacy flat accessors are documented views; ui url-sync is tree-preserving.
 
-**Verify**: root `bun run typecheck` 8/8; `bun run build --filter=@better-tables/core --filter=@better-tables/ui --filter=@better-tables/demo` → 0; `cd packages/core && bun test` → 0 fail; `ls .changeset/` shows BOTH the recreated 015 changeset and this plan's
+**Verify**: root `bun run typecheck` 8/8; `bun run build --filter=@better-tables/core --filter=@better-tables/ui --filter=@better-tables/site` → 0; `cd packages/core && bun test` → 0 fail; `ls .changeset/` shows BOTH the recreated 015 changeset and this plan's
 
 ## Test plan
 

@@ -20,7 +20,7 @@
 - **Depends on**: 001 (CI gate — this change needs typecheck running everywhere)
 - **Category**: dx
 - **Planned at**: commit `55dfd01`, 2026-07-12
-- **Completed**: 2026-07-13 at `c830997` (+ changeset/README commit) — Steps 1, 2, 4, 5, 6 done; Step 3 skipped per plan 011 (see Step 3 note). All done criteria verified: no `ColumnDefinition<TData, any>` in `table.tsx`, no `as string` casts in the demo columns, root typecheck/build green (build excludes the pre-existing, unrelated `apps/web` docs-page failure — see Step 6 report), core test suite 1011/0 including `tests/types/builder-inference.test.ts`.
+- **Completed**: 2026-07-13 at `c830997` (+ changeset/README commit) — Steps 1, 2, 4, 5, 6 done; Step 3 skipped per plan 011 (see Step 3 note). All done criteria verified: no `ColumnDefinition<TData, any>` in `table.tsx`, no `as string` casts in the demo columns, root typecheck/build green (build excludes the pre-existing, unrelated `apps/docs` docs-page failure — see Step 6 report), core test suite 1011/0 including `tests/types/builder-inference.test.ts`.
 
 ## Why this matters
 
@@ -59,7 +59,7 @@ Relationship to plan 011: plan 011 designs a path-first definition API (`t.text(
 
 - `packages/core/src/types/column.ts:27-38` — `ColumnDefinition<TData = unknown, TValue = unknown>` with `accessor: (data: TData) => TValue`; `cellRenderer` receives `CellRendererProps` (same file) whose `value` is `TValue`.
 - `packages/core/src/builders/column-factory.ts:106` — `createColumnBuilder<TData = unknown>()` returns the factory with `.text()`, `.option()`, etc.; `:145` exports an untyped global `export const column = createColumnBuilder();`.
-- Consumer proof of the failure: the demo (`apps/demo/lib/columns/user-columns.tsx`) writes `value as string` casts inside option-column `cellRenderer`s.
+- Consumer proof of the failure: the demo (`apps/marketing/src/lib/columns/user-columns.tsx`) writes `value as string` casts inside option-column `cellRenderer`s.
 - Conventions: TS 5.8, `strict: true`. Builders are classes with `this`-returning fluent methods and heavy JSDoc on every public method — keep both. Existing builder tests: `packages/core/tests/builders/*.test.ts` (bun:test). Compile-time behavior is tested via type-level test files — see `packages/core/tests/types/*.test.ts` for the convention (they use `@ts-expect-error` style assertions and typed helper functions; mirror it).
 
 ## Commands you will need
@@ -69,7 +69,7 @@ Relationship to plan 011: plan 011 designs a path-first definition API (`t.text(
 | Install   | `bun install` (repo root)                | exit 0              |
 | Typecheck core | `cd packages/core && bun run typecheck` | exit 0          |
 | Typecheck ui | `cd packages/ui && bun run typecheck` | exit 0              |
-| Typecheck repo (apps/demo compile too) | `bun run typecheck` (root) | exit 0 |
+| Typecheck repo (apps/marketing compile too) | `bun run typecheck` (root) | exit 0 |
 | Tests     | `cd packages/core && bun test`           | all pass            |
 | Build     | `bun run build` (root, turbo)            | exit 0              |
 
@@ -80,7 +80,7 @@ Relationship to plan 011: plan 011 designs a path-first definition API (`t.text(
 - `packages/core/src/types/column.ts`, `packages/core/src/types/filter.ts` (only the `FilterOption` genericization)
 - `packages/ui/src/components/table/table.tsx` (remove the `any` erasure; type the prop as `ColumnDefinition<TData, unknown>` — wait for Step 5's shape)
 - `packages/core/tests/builders/*.test.ts`, new `packages/core/tests/types/builder-inference.test.ts`
-- `apps/demo/lib/columns/user-columns.tsx` (delete the now-unneeded casts — proves the win)
+- `apps/marketing/src/lib/columns/user-columns.tsx` (delete the now-unneeded casts — proves the win)
 - `.changeset/*.md` (minor bump: `@better-tables/core`, `@better-tables/ui`)
 
 **Out of scope** (do NOT touch, even though they look related):
@@ -165,9 +165,9 @@ type AnyColumnOf<TData> = {
 type AnyColumnOf<TData> = ColumnDefinition<TData, never> | ColumnDefinition<TData, unknown>;
 ```
 
-If a clean variance-safe union proves unachievable (this is genuinely fiddly in TS), the acceptable fallback is: keep an internal erased type but make it `unknown`-based and **not exported**, and add a `defineColumns<TData>()` helper in core (`packages/core/src/builders/column-factory.ts`) that accepts a tuple of properly-typed built columns and returns the erased array — so the erasure happens in ONE audited place instead of at every consumer. Demo (`apps/demo/lib/columns/user-columns.tsx`) then drops its `as string` casts.
+If a clean variance-safe union proves unachievable (this is genuinely fiddly in TS), the acceptable fallback is: keep an internal erased type but make it `unknown`-based and **not exported**, and add a `defineColumns<TData>()` helper in core (`packages/core/src/builders/column-factory.ts`) that accepts a tuple of properly-typed built columns and returns the erased array — so the erasure happens in ONE audited place instead of at every consumer. Demo (`apps/marketing/src/lib/columns/user-columns.tsx`) then drops its `as string` casts.
 
-**Verify**: `cd packages/ui && bun run typecheck` → exit 0; `bun run typecheck` at root (compiles apps/demo) → exit 0; `grep -n "as string" apps/demo/lib/columns/user-columns.tsx` → 0 matches
+**Verify**: `cd packages/ui && bun run typecheck` → exit 0; `bun run typecheck` at root (compiles apps/marketing) → exit 0; `grep -n "as string" apps/marketing/src/lib/columns/user-columns.tsx` → 0 matches
 
 ### Step 6: Full verification + changeset
 
@@ -184,7 +184,7 @@ Type-level: Step 4's four assertions (the option-literal-union case is the flags
 Machine-checkable. ALL must hold:
 
 - [ ] `grep -n "ColumnDefinition<TData, any>" packages/ui/src/components/table/table.tsx` → 0 matches
-- [ ] `grep -rn "as string" apps/demo/lib/columns/user-columns.tsx` → 0 matches
+- [ ] `grep -rn "as string" apps/marketing/src/lib/columns/user-columns.tsx` → 0 matches
 - [ ] `bun run typecheck` (root) exits 0
 - [ ] `cd packages/core && bun test` exits 0, including `tests/types/builder-inference.test.ts`
 - [ ] `bun run build` exits 0
@@ -199,7 +199,7 @@ Stop and report back (do not improvise) if:
 - Excerpts at the cited lines don't match (drift).
 - Step 3's phantom-type approach forces changes to more than ~15 files or breaks the six subclass builders' fluent chains in a way that requires duplicating every method signature — report with a sketch of the damage; the maintainer may prefer shipping Steps 1–2 alone first.
 - Step 5's variance problem cannot be solved even with the `defineColumns` fallback without re-introducing `any` — stop and report; do NOT ship a hidden `any` and call it done.
-- Root typecheck reveals pre-existing errors in `apps/web` or `apps/marketing` unrelated to this change — report; don't fix unrelated apps in this branch.
+- Root typecheck reveals pre-existing errors in `apps/docs` or `apps/marketing` unrelated to this change — report; don't fix unrelated apps in this branch.
 
 ## Maintenance notes
 

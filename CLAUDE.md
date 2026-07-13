@@ -12,8 +12,8 @@ here.
 | `@better-tables/ui` | `packages/ui` | **private** — distributed via CLI copy, not npm | React table/filter components (shadcn-style), hooks, stores. |
 | `@better-tables/cli` | `packages/cli` | npm (public) | `better-tables init` — copies `ui`'s components into a consumer project. |
 | `@better-tables/adapters-drizzle` | `packages/adapters/drizzle` | npm (public) | Drizzle ORM adapter: schema introspection, JOIN/filter/pagination query generation for Postgres/MySQL/SQLite. |
-| `apps/demo` | `apps/demo` | private | Next.js example app (in-memory SQLite + seed). Working reference for the full stack. |
-| `apps/web`, `apps/marketing` | `apps/*` | private | Docs site / marketing site. Not part of the library; excluded from root typecheck (see caveats). |
+| `@better-tables/site` | `apps/marketing` | private | Public marketing site with live interactive demo (in-memory SQLite + seed). |
+| `@better-tables/docs` | `apps/docs` | private | Fumadocs documentation site. Not part of the library package surface. |
 
 ## Data flow (one-liner)
 
@@ -28,7 +28,7 @@ response, with URL state sync.
 |---|---|---|
 | Install | `bun install` (root) | — |
 | Typecheck | `bun run typecheck` (root) | Runs `tsc --noEmit` in every package via turbo. |
-| Build | `bun run build` (root) | `apps/web` currently fails root build on a pre-existing, unrelated TS error (plan 009). Use `bun run build --filter=<pkg>` to scope around it. |
+| Build | `bun run build` (root) | Runs all packages and apps via turbo. Use `bun run build --filter=<pkg>` to scope. |
 | Test (all) | `bun run test` (root) | Runs each package's `bun test`. |
 | Test (one package) | `cd packages/<name> && bun test` | e.g. `cd packages/core && bun test`. |
 | Lint (check) | `cd packages/<name> && bun run lint` | Per-package `biome check .` — read-only. |
@@ -56,7 +56,7 @@ for optional MySQL/Postgres integration tests).
   `@better-tables/adapters-drizzle`.
 - **Private** (`"private": true`): `@better-tables/ui` (copied via the CLI,
   not installed from npm — do not remove `private` without re-reading
-  plan 009 Step 3's reasoning), `apps/demo`, `apps/web`, `apps/marketing`.
+  plan 009 Step 3's reasoning), `apps/marketing`, `apps/docs`.
 
 ## Deferred packaging work (plan 007 / plan 009)
 

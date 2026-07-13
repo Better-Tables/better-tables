@@ -91,7 +91,7 @@ All verified at commit `55dfd01`:
    ```
 
    so the entire package is one client-boundary chunk; per-file `'use client'` directives already exist in the component sources (45 files).
-7. **Misleading env example.** Root `.env.example` documents only `MYSQL_TEST_URL`/`POSTGRES_TEST_URL` (drizzle integration-test URLs, placeholder credentials) with nothing telling a newcomer the demo app (`apps/demo`, SQLite + seed) needs no env at all.
+7. **Misleading env example.** Root `.env.example` documents only `MYSQL_TEST_URL`/`POSTGRES_TEST_URL` (drizzle integration-test URLs, placeholder credentials) with nothing telling a newcomer the demo app (`apps/marketing`, SQLite + seed) needs no env at all.
 8. **No agent/contributor onboarding.** No `CLAUDE.md`, `AGENTS.md`, or root `CONTRIBUTING.md`. The de-facto knowledge base is a 504 KB `wiki.md` at repo root — unusable as working context.
 9. **React version claim.** `README.md:6` badge says "React 18+"; the workspace catalog pins `react: ^19.2.0` and packages reference `"react": "catalog:"` in peerDeps. Decide the truth (see Step 4).
 
@@ -120,7 +120,7 @@ All verified at commit `55dfd01`:
 
 **Out of scope** (do NOT touch):
 - `wiki.md` content (distill FROM it; don't edit it)
-- Deleting or restructuring `apps/marketing`/`apps/web`
+- Deleting or restructuring `apps/marketing`/`apps/docs`
 - The decision to actually publish `@better-tables/ui` to npm — this plan makes the README truthful about TODAY's distribution and removes the `private` flag ONLY if the maintainer's distribution answer is "publish" (see STOP conditions / Step 3)
 - Per-component subpath exports for ui (larger packaging redesign; record as follow-up)
 
@@ -170,9 +170,9 @@ Restore user feedback in `packages/cli/src/commands/init.ts` following the picoc
 
 ### Step 7: Tree-shaking + RSC packaging
 
-Add `"sideEffects": false` to `packages/core/package.json`, `packages/ui/package.json`, `packages/adapters/drizzle/package.json` (first `grep -rn "^import ['\"]" packages/<pkg>/src --include="*.ts*"` in each to confirm no bare side-effect imports — CSS imports would need listing as exceptions). In `packages/ui/tsdown.config.ts`, remove the global `banner: { js: '"use client";' }` and rely on the per-file directives — then verify the built output preserves them (`bun run build`, then `grep -rl '"use client"' packages/ui/dist/ | head`; tsdown/rolldown must keep leading directives — if the built files do NOT contain the directives, revert the banner removal and record the blocker). Build `apps/demo` against the result as the smoke test.
+Add `"sideEffects": false` to `packages/core/package.json`, `packages/ui/package.json`, `packages/adapters/drizzle/package.json` (first `grep -rn "^import ['\"]" packages/<pkg>/src --include="*.ts*"` in each to confirm no bare side-effect imports — CSS imports would need listing as exceptions). In `packages/ui/tsdown.config.ts`, remove the global `banner: { js: '"use client";' }` and rely on the per-file directives — then verify the built output preserves them (`bun run build`, then `grep -rl '"use client"' packages/ui/dist/ | head`; tsdown/rolldown must keep leading directives — if the built files do NOT contain the directives, revert the banner removal and record the blocker). Build `apps/marketing` against the result as the smoke test.
 
-**Verify**: `bun run build` → exit 0; directives present in `packages/ui/dist`; `cd apps/demo && bun run build` (Next build) → exit 0
+**Verify**: `bun run build` → exit 0; directives present in `packages/ui/dist`; `cd apps/marketing && bun run build` (Next build) → exit 0
 
 ### Step 8: Env example + onboarding docs
 
@@ -193,7 +193,7 @@ Machine-checkable. ALL must hold:
 - [ ] `grep -c "console\." packages/cli/src/commands/init.ts` → > 0; CLI tests pass
 - [ ] drizzle package.json: `drizzle-orm`/`better-sqlite3` not in `dependencies`
 - [ ] `"sideEffects": false` present in core/ui/drizzle package.json
-- [ ] `bun run typecheck && bun run build` (root) exit 0; `cd apps/demo && bun run build` exit 0
+- [ ] `bun run typecheck && bun run build` (root) exit 0; `cd apps/marketing && bun run build` exit 0
 - [ ] `.changeset/*.md` exists covering drizzle dep-class and ui packaging changes
 - [ ] `plans/README.md` status row updated
 

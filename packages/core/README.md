@@ -644,11 +644,11 @@ For detailed documentation, see:
 
 ## Examples
 
-See the [demo app](../../apps/demo) for a complete working example:
+See the [live demo in the marketing site](../../apps/marketing) for a complete working example:
 
-- **Column Definitions**: [apps/demo/lib/columns/user-columns.tsx](../../apps/demo/lib/columns/user-columns.tsx)
-- **Action Builders**: [apps/demo/lib/actions/user-actions.tsx](../../apps/demo/lib/actions/user-actions.tsx)
-- **Integration**: [apps/demo/components/users-table-client.tsx](../../apps/demo/components/users-table-client.tsx)
+- **Column Definitions**: [apps/marketing/src/lib/columns/user-columns.tsx](../../apps/marketing/src/lib/columns/user-columns.tsx)
+- **Action Builders**: [apps/marketing/src/lib/actions/user-actions.tsx](../../apps/marketing/src/lib/actions/user-actions.tsx)
+- **Integration**: [apps/marketing/src/components/sections/users-table-client.tsx](../../apps/marketing/src/components/sections/users-table-client.tsx)
 
 ## TypeScript Support
 
@@ -702,7 +702,7 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 - **[@better-tables/ui](../../packages/ui)** - React components built on top of core
 - **[@better-tables/adapters-drizzle](../../packages/adapters/drizzle)** - Drizzle ORM adapter
-- **[Demo App](../../apps/demo)** - Complete working example
+- **[Live Demo](../../apps/marketing)** - Marketing site with interactive table demo
 
 ## Support
 

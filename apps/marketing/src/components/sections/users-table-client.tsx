@@ -2,26 +2,28 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
-import { type DemoUser, defaultVisibleColumns, demoColumns } from '@/lib/demo-columns';
+import { userActions } from '@/lib/actions/user-actions';
+import { defaultVisibleColumns, userColumns } from '@/lib/columns/user-columns';
+import type { UserWithRelations } from '@/lib/db/schema';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
-const TABLE_ID = 'demo-table';
+const TABLE_ID = 'users-table';
 
-interface DemoTableClientProps {
-  data: DemoUser[];
+interface UsersTableClientProps {
+  data: UserWithRelations[];
   totalCount: number;
   initialPagination: PaginationState;
   initialSorting: SortingState;
   initialFilters: FilterState[];
 }
 
-export function DemoTableClient({
+export function UsersTableClient({
   data,
   totalCount,
   initialPagination,
   initialSorting,
   initialFilters,
-}: DemoTableClientProps) {
+}: UsersTableClientProps) {
   const urlAdapter = useNextjsUrlAdapter();
 
   useTableUrlSync(
@@ -30,6 +32,8 @@ export function DemoTableClient({
       filters: true,
       pagination: true,
       sorting: true,
+      columnVisibility: true,
+      columnOrder: true,
     },
     urlAdapter
   );
@@ -37,8 +41,9 @@ export function DemoTableClient({
   return (
     <BetterTable
       id={TABLE_ID}
-      name="Demo Users"
-      columns={demoColumns}
+      name="Users"
+      columns={userColumns}
+      actions={userActions}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}
@@ -50,7 +55,14 @@ export function DemoTableClient({
         filtering: true,
         sorting: true,
         pagination: true,
-        rowSelection: false,
+        rowSelection: true,
+        columnReordering: true,
+        headerContextMenu: {
+          enabled: true,
+          showSortToggle: true,
+          allowSortReorder: true,
+          showColumnVisibility: true,
+        },
       }}
       sorting={{
         enabled: true,

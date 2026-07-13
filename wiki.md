@@ -13,12 +13,12 @@ The following files were used as context for generating this wiki page:
 
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [packages/cli/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/cli/README.md)
 - [packages/core/src/index.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/src/index.ts)
 - [examples/nextjs-setup-example.md](https://github.com/Better-Tables/better-tables/blob/main/examples/nextjs-setup-example.md)
 - [packages/adapters/drizzle/examples/advanced-relationships.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/advanced-relationships.ts)
-- [apps/demo/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/lib/db/seed.ts)
+- [apps/marketing/src/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/lib/db/seed.ts)
 
 </details>
 
@@ -77,7 +77,7 @@ Sources: [README.md:157-169]()
 | `@better-tables/adapters-memory` | An in-memory adapter primarily used for testing and demos. | ✅ Ready |
 | `@better-tables/adapters-rest` | A planned adapter for connecting to REST APIs. | 🚧 In Progress |
 | `@better-tables/cli` | Command-line utilities for initializing projects and accessing documentation. | ✅ Ready |
-| `@better-tables/demo` | A comprehensive Next.js application showcasing all library features. | ✅ Ready |
+| `@better-tables/site` | A comprehensive Next.js application showcasing all library features. | ✅ Ready |
 
 Sources: [README.md:171-176](), [README.md:262-270](), [packages/cli/README.md:3]()
 
@@ -195,7 +195,7 @@ bun add @better-tables/ui
 # Drizzle adapter
 bun add @better-tables/adapters-drizzle
 ```
-Sources: [README.md:73-79](), [apps/demo/package.json:13-15]()
+Sources: [README.md:73-79](), [apps/marketing/package.json:13-15]()
 
 ### 2. Basic Usage
 
@@ -240,7 +240,7 @@ Sources: [README.md:81-103]()
 Better Tables is designed to work seamlessly with server-side rendering frameworks like Next.js. State is managed through URL search parameters, making views easily shareable.
 
 ```typescript
-// app/page.tsx (Server Component)
+// interactive-demo.tsx (Server Component)
 import { deserializeFiltersFromURL } from '@better-tables/core';
 import { getAdapter } from '@/lib/adapter';
 
@@ -264,7 +264,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   return <Table data={result.data} totalCount={result.total} />;
 }
 ```
-Sources: [packages/core/README.md:386-422](), [apps/demo/README.md:38-43]()
+Sources: [packages/core/README.md:386-422](), [apps/marketing/README.md:38-43]()
 
 ## Command-Line Interface (CLI)
 
@@ -285,9 +285,9 @@ pnpm dlx @better-tables/cli init -y
 ```
 Sources: [packages/cli/README.md:3-20]()
 
-## The Demo App
+## The Live Demo (Marketing Site)
 
-The repository includes a comprehensive demo application located in `apps/demo`. It serves as a complete, working example that showcases all of Better Tables' features in a real-world context.
+The repository includes a comprehensive demo application located in `apps/marketing`. It serves as a complete, working example that showcases all of Better Tables' features in a real-world context.
 
 **Features Demonstrated:**
 *   **All Column Types**: Text, Number, Date, Boolean, and Option columns.
@@ -297,7 +297,7 @@ The repository includes a comprehensive demo application located in `apps/demo`.
 
 Exploring the demo app is an excellent way to understand how to implement advanced features and structure a project with Better Tables.
 
-Sources: [apps/demo/README.md:5-20](), [apps/demo/lib/db/seed.ts]()
+Sources: [apps/marketing/README.md:5-20](), [apps/marketing/src/lib/db/seed.ts]()
 
 ## Conclusion
 
@@ -312,11 +312,11 @@ The following files were used as context for generating this wiki page:
 
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [examples/nextjs-setup-example.md](https://github.com/Better-Tables/better-tables/blob/main/examples/nextjs-setup-example.md)
 - [packages/core/src/index.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/src/index.ts)
 - [packages/cli/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/cli/README.md)
-- [apps/demo/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/lib/db/seed.ts)
+- [apps/marketing/src/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/lib/db/seed.ts)
 - [packages/adapters/drizzle/examples/basic-usage.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/basic-usage.ts)
 </details>
 
@@ -352,7 +352,7 @@ graph TD
     B[core: Type system, builders, managers]
     C[ui: React components & hooks]
     D[adapters: Database integrations]
-    F[demo: Live demo application]
+    F["apps/marketing: Live demo"]
 ```
 Sources: [README.md:203-217]()
 
@@ -514,7 +514,7 @@ Sources: [README.md:143-149](), [packages/adapters/drizzle/examples/basic-usage.
 
 The demo application showcases a common pattern for integrating Better Tables in a Next.js App Router project. It uses Server Components for initial data fetching and Client Components for interactivity.
 
-Sources: [apps/demo/README.md:33-40]()
+Sources: [apps/marketing/README.md:33-40]()
 
 The data flow for a page load in the Next.js demo is as follows:
 
@@ -534,7 +534,7 @@ sequenceDiagram
     DrizzleAdapter-->>Next_js_Server: Returns { data, total }
     Next_js_Server-->>User: Renders HTML with initial data
 ```
-Sources: [apps/demo/README.md:73-78](), [packages/core/README.md:315-344]()
+Sources: [apps/marketing/README.md:73-78](), [packages/core/README.md:315-344]()
 
 ### 1. Tailwind CSS Configuration
 
@@ -558,10 +558,10 @@ Sources: [examples/nextjs-setup-example.md:12-25]()
 
 ### 2. Data Fetching (Server Component)
 
-The main page component (`app/page.tsx`) is a Server Component responsible for fetching the initial data. It parses state from URL search parameters and passes it to the adapter.
+The `interactive-demo.tsx` server component is a Server Component responsible for fetching the initial data. It parses state from URL search parameters and passes it to the adapter.
 
 ```typescript
-// app/page.tsx
+// interactive-demo.tsx
 import { deserializeFiltersFromURL } from '@better-tables/core';
 import { getAdapter } from '@/lib/adapter';
 
@@ -583,7 +583,7 @@ export default async function Page({ searchParams }) {
   return <UsersTableClient data={result.data} totalCount={result.total} />;
 }
 ```
-Sources: [packages/core/README.md:315-344](), [apps/demo/README.md:73-78]()
+Sources: [packages/core/README.md:315-344](), [apps/marketing/README.md:73-78]()
 
 ### 3. Interactivity (Client Component)
 
@@ -591,7 +591,7 @@ A client component (`users-table-client.tsx`) wraps the table and handles user i
 
 This pattern keeps the data fetching logic on the server while providing a responsive client-side experience.
 
-Sources: [apps/demo/README.md:80-85]()
+Sources: [apps/marketing/README.md:80-85]()
 
 ## Summary
 
@@ -604,12 +604,12 @@ Getting started with Better Tables involves three main steps: installing the nec
 The following files were used as context for generating this wiki page:
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [packages/adapters/drizzle/examples/advanced-relationships.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/advanced-relationships.ts)
 - [packages/cli/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/cli/README.md)
 - [packages/core/src/index.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/src/index.ts)
 - [examples/nextjs-setup-example.md](https://github.com/Better-Tables/better-tables/blob/main/examples/nextjs-setup-example.md)
-- [apps/demo/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/lib/db/seed.ts)
+- [apps/marketing/src/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/lib/db/seed.ts)
 - [packages/cli/src/lib/file-operations.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/cli/src/lib/file-operations.ts)
 </details>
 
@@ -684,7 +684,7 @@ graph TD
         C["@better-tables/adapters-drizzle"]
         D["@better-tables/adapters-memory"]
         E["@better-tables/cli"]
-        F["apps/demo"]
+        F["apps/marketing"]
     end
 
     B --> A
@@ -743,7 +743,7 @@ The library provides a robust state management system, abstracting the logic for
 
 This philosophy ensures that the table's state is not ephemeral UI state but a reproducible query that can be shared and re-loaded.
 
-Sources: [README.md:168-174](), [packages/core/README.md:143-220](), [apps/demo/README.md:35-37]()
+Sources: [README.md:168-174](), [packages/core/README.md:143-220](), [apps/marketing/README.md:35-37]()
 
 ## Conclusion
 
@@ -765,7 +765,7 @@ The following files were used as context for generating this wiki page:
 - [packages/ui/package.json](https://github.com/Better-Tables/better-tables/blob/main/packages/ui/package.json)
 - [packages/adapters/drizzle/examples/basic-usage.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/basic-usage.ts)
 - [packages/adapters/drizzle/examples/advanced-relationships.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/advanced-relationships.ts)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [package.json](https://github.com/Better-Tables/better-tables/blob/main/package.json)
 - [packages/cli/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/cli/README.md)
 - [examples/nextjs-setup-example.md](https://github.com/Better-Tables/better-tables/blob/main/examples/nextjs-setup-example.md)
@@ -798,7 +798,7 @@ graph TD
     end
 
     subgraph "Applications"
-        Demo["@better-tables/demo"]
+        Demo["@better-tables/site"]
     end
 
     UI --> Core
@@ -807,9 +807,9 @@ graph TD
     Demo --> UI
     Demo --> DrizzleAdapter
 ```
-This diagram shows that `@better-tables/core` is the foundational package, with the UI, Adapters, and Demo app all depending on it.
+This diagram shows that `@better-tables/core` is the foundational package, with the UI, Adapters, and Site app all depending on it.
 
-Sources: [apps/demo/package.json:11-13](), [packages/ui/package.json:37-37](), [packages/adapters/drizzle/examples/basic-usage.ts:4-4]()
+Sources: [apps/marketing/package.json:11-13](), [packages/ui/package.json:37-37](), [packages/adapters/drizzle/examples/basic-usage.ts:4-4]()
 
 ### Key Packages
 
@@ -819,9 +819,9 @@ Sources: [apps/demo/package.json:11-13](), [packages/ui/package.json:37-37](), [
 | `@better-tables/ui`              | A set of production-ready React components built with `shadcn/ui` and Radix UI primitives.                |
 | `@better-tables/adapters/drizzle` | A database adapter for Drizzle ORM that features automatic relationship detection and `JOIN` generation.  |
 | `@better-tables/cli`             | Command-line utilities for initializing projects and accessing documentation.                           |
-| `apps/demo`                      | A comprehensive Next.js demonstration application showcasing all features.                              |
+| `apps/marketing`                      | A comprehensive Next.js demonstration application showcasing all features.                              |
 
-Sources: [README.md:214-218](), [apps/demo/README.md:3-8]()
+Sources: [README.md:214-218](), [apps/marketing/README.md:3-8]()
 
 ## Core Package: `@better-tables/core`
 
@@ -1062,7 +1062,7 @@ The following files were used as context for generating this wiki page:
 - [packages/core/tests/utils/filter-serialization.test.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/tests/utils/filter-serialization.test.ts)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 
 </details>
 
@@ -1093,7 +1093,7 @@ flowchart TD
     C <-->|updateState / subscribe| D
 ```
 *This diagram shows how the `TableStateManager` communicates with the `useTableUrlSync` hook, which in turn uses a `UrlSyncAdapter` to read from and write to the browser's URL.*
-Sources: [packages/ui/src/stores/url-sync-adapter.ts](), [apps/demo/README.md]()
+Sources: [packages/ui/src/stores/url-sync-adapter.ts](), [apps/marketing/README.md]()
 
 ## Serialization and Compression
 
@@ -2362,7 +2362,7 @@ The following files were used as context for generating this wiki page:
 - [packages/core/tests/managers/selection-manager.test.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/tests/managers/selection-manager.test.ts)
 - [packages/ui/src/components/table/table.tsx](https://github.com/Better-Tables/better-tables/blob/main/packages/ui/src/components/table/table.tsx)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 
 </details>
 
@@ -2551,7 +2551,7 @@ flowchart TD
 
 The primary purpose of row selection is to enable bulk actions. The `BetterTable` component renders an `ActionsToolbar` when `actions` are defined. This toolbar receives the list of `selectedIds` and the corresponding `selectedData`, allowing actions to be performed on the selected set of rows.
 
-*Sources: [packages/ui/src/components/table/table.tsx:591-601](), [apps/demo/README.md]()*
+*Sources: [packages/ui/src/components/table/table.tsx:591-601](), [apps/marketing/README.md]()*
 
 ## Summary
 
@@ -2566,7 +2566,7 @@ The following files were used as context for generating this wiki page:
 
 - [packages/core/src/types/action.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/src/types/action.ts)
 - [packages/core/src/builders/action-builder.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/src/builders/action-builder.ts)
-- [apps/demo/lib/actions/user-actions.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/lib/actions/user-actions.tsx)
+- [apps/marketing/src/lib/actions/user-actions.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/lib/actions/user-actions.tsx)
 - [packages/ui/src/components/table/action-confirmation-dialog.tsx](https://github.com/Better-Tables/better-tables/blob/main/packages/ui/src/components/table/action-confirmation-dialog.tsx)
 - [packages/core/tests/builders/action-builder.test.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/tests/builders/action-builder.test.ts)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
@@ -2670,7 +2670,7 @@ Sources: [packages/core/src/builders/action-builder.ts](), [packages/core/README
 | `meta()`               | `Record<string, unknown>`                   | Attaches custom metadata to the action.                                                                                                                                                                  |
 | `build()`              | -                                           | Validates the configuration and returns the final `TableAction` object. Throws an error if `id`, `label`, or `handler` are missing.                                                                       |
 
-Sources: [packages/core/src/builders/action-builder.ts](), [packages/core/tests/builders/action-builder.test.ts:252-261](), [apps/demo/lib/actions/user-actions.tsx:21]()
+Sources: [packages/core/src/builders/action-builder.ts](), [packages/core/tests/builders/action-builder.test.ts:252-261](), [apps/marketing/src/lib/actions/user-actions.tsx:21]()
 
 ### Build Process Flow
 
@@ -2706,7 +2706,7 @@ Sources: [packages/core/tests/builders/action-builder.test.ts:252-276]()
 The following example from the demo application shows how to create a destructive "Delete" action with a confirmation dialog.
 
 ```typescript
-// Source: apps/demo/lib/actions/user-actions.tsx:13-31
+// Source: apps/marketing/src/lib/actions/user-actions.tsx:13-31
 import { createActionBuilder } from '@better-tables/core';
 import { Trash2 } from 'lucide-react';
 
@@ -2731,7 +2731,7 @@ export const deleteUserAction = createActionBuilder<User>()
 ```
 This demonstrates the fluent API, defining an action with an ID, label, icon, destructive variant, a confirmation dialog, and an asynchronous handler.
 
-Sources: [apps/demo/lib/actions/user-actions.tsx:13-31]()
+Sources: [apps/marketing/src/lib/actions/user-actions.tsx:13-31]()
 
 ## Action Confirmation
 
@@ -3077,7 +3077,7 @@ The following files were used as context for generating this wiki page:
 - [packages/adapters/drizzle/examples/basic-usage.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/basic-usage.ts)
 - [packages/adapters/drizzle/examples/advanced-relationships.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/advanced-relationships.ts)
 - [packages/adapters/drizzle/tests/adapter-mysql.test.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/tests/adapter-mysql.test.ts)
-- [apps/demo/app/page.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/app/page.tsx)
+- [apps/marketing/src/components/sections/interactive-demo.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/components/sections/interactive-demo.tsx)
 </details>
 
 # Data Adapters Overview
@@ -3167,7 +3167,7 @@ sequenceDiagram
 ```
 This sequence shows how URL parameters are parsed on the server, passed to the adapter's `fetchData` method, translated into a database query, and finally used to render the page with the initial dataset.
 
-Sources: [apps/demo/app/page.tsx:21-31](), [packages/core/src/types/adapter.ts:20-49]()
+Sources: [apps/marketing/src/components/sections/interactive-demo.tsx:21-31](), [packages/core/src/types/adapter.ts:20-49]()
 
 ### `FetchDataParams`
 
@@ -3326,7 +3326,7 @@ Sources: [README.md:310-315]()
 <summary>Relevant source files</summary>
 The following files were used as context for generating this wiki page:
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [packages/adapters/drizzle/src/index.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/src/index.ts)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
 - [packages/adapters/drizzle/examples/basic-usage.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/basic-usage.ts)
@@ -3394,7 +3394,7 @@ This diagram illustrates the data flow for a `fetchData` request within the Driz
 The recommended way to initialize the adapter is with the `drizzleAdapter` factory function, which provides type inference and a simplified setup.
 
 ```typescript
-// apps/demo/lib/adapter.ts
+// apps/marketing/src/lib/adapter.ts
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 import { db, schema, relations } from './db';
 
@@ -3416,7 +3416,7 @@ export const getAdapter = () => {
   return adapter;
 };
 ```
-*Sources: [apps/demo/lib/adapter.ts]() (Note: file not provided, but this is a common pattern from similar projects)*
+*Sources: [apps/marketing/src/lib/adapter.ts]() (Note: file not provided, but this is a common pattern from similar projects)*
 
 Alternatively, you can instantiate the `DrizzleAdapter` class directly, which is useful for more complex configurations or when extending the class.
 
@@ -3967,8 +3967,8 @@ The Automatic Relationship Handling system is a sophisticated yet elegant soluti
 
 The following files were used as context for generating this wiki page:
 
-- [apps/demo/app/page.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/app/page.tsx)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/src/components/sections/interactive-demo.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/components/sections/interactive-demo.tsx)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
 - [packages/adapters/drizzle/examples/basic-usage.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/basic-usage.ts)
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
@@ -3983,11 +3983,11 @@ Server-Side Data Fetching is a core architectural pattern in Better Tables, desi
 
 The system is built around a database-agnostic adapter model, with the Drizzle adapter being a key implementation. The adapter translates table state (filters, sorting) into efficient database queries. This state is persisted in the URL, allowing for shareable and bookmarkable table views. The entire process, from parsing URL parameters to fetching and rendering data, happens on the server, minimizing the amount of data and logic handled by the client.
 
-*Sources: [apps/demo/README.md](), [README.md](), [packages/core/README.md]()*
+*Sources: [apps/marketing/README.md](), [README.md](), [packages/core/README.md]()*
 
 ## Architecture Overview
 
-The server-side data fetching architecture in the Next.js demo application follows a clear, unidirectional data flow. The process begins with a user request to a server component, which then orchestrates data retrieval and rendering.
+The server-side data fetching architecture in the marketing site follows a clear, unidirectional data flow. The process begins with a user request to a server component, which then orchestrates data retrieval and rendering.
 
 This diagram illustrates the high-level architecture for server-side data fetching within a Next.js application.
 
@@ -4014,13 +4014,13 @@ graph TD
     end
 ```
 
-*Sources: [apps/demo/README.md](), [apps/demo/app/page.tsx:16-32]()*
+*Sources: [apps/marketing/README.md](), [apps/marketing/src/components/sections/interactive-demo.tsx:16-32]()*
 
 ## Core Components
 
 ### Next.js Server Component
 
-In the demo application, `app/page.tsx` serves as the primary server component responsible for orchestrating the data fetching process. It receives the `searchParams` from the URL, parses them, and uses the database adapter to fetch the initial dataset for the table.
+In the demo application, `interactive-demo.tsx` serves as the primary server component responsible for orchestrating the data fetching process. It receives the `searchParams` from the URL, parses them, and uses the database adapter to fetch the initial dataset for the table.
 
 Key responsibilities:
 - Reading table state (pagination, filters, sorting) from URL `searchParams`.
@@ -4029,7 +4029,7 @@ Key responsibilities:
 - Calling `adapter.fetchData` with the parsed state.
 - Passing the fetched data and initial state as props to a client component for rendering and interactivity.
 
-*Sources: [apps/demo/app/page.tsx](), [apps/demo/README.md:31-41]()*
+*Sources: [apps/marketing/src/components/sections/interactive-demo.tsx](), [apps/marketing/README.md:31-41]()*
 
 ### Database Adapter
 
@@ -4064,7 +4064,7 @@ The `package.json` for `@better-tables/ui` shows a dedicated `server` export for
 },
 ```
 
-*Sources: [packages/ui/package.json:10-15](), [apps/demo/app/page.tsx:16-22](), [packages/core/README.md:280-294]()*
+*Sources: [packages/ui/package.json:10-15](), [apps/marketing/src/components/sections/interactive-demo.tsx:16-22](), [packages/core/README.md:280-294]()*
 
 ## Data Fetching Flow
 
@@ -4095,7 +4095,7 @@ sequenceDiagram
     ClientComponent-->>User: Sends rendered HTML
 ```
 
-*Sources: [apps/demo/app/page.tsx:16-32](), [packages/adapters/drizzle/examples/basic-usage.ts:251-252]()*
+*Sources: [apps/marketing/src/components/sections/interactive-demo.tsx:16-32](), [packages/adapters/drizzle/examples/basic-usage.ts:251-252]()*
 
 ## The `fetchData` Method
 
@@ -4112,10 +4112,10 @@ The `adapter.fetchData()` method is the primary interface for retrieving data fr
 
 ### Example Usage
 
-Here is how `fetchData` is called within the demo application's server component.
+Here is how `fetchData` is called within the marketing site's interactive-demo server component.
 
 ```typescript
-// apps/demo/app/page.tsx:25-31
+// apps/marketing/src/components/sections/interactive-demo.tsx:25-31
 const result = await adapter.fetchData({
   columns: defaultVisibleColumns,
   pagination: { page, limit },
@@ -4147,13 +4147,13 @@ const complexResult = await adapter.fetchData({
 });
 ```
 
-*Sources: [apps/demo/app/page.tsx:25-31](), [packages/adapters/drizzle/examples/basic-usage.ts:297-312]()*
+*Sources: [apps/marketing/src/components/sections/interactive-demo.tsx:25-31](), [packages/adapters/drizzle/examples/basic-usage.ts:297-312]()*
 
 ## Summary
 
 The server-side data fetching model in Better Tables is a powerful pattern for building scalable and performant data grids. By using Next.js Server Components, a flexible adapter system, and URL-based state management, it offloads heavy data processing to the server. This results in a lightweight client, fast initial page loads, and a robust user experience, even with datasets containing hundreds of thousands of rows. The architecture is designed to be both efficient and developer-friendly, abstracting away the complexities of database querying and state synchronization.
 
-*Sources: [apps/demo/README.md](), [README.md]()*
+*Sources: [apps/marketing/README.md](), [README.md]()*
 
 ### Creating a Custom Data Adapter
 
@@ -4434,8 +4434,8 @@ The following files were used as context for generating this wiki page:
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
 - [packages/ui/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/ui/README.md)
 - [packages/ui/package.json](https://github.com/Better-Tables/better-tables/blob/main/packages/ui/package.json)
-- [apps/demo/app/page.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/app/page.tsx)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/src/components/sections/interactive-demo.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/components/sections/interactive-demo.tsx)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [examples/nextjs-setup-example.md](https://github.com/Better-Tables/better-tables/blob/main/examples/nextjs-setup-example.md)
 - [packages/core/src/index.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/src/index.ts)
 - [packages/core/tests/types/table.test.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/core/tests/types/table.test.ts)
@@ -4523,7 +4523,7 @@ The data fetching flow is as follows:
 5.  The adapter constructs the appropriate database query, fetches the data, and returns it along with total counts and pagination info.
 6.  The server component then renders a client-side wrapper (e.g., `UsersTableClient`), passing the fetched data and initial state as props.
 
-Sources: [apps/demo/app/page.tsx](), [apps/demo/README.md]()
+Sources: [apps/marketing/src/components/sections/interactive-demo.tsx](), [apps/marketing/README.md]()
 
 This sequence diagram visualizes the SSR data fetching process.
 
@@ -4544,7 +4544,7 @@ sequenceDiagram
     BT_Adapter-->>Next_js_Server: { data, total, pagination }
     Next_js_Server-->>User: HTML with initial data
 ```
-Sources: [apps/demo/app/page.tsx]()
+Sources: [apps/marketing/src/components/sections/interactive-demo.tsx]()
 
 ### Client-Side Interactivity
 
@@ -4555,7 +4555,7 @@ The client component receives the initial data and state. It is responsible for:
 
 The demo application uses a `UsersTableClient` component to encapsulate this logic.
 
-Sources: [apps/demo/README.md](), [apps/demo/app/page.tsx]()
+Sources: [apps/marketing/README.md](), [apps/marketing/src/components/sections/interactive-demo.tsx]()
 
 ### Basic Usage Example
 
@@ -4590,7 +4590,7 @@ export default async function UsersPage({ searchParams }) {
   );
 }
 ```
-Sources: [apps/demo/app/page.tsx:1-40](), [README.md]()
+Sources: [apps/marketing/src/components/sections/interactive-demo.tsx:1-40](), [README.md]()
 
 ## Key Features & Components
 
@@ -5779,11 +5779,11 @@ Sources: [packages/cli/README.md:28-37]()
 The following files were used as context for generating this wiki page:
 
 - [examples/nextjs-setup-example.md](https://github.com/Better-Tables/better-tables/blob/main/examples/nextjs-setup-example.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
 - [packages/ui/package.json](https://github.com/Better-Tables/better-tables/blob/main/packages/ui/package.json)
-- [apps/demo/package.json](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/package.json)
+- [apps/marketing/package.json](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/package.json)
 </details>
 
 # Next.js Integration Guide
@@ -5792,7 +5792,7 @@ This guide provides a comprehensive overview of how to integrate the Better Tabl
 
 The core principle is to use Next.js's App Router architecture. A Server Component handles the initial server-side data fetching based on URL search parameters, while a Client Component manages user interactions like filtering and sorting by updating these URL parameters. This approach combines the performance benefits of SSR with a dynamic client-side experience.
 
-Sources: [apps/demo/README.md](), [packages/core/README.md:301-336]()
+Sources: [apps/marketing/README.md](), [packages/core/README.md:301-336]()
 
 ## 1. Initial Setup and Configuration
 
@@ -5809,7 +5809,7 @@ The following packages are required for a typical Next.js setup using the provid
 | `@better-tables/core`         | The foundational package with builders, state managers, and types.       | [packages/core/README.md:3-8]()                                                                                                                                                                                                                                                              |
 | `@better-tables/ui`           | React components built with shadcn/ui for a ready-to-use table interface. | [packages/ui/package.json:4]()                                                                                                                                                                                                                                                               |
 | `@better-tables/drizzle`      | An adapter for integrating with a Drizzle ORM backend.                   | [examples/nextjs-setup-example.md:9]()                                                                                                                                                                                                                                                         |
-| `next`                        | The Next.js framework.                                                   | [apps/demo/package.json:15]()                                                                                                                                                                                                                                                                |
+| `next`                        | The Next.js framework.                                                   | [apps/marketing/package.json:15]()                                                                                                                                                                                                                                                                |
 | `react`, `react-dom`          | Peer dependencies for the library.                                       | [packages/ui/package.json:32-33]()                                                                                                                                                                                                                                                           |
 | `tailwindcss`, `tailwindcss-animate` | Required for styling the `@better-tables/ui` components.                 | [packages/ui/package.json:52](), [examples/nextjs-setup-example.md:6-7]()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    -
 
@@ -5871,20 +5871,20 @@ graph TD
         I -- Triggers navigation --> A;
     end
 ```
-Sources: [apps/demo/README.md:29-32](), [packages/core/README.md:301-303]()
+Sources: [apps/marketing/README.md:29-32](), [packages/core/README.md:301-303]()
 
 ### Key Components
 
 | File Path                         | Type              | Responsibility                                                                                             | Source                                                                                             |
 | --------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `app/page.tsx`                    | Server Component  | Fetches initial data using the adapter based on URL params. Renders the client wrapper.                    | [apps/demo/README.md:66-70]()                                                                      |
-| `components/users-table-client.tsx` | Client Component  | Manages interactive state (filters, sorting, pagination) by updating the URL. Handles row selection state. | [apps/demo/README.md:72-76]()                                                                      |
-| `lib/adapter.ts`                  | Server-side module | Configures and provides the Drizzle adapter instance for data fetching.                                    | [apps/demo/README.md:58]()                                                                         |
-| `lib/columns/user-columns.tsx`    | Module            | Contains all column definitions for the table.                                                             | [apps/demo/README.md:60-64]()                                                                      |
+| `src/components/sections/interactive-demo.tsx` | Server Component  | Fetches initial data and renders the client table wrapper on the marketing homepage.                    | [apps/marketing/README.md]() |
+| `src/components/sections/users-table-client.tsx` | Client Component  | Manages interactive state (filters, sorting, pagination) by updating the URL. Handles row selection state. | [apps/marketing/README.md]() |
+| `src/lib/adapter.ts`                  | Server-side module | Configures and provides the Drizzle adapter instance for data fetching.                                    | [apps/marketing/README.md]() |
+| `src/lib/columns/user-columns.tsx`    | Module            | Contains all column definitions for the table.                                                             | [apps/marketing/README.md]() |
 
 ## 3. Server-Side Data Fetching
 
-The main page component (`app/page.tsx`) should be an `async` Server Component. It is responsible for parsing state from the URL, calling the data adapter, and passing the initial data to a client component.
+The `interactive-demo.tsx` server component should be an `async` Server Component. It is responsible for parsing state from the URL, calling the data adapter, and passing the initial data to a client component.
 
 ### 3.1. Parsing URL State
 
@@ -5894,7 +5894,7 @@ State such as filters, sorting, and pagination is read from the `searchParams` o
 -   **`decompressAndDecode<SortingState>(params.sorting)`**: A more generic utility to decompress and decode sorting state or other data.
 
 ```typescript
-// app/page.tsx
+// interactive-demo.tsx
 import type { FilterState, SortingState } from '@better-tables/core';
 import { deserializeFiltersFromURL, decompressAndDecode } from '@better-tables/core';
 import { getAdapter } from '@/lib/adapter';
@@ -5952,7 +5952,7 @@ sequenceDiagram
     ServerComponent-->>NextRouter: Returns updated page HTML
     NextRouter-->>User: Renders updated table
 ```
-Sources: [README.md:204-206](), [apps/demo/README.md:33-34]()
+Sources: [README.md:204-206](), [apps/marketing/README.md:33-34]()
 
 ## 4. Client-Side Integration
 
@@ -6012,7 +6012,7 @@ Sources: [examples/nextjs-setup-example.md:83-112]()
 
 The client component uses the state managers (`filterManager`, `paginationManager`, etc.) to update the state. When state changes, the component should construct a new URL and use the Next.js router (`useRouter`) to navigate, triggering a re-render with the new data.
 
-Sources: [apps/demo/README.md:73-75]()
+Sources: [apps/marketing/README.md:73-75]()
 
 ## 5. Summary
 
@@ -6020,39 +6020,39 @@ Integrating Better Tables with Next.js provides a powerful, server-rendered tabl
 
 Sources: [README.md:204-206](), [examples/nextjs-setup-example.md:1-3]()
 
-### Running the Demo App
+### Running the Live Demo
 
 <details>
 <summary>Relevant source files</summary>
 The following files were used as context for generating this wiki page:
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
-- [apps/demo/package.json](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/package.json)
-- [apps/demo/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/lib/db/seed.ts)
-- [apps/demo/app/page.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/app/page.tsx)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
+- [apps/marketing/package.json](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/package.json)
+- [apps/marketing/src/lib/db/seed.ts](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/lib/db/seed.ts)
+- [apps/marketing/src/components/sections/interactive-demo.tsx](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/src/components/sections/interactive-demo.tsx)
 - [packages/adapters/drizzle/examples/basic-usage.ts](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/examples/basic-usage.ts)
 - [README.md](https://github.com/Better-Tables/better-tables/blob/main/README.md)
 </details>
 
-# Running the Demo App
+# Running the Live Demo
 
-The Better Tables Demo App serves as a comprehensive demonstration of the library's capabilities, particularly its integration with the Drizzle adapter. It showcases a wide range of features, including advanced filtering, multi-column sorting, pagination, various column types, and the handling of complex data relationships. The demo is built as a modern Next.js application, providing a real-world example of how to implement `better-tables` in a server-rendered environment.
+The Better Tables marketing site serves as a comprehensive demonstration of the library's capabilities, particularly its integration with the Drizzle adapter. It showcases a wide range of features, including advanced filtering, multi-column sorting, pagination, various column types, and the handling of complex data relationships. The demo is built as a modern Next.js application, providing a real-world example of how to implement `better-tables` in a server-rendered environment.
 
 This document provides a technical overview of the demo app's setup, architecture, and key components, based on the source code. It is intended for developers looking to understand how to use Better Tables or contribute to the project.
 
-Sources: [apps/demo/README.md:1-4](), [README.md:10-13]()
+Sources: [apps/marketing/README.md:1-4](), [README.md:10-13]()
 
 ## Getting Started
 
 To run the demo application locally, ensure you have the required prerequisites and follow the installation steps.
 
-Sources: [apps/demo/README.md:27-29]()
+Sources: [apps/marketing/README.md:27-29]()
 
 ### Prerequisites
 
 -   Node.js 18+
 -   Bun 1.3+
 
-Sources: [apps/demo/README.md:30-32]()
+Sources: [apps/marketing/README.md:30-32]()
 
 ### Installation and Execution
 
@@ -6060,9 +6060,9 @@ Sources: [apps/demo/README.md:30-32]()
     ```bash
     bun install
     ```
-2.  **Navigate to the demo app** directory:
+2.  **Navigate to the marketing site** directory:
     ```bash
-    cd apps/demo
+    cd apps/marketing
     ```
 3.  **Run the development server**:
     ```bash
@@ -6070,7 +6070,7 @@ Sources: [apps/demo/README.md:30-32]()
     ```
 The application will be available at `http://localhost:3000`.
 
-Sources: [apps/demo/README.md:36-44]()
+Sources: [apps/marketing/README.md:36-44]()
 
 ### Key Dependencies
 
@@ -6086,7 +6086,7 @@ The demo app relies on several key packages from the Better Tables ecosystem and
 | `drizzle-orm`                 | `^0.44.7`   | The TypeScript ORM used for database access.                             |
 | `better-sqlite3`              | `^12.4.6`   | The driver for the in-memory SQLite database.                            |
 
-Sources: [apps/demo/package.json:14-22]()
+Sources: [apps/marketing/package.json:14-22]()
 
 ## Architecture
 
@@ -6097,7 +6097,7 @@ The demo is built using the **Next.js 15 App Router**, leveraging a modern archi
 -   **URL State Management**: The application's state (filters, sorting, pagination) is stored in the URL's search parameters. This makes table views shareable and bookmarkable.
 -   **Database**: An in-memory SQLite database is used, which is created on the first request and persists for the lifetime of the server process. Data is reset on server restart.
 
-Sources: [apps/demo/README.md:51-57](), [apps/demo/README.md:120-121]()
+Sources: [apps/marketing/README.md:51-57](), [apps/marketing/README.md:120-121]()
 
 ### Data Flow
 
@@ -6126,7 +6126,7 @@ sequenceDiagram
 ```
 This diagram shows how client-side actions trigger server-side data fetching by manipulating URL state, a core pattern in the demo app.
 
-Sources: [apps/demo/README.md:53-56](), [apps/demo/app/page.tsx:16-32]()
+Sources: [apps/marketing/README.md:53-56](), [apps/marketing/src/components/sections/interactive-demo.tsx:16-32]()
 
 ## Project Structure
 
@@ -6141,13 +6141,13 @@ The demo application is organized to separate concerns like data, UI components,
 | `lib/db/seed.ts`               | Contains the logic to seed the database with sample data.                   |
 | `lib/adapter.ts`               | Configures and initializes the Drizzle adapter.                             |
 
-Sources: [apps/demo/README.md:76-88]()
+Sources: [apps/marketing/README.md:76-88]()
 
 ## Database and Seeding
 
 The demo uses an in-memory SQLite database that is populated with a rich set of sample data upon initialization.
 
-Sources: [apps/demo/README.md:57](), [apps/demo/lib/db/seed.ts]()
+Sources: [apps/marketing/README.md:57](), [apps/marketing/src/lib/db/seed.ts]()
 
 ### Database Schema
 
@@ -6206,7 +6206,7 @@ erDiagram
 ```
 This ER diagram shows the relationships between users, their profiles, posts, comments, and categories.
 
-Sources: [apps/demo/README.md:59-65](), [packages/adapters/drizzle/examples/basic-usage.ts:8-90]()
+Sources: [apps/marketing/README.md:59-65](), [packages/adapters/drizzle/examples/basic-usage.ts:8-90]()
 
 ### Seed Data
 
@@ -6219,7 +6219,7 @@ The `lib/db/seed.ts` file populates the database with a varied dataset to ensure
 -   **categories**: 8 categories.
 -   **post_categories**: Many-to-many relationships between posts and categories.
 
-Sources: [apps/demo/README.md:60-65](), [apps/demo/lib/db/seed.ts:7-105]()
+Sources: [apps/marketing/README.md:60-65](), [apps/marketing/src/lib/db/seed.ts:7-105]()
 
 ## Features Demonstrated
 
@@ -6235,7 +6235,7 @@ The demo is designed to be a comprehensive showcase of Better Tables' features.
 | **Boolean columns** | `has_profile`, `is_active`                                               |
 | **Option columns** | `role`, `status` with custom rendered badges.                            |
 
-Sources: [apps/demo/README.md:8-14]()
+Sources: [apps/marketing/README.md:8-14]()
 
 ### Relationships and Aggregations
 
@@ -6247,7 +6247,7 @@ Sources: [apps/demo/README.md:8-14]()
 | **Cross-table filtering**| Ability to filter users based on fields from their profile or post data.         |
 | **Aggregations**         | Columns that compute `sum`, `count`, and `average` values from related tables.   |
 
-Sources: [apps/demo/README.md:16-21]()
+Sources: [apps/marketing/README.md:16-21]()
 
 ### Table Operations
 
@@ -6259,7 +6259,7 @@ Sources: [apps/demo/README.md:16-21]()
 | **Row selection**     | Functionality to select individual or all rows.                          |
 | **Bulk actions**      | Demonstrates how to implement bulk export and delete on selected rows.   |
 
-Sources: [apps/demo/README.md:23-28]()
+Sources: [apps/marketing/README.md:23-28]()
 
 ## Server-Side Rendering (SSR) and State
 
@@ -6273,7 +6273,7 @@ The main page component, `DemoPage`, is an `async` server component. It is respo
 5.  Passing the fetched data and initial state down to the `UsersTableClient` component as props.
 
 ```typescript
-// apps/demo/app/page.tsx:16-32
+// apps/marketing/src/components/sections/interactive-demo.tsx:16-32
 export default async function DemoPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
@@ -6299,7 +6299,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
 ```
 This pattern ensures that the initial page load is fully rendered on the server with the correct data, while subsequent interactions are handled on the client by updating the URL, which in turn triggers a new server render.
 
-Sources: [apps/demo/app/page.tsx:16-32](), [apps/demo/README.md:90-95](), [apps/demo/README.md:100-105]()
+Sources: [apps/marketing/src/components/sections/interactive-demo.tsx:16-32](), [apps/marketing/README.md:90-95](), [apps/marketing/README.md:100-105]()
 
 ### Testing Strategy
 
@@ -6509,7 +6509,7 @@ The following files were used as context for generating this wiki page:
 - [SECURITY.md](https://github.com/Better-Tables/better-tables/blob/main/SECURITY.md)
 - [package.json](https://github.com/Better-Tables/better-tables/blob/main/package.json)
 - [packages/core/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/core/README.md)
-- [apps/demo/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/demo/README.md)
+- [apps/marketing/README.md](https://github.com/Better-Tables/better-tables/blob/main/apps/marketing/README.md)
 - [examples/integrated-demo-issues.md](https://github.com/Better-Tables/better-tables/blob/main/examples/integrated-demo-issues.md)
 - [packages/cli/README.md](https://github.com/Better-Tables/better-tables/blob/main/packages/cli/README.md)
 - [turbo.json](https://github.com/Better-Tables/better-tables/blob/main/turbo.json)
@@ -6580,7 +6580,7 @@ Sources: [README.md:260-266](), [packages/core/README.md:410-416]()
 *   Node.js version 18.0.0 or higher.
 *   Bun version 1.3.1 or higher as the package manager.
 
-Sources: [package.json:35-37](), [apps/demo/README.md:21-22]()
+Sources: [package.json:35-37](), [apps/marketing/README.md:21-22]()
 
 ### Installation
 
@@ -6592,7 +6592,7 @@ bun install
 ```
 This command will install all necessary packages defined in the workspaces.
 
-Sources: [apps/demo/README.md:26-28](), [package.json:6-14]()
+Sources: [apps/marketing/README.md:26-28](), [package.json:6-14]()
 
 ## Project Structure
 

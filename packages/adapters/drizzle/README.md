@@ -1003,11 +1003,11 @@ const result = await adapter.fetchData({
 
 ## Examples
 
-See the [demo app](../../apps/demo) for a complete working example:
+See the [live demo in the marketing site](../../apps/marketing) for a complete working example:
 
-- **Adapter Setup**: [apps/demo/lib/adapter.ts](../../apps/demo/lib/adapter.ts)
-- **Column Definitions**: [apps/demo/lib/columns/user-columns.tsx](../../apps/demo/lib/columns/user-columns.tsx)
-- **Server Component**: [apps/demo/app/page.tsx](../../apps/demo/app/page.tsx)
+- **Adapter Setup**: [apps/marketing/src/lib/adapter.ts](../../apps/marketing/src/lib/adapter.ts)
+- **Column Definitions**: [apps/marketing/src/lib/columns/user-columns.tsx](../../apps/marketing/src/lib/columns/user-columns.tsx)
+- **Interactive Demo**: [apps/marketing/src/components/sections/interactive-demo.tsx](../../apps/marketing/src/components/sections/interactive-demo.tsx)
 
 ## Documentation
 
@@ -1113,7 +1113,7 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 - **[@better-tables/core](../core)** - Core functionality and column builders
 - **[@better-tables/ui](../ui)** - React components built on top of core
-- **[Demo App](../../apps/demo)** - Complete working example
+- **[Live Demo](../../apps/marketing)** - Marketing site with interactive table demo
 
 ## Support
 

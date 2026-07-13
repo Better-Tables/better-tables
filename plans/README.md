@@ -80,12 +80,8 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
   `continue-on-error` until biome residue hits 0 (81 errors as of the 001 merge;
   ~10 are plan 011's `experimental/`+fixture files — add pragmas or fix when the
   prototype is promoted).
-- **Typecheck exclusions (recorded debt)**: `apps/web` (needs its
-  `fumadocs-mdx && next typegen` pre-step wired into turbo) and `apps/marketing`
-  (pins `@types/react@18` — clashes with the React 19+ decision; migrate it or
-  fold into a marketing-app plan). Also two pre-existing app build failures
-  (web: stale `@ts-expect-error`; marketing: DrawerTrigger JSX type) reproduced
-  on unmodified bases — untouched by all plans.
+- **Typecheck exclusions (recorded debt)**: none — `apps/docs` and `apps/marketing`
+  both have `typecheck` scripts and participate in root turbo typecheck.
 - **Changesets accumulate for one 0.6 train** — do not partially publish.
 - Root `lint` script mutates (`biome check --write --unsafe .`); check-only is
   `bunx biome check .`. Fresh worktrees: `bun install` first; build core (and now

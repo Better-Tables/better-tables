@@ -328,13 +328,13 @@ Each package is independently versioned and can be used standalone or together.
 - **[@better-tables/adapters-drizzle](packages/adapters/drizzle/README.md)** - Drizzle ORM adapter
   - [Advanced Usage Guide](packages/adapters/drizzle/docs/ADVANCED_USAGE.md)
 - **[URL State Sync](packages/ui/docs/URL_SYNC.md)** - Framework-agnostic URL synchronization
-- **[Demo App](apps/demo/README.md)** - Complete working example
+- **[Live Demo](apps/marketing)** - Marketing site with full interactive table demo (`#interactive-demo`)
 
 ---
 
 ## 🎨 Examples
 
-> **💡 Tip**: Check out the [complete demo app](apps/demo) for a full working example with all features!
+> **💡 Tip**: Scroll to the live demo on the [marketing site](apps/marketing) or run `cd apps/marketing && bun run dev` locally.
 
 ### Cross-Table Filtering (The Magic Feature)
 
