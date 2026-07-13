@@ -33,9 +33,24 @@ import { ColumnBuilder } from './column-builder';
 export class BooleanColumnBuilder<
   TData = unknown,
   TValue extends boolean = boolean,
-> extends ColumnBuilder<TData, TValue> {
+  TId extends string = string,
+> extends ColumnBuilder<TData, TValue, TId> {
   constructor() {
     super('boolean');
+  }
+
+  /**
+   * Set the column identifier.
+   *
+   * Rebinds the builder's id type to the literal passed in, so subsequent
+   * chained methods (and `build()`) see the narrowed id type.
+   *
+   * @param id - Unique column identifier
+   * @returns A `BooleanColumnBuilder` rebound to the id literal
+   */
+  override id<const K extends string>(id: K): BooleanColumnBuilder<TData, TValue, K> {
+    this.config.id = id as unknown as TId;
+    return this as unknown as BooleanColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -49,9 +64,9 @@ export class BooleanColumnBuilder<
    */
   override accessor<V extends boolean>(
     accessor: (data: TData) => V
-  ): BooleanColumnBuilder<TData, V> {
+  ): BooleanColumnBuilder<TData, V, TId> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as BooleanColumnBuilder<TData, V>;
+    return this as unknown as BooleanColumnBuilder<TData, V, TId>;
   }
 
   /**
