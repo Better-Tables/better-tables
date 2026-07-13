@@ -1,12 +1,28 @@
 import { describe, expect, it, mock } from 'bun:test';
 import { ActionBuilder } from '../../src/builders/action-builder';
-import type { ActionEnabled, ActionHandler, ActionVisibility } from '../../src/types/action';
+import type {
+  ActionEnabled,
+  ActionHandler,
+  ActionVisibility,
+  TableAction,
+} from '../../src/types/action';
 
 interface TestUser {
   id: string;
   name: string;
   email: string;
   isActive: boolean;
+}
+
+/**
+ * Test subclass that exposes the protected `config` for assertions.
+ * Subclassing keeps the production member `protected` while letting
+ * tests observe the internal state the fluent setters mutate.
+ */
+class TestActionBuilder<TData = unknown> extends ActionBuilder<TData> {
+  exposeConfig(): Partial<TableAction<TData>> {
+    return this.config;
+  }
 }
 
 describe('ActionBuilder', () => {
@@ -24,10 +40,10 @@ describe('ActionBuilder', () => {
 
   describe('id method', () => {
     it('should set the action id', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       builder.id('test-action');
 
-      expect(builder.config.id).toBe('test-action');
+      expect(builder.exposeConfig().id).toBe('test-action');
     });
 
     it('should return builder instance for chaining', () => {
@@ -40,10 +56,10 @@ describe('ActionBuilder', () => {
 
   describe('label method', () => {
     it('should set the action label', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       builder.label('Test Action');
 
-      expect(builder.config.label).toBe('Test Action');
+      expect(builder.exposeConfig().label).toBe('Test Action');
     });
 
     it('should return builder instance for chaining', () => {
@@ -57,10 +73,10 @@ describe('ActionBuilder', () => {
   describe('icon method', () => {
     it('should set the action icon', () => {
       const MockIcon = () => null;
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       builder.icon(MockIcon);
 
-      expect(builder.config.icon).toBe(MockIcon);
+      expect(builder.exposeConfig().icon).toBe(MockIcon);
     });
 
     it('should return builder instance for chaining', () => {
@@ -73,23 +89,23 @@ describe('ActionBuilder', () => {
 
   describe('variant method', () => {
     it('should set the action variant', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       builder.variant('destructive');
 
-      expect(builder.config.variant).toBe('destructive');
+      expect(builder.exposeConfig().variant).toBe('destructive');
     });
 
     it('should support different variants', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
 
       builder.variant('default');
-      expect(builder.config.variant).toBe('default');
+      expect(builder.exposeConfig().variant).toBe('default');
 
       builder.variant('secondary');
-      expect(builder.config.variant).toBe('secondary');
+      expect(builder.exposeConfig().variant).toBe('secondary');
 
       builder.variant('destructive');
-      expect(builder.config.variant).toBe('destructive');
+      expect(builder.exposeConfig().variant).toBe('destructive');
     });
 
     it('should return builder instance for chaining', () => {
@@ -105,14 +121,14 @@ describe('ActionBuilder', () => {
       const handler: ActionHandler<TestUser> = async () => {
         // Handler returns void
       };
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       builder.handler(handler);
 
-      expect(builder.config.handler).toBe(handler);
+      expect(builder.exposeConfig().handler).toBe(handler);
 
       // Test handler is callable
       await handler(['1', '2']);
-      expect(builder.config.handler).toBe(handler);
+      expect(builder.exposeConfig().handler).toBe(handler);
     });
 
     it('should allow handler to receive selectedIds and selectedData', async () => {
@@ -138,7 +154,7 @@ describe('ActionBuilder', () => {
 
   describe('confirmationDialog method', () => {
     it('should set the confirmation dialog configuration', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       const config = {
         title: 'Confirm Delete',
         description: 'Are you sure?',
@@ -149,7 +165,7 @@ describe('ActionBuilder', () => {
 
       builder.confirmationDialog(config);
 
-      expect(builder.config.confirmationDialog).toEqual(config);
+      expect(builder.exposeConfig().confirmationDialog).toEqual(config);
     });
 
     it('should return builder instance for chaining', () => {
@@ -168,12 +184,12 @@ describe('ActionBuilder', () => {
 
   describe('isVisible method', () => {
     it('should set visibility check function', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       const visibilityCheck: ActionVisibility = (_ids) => _ids.length > 0;
 
       builder.isVisible(visibilityCheck);
 
-      expect(builder.config.isVisible).toBe(visibilityCheck);
+      expect(builder.exposeConfig().isVisible).toBe(visibilityCheck);
     });
 
     it('should support visibility check with selected data', () => {
@@ -201,12 +217,12 @@ describe('ActionBuilder', () => {
 
   describe('isEnabled method', () => {
     it('should set enabled check function', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       const enabledCheck: ActionEnabled = (ids) => ids.length > 0;
 
       builder.isEnabled(enabledCheck);
 
-      expect(builder.config.isEnabled).toBe(enabledCheck);
+      expect(builder.exposeConfig().isEnabled).toBe(enabledCheck);
     });
 
     it('should support enabled check with selected data', () => {
@@ -234,12 +250,12 @@ describe('ActionBuilder', () => {
 
   describe('meta method', () => {
     it('should set action metadata', () => {
-      const builder = new ActionBuilder<TestUser>();
+      const builder = new TestActionBuilder<TestUser>();
       const meta = { requiresPermission: 'delete', logLevel: 'info' };
 
       builder.meta(meta);
 
-      expect(builder.config.meta).toEqual(meta);
+      expect(builder.exposeConfig().meta).toEqual(meta);
     });
 
     it('should return builder instance for chaining', () => {
