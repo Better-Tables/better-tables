@@ -3,7 +3,7 @@
 import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
 import { getColumnStyle } from '@better-tables/core';
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
 import { cn } from '../../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -148,6 +148,43 @@ function VirtualizedRow<T>({
     </TableRow>
   );
 }
+
+/**
+ * `styles.getRowStyle()` (`useVirtualization`) allocates a new object on
+ * every call, so `style` is never referentially equal across renders even
+ * when the row's actual position/height didn't change. Compare it by value
+ * instead of falling back to `React.memo`'s default shallow-by-reference
+ * check, which would otherwise re-render every row on every parent render
+ * regardless of the other props' stability.
+ */
+function areVirtualizedRowPropsEqual<T>(
+  prev: Readonly<VirtualizedRowProps<T>>,
+  next: Readonly<VirtualizedRowProps<T>>
+): boolean {
+  return (
+    prev.item === next.item &&
+    prev.index === next.index &&
+    prev.columns === next.columns &&
+    prev.renderCell === next.renderCell &&
+    prev.onRowClick === next.onRowClick &&
+    prev.onMeasure === next.onMeasure &&
+    prev.style.top === next.style.top &&
+    prev.style.left === next.style.left &&
+    prev.style.right === next.style.right &&
+    prev.style.height === next.style.height
+  );
+}
+
+/**
+ * Memoized so an unrelated parent re-render (e.g. from a scroll-adjacent
+ * state update) doesn't re-render every visible row — this only helps if
+ * `item`/`columns`/`renderCell`/`onRowClick`/`onMeasure` stay referentially
+ * stable across renders where nothing the row actually displays changed.
+ */
+const MemoizedVirtualizedRow = memo(
+  VirtualizedRow,
+  areVirtualizedRowPropsEqual
+) as typeof VirtualizedRow;
 
 /**
  * High-performance virtualized table component for large datasets
@@ -326,7 +363,7 @@ export function VirtualizedTable<T = unknown>({
                 }
 
                 return (
-                  <VirtualizedRow
+                  <MemoizedVirtualizedRow
                     key={virtualRow.index}
                     item={item}
                     index={virtualRow.index}

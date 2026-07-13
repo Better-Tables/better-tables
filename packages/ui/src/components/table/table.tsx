@@ -17,7 +17,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import {
   useTableColumnOrder,
   useTableColumnVisibility,
@@ -142,6 +142,122 @@ export interface BetterTableProps<TData = unknown>
    */
   isFilterProtected?: (filter: FilterState) => boolean;
 }
+
+interface TableRowComponentProps<TData> {
+  row: TData;
+  rowId: string;
+  index: number;
+  isSelected: boolean;
+  visibleColumns: ColumnDefinition<TData, unknown>[];
+  shouldShowRowSelection: boolean;
+  clickable: boolean;
+  onActivate: (row: TData) => void;
+  onToggleSelection: (rowId: string, selected: boolean) => void;
+}
+
+function TableRowComponent<TData>({
+  row,
+  rowId,
+  index,
+  isSelected,
+  visibleColumns,
+  shouldShowRowSelection,
+  clickable,
+  onActivate,
+  onToggleSelection,
+}: TableRowComponentProps<TData>) {
+  return (
+    <TableRow
+      className={cn(isSelected && 'bg-muted/50', clickable && 'cursor-pointer')}
+      onClick={() => onActivate(row)}
+      onKeyDown={(e) => {
+        if (clickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onActivate(row);
+        }
+      }}
+      tabIndex={clickable ? 0 : undefined}
+      role={clickable ? 'button' : undefined}
+      aria-label={clickable ? `Row ${index + 1}: Click to view details` : undefined}
+    >
+      {shouldShowRowSelection && (
+        <TableCell
+          className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
+          style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={(checked) => onToggleSelection(rowId, checked === true)}
+          />
+        </TableCell>
+      )}
+      {visibleColumns.map((column) => {
+        const value = column.accessor(row);
+
+        return (
+          <TableCell
+            key={column.id}
+            className={cn(
+              column.align === 'center' && 'text-center',
+              column.align === 'right' && 'text-right'
+            )}
+          >
+            {column.cellRenderer
+              ? column.cellRenderer({
+                  value,
+                  row,
+                  column,
+                  rowIndex: index,
+                })
+              : (() => {
+                  const formatted = getFormatterForType(column.type, value, column.meta);
+                  const truncateConfig = column.meta?.truncate as
+                    | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                    | undefined;
+
+                  // Show tooltip for truncated text if showTooltip is enabled
+                  if (truncateConfig?.showTooltip && value != null) {
+                    const originalValue = String(value);
+                    const maxLen = truncateConfig.maxLength || 50;
+                    const isTruncated = originalValue.length > maxLen;
+
+                    if (isTruncated) {
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span className="cursor-help truncate max-w-full inline-block" />
+                            }
+                          >
+                            {formatted}
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <div className="wrap-break-word whitespace-pre-wrap text-pretty">
+                              {originalValue}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                  }
+
+                  return <span>{formatted}</span>;
+                })()}
+          </TableCell>
+        );
+      })}
+    </TableRow>
+  );
+}
+
+/**
+ * Memoized so a state change affecting one row (e.g. selection) doesn't
+ * re-render every other row. This only bails out when `row`/`visibleColumns`
+ * stay referentially stable across renders where nothing the row displays
+ * changed — see `BetterTable` for how `onActivate`/`onToggleSelection` are
+ * kept stable via `useCallback`.
+ */
+const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
 
 export function BetterTable<TData = unknown>({
   // Core table config (minus adapter)
@@ -445,6 +561,21 @@ export function BetterTable<TData = unknown>({
     },
     [data, getRowId, selectAll, clearSelection]
   );
+
+  // Row activation (click/Enter/Space) bridges to two parent-supplied
+  // callbacks, wrapped in a single stable callback — passed straight into
+  // `MemoizedTableRow`, whose memoization would otherwise be defeated by a
+  // fresh `onClick` closure every render. Stable as long as `onRowClick`/
+  // `rowConfig.onClick` themselves are (ref-latched in UI-08 for the case
+  // where they aren't).
+  const handleRowActivate = useCallback(
+    (row: TData) => {
+      onRowClick?.(row);
+      rowConfig?.onClick?.(row);
+    },
+    [onRowClick, rowConfig?.onClick]
+  );
+  const rowsClickable = Boolean(onRowClick || rowConfig?.onClick);
 
   // Clear filters handler
   const handleClearFilters = useCallback(() => {
@@ -801,101 +932,18 @@ export function BetterTable<TData = unknown>({
               const isSelected = selectedRows.has(rowId);
 
               return (
-                <TableRow
+                <MemoizedTableRow
                   key={rowId}
-                  className={cn(isSelected && 'bg-muted/50', onRowClick && 'cursor-pointer')}
-                  onClick={() => {
-                    onRowClick?.(row);
-                    rowConfig?.onClick?.(row);
-                  }}
-                  onKeyDown={(e) => {
-                    if (onRowClick || rowConfig?.onClick) {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onRowClick?.(row);
-                        rowConfig?.onClick?.(row);
-                      }
-                    }
-                  }}
-                  tabIndex={onRowClick || rowConfig?.onClick ? 0 : undefined}
-                  role={onRowClick || rowConfig?.onClick ? 'button' : undefined}
-                  aria-label={
-                    onRowClick || rowConfig?.onClick
-                      ? `Row ${index + 1}: Click to view details`
-                      : undefined
-                  }
-                >
-                  {shouldShowRowSelection && (
-                    <TableCell
-                      className="w-8 min-w-8 max-w-8 sticky left-0 z-30 bg-background rounded-l-md"
-                      style={{ boxShadow: 'inset -1px 0 0 0 hsl(var(--border))' }}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleRowSelection(rowId, checked === true)}
-                      />
-                    </TableCell>
-                  )}
-                  {visibleColumns.map((column) => {
-                    const value = column.accessor(row);
-
-                    return (
-                      <TableCell
-                        key={column.id}
-                        className={cn(
-                          column.align === 'center' && 'text-center',
-                          column.align === 'right' && 'text-right'
-                        )}
-                      >
-                        {column.cellRenderer
-                          ? column.cellRenderer({
-                              value,
-                              row,
-                              column,
-                              rowIndex: index,
-                            })
-                          : (() => {
-                              const formatted = getFormatterForType(
-                                column.type,
-                                value,
-                                column.meta
-                              );
-                              const truncateConfig = column.meta?.truncate as
-                                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
-                                | undefined;
-
-                              // Show tooltip for truncated text if showTooltip is enabled
-                              if (truncateConfig?.showTooltip && value != null) {
-                                const originalValue = String(value);
-                                const maxLen = truncateConfig.maxLength || 50;
-                                const isTruncated = originalValue.length > maxLen;
-
-                                if (isTruncated) {
-                                  return (
-                                    <Tooltip>
-                                      <TooltipTrigger
-                                        render={
-                                          <span className="cursor-help truncate max-w-full inline-block" />
-                                        }
-                                      >
-                                        {formatted}
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="max-w-xs">
-                                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
-                                          {originalValue}
-                                        </div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                }
-                              }
-
-                              return <span>{formatted}</span>;
-                            })()}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
+                  row={row}
+                  rowId={rowId}
+                  index={index}
+                  isSelected={isSelected}
+                  visibleColumns={visibleColumns}
+                  shouldShowRowSelection={shouldShowRowSelection}
+                  clickable={rowsClickable}
+                  onActivate={handleRowActivate}
+                  onToggleSelection={handleRowSelection}
+                />
               );
             })}
           </TableBody>

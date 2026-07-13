@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import type { ColumnDefinition } from '@better-tables/core';
 import { destroyTableStore, getTableStore } from '@better-tables/core';
 import { act, cleanup, render } from '@testing-library/react';
-import { BetterTable } from '../../src/components/table/table';
+import { BetterTable, type BetterTableProps } from '../../src/components/table/table';
 
 interface Row {
   id: string;
@@ -40,8 +40,8 @@ describe('BetterTable row render counts (UI-05)', () => {
     cleanup();
   });
 
-  it('BEFORE FIX baseline: selecting one row re-renders every row (no memoization yet)', () => {
-    const tableId = 'row-render-select-baseline';
+  it('AFTER FIX: selecting one row re-renders only that row, not its siblings', () => {
+    const tableId = 'row-render-select-fixed';
     const counts = new Map<string, number>();
     const columns = makeCountingColumns(counts);
     const rows = makeRows(10);
@@ -49,7 +49,7 @@ describe('BetterTable row render counts (UI-05)', () => {
     render(
       <BetterTable
         id={tableId}
-        name="Row render select baseline"
+        name="Row render select fixed"
         columns={columns}
         data={rows}
         features={{ rowSelection: true }}
@@ -64,51 +64,53 @@ describe('BetterTable row render counts (UI-05)', () => {
       store.getState().toggleRow('r3');
     });
 
-    // Pre-fix: selecting row 3 bumps EVERY row's render count by the same
-    // amount as r3's — not just r3's — because rows are unmemoized inline
-    // JSX recreated by the parent's render. (The exact increment can be >1
-    // if the store notifies subscribers more than once per toggle; what
-    // matters here is that it's identical and >1 across every row.)
-    const r3Count = counts.get('r3');
-    expect(r3Count).toBeGreaterThan(1);
+    // `MemoizedTableRow` bails out for every row whose own props
+    // (`isSelected`, plus the referentially-stable `row`/`visibleColumns`/
+    // callbacks) didn't change. Only r3's `isSelected` flips, so only r3
+    // re-renders — every other row's count stays at the pre-toggle value.
+    expect(counts.get('r3')).toBeGreaterThan(1);
     for (const row of rows) {
-      expect(counts.get(row.id)).toBe(r3Count);
+      if (row.id === 'r3') continue;
+      expect(counts.get(row.id)).toBe(1);
     }
 
     destroyTableStore(tableId);
   });
 
   it(
-    'BEFORE FIX baseline: a sort re-renders every row (also true after the fix, ' +
-      'documented so the "sort still re-renders everything" behavior does not regress ' +
-      'into "sort renders nothing")',
+    'AFTER FIX: reordering data (as a real consumer does in response to a sort) ' +
+      're-renders every row exactly once, not zero times and not repeatedly',
     () => {
-      const tableId = 'row-render-sort-baseline';
+      const tableId = 'row-render-sort-fixed';
       const counts = new Map<string, number>();
       const columns = makeCountingColumns(counts);
       const rows = makeRows(10);
 
-      render(
-        <BetterTable
-          id={tableId}
-          name="Row render sort baseline"
-          columns={columns}
-          data={rows}
-          features={{ rowSelection: true }}
-        />
-      );
+      function Harness({ data }: { data: BetterTableProps<(typeof rows)[number]>['data'] }) {
+        return (
+          <BetterTable
+            id={tableId}
+            name="Row render sort fixed"
+            columns={columns}
+            data={data}
+            features={{ rowSelection: true }}
+          />
+        );
+      }
 
-      const store = getTableStore(tableId);
-      if (!store) throw new Error('store missing');
+      const { rerender } = render(<Harness data={rows} />);
+      expect(Array.from(counts.values())).toEqual(rows.map(() => 1));
 
-      act(() => {
-        store.getState().toggleSort('name');
-      });
+      // `BetterTable` doesn't sort `data` itself — a real consumer reacts to
+      // `sortingState` (via `onSortingChange`) by re-fetching/reordering and
+      // passing a new `data` array, which is what actually changes each
+      // row's `index` prop. Simulate that directly: same row objects,
+      // reversed order.
+      const reordered = [...rows].reverse();
+      rerender(<Harness data={reordered} />);
 
-      const afterSortCount = counts.get('r0');
-      expect(afterSortCount).toBeGreaterThan(1);
       for (const row of rows) {
-        expect(counts.get(row.id)).toBe(afterSortCount);
+        expect(counts.get(row.id)).toBe(2);
       }
 
       destroyTableStore(tableId);
