@@ -1,6 +1,6 @@
 /**
  * @fileoverview Levenshtein distance algorithm for fuzzy string matching
- * @module @better-tables/drizzle-adapter/utils/levenshtein
+ * @module @better-tables/adapters-toolkit/utils/levenshtein
  *
  * @description
  * Provides utilities for calculating the edit distance between two strings using

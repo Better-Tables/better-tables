@@ -50,6 +50,7 @@
  * @since 1.0.0
  */
 
+import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import type {
   AdapterFeatures,
   AdapterMeta,
@@ -65,10 +66,7 @@ import type {
   TableAdapter,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
-
-import { DataTransformer } from './data-transformer';
 import { getOperationsFactory } from './operations';
-import { PrimaryTableResolver } from './primary-table-resolver';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
 import { RelationshipManager } from './relationship-manager';
@@ -88,6 +86,11 @@ import type {
   TableWithId,
 } from './types';
 import { QueryError, SchemaError } from './types';
+import {
+  getColumnNames,
+  getForeignKeyColumns,
+  getPrimaryKeyColumns,
+} from './utils/drizzle-schema-utils';
 import { filterTablesFromSchema } from './utils/schema-extractor';
 
 /**
@@ -140,9 +143,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   private relationships: RelationshipMap;
   private relationshipDetector: RelationshipDetector;
   private relationshipManager: RelationshipManager;
-  private primaryTableResolver: PrimaryTableResolver;
+  private primaryTableResolver: PrimaryTableResolver<AnyTableType>;
   private queryBuilder: BaseQueryBuilder;
-  private dataTransformer: DataTransformer;
+  private dataTransformer: DataTransformer<AnyTableType>;
   private cache: Map<
     string,
     {
@@ -259,7 +262,11 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     // Initialize query builder using factory pattern based on driver
     // Primary keys are auto-detected from schema
     this.queryBuilder = this.createQueryBuilderStrategy(config.driver);
-    this.dataTransformer = new DataTransformer(this.schema, this.relationshipManager);
+    this.dataTransformer = new DataTransformer(this.schema, this.relationshipManager, {
+      getColumnNames,
+      getForeignKeyColumns,
+      getPrimaryKeyColumns,
+    });
 
     // Initialize metadata
     this.meta = this.buildAdapterMeta(config.meta);

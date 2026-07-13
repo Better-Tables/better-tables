@@ -125,6 +125,7 @@
       "name": "@better-tables/adapters-drizzle",
       "version": "0.5.31",
       "dependencies": {
+        "@better-tables/adapters-toolkit": "workspace:*",
         "better-sqlite3": "^12.4.6",
         "drizzle-orm": "^0.45.1",
       },
@@ -143,6 +144,19 @@
         "@better-tables/core": "workspace:*",
         "mysql2": "^3.12.0",
         "postgres": "^3.4.0",
+      },
+    },
+    "packages/adapters/toolkit": {
+      "name": "@better-tables/adapters-toolkit",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@better-tables/core": "workspace:*",
+        "drizzle-orm": "^0.45.1",
+        "tsdown": "catalog:",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "@better-tables/core": "workspace:*",
       },
     },
     "packages/cli": {
@@ -260,6 +274,8 @@
     "@babel/types": ["@babel/types@7.28.5", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-qQ5m48eI/MFLQ5PxQj4PFaprjyCTLI37ElWMmNs0K8Lk3dVeOdNpB3ks8jc7yM5CDmVC73eMVk/trk3fgmrUpA=="],
 
     "@better-tables/adapters-drizzle": ["@better-tables/adapters-drizzle@workspace:packages/adapters/drizzle"],
+
+    "@better-tables/adapters-toolkit": ["@better-tables/adapters-toolkit@workspace:packages/adapters/toolkit"],
 
     "@better-tables/cli": ["@better-tables/cli@workspace:packages/cli"],
 

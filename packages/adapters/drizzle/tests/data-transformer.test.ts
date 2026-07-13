@@ -1,9 +1,19 @@
+import { DataTransformer, generateAlias } from '@better-tables/adapters-toolkit';
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { DataTransformer } from '../src/data-transformer';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
 import type { RelationshipMap } from '../src/types';
+import {
+  getColumnNames,
+  getForeignKeyColumns,
+  getPrimaryKeyColumns,
+} from '../src/utils/drizzle-schema-utils';
 import { relationsSchema, schema, type User } from './helpers/test-schema';
+
+// DataTransformer moved to @better-tables/adapters-toolkit in plan 007 and now
+// takes an injected schema-introspection port instead of importing Drizzle's
+// column utilities directly.
+const drizzleSchemaPort = { getColumnNames, getForeignKeyColumns, getPrimaryKeyColumns };
 
 describe('DataTransformer', () => {
   let transformer: DataTransformer;
@@ -14,7 +24,7 @@ describe('DataTransformer', () => {
     const detector = new RelationshipDetector();
     relationships = detector.detectFromSchema(relationsSchema, schema);
     relationshipManager = new RelationshipManager(schema, relationships);
-    transformer = new DataTransformer(schema, relationshipManager);
+    transformer = new DataTransformer(schema, relationshipManager, drizzleSchemaPort);
   });
 
   describe('Basic Transformation', () => {
@@ -185,7 +195,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'events', [
         'title',
@@ -231,7 +241,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'events', [
         'title',
@@ -272,7 +282,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'events', [
         'title',
@@ -418,7 +428,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(eventsSchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(eventsSchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(eventsSchema, arrayRelationshipManager, drizzleSchemaPort);
 
       // Request multiple fields from same relationship (using fields that exist in users table)
       const result = arrayTransformer.transformToNested(
@@ -483,7 +493,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(
         nestedData as unknown as Record<string, unknown>[],
@@ -589,7 +599,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(
         nestedData as unknown as Record<string, unknown>[],
@@ -675,7 +685,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'posts', [
         'id',
@@ -739,7 +749,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'events', [
         'title',
@@ -792,7 +802,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       // Request 'authors' as a direct column (not as relationship), so it should remain
       const result = arrayTransformer.transformToNested(flatData, 'posts', [
@@ -844,7 +854,7 @@ describe('DataTransformer', () => {
         regularSchema,
         regularRelationships
       );
-      const regularTransformer = new DataTransformer(regularSchema, regularRelationshipManager);
+      const regularTransformer = new DataTransformer(regularSchema, regularRelationshipManager, drizzleSchemaPort);
 
       const result = regularTransformer.transformToNested(flatData, 'users', [
         'name',
@@ -891,7 +901,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'posts', ['title', 'authors.id']);
 
@@ -936,7 +946,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'posts', ['title', 'authors.id']);
 
@@ -1003,7 +1013,7 @@ describe('DataTransformer', () => {
       };
 
       const arrayRelationshipManager = new RelationshipManager(arraySchema, arrayRelationships);
-      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager);
+      const arrayTransformer = new DataTransformer(arraySchema, arrayRelationshipManager, drizzleSchemaPort);
 
       const result = arrayTransformer.transformToNested(flatData, 'posts', [
         'title',
@@ -1057,7 +1067,7 @@ describe('DataTransformer', () => {
         regularSchema,
         regularRelationships
       );
-      const regularTransformer = new DataTransformer(regularSchema, regularRelationshipManager);
+      const regularTransformer = new DataTransformer(regularSchema, regularRelationshipManager, drizzleSchemaPort);
 
       const result = regularTransformer.transformToNested(flatData, 'users', [
         'name',
@@ -1277,7 +1287,6 @@ describe('DataTransformer', () => {
 
     it('should generate correct flattened field names for usersTable', () => {
       // Test that generateAlias creates correct field names
-      const { generateAlias } = require('../src/utils/alias-generator');
       const relationshipPath = [
         {
           from: 'postsTable',
@@ -1344,7 +1353,8 @@ describe('DataTransformer', () => {
       );
       const postsTableTransformer = new DataTransformer(
         postsTableSchema,
-        postsTableRelationshipManager
+        postsTableRelationshipManager,
+        drizzleSchemaPort
       );
 
       const result = postsTableTransformer.transformToNested(flatData, 'postsTable', [

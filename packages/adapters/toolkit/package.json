@@ -1,7 +1,7 @@
 {
-  "name": "@better-tables/adapters-drizzle",
-  "version": "0.5.31",
-  "description": "Drizzle ORM adapter for Better Tables - Multi-database support with automatic relationship detection",
+  "name": "@better-tables/adapters-toolkit",
+  "version": "0.1.0",
+  "description": "ORM-agnostic adapter toolkit for Better Tables - shared primitives for building table adapters",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -27,24 +27,12 @@
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
-  "dependencies": {
-    "@better-tables/adapters-toolkit": "workspace:*",
-    "better-sqlite3": "^12.4.6",
-    "drizzle-orm": "^0.45.1"
-  },
   "peerDependencies": {
-    "@better-tables/core": "workspace:*",
-    "mysql2": "^3.12.0",
-    "postgres": "^3.4.0"
+    "@better-tables/core": "workspace:*"
   },
   "devDependencies": {
     "@better-tables/core": "workspace:*",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "dotenv": "^17.2.3",
-    "react": "catalog:",
-    "react-dom": "catalog:",
+    "drizzle-orm": "^0.45.1",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },
@@ -56,12 +44,7 @@
     "table",
     "data-table",
     "data-grid",
-    "drizzle",
-    "orm",
-    "database",
-    "postgresql",
-    "mysql",
-    "sqlite",
+    "adapter",
     "typescript"
   ],
   "author": "",
@@ -69,7 +52,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Better-Tables/better-tables",
-    "directory": "packages/adapters/drizzle"
+    "directory": "packages/adapters/toolkit"
   },
   "bugs": {
     "url": "https://github.com/Better-Tables/better-tables/issues"

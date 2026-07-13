@@ -4,6 +4,11 @@
  *
  * @description
  * PostgreSQL query builder implementation with driver-specific optimizations.
+ * The select/count/aggregate/filter-options/min-max skeletons live in
+ * `BaseQueryBuilder` (plan 007 step 5); this class supplies the
+ * PostgreSQL-specific pieces: relational-query support (nested results via
+ * Drizzle's query API), native array-FK join syntax, `->>'field'` JSONB
+ * column selections, and the identifier quote character.
  *
  * Supports all PostgreSQL-compatible Drizzle drivers:
  * - postgres-js (PostgresJsDatabase)
@@ -13,21 +18,10 @@
  * @since 1.0.0 (expanded to support all PostgreSQL drivers in 1.1.0)
  */
 
-import {
-  and,
-  count,
-  countDistinct,
-  isNotNull,
-  max,
-  min,
-  type SQL,
-  type SQLWrapper,
-  sql,
-} from 'drizzle-orm';
-import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { and, type SQL, type SQLWrapper, sql } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
-  AggregateFunction,
   AnyColumnType,
   AnyTableType,
   ComputedFieldWithResolvedSortSql,
@@ -37,8 +31,7 @@ import type {
   QueryContext,
 } from '../types';
 import { QueryError } from '../types';
-import { generateAlias } from '../utils/alias-generator';
-import { BaseQueryBuilder } from './base-query-builder';
+import { BaseQueryBuilder, type DialectDb } from './base-query-builder';
 
 /**
  * Wrapper class for Drizzle relational queries to implement QueryBuilderWithJoins interface
@@ -173,6 +166,8 @@ class RelationalQueryWrapper implements PostgresQueryBuilderWithJoins {
 export class PostgresQueryBuilder extends BaseQueryBuilder {
   private db: PostgresDatabaseType;
 
+  protected readonly quoteChar = '"' as const;
+
   constructor(
     db: PostgresDatabaseType,
     schema: Record<string, AnyTableType>,
@@ -184,11 +179,14 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
-   * Type-safe helper to cast AnyTableType to PgTable.
-   * At runtime, this query builder only receives PostgreSQL tables via the factory pattern.
+   * Dialect hook: view the PostgreSQL db handle through the structural
+   * DialectDb interface the shared skeletons use. The cast is safe because
+   * Drizzle's PostgreSQL select builders implement every method the
+   * interface declares — the previous per-call-site `asPgTable`/`asPgColumn`
+   * casts were compile-time-only and this single cast replaces them all.
    */
-  private asPgTable(table: AnyTableType): PgTable {
-    return table as PgTable;
+  protected getDb(): DialectDb {
+    return this.db as unknown as DialectDb;
   }
 
   /**
@@ -409,21 +407,15 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
 
   /**
    * Build SELECT query with joins
-   * Attempts to use Drizzle relational queries first, falls back to manual joins
+   * Attempts to use Drizzle relational queries first, falls back to the
+   * shared manual-join skeleton in BaseQueryBuilder
    */
   buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
     columns?: string[],
     computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
-  ): {
-    query: PostgresQueryBuilderWithJoins;
-    columnMetadata: {
-      selections: Record<string, AnyColumnType>;
-      columnMapping: Record<string, string>;
-    };
-    isNested?: boolean; // Flag to indicate if data is already nested from relational query
-  } {
+  ): ReturnType<BaseQueryBuilder['buildSelectQuery']> {
     const primaryTableSchema = this.schema[primaryTable];
     if (!primaryTableSchema) {
       throw new QueryError(`Primary table not found: ${primaryTable}`, {
@@ -449,329 +441,9 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
       };
     }
 
-    // Fall back to manual SQL joins (for array relationships or when relational API unavailable)
-    const selections: Record<string, AnyColumnType> = {};
-    const columnMapping: Record<string, string> = {};
-
-    if (columns && columns.length > 0) {
-      Object.assign(selections, this.buildColumnSelections(columns, primaryTable));
-      for (const columnId of columns) {
-        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-
-        if (columnPath.isNested && columnPath.relationshipPath) {
-          const aliasedKey = generateAlias(columnPath.relationshipPath, columnPath.field);
-          columnMapping[aliasedKey] = columnId;
-        } else {
-          columnMapping[columnId] = columnId;
-        }
-      }
-    } else if (context.joinPaths.size > 0) {
-      Object.assign(selections, this.buildFlatSelectionsForRelationships(primaryTable));
-      for (const key of Object.keys(selections)) {
-        columnMapping[key] = key;
-      }
-    }
-
-    // Add computed field SQL expressions for sorting
-    // These need to be in SELECT so they can be referenced in ORDER BY
-    // Note: sortSql expressions are pre-resolved in DrizzleAdapter.fetchData before calling buildSelectQuery
-    // The double type assertion (as unknown as AnyColumnType) is necessary because Drizzle's type system
-    // doesn't recognize SQL expressions as valid column types, but at runtime they work correctly.
-    if (computedFields) {
-      for (const [fieldName, computedField] of Object.entries(computedFields)) {
-        // Check that the SQL expression was resolved (should always be true at this point)
-        if (computedField.__resolvedSortSql !== undefined) {
-          // Use pre-resolved SQL expression (resolved in adapter)
-          // Explicitly alias the SQL expression with the field name so it can be referenced in ORDER BY
-          // According to Drizzle docs: sql`expression`.as('alias') adds an alias to the SQL expression
-          // All SQL expressions from Drizzle support .as() method
-          // Type assertion needed: Drizzle's type system doesn't accept SQL expressions as column types,
-          // but they work correctly at runtime when used in SELECT clauses
-          const aliasedSql = (
-            computedField.__resolvedSortSql as SQL & { as: (alias: string) => SQL }
-          ).as(fieldName);
-          selections[fieldName] = aliasedSql as unknown as AnyColumnType;
-          columnMapping[fieldName] = fieldName;
-        }
-      }
-    }
-
-    // Cast selections to Record<string, PgColumn> for type-safe select
-    const pgSelections = selections as Record<string, PgColumn>;
-    const pgTable = this.asPgTable(primaryTableSchema);
-
-    const baseQuery =
-      Object.keys(selections).length > 0
-        ? this.db.select(pgSelections).from(pgTable)
-        : this.db.select().from(pgTable);
-
-    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const relationship of joinOrder) {
-      const targetTable = this.schema[relationship.to];
-      if (!targetTable) {
-        throw new QueryError(`Target table not found: ${relationship.to}`, {
-          targetTable: relationship.to,
-        });
-      }
-
-      const joinCondition = this.buildJoinCondition(relationship) as SQL;
-      const pgTargetTable = this.asPgTable(targetTable);
-
-      if (relationship.joinType === 'left') {
-        query = query.leftJoin(pgTargetTable, joinCondition);
-      } else {
-        query = query.innerJoin(pgTargetTable, joinCondition);
-      }
-    }
-
-    return {
-      query: this.asPostgresQueryBuilder(query),
-      columnMetadata: {
-        selections,
-        columnMapping,
-      },
-      isNested: false, // Manual joins return flat data
-    };
-  }
-
-  /**
-   * Build COUNT query for pagination
-   */
-  buildCountQuery(context: QueryContext, primaryTable: string): PostgresQueryBuilderWithJoins {
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const pgTable = this.asPgTable(primaryTableSchema);
-    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
-
-    // If there are joins, count distinct primary keys to avoid inflated counts
-    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
-    const hasJoins = joinOrder.length > 0;
-
-    const baseQuery =
-      hasJoins && primaryKeyInfo
-        ? (() => {
-            // Use count distinct on primary key to avoid counting duplicate rows from joins
-            const pgPkColumn = this.asPgColumn(primaryKeyInfo.column);
-            return this.db.select({ count: countDistinct(pgPkColumn) }).from(pgTable);
-          })()
-        : this.db.select({ count: count() }).from(pgTable);
-
-    // Build query by chaining operations - use proper typing
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const relationship of joinOrder) {
-      const targetTable = this.schema[relationship.to];
-      if (!targetTable) {
-        throw new QueryError(`Target table not found: ${relationship.to}`, {
-          targetTable: relationship.to,
-        });
-      }
-
-      const joinCondition = this.buildJoinCondition(relationship) as SQL;
-      const pgTargetTable = this.asPgTable(targetTable);
-
-      if (relationship.joinType === 'left') {
-        query = query.leftJoin(pgTargetTable, joinCondition);
-      } else {
-        query = query.innerJoin(pgTargetTable, joinCondition);
-      }
-    }
-
-    return this.asPostgresQueryBuilder(query);
-  }
-
-  /**
-   * Build aggregate query for faceted values
-   */
-  buildAggregateQuery<TColumnId extends string>(
-    columnId: TColumnId,
-    aggregateFunction: AggregateFunction = 'count',
-    primaryTable: string
-  ): PostgresQueryBuilderWithJoins {
-    this.validateColumnId(columnId, primaryTable);
-    this.validateAggregateFunction(aggregateFunction);
-
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
-
-    this.validateAggregateColumnCompatibility(columnReference.column, aggregateFunction);
-
-    const mainTableSchema = this.schema[primaryTable];
-    if (!mainTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const pgTable = this.asPgTable(mainTableSchema);
-    const pgColumn = this.asPgColumn(columnReference.column);
-    const aggregateFn = this.getAggregateFunction(columnReference.column, aggregateFunction) as SQL;
-
-    const baseQuery = this.db
-      .select({
-        value: pgColumn,
-        count: aggregateFn,
-      })
-      .from(pgTable);
-
-    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
-      columnPath,
-      primaryTable
-    );
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const joinConfig of requiredJoins) {
-      const pgJoinTable = this.asPgTable(joinConfig.table);
-      const joinCondition = joinConfig.condition as SQL;
-
-      if (joinConfig.type === 'left') {
-        query = query.leftJoin(pgJoinTable, joinCondition);
-      } else {
-        query = query.innerJoin(pgJoinTable, joinCondition);
-      }
-    }
-
-    return this.asPostgresQueryBuilder(
-      query.where(isNotNull(pgColumn)).groupBy(pgColumn).orderBy(pgColumn)
-    );
-  }
-
-  /**
-   * Build filter options query
-   */
-  buildFilterOptionsQuery(columnId: string, primaryTable: string): PostgresQueryBuilderWithJoins {
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-    const column = this.getColumn(columnPath);
-
-    if (!column) {
-      throw new QueryError(`Column not found: ${columnId}`, { columnId });
-    }
-
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const pgTable = this.asPgTable(primaryTableSchema);
-    const pgColumn = this.asPgColumn(column);
-
-    const baseQuery = this.db
-      .select({
-        value: pgColumn,
-        count: count(),
-      })
-      .from(pgTable);
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    if (columnPath.isNested && columnPath.relationshipPath) {
-      const joinOrder = this.relationshipManager.optimizeJoinOrder(
-        new Map([[columnPath.table, columnPath.relationshipPath || []]]),
-        primaryTable
-      );
-
-      for (const relationship of joinOrder) {
-        const targetTable = this.schema[relationship.to];
-        if (!targetTable) {
-          throw new QueryError(`Target table not found: ${relationship.to}`, {
-            targetTable: relationship.to,
-          });
-        }
-
-        const joinCondition = this.buildJoinCondition(relationship) as SQL;
-        const pgTargetTable = this.asPgTable(targetTable);
-
-        if (relationship.joinType === 'left') {
-          query = query.leftJoin(pgTargetTable, joinCondition);
-        } else {
-          query = query.innerJoin(pgTargetTable, joinCondition);
-        }
-      }
-    }
-
-    return this.asPostgresQueryBuilder(
-      query.where(isNotNull(pgColumn)).groupBy(pgColumn).orderBy(pgColumn)
-    );
-  }
-
-  /**
-   * Build min/max values query
-   */
-  /**
-   * Quote SQL identifier for PostgreSQL (uses double quotes)
-   */
-  protected quoteIdentifier(identifier: string): SQL {
-    return sql.raw(`"${identifier}"`);
-  }
-
-  buildMinMaxQuery<TColumnId extends string>(
-    columnId: TColumnId,
-    primaryTable: string
-  ): PostgresQueryBuilderWithJoins {
-    this.validateColumnId(columnId, primaryTable);
-
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
-
-    this.validateMinMaxColumnCompatibility(columnReference.column);
-
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const pgTable = this.asPgTable(primaryTableSchema);
-    const pgColumn = this.asPgColumn(columnReference.column);
-
-    const baseQuery = this.db
-      .select({
-        min: min(pgColumn),
-        max: max(pgColumn),
-      })
-      .from(pgTable);
-
-    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
-      columnPath,
-      primaryTable
-    );
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const joinConfig of requiredJoins) {
-      const pgJoinTable = this.asPgTable(joinConfig.table);
-      const joinCondition = joinConfig.condition as SQL;
-
-      if (joinConfig.type === 'left') {
-        query = query.leftJoin(pgJoinTable, joinCondition);
-      } else {
-        query = query.innerJoin(pgJoinTable, joinCondition);
-      }
-    }
-
-    return this.asPostgresQueryBuilder(query.where(isNotNull(pgColumn)));
+    // Fall back to the shared manual-join skeleton (for array relationships
+    // or when the relational API is unavailable)
+    return super.buildSelectQuery(context, primaryTable, columns, computedFields);
   }
 
   /**

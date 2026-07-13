@@ -1,6 +1,6 @@
 /**
- * @fileoverview Primary table resolution for Drizzle ORM adapter
- * @module @better-tables/drizzle-adapter/primary-table-resolver
+ * @fileoverview ORM-agnostic primary table resolution
+ * @module @better-tables/adapters-toolkit/primary-table-resolver
  *
  * @description
  * Handles the determination of the primary table for queries when not explicitly specified.
@@ -13,6 +13,12 @@
  * - Prefers tables with the most matching direct columns
  * - Handles relationship columns correctly
  * - Only searches other tables when truly ambiguous
+ *
+ * Column existence is checked structurally (an own, non-`_`-prefixed,
+ * object-valued property on the table) rather than through an ORM-specific
+ * column API. This is exactly what every adapter's own "does this table have
+ * a column named X" check reduces to, so no adapter port is required here —
+ * `TTable` stays fully opaque to this class.
  *
  * @example
  * ```typescript
@@ -30,9 +36,14 @@
  * @since 1.0.0
  */
 
-import type { AnyTableType, RelationshipMap } from './types';
 import { SchemaError } from './types';
-import { hasColumn } from './utils/drizzle-schema-utils';
+
+/**
+ * Minimal relationship-map shape `PrimaryTableResolver` needs: it only ever
+ * reads the map's *keys* (`"<sourceTable>.<alias>"`), never the relationship
+ * path values, so adapters can pass their own richer relationship map as-is.
+ */
+export type RelationshipMapLike = Record<string, unknown>;
 
 /**
  * Primary table resolver that determines the primary table for queries.
@@ -40,8 +51,8 @@ import { hasColumn } from './utils/drizzle-schema-utils';
  * @class PrimaryTableResolver
  * @description Resolves the primary table using explicit specification or smart heuristics
  *
- * @property {Record<string, AnyTableType>} schema - The schema containing all tables
- * @property {RelationshipMap} relationships - Map of all relationships
+ * @property schema - The schema containing all tables, keyed by table name
+ * @property relationships - Map of all relationships (keys only are read)
  *
  * @example
  * ```typescript
@@ -51,13 +62,30 @@ import { hasColumn } from './utils/drizzle-schema-utils';
  *
  * @since 1.0.0
  */
-export class PrimaryTableResolver {
-  private schema: Record<string, AnyTableType>;
-  private relationships: RelationshipMap;
+export class PrimaryTableResolver<TTable = unknown> {
+  private schema: Record<string, TTable>;
+  private relationships: RelationshipMapLike;
 
-  constructor(schema: Record<string, AnyTableType>, relationships: RelationshipMap) {
+  constructor(schema: Record<string, TTable>, relationships: RelationshipMapLike) {
     this.schema = schema;
     this.relationships = relationships;
+  }
+
+  /**
+   * Structural column-existence check: true if `table` has an own,
+   * non-`_`-prefixed property named `columnName` whose value is an object.
+   * Mirrors the duck-typed check every ORM's column metadata satisfies
+   * (columns are objects; internal bookkeeping keys are `_`-prefixed).
+   */
+  private hasColumn(table: TTable, columnName: string): boolean {
+    if (!table || typeof table !== 'object') {
+      return false;
+    }
+    if (columnName.startsWith('_')) {
+      return false;
+    }
+    const value = (table as unknown as Record<string, unknown>)[columnName];
+    return typeof value === 'object' && value !== null;
   }
 
   /**
@@ -145,7 +173,7 @@ export class PrimaryTableResolver {
       if (parts.length === 1) {
         // Direct column - check if it exists in this table
         const fieldName = parts[0];
-        if (fieldName && hasColumn(tableSchema, fieldName)) {
+        if (fieldName && this.hasColumn(tableSchema, fieldName)) {
           count++;
         }
       } else if (parts.length >= 2) {
