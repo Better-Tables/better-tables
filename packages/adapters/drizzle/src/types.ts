@@ -16,7 +16,17 @@
  */
 
 import type { AdapterMeta, ColumnType, FilterState } from '@better-tables/core';
-import type { AnyColumn, InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
+import type {
+  AnyColumn,
+  BuildQueryResult,
+  ExtractTablesWithRelations,
+  FindTableByDBName,
+  InferSelectModel,
+  SQL,
+  SQLWrapper,
+  TableRelationalConfig,
+  TablesRelationalConfig,
+} from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
@@ -1200,6 +1210,110 @@ export type ExtractDriverFromDB<TDB> =
             TDB extends BetterSQLite3Database<infer _>
             ? 'sqlite'
             : DatabaseDriver;
+
+/**
+ * Extract the FULL (unfiltered, relations-included) schema type parameter
+ * embedded in a Drizzle database instance -- the counterpart to
+ * {@link ExtractSchemaFromDB}, which filters relations OUT. The `$types`
+ * recipe below needs the unfiltered schema because
+ * `ExtractTablesWithRelations` (from `drizzle-orm`) reads relation
+ * definitions (e.g. `usersRelations = relations(users, ...)`) that live
+ * alongside the plain tables in the SAME schema object passed to
+ * `drizzle(connection, { schema })`.
+ */
+export type ExtractRawSchemaFromDB<TDB> = TDB extends PostgresJsDatabase<infer S>
+  ? S
+  : TDB extends NodePgDatabase<infer S>
+    ? S
+    : TDB extends NeonHttpDatabase<infer S>
+      ? S
+      : TDB extends MySql2Database<infer S>
+        ? S
+        : TDB extends BetterSQLite3Database<infer S>
+          ? S
+          : Record<string, unknown>;
+
+/**
+ * Depth-decrement lookup, matching `@better-tables/core`'s `Prev` (used by
+ * `Paths<T>`) -- see `plans/design/table-definition-dx.md`, Step 1 decision
+ * 2: "this deliberately mirrors plan 011's `Paths<T>` depth cap of 3 ...
+ * one '3' to reason about across the whole contract."
+ */
+type SchemaDepthPrev = [never, 0, 1, 2, 3];
+
+/**
+ * Build the `with` config object `BuildQueryResult` needs to compute a
+ * depth-capped, relation-aware row type. `BuildQueryResult` is driven by an
+ * explicit `with` config and stops recursing at `true` -- there is no
+ * built-in "every relation to depth N" helper, so this recurses the SAME
+ * depth-capped shape `Paths<T, D>` implements natively for plain object
+ * types, for the different purpose of producing a `with` CONFIG object
+ * instead of a path-string union.
+ *
+ * Verified against the installed `drizzle-orm@0.45.2` package (design doc
+ * Step 1 decision 2, "The Drizzle recipe (verified)").
+ */
+type DeepWith<
+  TConfig extends TableRelationalConfig,
+  TSchema extends TablesRelationalConfig,
+  D extends number,
+> = [D] extends [never]
+  ? Record<string, never>
+  : {
+      [K in keyof TConfig['relations']]?: TConfig['relations'][K] extends {
+        referencedTableName: infer RT extends string;
+      }
+        ? FindTableByDBName<TSchema, RT> extends infer RC extends TableRelationalConfig
+          ? { with: DeepWith<RC, TSchema, SchemaDepthPrev[D]> }
+          : true
+        : true;
+    };
+
+/**
+ * The relation-aware row type for table `TTableName`, depth-capped to match
+ * `Paths<T>`'s default depth (3).
+ *
+ * **Verified caveat (design doc Step 1 decision 2):** relation nullability
+ * here is NOT "could this row be missing", it is "is the local join column
+ * `.notNull()`". A `profile: one(profiles, { fields: [users.id], references:
+ * [profiles.userId] })` relation declared using the PRIMARY KEY as the local
+ * field types as non-nullable in Drizzle's own inference (`users.id` is
+ * always `.notNull()`), even though a matching profile row may not exist at
+ * runtime. This is a pre-existing Drizzle behavior (`createOne` /
+ * `BuildRelationResult`'s `Equal<TRel['isNullable'], false>` check), not
+ * something this recipe introduces or works around -- flagged here per the
+ * design doc's instruction to document it prominently wherever this recipe
+ * ships.
+ */
+export type RelationAwareRow<
+  TSchema extends Record<string, unknown>,
+  TTableName extends string,
+  D extends number = 3,
+> = ExtractTablesWithRelations<TSchema> extends infer TRel extends TablesRelationalConfig
+  ? TTableName extends keyof TRel
+    ? BuildQueryResult<TRel, TRel[TTableName], { with: DeepWith<TRel[TTableName], TRel, D> }>
+    : never
+  : never;
+
+/**
+ * The type-only `$types` schema catalog a Drizzle-backed `betterTables()`
+ * instance carries (`SchemaAwareAdapter<T>` from `@better-tables/core`,
+ * `types/paths.ts`). Populated for every table name in the FILTERED
+ * (tables-only) schema `ExtractSchemaFromDB<TDB>` already computes; each
+ * table's `row` is the relation-aware row computed from the FULL (raw,
+ * relations-included) schema embedded in `TDB`.
+ *
+ * Zero runtime values -- see `drizzleAdapter()`'s return type in
+ * `factory.ts`, which intersects this in as an OPTIONAL phantom property
+ * (never assigned).
+ */
+export type DrizzleSchemaTypes<TDB> = {
+  tables: {
+    [TName in keyof ExtractSchemaFromDB<TDB> & string]: {
+      row: RelationAwareRow<ExtractRawSchemaFromDB<TDB>, TName>;
+    };
+  };
+};
 
 /**
  * Error types for the adapter

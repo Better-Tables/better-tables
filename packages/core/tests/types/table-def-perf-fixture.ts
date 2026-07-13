@@ -1,6 +1,7 @@
 /**
- * @fileoverview Type-performance stress fixture for the plan 011 path-typed
- * prototype (`src/types/experimental/table-def-v1.ts`).
+ * @fileoverview Type-performance stress fixture for the PRODUCTION path-typed
+ * runtime (`src/factory.ts` + `src/types/paths.ts`), retargeted from the
+ * plan 011 experimental prototype per plan 018 Step 1.
  *
  * @remarks
  * NOT a functional test -- this file exists to be fed to
@@ -9,21 +10,22 @@
  * Check-time / Instantiation numbers against a synthetic schema shaped like
  * a realistic large app: 30 tables, 5-15 columns each, ~15 relations
  * (including a deliberate 2-table mutual recursion AND a longer 15-table
- * cycle back to table1), and 10 `defineTableV1` calls with ~8 columns each.
+ * cycle back to table1), and 10 `defineTable` calls with ~8 columns each.
+ * `t.count()` calls from the original prototype fixture are replaced with
+ * `t.number('relX.score')` (a numeric path traversal THROUGH the array
+ * relation) since aggregate builders are deferred out of plan 018's scope --
+ * this is an equal-or-greater type-complexity substitute, not a reduction.
  *
- * Generated once by a throwaway authoring script (not checked in); edit by
- * hand from here on -- see plans/design/table-definition-dx.md Step 5 for
- * the measurement command and recorded budget numbers.
+ * Originally generated once by a throwaway authoring script (not checked
+ * in); edit by hand from here on -- see plans/design/table-definition-dx.md
+ * Step 5 for the measurement command and recorded budget numbers.
  *
  * Measure with:
  *   cd packages/core && bunx tsc --noEmit --extendedDiagnostics \
  *     tests/types/table-def-perf-fixture.ts 2>&1 | grep -E "Check time|Instantiations"
  */
-import {
-  betterTablesV1,
-  defineTableV1,
-  type SchemaAwareAdapter,
-} from '../../src/types/experimental/table-def-v1';
+import { betterTables, defineTable } from '../../src/factory';
+import type { SchemaAwareAdapter } from '../../src/types/paths';
 
 // ----------------------------------------------------------------------------
 // 30-table synthetic schema, 5-15 columns each, ~15 relations, includes a
@@ -484,15 +486,15 @@ type Schema = {
 };
 
 const fakeAdapter = {} as SchemaAwareAdapter<{ tables: Schema }>;
-const tables = betterTablesV1({ database: fakeAdapter });
+const tables = betterTables({ database: fakeAdapter });
 
 // ----------------------------------------------------------------------------
-// 10 defineTableV1 calls, ~8 columns each.
+// 10 defineTable calls, ~8 columns each.
 // ----------------------------------------------------------------------------
 
-const table1Def = defineTableV1<typeof tables>()('table1', (t) => ({
+const table1Def = defineTable<typeof tables>()('table1', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -502,14 +504,14 @@ const table1Def = defineTableV1<typeof tables>()('table1', (t) => ({
       { value: 'pending', label: 'Pending' },
     ]),
     t.computed('display', (row) => `${row.name} (${row.score})`),
-    t.count('rel2'),
+    t.number('rel2.score'),
     t.number('weight'),
   ],
 }));
 
-const table2Def = defineTableV1<typeof tables>()('table2', (t) => ({
+const table2Def = defineTable<typeof tables>()('table2', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -524,9 +526,9 @@ const table2Def = defineTableV1<typeof tables>()('table2', (t) => ({
   ],
 }));
 
-const table3Def = defineTableV1<typeof tables>()('table3', (t) => ({
+const table3Def = defineTable<typeof tables>()('table3', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -536,14 +538,14 @@ const table3Def = defineTableV1<typeof tables>()('table3', (t) => ({
       { value: 'pending', label: 'Pending' },
     ]),
     t.computed('display', (row) => `${row.name} (${row.score})`),
-    t.count('rel4'),
+    t.number('rel4.score'),
     t.number('weight'),
   ],
 }));
 
-const table4Def = defineTableV1<typeof tables>()('table4', (t) => ({
+const table4Def = defineTable<typeof tables>()('table4', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -558,9 +560,9 @@ const table4Def = defineTableV1<typeof tables>()('table4', (t) => ({
   ],
 }));
 
-const table5Def = defineTableV1<typeof tables>()('table5', (t) => ({
+const table5Def = defineTable<typeof tables>()('table5', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -570,14 +572,14 @@ const table5Def = defineTableV1<typeof tables>()('table5', (t) => ({
       { value: 'pending', label: 'Pending' },
     ]),
     t.computed('display', (row) => `${row.name} (${row.score})`),
-    t.count('rel6'),
+    t.number('rel6.score'),
     t.number('weight'),
   ],
 }));
 
-const table6Def = defineTableV1<typeof tables>()('table6', (t) => ({
+const table6Def = defineTable<typeof tables>()('table6', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -592,9 +594,9 @@ const table6Def = defineTableV1<typeof tables>()('table6', (t) => ({
   ],
 }));
 
-const table7Def = defineTableV1<typeof tables>()('table7', (t) => ({
+const table7Def = defineTable<typeof tables>()('table7', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -604,14 +606,14 @@ const table7Def = defineTableV1<typeof tables>()('table7', (t) => ({
       { value: 'pending', label: 'Pending' },
     ]),
     t.computed('display', (row) => `${row.name} (${row.score})`),
-    t.count('rel8'),
+    t.number('rel8.score'),
     t.number('weight'),
   ],
 }));
 
-const table8Def = defineTableV1<typeof tables>()('table8', (t) => ({
+const table8Def = defineTable<typeof tables>()('table8', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -626,9 +628,9 @@ const table8Def = defineTableV1<typeof tables>()('table8', (t) => ({
   ],
 }));
 
-const table9Def = defineTableV1<typeof tables>()('table9', (t) => ({
+const table9Def = defineTable<typeof tables>()('table9', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
@@ -638,14 +640,14 @@ const table9Def = defineTableV1<typeof tables>()('table9', (t) => ({
       { value: 'pending', label: 'Pending' },
     ]),
     t.computed('display', (row) => `${row.name} (${row.score})`),
-    t.count('rel10'),
+    t.number('rel10.score'),
     t.number('weight'),
   ],
 }));
 
-const table10Def = defineTableV1<typeof tables>()('table10', (t) => ({
+const table10Def = defineTable<typeof tables>()('table10', (t) => ({
   columns: [
-    t.text('name').label('Name'),
+    t.text('name').displayName('Name'),
     t.number('score').range(0, 1000),
     t.boolean('isEnabled'),
     t.date('createdAt'),
