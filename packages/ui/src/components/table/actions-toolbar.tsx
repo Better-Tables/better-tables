@@ -56,7 +56,11 @@ export function ActionsToolbar<TData = unknown>({
   const handleActionClick = async (action: TableAction<TData>) => {
     // If action has confirmation, show dialog
     if (action.confirmationDialog) {
-      setConfirmationAction({ action, selectedIds, selectedData });
+      setConfirmationAction({
+        action,
+        selectedIds,
+        ...(selectedData !== undefined && { selectedData }),
+      });
       return;
     }
 

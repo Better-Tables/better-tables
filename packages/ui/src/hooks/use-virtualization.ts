@@ -146,7 +146,9 @@ export function useVirtualization(config: UseVirtualizationConfig): UseVirtualiz
   const memoizedConfig = useMemo(
     () => ({
       containerHeight: virtualizationConfig.containerHeight ?? 400,
-      containerWidth: virtualizationConfig.containerWidth,
+      ...(virtualizationConfig.containerWidth !== undefined && {
+        containerWidth: virtualizationConfig.containerWidth,
+      }),
       defaultRowHeight: virtualizationConfig.defaultRowHeight ?? 40,
       overscan: virtualizationConfig.overscan ?? 5,
     }),

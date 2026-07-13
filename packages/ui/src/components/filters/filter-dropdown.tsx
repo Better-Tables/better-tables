@@ -143,9 +143,11 @@ export function FilterDropdown<TData = unknown>({
         grouped.push({
           id: group.id,
           label: group.label,
-          icon: group.icon as React.ComponentType<{ className?: string }>,
           columns: filteredGroupColumns,
-          description: group.description,
+          ...(group.icon !== undefined && {
+            icon: group.icon as React.ComponentType<{ className?: string }>,
+          }),
+          ...(group.description !== undefined && { description: group.description }),
         });
 
         filteredGroupColumns.forEach((col) => {

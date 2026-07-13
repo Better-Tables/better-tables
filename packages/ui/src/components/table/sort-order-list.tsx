@@ -55,7 +55,7 @@ export function SortOrderList({ sorts, columns, onRemoveSort }: SortOrderListPro
             sort={sort}
             index={index}
             columnName={getColumnName(sort.columnId)}
-            onRemove={onRemoveSort}
+            {...(onRemoveSort !== undefined && { onRemove: onRemoveSort })}
           />
         ))}
 

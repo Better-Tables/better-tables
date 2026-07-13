@@ -21,8 +21,9 @@ function latestCallForFilters(
   filters: FilterState[]
 ) {
   for (let index = calls.length - 1; index >= 0; index -= 1) {
-    if (matchesFilters(calls[index].params, filters)) {
-      return calls[index];
+    const call = calls[index];
+    if (call !== undefined && matchesFilters(call.params, filters)) {
+      return call;
     }
   }
   return undefined;

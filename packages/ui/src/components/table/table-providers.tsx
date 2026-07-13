@@ -158,7 +158,10 @@ export function TableProviders({
   // Wrap with DND provider if enabled
   if (enableDnd) {
     content = (
-      <TableDndProvider onDragEnd={onDragEnd} renderDragOverlay={renderDragOverlay}>
+      <TableDndProvider
+        {...(onDragEnd !== undefined && { onDragEnd })}
+        {...(renderDragOverlay !== undefined && { renderDragOverlay })}
+      >
         {content}
       </TableDndProvider>
     );

@@ -248,7 +248,9 @@ export function BetterTable<TData = unknown>({
     pagination: initialPagination,
     sorting: initialSorting,
     selectedRows: initialSelectedRows,
-    columnVisibility: computedColumnVisibility,
+    ...(computedColumnVisibility !== undefined && {
+      columnVisibility: computedColumnVisibility,
+    }),
   });
 
   // Subscribe to store state
@@ -557,7 +559,11 @@ export function BetterTable<TData = unknown>({
   if (error) {
     return (
       <div className={cn('space-y-4', className)}>
-        <ErrorState error={error} onRetry={onRetry} title={errorState?.title} />
+        <ErrorState
+          error={error}
+          {...(onRetry !== undefined && { onRetry })}
+          {...(errorState?.title !== undefined && { title: errorState.title })}
+        />
       </div>
     );
   }
@@ -571,8 +577,8 @@ export function BetterTable<TData = unknown>({
             columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}
-            groups={groups}
-            autoGroupFilters={autoGroupFilters}
+            {...(groups !== undefined && { groups })}
+            {...(autoGroupFilters !== undefined && { autoGroupFilters })}
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}
@@ -584,7 +590,7 @@ export function BetterTable<TData = unknown>({
             enableColumnReordering={columnReordering}
             onReset={handleReset}
             searchable={false}
-            isFilterProtected={isFilterProtected}
+            {...(isFilterProtected !== undefined && { isFilterProtected })}
           />
         )}
         <EmptyState
@@ -638,8 +644,8 @@ export function BetterTable<TData = unknown>({
             columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}
-            groups={groups}
-            autoGroupFilters={autoGroupFilters}
+            {...(groups !== undefined && { groups })}
+            {...(autoGroupFilters !== undefined && { autoGroupFilters })}
             showColumnVisibility={features.columnVisibility !== false}
             columnVisibility={columnVisibility}
             onToggleColumnVisibility={toggleColumnVisibility}
@@ -651,7 +657,7 @@ export function BetterTable<TData = unknown>({
             enableColumnReordering={columnReordering}
             onReset={handleReset}
             searchable={false}
-            isFilterProtected={isFilterProtected}
+            {...(isFilterProtected !== undefined && { isFilterProtected })}
           />
         )}
       </div>
@@ -679,8 +685,12 @@ export function BetterTable<TData = unknown>({
                   column.headerRenderer({
                     column,
                     isSorted: !!currentSort,
-                    sortDirection: currentSort?.direction,
-                    onSort: isSortable ? () => handleSortingChange(column.id) : undefined,
+                    ...(currentSort?.direction !== undefined && {
+                      sortDirection: currentSort.direction,
+                    }),
+                    ...(isSortable && {
+                      onSort: () => handleSortingChange(column.id),
+                    }),
                   })
                 ) : (
                   <div key={`header-${column.id}`} className="flex items-center gap-2">
@@ -704,7 +714,7 @@ export function BetterTable<TData = unknown>({
                     key={column.id}
                     column={column}
                     contextMenuConfig={headerContextMenu || {}}
-                    currentSort={currentSort}
+                    {...(currentSort !== undefined && { currentSort })}
                     allSorts={sortingState}
                     multiSortEnabled={multiSortEnabled}
                     isVisible={columnVisibility[column.id] !== false}
@@ -1027,7 +1037,7 @@ export function BetterTable<TData = unknown>({
   return (
     <TableProviders
       enableTooltip={true}
-      enableDnd={shouldShowContextMenu}
+      enableDnd={!!shouldShowContextMenu}
       onDragEnd={handleDragEnd}
       renderDragOverlay={renderDragOverlay}
     >

@@ -66,8 +66,6 @@ export function DateFilterInput<TData = unknown>({
       locale: 'en-US',
       showTime: filterConfig?.includeTime || false,
       showRelative: false,
-      timeZone: undefined,
-      relativeOptions: undefined,
     };
   }, [column.filter]);
 
@@ -319,11 +317,11 @@ export function DateFilterInput<TData = unknown>({
               <Calendar
                 autoFocus
                 mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={disabled ? undefined : setDateRange}
                 numberOfMonths={2}
                 disabled={disabled}
+                {...(dateRange?.from !== undefined && { defaultMonth: dateRange.from })}
+                {...(dateRange !== undefined && { selected: dateRange })}
+                {...(!disabled && { onSelect: setDateRange })}
               />
             </div>
           </PopoverContent>
@@ -367,10 +365,10 @@ export function DateFilterInput<TData = unknown>({
             <Separator orientation="vertical" className="h-auto" />
             <Calendar
               mode="single"
-              selected={singleDate}
-              onSelect={disabled ? undefined : setSingleDate}
               autoFocus
               disabled={disabled}
+              {...(singleDate !== undefined && { selected: singleDate })}
+              {...(!disabled && { onSelect: setSingleDate })}
             />
           </div>
         </PopoverContent>

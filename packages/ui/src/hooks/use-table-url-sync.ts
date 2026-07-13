@@ -57,11 +57,13 @@ function debounce<T extends (args: Record<string, string | null>) => void>(
 function useStableUrlSyncConfig(config: UrlSyncConfig): UrlSyncConfig {
   return useMemo(
     () => ({
-      filters: config.filters,
-      pagination: config.pagination,
-      sorting: config.sorting,
-      columnVisibility: config.columnVisibility,
-      columnOrder: config.columnOrder,
+      ...(config.filters !== undefined && { filters: config.filters }),
+      ...(config.pagination !== undefined && { pagination: config.pagination }),
+      ...(config.sorting !== undefined && { sorting: config.sorting }),
+      ...(config.columnVisibility !== undefined && {
+        columnVisibility: config.columnVisibility,
+      }),
+      ...(config.columnOrder !== undefined && { columnOrder: config.columnOrder }),
     }),
     [config.filters, config.pagination, config.sorting, config.columnVisibility, config.columnOrder]
   );
