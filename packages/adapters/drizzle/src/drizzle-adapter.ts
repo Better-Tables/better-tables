@@ -459,7 +459,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const finalColumns = [...columnsWithoutComputed, ...columnsToFetch];
 
       // Handle computed field filtering
-      let processedFilters = [...(params.filters || [])];
+      let processedFilters = [...(this.requireFlatFilters(params.filters) || [])];
       const computedFieldFilters: Array<{ filter: FilterState; config: ComputedFieldConfig }> = [];
       const additionalSqlConditions: (SQL | SQLWrapper)[] = [];
 
@@ -1207,6 +1207,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       features,
       supportedColumnTypes,
       supportedOperators,
+      // Truthful capability flag (design core-contract-v2.md §1.5): filter
+      // groups are rejected, not translated, until plan 017 lands. Paired
+      // with the requireFlatFilters guard in fetchData/getJoinCount.
+      supportsFilterGroups: false,
       ...customMeta,
     };
   }
@@ -1312,6 +1316,33 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   /**
    * Utility methods
    */
+
+  /**
+   * Reject-by-default guard for the widened `FetchDataParams.filters`
+   * (`FilterState[] | FilterGroupNode`, contract v2,
+   * `plans/design/core-contract-v2.md` §1.5): this adapter does not yet
+   * translate AND/OR filter-group trees (`meta.supportsFilterGroups` is
+   * `false`), and silently flattening a group into an implicit AND would
+   * return a WRONG (narrower) result set with no signal -- so a group input
+   * is rejected loudly instead. Group translation lands in a follow-up plan
+   * (plan 017), which replaces this guard with a recursive walk.
+   *
+   * @param filters - The raw `FetchDataParams.filters` value
+   * @returns The flat filter array unchanged (or `undefined` when absent)
+   * @throws {QueryError} If `filters` is a `FilterGroupNode` tree
+   */
+  private requireFlatFilters(
+    filters: FetchDataParams['filters']
+  ): FilterState[] | undefined {
+    if (filters === undefined || Array.isArray(filters)) {
+      return filters;
+    }
+    throw new QueryError(
+      'Filter groups are not yet supported by the Drizzle adapter (supportsFilterGroups: false); pass a flat FilterState[]. Group translation lands in a follow-up plan.',
+      { supportsFilterGroups: false }
+    );
+  }
+
   private getJoinCount(
     params: FetchDataParams & {
       computedFields?: string[];
@@ -1335,7 +1366,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: columnsForContext,
-        filters: params.filters?.map((filter) => ({ columnId: filter.columnId })) || [],
+        filters:
+          this.requireFlatFilters(params.filters)?.map((filter) => ({
+            columnId: filter.columnId,
+          })) || [],
         sorts: sortsForContext,
       },
       primaryTable
