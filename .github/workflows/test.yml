@@ -158,6 +158,44 @@ jobs:
           echo "✅ CLI tests completed successfully"
           echo "========================================="
 
+  test-ui:
+    name: Test UI Package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/ui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.1'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies from workspace root..."
+          cd ../..
+          bun install --frozen-lockfile
+
+      - name: Build Core Package (dependency)
+        run: |
+          cd ../..
+          cd packages/core
+          bun run build
+
+      - name: Run UI Tests
+        run: bun test
+
   test-adapters:
     name: Test Adapter Packages
     runs-on: ubuntu-latest
@@ -270,7 +308,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [static-checks, test-core, test-cli, test-adapters]
+    needs: [static-checks, test-core, test-cli, test-ui, test-adapters]
     if: always()
 
     steps:
@@ -284,6 +322,7 @@ jobs:
           STATIC_RESULT="${{ needs.static-checks.result }}"
           CORE_RESULT="${{ needs.test-core.result }}"
           CLI_RESULT="${{ needs.test-cli.result }}"
+          UI_RESULT="${{ needs.test-ui.result }}"
           ADAPTER_RESULT="${{ needs.test-adapters.result }}"
 
           if [ "$STATIC_RESULT" = "success" ]; then
@@ -304,6 +343,12 @@ jobs:
             echo "CLI Package Tests: ❌ FAILED"
           fi
 
+          if [ "$UI_RESULT" = "success" ]; then
+            echo "UI Package Tests: ✅ PASSED"
+          else
+            echo "UI Package Tests: ❌ FAILED"
+          fi
+
           if [ "$ADAPTER_RESULT" = "success" ]; then
             echo "Adapter Package Tests: ✅ PASSED"
           else
@@ -313,7 +358,7 @@ jobs:
           echo ""
           echo "========================================="
 
-          if [ "$STATIC_RESULT" != "success" ] || [ "$CORE_RESULT" != "success" ] || [ "$CLI_RESULT" != "success" ] || [ "$ADAPTER_RESULT" != "success" ]; then
+          if [ "$STATIC_RESULT" != "success" ] || [ "$CORE_RESULT" != "success" ] || [ "$CLI_RESULT" != "success" ] || [ "$UI_RESULT" != "success" ] || [ "$ADAPTER_RESULT" != "success" ]; then
             echo "❌ Some tests failed. Please check the logs above for details."
             exit 1
           else

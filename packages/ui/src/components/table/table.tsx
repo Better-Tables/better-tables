@@ -273,17 +273,25 @@ export function BetterTable<TData = unknown>({
     [urlSync?.adapter]
   );
 
-  useTableUrlSync(
-    id,
-    urlSync?.config || {
-      filters: false,
-      pagination: false,
-      sorting: false,
-      columnVisibility: false,
-      columnOrder: false,
-    },
-    urlAdapter
+  const urlSyncConfig = useMemo(
+    () =>
+      urlSync?.config ?? {
+        filters: false,
+        pagination: false,
+        sorting: false,
+        columnVisibility: false,
+        columnOrder: false,
+      },
+    [
+      urlSync?.config?.filters,
+      urlSync?.config?.pagination,
+      urlSync?.config?.sorting,
+      urlSync?.config?.columnVisibility,
+      urlSync?.config?.columnOrder,
+    ]
   );
+
+  useTableUrlSync(id, urlSyncConfig, urlAdapter);
 
   // Cleanup store on unmount to prevent memory leaks
   useEffect(() => {

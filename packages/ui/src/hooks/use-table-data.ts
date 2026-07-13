@@ -7,19 +7,25 @@ import type {
   PaginationState,
   TableAdapter,
 } from '@better-tables/core';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseTableDataOptions<TData = unknown> {
   /** Table adapter for data fetching */
   adapter: TableAdapter<TData>;
 
-  /** Current filters */
+  /**
+   * Current filters.
+   * Pass a referentially stable array when possible (e.g. from state or useMemo).
+   */
   filters?: FilterState[];
 
   /** Current pagination state */
   pagination?: PaginationState;
 
-  /** Additional fetch parameters */
+  /**
+   * Additional fetch parameters.
+   * Pass a referentially stable object when possible.
+   */
   params?: Record<string, unknown>;
 
   /** Whether to fetch data automatically */
@@ -90,10 +96,18 @@ export function useTableData<TData = unknown>({
     null
   );
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+
   const fetchData = useCallback(async () => {
     if (!enabled) return;
 
+    abortControllerRef.current?.abort();
+
     const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const requestId = ++requestIdRef.current;
+
     setLoading(true);
     setError(null);
 
@@ -101,9 +115,9 @@ export function useTableData<TData = unknown>({
       const fetchParams: FetchDataParams = {
         filters,
         ...params,
+        signal: abortController.signal,
       };
 
-      // Add pagination if provided
       if (pagination) {
         fetchParams.pagination = {
           page: pagination.page,
@@ -113,24 +127,24 @@ export function useTableData<TData = unknown>({
 
       const result = await adapter.fetchData(fetchParams);
 
-      if (!abortController.signal.aborted) {
-        setData(result.data);
-        setTotalCount(result.total);
-        setPaginationInfo(result.pagination);
+      if (requestId !== requestIdRef.current || abortController.signal.aborted) {
+        return;
       }
+
+      setData(result.data);
+      setTotalCount(result.total);
+      setPaginationInfo(result.pagination);
     } catch (err) {
-      if (!abortController.signal.aborted) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch data'));
+      if (requestId !== requestIdRef.current || abortController.signal.aborted) {
+        return;
       }
+
+      setError(err instanceof Error ? err : new Error('Failed to fetch data'));
     } finally {
-      if (!abortController.signal.aborted) {
+      if (requestId === requestIdRef.current && !abortController.signal.aborted) {
         setLoading(false);
       }
     }
-
-    return () => {
-      abortController.abort();
-    };
   }, [adapter, filters, pagination, params, enabled]);
 
   const refetch = useCallback(async () => {
@@ -142,14 +156,10 @@ export function useTableData<TData = unknown>({
   }, []);
 
   useEffect(() => {
-    let cleanup: (() => void) | undefined;
-
-    fetchData().then((cleanupFn) => {
-      cleanup = cleanupFn;
-    });
+    void fetchData();
 
     return () => {
-      cleanup?.();
+      abortControllerRef.current?.abort();
     };
   }, [fetchData]);
 

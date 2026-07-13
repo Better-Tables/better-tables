@@ -81,6 +81,12 @@ export interface FetchDataParams {
 
   /** Additional custom parameters */
   params?: Record<string, unknown>;
+
+  /**
+   * Optional abort signal for in-flight request cancellation.
+   * Adapters SHOULD honor abort when possible; they may ignore it.
+   */
+  signal?: AbortSignal;
 }
 
 /**
