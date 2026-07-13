@@ -6,17 +6,39 @@
 > tests at `packages/core/tests/types/table-def-v1.test.ts`, and the
 > type-performance fixture at `packages/core/tests/types/table-def-perf-fixture.ts`.
 >
-> **Provenance note**: this plan set assumes two sibling documents —
-> `plans/design/core-contract-v2.md` (plan 006) and
-> `plans/005-builder-type-inference.md` (plan 005). Neither exists yet at the
-> time of writing. Everywhere this document references them, it is stating
-> what THIS design *requires of* them, prescriptively — not reporting
-> something read from an existing file. Plan 005's shape is taken from the
-> maintainer's own one-line summary of it: it threads accessor-inferred
-> `TValue` through the fluent builders (`accessor<V>(fn): Builder<TData, V>`),
-> adds `const`-literal checking to `.options()`, and replaces the
-> `ColumnDefinition<TData, any>` erasure at the `BetterTable` boundary with a
-> `defineColumns()` helper.
+> **Provenance note** (updated 2026-07-13): at authoring time this document
+> was written in an isolated worktree where the plan files were not visible;
+> its references to plans 005/006 are prescriptive (what this design
+> *requires of* them). Current state: `plans/005-builder-type-inference.md`
+> EXISTS in the repo (implementation in progress; its shape matches what is
+> assumed here — accessor-inferred `TValue`, `const`-literal `.options()`
+> checking, `defineColumns()` replacing the `ColumnDefinition<TData, any>`
+> erasure). `plans/design/core-contract-v2.md` (plan 006's deliverable) does
+> NOT exist yet — plan 006 must derive its `ColumnRegistry` from this
+> document's `define()` design when it runs.
+
+---
+
+## Maintainer decisions (2026-07-12)
+
+The maintainer reviewed this design and ruled on release strategy. These
+decisions SUPERSEDE the compatibility-preserving recommendations below where
+they conflict (superseded passages are edited in place and marked):
+
+1. **One coordinated breaking release.** Everything in this design plus
+   contract v2 (plan 006) ships together as a major upgrade (`0.6.0` —
+   pre-1.0, so the 0.x minor is the breaking-change slot per semver).
+   Backward compatibility is NOT required: no deprecation cycles, no
+   `@deprecated`-and-warn releases, no legacy overloads kept alive. Users
+   are expected to migrate in one step; the deliverable owed to them is a
+   **migration guide**, not a compatibility layer.
+2. **Open question (b) is DECIDED: ship the instance API and contract v2
+   together in 0.6** — which this doc already recommended.
+3. **What survives is architecture, not compat**: the fluent builders remain
+   as the low-level layer because the path builders compile down to them
+   (the identical-`ColumnDefinition` invariant), NOT to preserve old call
+   sites. The legacy per-table `betterTables()` shell is REMOVED in 0.6,
+   not deprecated.
 
 ---
 
@@ -26,11 +48,13 @@
 
 **Recommendation:** Introduce `betterTables({ database, defaults?, plugins? })`
 as an app-level factory, called once, returning `BetterTablesInstance<TAdapter>`
-— a schema-carrying object that `defineTable` reads from. Ship it under the
-overload of the SAME export name `betterTables` for one minor release,
-disambiguated structurally from the current per-table shell, with the legacy
-path marked `@deprecated` and emitting a one-time runtime warning; remove the
-legacy overload in the following minor.
+— a schema-carrying object that `defineTable` reads from.
+*(Superseded per Maintainer decisions, 2026-07-12: the original text here
+recommended shipping the new shape as an overload alongside the deprecated
+legacy shell for one minor release. Decision: the legacy per-table shell is
+REPLACED outright in 0.6 — same export name, new signature, no overload, no
+deprecation cycle. The old call shape becomes a compile error with a
+migration-guide entry.)*
 
 Today's `betterTables<TRecord = unknown>(config: BetterTablesConfig<TRecord>): BetterTablesInstance<TRecord>`
 (`packages/core/src/factory.ts:76-123`, types in `packages/core/src/types/factory.ts:26-111`)
@@ -816,27 +840,27 @@ release).
 | Multi-table setup | `createColumnBuilders({ users: {} as User, posts: {} as Post })` — `column-factory.ts:250-260`, a map of untyped placeholder values | `defineTable<typeof tables>()('users', ...)` / `('posts', ...)` — one instance, schema-derived, no placeholder values needed | N/A (the multi-table NEED already existed — `createColumnBuilders` is evidence of it per the source plan — this design formalizes it) |
 | UI wiring | `<BetterTable columns={columns} data={data} features={{...}} />` — `README.md:101-114` | `<BetterTable table={usersTable} data={data} />` (sketch; actual prop implementation is a follow-up plan, not built here) | Both ultimately read `ColumnDefinition[]` under the hood |
 
-**What's deprecated when:** the legacy `betterTables()` overload and the
-existing fluent `createColumnBuilder`/`createColumnBuilders` stay fully
-functional and undeprecated in code (no runtime warning) for the 0.6
-release that ships this design's runtime implementation — they are a
-DIFFERENT, still-valid layer (Step 2 section 8's raw-`ColumnDefinition`
-escape hatch depends on the fluent builders continuing to exist and produce
-`ColumnDefinition` objects). Only the OLD `betterTables()` call SHAPE
-(instance-shell-per-table, decision 1) gets the `@deprecated`-and-warn
-treatment, and only once the new instance shape ships. This mirrors the
-existing repo convention exactly (`nullableAccessor`/`nullable` deprecated
-in place, not removed, `column-builder.ts:144-151,301-303`).
+**What's removed vs. what remains (updated per Maintainer decisions,
+2026-07-12):** the legacy per-table `betterTables()` call shape is REMOVED
+in 0.6 — no `@deprecated` interlude, no runtime warning release; migrating
+it is a documented one-step change in the migration guide. The fluent
+`createColumnBuilder`/`createColumnBuilders` layer REMAINS — not for
+compatibility, but because it is the compilation target of the path
+builders and the raw-`ColumnDefinition` escape hatch (Step 2 section 8)
+depends on it. Anything else in the old public surface that contradicts
+the new instance API is likewise removed in 0.6 rather than deprecated.
 
-**The invariant that makes incremental migration possible:** path
+**The invariant that makes column-level migration incremental:** path
 builders and the low-level fluent builders emit the IDENTICAL
 `ColumnDefinition<TData, TValue>` shape (`types/column.ts:27-87`) — verified
 structurally in the prototype (`RawColumnDefinitionLike<TData>` is a
 projection of that same interface, unioned into the same `columns` array
 type as the path builders). An app can have SOME columns still written with
 `cb.text().id(...).accessor(...).build()` and SOME written as `t.text(path)`
-in the same `columns` array, table by table, forever if needed — there is
-no flag day.
+in the same `columns` array — column-by-column migration works. (Per
+Maintainer decisions 2026-07-12, the INSTANCE shape does have a flag day in
+0.6 — the incremental property applies to columns, not to the removed
+per-table shell.)
 
 ### Open questions for the maintainer
 
@@ -855,7 +879,9 @@ future codegen CLI that needs `Paths<T>` without pulling in the rest of
 `core`) materializes.
 
 **(b) Ship the instance API in 0.6 with contract v2, or after.**
-**Recommendation:** together, in 0.6. `usersTable.$infer.FilterState`
+**DECIDED (maintainer, 2026-07-12): together, in 0.6, as one coordinated
+breaking release — see "Maintainer decisions" at the top of this doc.**
+**Recommendation (accepted):** together, in 0.6. `usersTable.$infer.FilterState`
 (Step 1 decision 6) and the "`ColumnRegistry` derived from `define()`"
 requirement (Interaction section above) mean the instance API and contract
 v2's typed registry are not independently useful — shipping the instance
