@@ -43,9 +43,24 @@ const DEFAULT_PRIORITIES = [
 export class OptionColumnBuilder<
   TData = unknown,
   TValue extends string = string,
-> extends ColumnBuilder<TData, TValue> {
+  TId extends string = string,
+> extends ColumnBuilder<TData, TValue, TId> {
   constructor() {
     super('option');
+  }
+
+  /**
+   * Set the column identifier.
+   *
+   * Rebinds the builder's id type to the literal passed in, so subsequent
+   * chained methods (and `build()`) see the narrowed id type.
+   *
+   * @param id - Unique column identifier
+   * @returns An `OptionColumnBuilder` rebound to the id literal
+   */
+  override id<const K extends string>(id: K): OptionColumnBuilder<TData, TValue, K> {
+    this.config.id = id as unknown as TId;
+    return this as unknown as OptionColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -61,9 +76,11 @@ export class OptionColumnBuilder<
    * @param accessor - Function that extracts the column value from row data
    * @returns An `OptionColumnBuilder` rebound to the accessor's return type
    */
-  override accessor<V extends TValue>(accessor: (data: TData) => V): OptionColumnBuilder<TData, V> {
+  override accessor<V extends TValue>(
+    accessor: (data: TData) => V
+  ): OptionColumnBuilder<TData, V, TId> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as OptionColumnBuilder<TData, V>;
+    return this as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -108,7 +125,7 @@ export class OptionColumnBuilder<
       /** Placeholder text for the option selector */
       placeholder?: string;
     } = {}
-  ): OptionColumnBuilder<TData, V> {
+  ): OptionColumnBuilder<TData, V, TId> {
     const { includeNull = false, validation, searchable = true, placeholder } = config;
 
     const filterConfig: FilterConfig<V> = {
@@ -127,7 +144,7 @@ export class OptionColumnBuilder<
         values: options,
       },
     };
-    return this as unknown as OptionColumnBuilder<TData, V>;
+    return this as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -198,7 +215,7 @@ export class OptionColumnBuilder<
       /** Loading placeholder text */
       loadingPlaceholder?: string;
     } = {}
-  ): OptionColumnBuilder<TData, V> {
+  ): OptionColumnBuilder<TData, V, TId> {
     const {
       includeNull = false,
       validation,
@@ -224,7 +241,7 @@ export class OptionColumnBuilder<
         optionsLoader,
       },
     };
-    return this as unknown as OptionColumnBuilder<TData, V>;
+    return this as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -244,7 +261,7 @@ export class OptionColumnBuilder<
       /** Default status value */
       defaultValue?: V;
     } = {}
-  ): OptionColumnBuilder<TData, V> {
+  ): OptionColumnBuilder<TData, V, TId> {
     const { includeNull = false, defaultValue } = config;
 
     const statusOptions: FilterOption<V>[] = statuses.map((status) => ({
@@ -262,7 +279,7 @@ export class OptionColumnBuilder<
         showBadge: true,
       },
     };
-    return this as unknown as OptionColumnBuilder<TData, V>;
+    return this as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -290,7 +307,7 @@ export class OptionColumnBuilder<
       /** Default priority value */
       defaultValue?: V;
     } = {}
-  ): OptionColumnBuilder<TData, V> {
+  ): OptionColumnBuilder<TData, V, TId> {
     const { includeNull = false, defaultValue } = config;
 
     const priorityOptions: FilterOption<V>[] = [...priorities]
@@ -312,7 +329,7 @@ export class OptionColumnBuilder<
         sortByOrder: true,
       },
     };
-    return this as unknown as OptionColumnBuilder<TData, V>;
+    return this as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -330,7 +347,7 @@ export class OptionColumnBuilder<
       /** Whether to show category icons (default: true) */
       showIcons?: boolean;
     } = {}
-  ): OptionColumnBuilder<TData, V> {
+  ): OptionColumnBuilder<TData, V, TId> {
     const { includeNull = false, searchable = true, showIcons = true } = config;
 
     this.options(categories, { includeNull, searchable });
@@ -341,7 +358,7 @@ export class OptionColumnBuilder<
         showIcons,
       },
     };
-    return this as unknown as OptionColumnBuilder<TData, V>;
+    return this as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**

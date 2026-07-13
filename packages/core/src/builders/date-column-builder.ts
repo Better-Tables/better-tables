@@ -30,12 +30,27 @@ import { ColumnBuilder } from './column-builder';
  *   .build();
  * ```
  */
-export class DateColumnBuilder<TData = unknown, TValue extends Date = Date> extends ColumnBuilder<
-  TData,
-  TValue
-> {
+export class DateColumnBuilder<
+  TData = unknown,
+  TValue extends Date = Date,
+  TId extends string = string,
+> extends ColumnBuilder<TData, TValue, TId> {
   constructor() {
     super('date');
+  }
+
+  /**
+   * Set the column identifier.
+   *
+   * Rebinds the builder's id type to the literal passed in, so subsequent
+   * chained methods (and `build()`) see the narrowed id type.
+   *
+   * @param id - Unique column identifier
+   * @returns A `DateColumnBuilder` rebound to the id literal
+   */
+  override id<const K extends string>(id: K): DateColumnBuilder<TData, TValue, K> {
+    this.config.id = id as unknown as TId;
+    return this as unknown as DateColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -47,9 +62,11 @@ export class DateColumnBuilder<TData = unknown, TValue extends Date = Date> exte
    * @param accessor - Function that extracts the column value from row data
    * @returns A `DateColumnBuilder` rebound to the accessor's return type
    */
-  override accessor<V extends Date>(accessor: (data: TData) => V): DateColumnBuilder<TData, V> {
+  override accessor<V extends Date>(
+    accessor: (data: TData) => V
+  ): DateColumnBuilder<TData, V, TId> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as DateColumnBuilder<TData, V>;
+    return this as unknown as DateColumnBuilder<TData, V, TId>;
   }
 
   /**

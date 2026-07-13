@@ -106,7 +106,11 @@ describe('DateColumnBuilder', () => {
         .sortable()
         .filterable();
 
-      expect(result).toBe(builder);
+      // `.id('createdAt')` rebinds the builder's id type to the literal, so
+      // `result`'s static type narrows past `builder`'s pre-chain type even
+      // though they're the same runtime object (`.id()` mutates and returns
+      // `this`). Cast for the identity comparison only.
+      expect(result).toBe(builder as unknown as typeof result);
 
       const config = builder.build();
       expect(config.id).toBe('createdAt');

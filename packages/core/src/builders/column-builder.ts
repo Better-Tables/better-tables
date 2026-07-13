@@ -58,8 +58,8 @@ import type { FilterConfig } from '../types/filter';
  *   .build();
  * ```
  */
-export class ColumnBuilder<TData = unknown, TValue = unknown> {
-  protected config: Partial<ColumnDefinition<TData, TValue>>;
+export class ColumnBuilder<TData = unknown, TValue = unknown, TId extends string = string> {
+  protected config: Partial<ColumnDefinition<TData, TValue, TId>>;
 
   /**
    * Create a new column builder instance.
@@ -103,9 +103,9 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    *   .build();
    * ```
    */
-  id(id: string): this {
-    this.config.id = id;
-    return this;
+  id<const K extends string>(id: K): ColumnBuilder<TData, TValue, K> {
+    this.config.id = id as unknown as TId;
+    return this as unknown as ColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -137,9 +137,9 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    *   .build();
    * ```
    */
-  accessor<V extends TValue>(accessor: (data: TData) => V): ColumnBuilder<TData, V> {
+  accessor<V extends TValue>(accessor: (data: TData) => V): ColumnBuilder<TData, V, TId> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as ColumnBuilder<TData, V>;
+    return this as unknown as ColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -363,7 +363,7 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    * const columns = [column];
    * ```
    */
-  build(): ColumnDefinition<TData, TValue> {
+  build(): ColumnDefinition<TData, TValue, TId> {
     this.validateConfig();
 
     // If nullable is true, wrap the accessor to convert empty strings to null
@@ -379,7 +379,7 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
       };
     }
 
-    return this.config as ColumnDefinition<TData, TValue>;
+    return this.config as ColumnDefinition<TData, TValue, TId>;
   }
 
   /**
@@ -409,7 +409,7 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
   /**
    * Get the current configuration (for debugging)
    */
-  protected getConfig(): Partial<ColumnDefinition<TData, TValue>> {
+  protected getConfig(): Partial<ColumnDefinition<TData, TValue, TId>> {
     return { ...this.config };
   }
 }

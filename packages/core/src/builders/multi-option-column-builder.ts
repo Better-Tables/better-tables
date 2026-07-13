@@ -36,9 +36,24 @@ import { ColumnBuilder } from './column-builder';
 export class MultiOptionColumnBuilder<
   TData = unknown,
   TValue extends string[] = string[],
-> extends ColumnBuilder<TData, TValue> {
+  TId extends string = string,
+> extends ColumnBuilder<TData, TValue, TId> {
   constructor() {
     super('multiOption');
+  }
+
+  /**
+   * Set the column identifier.
+   *
+   * Rebinds the builder's id type to the literal passed in, so subsequent
+   * chained methods (and `build()`) see the narrowed id type.
+   *
+   * @param id - Unique column identifier
+   * @returns A `MultiOptionColumnBuilder` rebound to the id literal
+   */
+  override id<const K extends string>(id: K): MultiOptionColumnBuilder<TData, TValue, K> {
+    this.config.id = id as unknown as TId;
+    return this as unknown as MultiOptionColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -56,9 +71,9 @@ export class MultiOptionColumnBuilder<
    */
   override accessor<V extends TValue>(
     accessor: (data: TData) => V
-  ): MultiOptionColumnBuilder<TData, V> {
+  ): MultiOptionColumnBuilder<TData, V, TId> {
     this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as MultiOptionColumnBuilder<TData, V>;
+    return this as unknown as MultiOptionColumnBuilder<TData, V, TId>;
   }
 
   /**
@@ -109,7 +124,7 @@ export class MultiOptionColumnBuilder<
       /** Minimum number of selections required */
       minSelections?: number;
     } = {}
-  ): MultiOptionColumnBuilder<TData, V[]> {
+  ): MultiOptionColumnBuilder<TData, V[], TId> {
     const {
       includeNull = false,
       validation,
@@ -144,7 +159,7 @@ export class MultiOptionColumnBuilder<
         minSelections,
       },
     };
-    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[], TId>;
   }
 
   /**
@@ -224,7 +239,7 @@ export class MultiOptionColumnBuilder<
       /** Minimum number of selections required */
       minSelections?: number;
     } = {}
-  ): MultiOptionColumnBuilder<TData, V[]> {
+  ): MultiOptionColumnBuilder<TData, V[], TId> {
     const {
       includeNull = false,
       validation,
@@ -261,7 +276,7 @@ export class MultiOptionColumnBuilder<
         minSelections,
       },
     };
-    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[], TId>;
   }
 
   /**
@@ -307,7 +322,7 @@ export class MultiOptionColumnBuilder<
       /** Minimum number of tags required */
       minTags?: number;
     } = {}
-  ): MultiOptionColumnBuilder<TData, V[]> {
+  ): MultiOptionColumnBuilder<TData, V[], TId> {
     const {
       includeNull = false,
       searchable = true,
@@ -330,7 +345,7 @@ export class MultiOptionColumnBuilder<
         showCount: true,
       },
     };
-    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[], TId>;
   }
 
   /**
@@ -350,7 +365,7 @@ export class MultiOptionColumnBuilder<
       /** Maximum number of categories allowed */
       maxCategories?: number;
     } = {}
-  ): MultiOptionColumnBuilder<TData, V[]> {
+  ): MultiOptionColumnBuilder<TData, V[], TId> {
     const { includeNull = false, searchable = true, showHierarchy = true, maxCategories } = config;
 
     this.options(categories, {
@@ -366,7 +381,7 @@ export class MultiOptionColumnBuilder<
         showIcons: true,
       },
     };
-    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[], TId>;
   }
 
   /**
@@ -386,7 +401,7 @@ export class MultiOptionColumnBuilder<
       /** Maximum number of roles allowed */
       maxRoles?: number;
     } = {}
-  ): MultiOptionColumnBuilder<TData, V[]> {
+  ): MultiOptionColumnBuilder<TData, V[], TId> {
     const { includeNull = false, searchable = true, showDescriptions = true, maxRoles } = config;
 
     this.options(roles, { includeNull, searchable, maxSelections: maxRoles });
@@ -398,7 +413,7 @@ export class MultiOptionColumnBuilder<
         showBadges: true,
       },
     };
-    return this as unknown as MultiOptionColumnBuilder<TData, V[]>;
+    return this as unknown as MultiOptionColumnBuilder<TData, V[], TId>;
   }
 
   /**

@@ -24,9 +24,13 @@ export type ColumnType =
 /**
  * Column definition for table columns
  */
-export interface ColumnDefinition<TData = unknown, TValue = unknown> {
+export interface ColumnDefinition<
+  TData = unknown,
+  TValue = unknown,
+  TId extends string = string,
+> {
   /** Unique column identifier */
-  id: string;
+  id: TId;
 
   /** Column display name */
   displayName: string;
