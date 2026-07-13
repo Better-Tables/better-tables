@@ -16,7 +16,12 @@ import {
   getPrimaryKeyMap,
   quoteIdentifier as quoteIdentifierRaw,
 } from '@better-tables/adapters-toolkit';
-import type { FilterGroupNode, FilterState, PaginationParams, SortingParams } from '@better-tables/core';
+import type {
+  FilterGroupNode,
+  FilterState,
+  PaginationParams,
+  SortingParams,
+} from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import {
   and,
@@ -575,6 +580,105 @@ export abstract class BaseQueryBuilder {
     const offset = (page - 1) * limit;
 
     return query.limit(limit).offset(offset);
+  }
+
+  /**
+   * Detect whether a join order contains a fan-out (one-to-many/array)
+   * relationship (plan 020, ADAPTER-03). `RelationshipPath.cardinality`
+   * already carries this: `'many'` means the join multiplies primary-table
+   * rows (one-to-many), `'one'` means it doesn't (many-to-one/one-to-one).
+   * Array-FK relationships are always detected with `cardinality: 'many'`
+   * (see `RelationshipDetector`), so checking `isArray` too is belt-and-
+   * suspenders, not a separate case. A many-to-one-only join order (gate
+   * false) never row-multiplies, so pagination there is already correct.
+   */
+  protected hasFanOutJoin(joinOrder: RelationshipPath[]): boolean {
+    return joinOrder.some(
+      (relationship) => relationship.cardinality === 'many' || relationship.isArray === true
+    );
+  }
+
+  /**
+   * Build ORDER BY clauses for the phase-1 fan-out key-page query (plan
+   * 020). Phase 1 groups by the primary key only, so any sort column from
+   * a joined table (or the primary table, functionally determined by the
+   * group) must be wrapped in an aggregate to stay valid SQL under GROUP
+   * BY across Postgres/MySQL/SQLite. MIN for ascending and MAX for
+   * descending sorts each group by its most-extreme matching value in the
+   * requested direction -- deterministic and dialect-portable, at the cost
+   * of not having one canonical "the" value to sort a fanned-out group by
+   * (there isn't one; the multi-valued semantics are inherently ambiguous).
+   */
+  protected buildFanOutOrderByClauses(
+    sorting: SortingParams[],
+    primaryTable: string,
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
+  ): (SQL | SQLWrapper)[] {
+    if (!sorting || sorting.length === 0) {
+      return [];
+    }
+
+    return sorting.map((sort) => {
+      const computedField = computedFields?.[sort.columnId];
+      if (computedField?.__resolvedSortSql !== undefined) {
+        return sort.direction === 'desc'
+          ? desc(max(computedField.__resolvedSortSql))
+          : asc(min(computedField.__resolvedSortSql));
+      }
+
+      const columnPath = this.relationshipManager.resolveColumnPath(sort.columnId, primaryTable);
+      const column = this.getColumn(columnPath);
+
+      if (!column) {
+        throw new QueryError(`Column not found for sorting: ${sort.columnId}`, {
+          columnId: sort.columnId,
+        });
+      }
+
+      return sort.direction === 'desc' ? desc(max(column)) : asc(min(column));
+    });
+  }
+
+  /**
+   * Build phase 1 of the two-phase fan-out pagination fix (plan 020):
+   * the page of DISTINCT primary keys under the same joins/filters as the
+   * real data query, `GROUP BY` the primary key, ordered by aggregates of
+   * the requested sort columns (see `buildFanOutOrderByClauses`) with the
+   * primary key itself as a final deterministic tiebreaker, then
+   * LIMIT/OFFSET. This is what makes a "page of `limit`" mean `limit`
+   * distinct primary rows instead of `limit` fanned-out join rows.
+   */
+  protected buildFanOutKeyPageQuery(
+    joinOrder: RelationshipPath[],
+    primaryTable: string,
+    primaryKeyInfo: { columnName: string; column: AnyColumnType },
+    filters: FilterState[] | FilterGroupNode,
+    sorting: SortingParams[],
+    pagination: PaginationParams,
+    additionalConditions?: (SQL | SQLWrapper)[],
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
+  ): QueryBuilderWithJoins {
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, { primaryTable });
+    }
+
+    const baseQuery = this.getDb().select({ pk: primaryKeyInfo.column }).from(primaryTableSchema);
+    const joinedQuery = this.applyJoins(baseQuery, joinOrder);
+    const filteredQuery = this.applyFilters(
+      joinedQuery,
+      filters,
+      primaryTable,
+      additionalConditions
+    );
+    const groupedQuery = filteredQuery.groupBy(primaryKeyInfo.column);
+
+    const orderByClauses = this.buildFanOutOrderByClauses(sorting, primaryTable, computedFields);
+    const orderedQuery = groupedQuery.orderBy(...orderByClauses, asc(primaryKeyInfo.column));
+
+    const { page, limit } = pagination;
+    const offset = (page - 1) * limit;
+    return orderedQuery.limit(limit).offset(offset);
   }
 
   /**
