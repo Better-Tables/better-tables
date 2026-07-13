@@ -1,10 +1,14 @@
 # Design: Core contract v2 — AND/OR filter groups + typed column registry
 
 > Companion to `plans/006-core-contract-v2-design.md`. This document is the
-> design deliverable for **Steps 1, 2, and 5** of that plan. It is design-only:
-> the compiling type prototype (`packages/core/src/types/experimental/contract-v2.ts`)
-> and its type-level acceptance tests (`packages/core/tests/types/contract-v2.test.ts`)
-> are **Steps 3–4**, deferred to a follow-up. Nothing here changes shipping code.
+> design deliverable for **Steps 1, 2, and 5** of that plan.
+> *(Status update 2026-07-13: the header below is stale in two ways — the
+> Steps 3–4 prototype + type tests WERE subsequently delivered (commit
+> `b074f49`: `experimental/contract-v2.ts` + `tests/types/contract-v2.test.ts`,
+> 11 assertions passing), and the "unresolved dependency" on literal-preserving
+> ids is RESOLVED by plan 014 (merged `11c2ac2`). Implementation follow-ups 1–2
+> at the bottom of this doc are therefore DONE; follow-up 3 is plan 015.)*
+> It is design-only: nothing here changes shipping code.
 >
 > This design derives from — and must stay a type FUNCTION of — plan 011's
 > approved `define()` API (`plans/design/table-definition-dx.md`, prototype at
@@ -481,7 +485,12 @@ fully exploit it**, and none is forced in a single commit.
 
 ---
 
-## Unresolved dependency: literal-preserving column ids
+## Unresolved dependency: literal-preserving column ids — RESOLVED
+
+*(2026-07-13: plan 014 delivered exactly the required change below — merged at
+`11c2ac2`; `ColumnRegistry` over real built columns now resolves literal keys,
+verified by a type test asserting against this doc's own prototype. The section
+is preserved as the historical rationale.)*
 
 The registry in Step 2 is keyed by `C['id'] & string`. That requires column ids
 to be **literal-preserving**, which they are NOT today:
