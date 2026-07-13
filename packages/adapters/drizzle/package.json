@@ -15,6 +15,7 @@
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
@@ -28,21 +29,34 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
-    "@better-tables/adapters-toolkit": "workspace:*",
-    "better-sqlite3": "^12.4.6",
-    "drizzle-orm": "^0.45.1"
+    "@better-tables/adapters-toolkit": "workspace:*"
   },
   "peerDependencies": {
     "@better-tables/core": "workspace:*",
+    "better-sqlite3": "^12.4.6",
+    "drizzle-orm": ">=0.44.0 <0.46.0",
     "mysql2": "^3.12.0",
     "postgres": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "postgres": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@better-tables/core": "workspace:*",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "better-sqlite3": "^12.4.6",
     "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tsdown": "catalog:",

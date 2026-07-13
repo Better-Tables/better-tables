@@ -126,15 +126,15 @@
       "version": "0.5.31",
       "dependencies": {
         "@better-tables/adapters-toolkit": "workspace:*",
-        "better-sqlite3": "^12.4.6",
-        "drizzle-orm": "^0.45.1",
       },
       "devDependencies": {
         "@better-tables/core": "workspace:*",
         "@types/better-sqlite3": "^7.6.13",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
+        "better-sqlite3": "^12.4.6",
         "dotenv": "^17.2.3",
+        "drizzle-orm": "^0.45.1",
         "react": "catalog:",
         "react-dom": "catalog:",
         "tsdown": "catalog:",
@@ -142,9 +142,16 @@
       },
       "peerDependencies": {
         "@better-tables/core": "workspace:*",
+        "better-sqlite3": "^12.4.6",
+        "drizzle-orm": ">=0.44.0 <0.46.0",
         "mysql2": "^3.12.0",
         "postgres": "^3.4.0",
       },
+      "optionalPeers": [
+        "better-sqlite3",
+        "mysql2",
+        "postgres",
+      ],
     },
     "packages/adapters/toolkit": {
       "name": "@better-tables/adapters-toolkit",
