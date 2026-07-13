@@ -24,12 +24,7 @@
 
 import type { FilterGroupNode, FilterState } from '../types/filter';
 import { compressAndEncode, decompressAndDecode } from './compression';
-import {
-  isFilterGroupNode,
-  isFilterNodeShape,
-  isFilterStateShape,
-  normalizeFilterNode,
-} from './type-guards';
+import { isFilterGroupNode, isFilterStateShape, normalizeFilterNode } from './type-guards';
 
 /** URL prefix for the group-aware (contract v2) wire format. WRITE always emits this. */
 const FILTER_WIRE_PREFIX_V2 = 'c2:';
@@ -99,12 +94,19 @@ export function serializeFiltersToURL(filters: FilterState[] | FilterGroupNode):
  * Deserialize a `c2:`-prefixed (contract v2, group-aware) payload.
  *
  * A bare top-level array is a flat `FilterState[]` (implicit AND, same
- * validation as the legacy path). A non-array top-level value is validated
- * and normalized as a {@link FilterGroupNode} tree (design §1.4: fail
- * closed, drop invalid/unknown-logic/empty groups, unwrap single-child
+ * validation as the legacy path). A non-array top-level value is normalized
+ * as a {@link FilterGroupNode} tree via {@link normalizeFilterNode} (design
+ * §1.4: fail closed, drop invalid/unknown-logic/empty groups -- including a
+ * single invalid child among otherwise-valid siblings -- unwrap single-child
  * groups, drop over-deep subtrees). A normalized single leaf is wrapped back
  * into a length-1 array so the return type stays `FilterState[] |
  * FilterGroupNode`, matching what `serializeFiltersToURL` accepts.
+ *
+ * Deliberately does NOT pre-gate on `isFilterNodeShape` (`utils/type-guards.ts`):
+ * that guard is strict/all-or-nothing (one invalid child fails the whole
+ * node), whereas `normalizeFilterNode` does the equivalent validation itself
+ * but bottom-up and per-node, which is what lets an invalid sibling be
+ * dropped while valid siblings survive.
  */
 function deserializeV2Payload(urlString: string): FilterState[] | FilterGroupNode {
   const decoded = decompressAndDecode<unknown>(urlString, FILTER_WIRE_PREFIX_V2);
@@ -114,14 +116,6 @@ function deserializeV2Payload(urlString: string): FilterState[] | FilterGroupNod
 
   if (Array.isArray(decoded)) {
     return collectValidFlatFilters(decoded);
-  }
-
-  if (!isFilterNodeShape(decoded)) {
-    // biome-ignore lint: Intentional warning logging for dropped invalid filter payload
-    console.warn(
-      '[better-tables] Dropped invalid filter payload: entry does not match the expected filter or group shape.'
-    );
-    return [];
   }
 
   const normalized = normalizeFilterNode(decoded);

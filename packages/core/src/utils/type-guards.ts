@@ -175,9 +175,7 @@ export function normalizeFilterNode(
   if (isFilterGroupNode(node)) {
     if (depth > maxDepth) {
       // biome-ignore lint: Intentional warning logging for dropped invalid filter groups
-      console.warn(
-        `[better-tables] Dropped filter group: nesting exceeds max depth ${maxDepth}.`
-      );
+      console.warn(`[better-tables] Dropped filter group: nesting exceeds max depth ${maxDepth}.`);
       return null;
     }
 

@@ -1,13 +1,13 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
-import {
-  type ColumnDefLike,
-  type ColumnRegistry,
-  type FilterStateFor,
-  type RegistryFromRow,
-  type TableAdapterV2,
+import type {
+  ColumnDefLike,
+  ColumnRegistry,
+  FilterStateFor,
+  RegistryFromRow,
+  TableAdapterV2,
 } from '../../src/types/experimental/contract-v2';
-import { isFilterGroupNode } from '../../src/utils/type-guards';
 import type { FilterNode, FilterState } from '../../src/types/filter';
+import { isFilterGroupNode } from '../../src/utils/type-guards';
 
 /**
  * Type-level acceptance tests for the plan 006 "core contract v2" prototype
