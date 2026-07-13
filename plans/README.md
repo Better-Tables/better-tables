@@ -50,8 +50,28 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   and can be poisoned by a stale `.next/types/validator.ts` referencing
   deleted routes — `rm -rf apps/marketing/.next` clears it; consider
   prepending `next typegen` like apps/docs (backlog).
-- **In flight**: 029 marketing showcase (`marketing-showcase`, from WIP at
-  `b1300d7`).
+- **029 MERGED (2026-07-13)**: four showcase examples live
+  (`/examples`: relationship-filtering, query-groups, big-board, facets) on
+  the flagship `betterTables()`/`defineTable()` API, every page
+  browser-verified against seed data; site build green. The dogfood harvest:
+  **17 DX findings** in `plans/findings/029-dx-findings.md` — three are
+  correctness bugs (9: parameterless `fetchData` silently returns the WRONG
+  TABLE's rows typed as the right shape; 10: relations silently absent from
+  results unless dot-pathed in `columns`, while filtering by them works;
+  14: auto-detection breaks when SQL table name ≠ JS schema key — tables
+  keyed by export name, relations keyed by `drizzle:Name` symbol in
+  `schema-extractor.ts`). Also: homepage demo has a pre-existing faker
+  seed error (spawned as a separate follow-up task, untouched by 029).
+
+**Proposed next wave from the findings (no plans written yet — maintainer
+gates)**: 030 = the correctness trio (14 keying fix; 9 escalate wrong-table
+fallback from warn to throw for `fetchData` — revisits 022's no-columns
+decision with new evidence; 10 decide+implement relation-projection
+semantics). 031 = filter-authoring DX (typed `buildFilter` helper from the
+registry line, `filter.id` identity, better group-shape errors — findings
+1/2/8/16/17). 032 = UI integration gaps (VirtualizedTable
+adapter/formatter integration, facet sidebar component, chip URL resync —
+findings 6/7/15). Smaller: 3/4/5/12/13 are docs/design-doc inputs.
 
 ## Outstanding
 
