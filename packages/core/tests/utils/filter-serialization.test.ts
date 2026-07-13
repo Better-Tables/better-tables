@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
 import type { FilterState } from '../../src/types/filter';
+import { compressAndEncode } from '../../src/utils/compression';
 import {
   deserializeFiltersFromURL,
   serializeFiltersToURL,
@@ -261,5 +262,79 @@ describe('edge cases', () => {
     const deserialized = deserializeFiltersFromURL(serialized);
 
     expect(deserialized).toEqual(complexFilters);
+  });
+});
+
+describe('deserializeFiltersFromURL - untrusted/malformed input (URL boundary validation)', () => {
+  it('drops a filter object missing `values` instead of crashing with a TypeError, and keeps valid filters', () => {
+    const warnSpy = mock(() => {});
+    const originalWarn = console.warn;
+    console.warn = warnSpy;
+
+    try {
+      const tampered = [
+        { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
+        { columnId: 'broken', type: 'text', operator: 'contains' }, // missing `values`
+      ];
+      const serialized = compressAndEncode(tampered);
+
+      let deserialized: FilterState[] = [];
+      expect(() => {
+        deserialized = deserializeFiltersFromURL(serialized);
+      }).not.toThrow();
+
+      expect(deserialized).toHaveLength(1);
+      expect(deserialized[0].columnId).toBe('name');
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  it('drops a filter with an unknown `type` or unknown `operator`', () => {
+    const tampered = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
+      { columnId: 'bad-type', type: 'not-a-real-type', operator: 'contains', values: ['x'] },
+      { columnId: 'bad-operator', type: 'text', operator: 'not-a-real-operator', values: ['x'] },
+    ];
+    const serialized = compressAndEncode(tampered);
+
+    const deserialized = deserializeFiltersFromURL(serialized);
+
+    expect(deserialized).toHaveLength(1);
+    expect(deserialized[0].columnId).toBe('name');
+  });
+
+  it('drops a filter where `values` is a string, not an array', () => {
+    const tampered = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
+      { columnId: 'string-values', type: 'text', operator: 'contains', values: 'not-an-array' },
+    ];
+    const serialized = compressAndEncode(tampered);
+
+    const deserialized = deserializeFiltersFromURL(serialized);
+
+    expect(deserialized).toHaveLength(1);
+    expect(deserialized[0].columnId).toBe('name');
+  });
+
+  it('round-trips a completely valid payload identically (regression guard)', () => {
+    const filters: FilterState[] = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
+      { columnId: 'age', type: 'number', operator: 'greaterThan', values: [25] },
+    ];
+    const serialized = serializeFiltersToURL(filters);
+
+    const deserialized = deserializeFiltersFromURL(serialized);
+
+    expect(deserialized).toEqual(filters);
+  });
+
+  it('still throws for a non-array payload (existing behavior preserved)', () => {
+    const serialized = compressAndEncode({ columnId: 'name', type: 'text' });
+
+    expect(() => {
+      deserializeFiltersFromURL(serialized);
+    }).toThrow('Invalid filter data format: expected array');
   });
 });

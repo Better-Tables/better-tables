@@ -10,6 +10,74 @@ import type {
   OptionFilterState,
   TextFilterState,
 } from '../types/filter';
+import { getAllOperators } from '../types/filter-operators';
+
+/**
+ * Known filter `type` discriminants (the eight members of the `FilterState` union).
+ */
+const KNOWN_FILTER_TYPES: ReadonlyArray<FilterState['type']> = [
+  'text',
+  'email',
+  'url',
+  'phone',
+  'number',
+  'currency',
+  'percentage',
+  'date',
+  'boolean',
+  'option',
+  'multiOption',
+  'json',
+  'custom',
+];
+
+/**
+ * Set of all known filter operator keys, built from the canonical operator
+ * definitions in `types/filter-operators.ts` so it can't drift from them.
+ */
+const KNOWN_FILTER_OPERATORS: ReadonlySet<string> = new Set(getAllOperators().map((op) => op.key));
+
+/**
+ * Shape guard for untrusted, `unknown`-typed input (e.g. decompressed URL
+ * payloads) that validates the minimal structural contract of a `FilterState`
+ * without assuming the input has already been typed.
+ *
+ * This is intentionally permissive on `values` element types — per-type
+ * element checking (e.g. all-numbers for `number` filters) is left to the
+ * managers, which re-validate values against operator/column requirements.
+ */
+export function isFilterStateShape(value: unknown): value is FilterState {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.columnId !== 'string' || candidate.columnId.length === 0) {
+    return false;
+  }
+
+  if (
+    typeof candidate.type !== 'string' ||
+    !KNOWN_FILTER_TYPES.includes(candidate.type as FilterState['type'])
+  ) {
+    return false;
+  }
+
+  if (typeof candidate.operator !== 'string' || !KNOWN_FILTER_OPERATORS.has(candidate.operator)) {
+    return false;
+  }
+
+  if (!Array.isArray(candidate.values)) {
+    return false;
+  }
+
+  if (candidate.includeNull !== undefined && typeof candidate.includeNull !== 'boolean') {
+    return false;
+  }
+
+  return true;
+}
 
 /**
  * Type guard for text filter states (text, email, url, phone)

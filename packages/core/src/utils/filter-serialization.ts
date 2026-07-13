@@ -14,6 +14,7 @@
 
 import type { FilterState } from '../types/filter';
 import { compressAndEncode, decompressAndDecode } from './compression';
+import { isFilterStateShape } from './type-guards';
 
 /**
  * Serialize filters to URL-safe compressed string.
@@ -80,7 +81,29 @@ export function deserializeFiltersFromURL(urlString: string): FilterState[] {
       throw new Error('Invalid filter data format: expected array');
     }
 
-    return decoded;
+    // URL content is untrusted input: validate the shape of every entry and
+    // drop (fail closed) anything that doesn't match the FilterState contract,
+    // rather than letting malformed entries crash downstream consumers
+    // (filter-manager validation, server-side query construction, etc).
+    const valid: FilterState[] = [];
+    for (const entry of decoded) {
+      if (isFilterStateShape(entry)) {
+        valid.push(entry);
+      } else {
+        const columnId =
+          entry &&
+          typeof entry === 'object' &&
+          typeof (entry as { columnId?: unknown }).columnId === 'string'
+            ? (entry as { columnId: string }).columnId
+            : '<unknown>';
+        // biome-ignore lint: Intentional warning logging for dropped invalid filters
+        console.warn(
+          `[better-tables] Dropped invalid filter for column "${columnId}": entry does not match the expected filter shape.`
+        );
+      }
+    }
+
+    return valid;
   } catch (error) {
     if (error instanceof Error) {
       throw error;

@@ -387,6 +387,16 @@ export class FilterManager<TData = unknown> {
       };
     }
 
+    // Guard against malformed input (e.g. URL-derived filters) before
+    // dereferencing `values` below - a missing/non-array `values` must be
+    // reported as an invalid filter, not throw.
+    if (!Array.isArray(filter.values)) {
+      return {
+        valid: false,
+        error: `Filter for column ${filter.columnId} has invalid values (expected an array)`,
+      };
+    }
+
     // Validate operator value requirements
     if (operatorDef.valueCount === 0 && filter.values.length > 0) {
       return { valid: false, error: `Operator ${filter.operator} requires no values` };
