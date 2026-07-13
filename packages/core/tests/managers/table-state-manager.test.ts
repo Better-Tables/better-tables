@@ -701,6 +701,36 @@ describe('TableStateManager', () => {
       // Reset returns column order to default (all columns)
       expect(state.columnOrder.length).toBeGreaterThan(0);
     });
+
+    it('updateState with an out-of-range limit (limit=15) does not throw and clamps to an allowed page size', () => {
+      // Regression guard: a bookmarked/shared URL with `?limit=15` used to
+      // throw inside changePageSize because 15 isn't in the default
+      // pageSizeOptions ([10, 20, 50, 100]).
+      const currentPagination = manager.getPagination();
+
+      expect(() => {
+        manager.updateState({ pagination: { ...currentPagination, limit: 15 } });
+      }).not.toThrow();
+
+      const state = manager.getState();
+      const allowedSizes = manager.getPaginationManager().getPageSizeOptions();
+      expect(allowedSizes).toContain(state.pagination.limit);
+      // Nearest-neighbor rule (ties broken toward the smaller option): 15 is
+      // equidistant from 10 and 20, so it resolves to 10.
+      expect(state.pagination.limit).toBe(10);
+    });
+
+    it('updateState with an out-of-range page (page=999) does not throw and clamps to the last valid page', () => {
+      manager.setTotal(30); // default page size 10 -> 3 total pages
+      const currentPagination = manager.getPagination();
+
+      expect(() => {
+        manager.updateState({ pagination: { ...currentPagination, page: 999 } });
+      }).not.toThrow();
+
+      const state = manager.getState();
+      expect(state.pagination.page).toBe(3);
+    });
   });
 
   describe('column management', () => {

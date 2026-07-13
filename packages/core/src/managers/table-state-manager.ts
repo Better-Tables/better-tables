@@ -536,11 +536,45 @@ export class TableStateManager<TData = unknown> {
       }
 
       if (limit !== undefined && limit !== this.paginationManager.getPageSize()) {
-        this.paginationManager.changePageSize(limit);
+        // Restoring state (e.g. from a shared URL) must never throw for a
+        // limit that isn't one of the configured pageSizeOptions - fall back
+        // to the nearest allowed size instead of letting changePageSize throw.
+        const allowedSizes = this.paginationManager.getPageSizeOptions();
+        const resolvedLimit = allowedSizes.includes(limit)
+          ? limit
+          : allowedSizes.reduce((closest, size) =>
+              Math.abs(size - limit) < Math.abs(closest - limit) ? size : closest
+            );
+
+        if (resolvedLimit !== limit) {
+          // biome-ignore lint: Intentional warning logging for clamped pagination limit
+          console.warn(
+            `[better-tables] Restored pagination limit ${limit} is not an allowed page size; falling back to nearest allowed size ${resolvedLimit}.`
+          );
+        }
+
+        if (resolvedLimit !== this.paginationManager.getPageSize()) {
+          this.paginationManager.changePageSize(resolvedLimit);
+        }
       }
 
       if (page !== undefined && page !== this.paginationManager.getCurrentPage()) {
-        this.paginationManager.goToPage(page);
+        // Restoring state must never throw for an out-of-range page (e.g. a
+        // bookmarked URL pointing past the current total) - clamp instead.
+        const totalPages = this.paginationManager.getTotalPages();
+        const resolvedPage =
+          totalPages > 0 ? Math.min(Math.max(page, 1), totalPages) : Math.max(page, 1);
+
+        if (resolvedPage !== page) {
+          // biome-ignore lint: Intentional warning logging for clamped pagination page
+          console.warn(
+            `[better-tables] Restored pagination page ${page} is out of range; clamping to ${resolvedPage}.`
+          );
+        }
+
+        if (resolvedPage !== this.paginationManager.getCurrentPage()) {
+          this.paginationManager.goToPage(resolvedPage);
+        }
       }
     }
 
