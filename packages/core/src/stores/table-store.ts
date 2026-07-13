@@ -22,10 +22,15 @@ export interface TableStoreState {
   // State (synced from manager)
   columns: ColumnDefinition[];
   /**
-   * The real stored filter state (plan 016 semantic contract rule 2): a flat
-   * array (implicit AND) or a single {@link FilterGroupNode} tree.
+   * Flat leaf view of the manager's filter state (plan 016 semantic
+   * contract rule 3/5) -- the filter bar and other React consumers of this
+   * store stay flat in 0.6 (design `plans/design/core-contract-v2.md`
+   * §1.6). When the manager's real stored value is a {@link FilterGroupNode}
+   * tree (e.g. hydrated from a `c2:` URL), this field surfaces its flat
+   * LEAVES, not the tree. Use `store.getState().manager.getFilterNode()` /
+   * `setFilterNode()` for the real (possibly tree) value.
    */
-  filters: FilterState[] | FilterGroupNode;
+  filters: FilterState[];
   pagination: PaginationState;
   sorting: SortingState;
   selectedRows: Set<string>;
@@ -123,10 +128,14 @@ export function createTableStore(initialState: TableStoreInitialState) {
       manager.subscribe((event: TableStateEvent) => {
         if (event.type === 'state_changed') {
           // Only update Zustand if references actually changed
-          // The manager already does deep equality checks, so we just check references
+          // The manager already does deep equality checks, so we just check references.
+          // filters uses the manager's flat legacy accessor (not
+          // event.state.filters, which is the real, possibly tree-shaped
+          // value) -- this store's `filters` field stays flat (rule 5).
           set((state: TableStoreState) => {
+            const flatFilters = manager.getFilters();
             const hasChanged =
-              state.filters !== event.state.filters ||
+              state.filters !== flatFilters ||
               state.pagination !== event.state.pagination ||
               state.sorting !== event.state.sorting ||
               state.selectedRows !== event.state.selectedRows ||
@@ -141,7 +150,7 @@ export function createTableStore(initialState: TableStoreInitialState) {
             // IMPORTANT: Must preserve manager reference and all actions
             return {
               ...state, // Preserve manager and all action functions
-              filters: event.state.filters,
+              filters: flatFilters,
               pagination: event.state.pagination,
               sorting: event.state.sorting,
               selectedRows: event.state.selectedRows,
@@ -173,7 +182,8 @@ export function createTableStore(initialState: TableStoreInitialState) {
 
         // Initial state from manager
         columns: initialState.columns,
-        filters: managerState.filters,
+        // Flat leaf view (rule 5) -- see the `filters` field doc above.
+        filters: manager.getFilters(),
         pagination: managerState.pagination,
         sorting: managerState.sorting,
         selectedRows: managerState.selectedRows,
