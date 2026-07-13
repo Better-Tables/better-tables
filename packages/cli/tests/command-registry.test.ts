@@ -226,7 +226,13 @@ describe('Command Registry Pattern', () => {
       }
 
       // Test parsing with custom path
-      command.parse(['init', '--components-path', 'custom-path'], { from: 'user' });
+      // Note: `command` here is the "init" command itself (not a dispatching
+      // parent program), so with `from: 'user'` the args must be just the
+      // flags/values a user would pass after the subcommand name -- not the
+      // subcommand name itself. Commander 12 tolerated the redundant leading
+      // 'init' token as an unvalidated excess argument; Commander 14 enforces
+      // "too many arguments" for it.
+      command.parse(['--components-path', 'custom-path'], { from: 'user' });
       const options = command.opts();
       expect(options.componentsPath).toBe('custom-path');
     });
@@ -256,7 +262,7 @@ describe('Command Registry Pattern', () => {
       }
 
       // Test parsing without the option (default handled in init command code)
-      command.parse(['init'], { from: 'user' });
+      command.parse([], { from: 'user' });
       const options = command.opts();
       // The option won't be set, default is handled in init command action
       expect(options.componentsPath).toBeUndefined();
