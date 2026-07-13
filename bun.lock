@@ -148,7 +148,7 @@
     },
     "packages/adapters/toolkit": {
       "name": "@better-tables/adapters-toolkit",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@better-tables/core": "workspace:*",
         "drizzle-orm": "^0.45.1",

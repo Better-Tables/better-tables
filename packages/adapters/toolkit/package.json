@@ -1,6 +1,6 @@
 {
   "name": "@better-tables/adapters-toolkit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "ORM-agnostic adapter toolkit for Better Tables - shared primitives for building table adapters",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -35,6 +35,9 @@
     "drizzle-orm": "^0.45.1",
     "tsdown": "catalog:",
     "typescript": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "react",
