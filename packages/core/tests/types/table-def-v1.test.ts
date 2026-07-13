@@ -1,21 +1,30 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
-import {
-  betterTablesV1,
-  defineTableRowV1,
-  defineTableV1,
-  type Paths,
-  type PathsOfType,
-  type PathValue,
-  type SchemaAwareAdapter,
-} from '../../src/types/experimental/table-def-v1';
+import { betterTables, defineTable, defineTableRow } from '../../src/factory';
+import type {
+  ArrayRelationPaths,
+  Paths,
+  PathsOfType,
+  PathValue,
+  SchemaAwareAdapter,
+} from '../../src/types/paths';
 
 /**
- * Type-level acceptance tests for the plan 011 "path-typed" prototype
- * (`src/types/experimental/table-def-v1.ts`). See
- * `plans/design/table-definition-dx.md` for the design these validate.
+ * Type-level acceptance tests for plan 011's "path-typed" design, RETARGETED
+ * (plan 018, Step 1/Step 4) to run against the PRODUCTION types/runtime
+ * (`src/types/paths.ts`, `src/factory.ts`) rather than the experimental
+ * prototype (`src/types/experimental/table-def-v1.ts`, whose own copy of
+ * these 16 assertions is left unchanged and still passes against the
+ * prototype -- see that file's test for the historical record).
+ *
+ * `t.count()` (aggregate builders) is deferred out of plan 018's scope --
+ * see `plans/018-instance-api-runtime.md`, "Deferred OUT of this plan" --
+ * so the prototype's `t.count()`-based assertions are adapted here to test
+ * the promoted `ArrayRelationPaths<T>` type directly (the same type-level
+ * machinery `t.count()` would eventually constrain against).
  *
  * Fixture is DELIBERATELY mutually recursive (User -> Post -> User -> ...)
- * to exercise the depth cap in `Paths`.
+ * to exercise the depth cap in `Paths`, matching the original prototype
+ * fixture exactly.
  */
 
 interface Profile {
@@ -45,11 +54,12 @@ type Schema = {
 };
 
 // A dummy value cast to the schema-aware adapter shape. `$types` is a
-// type-only phantom (see table-def-v1.ts) -- never actually populated.
+// type-only phantom (see types/paths.ts#SchemaAwareAdapter) -- never
+// actually populated.
 const fakeAdapter = {} as SchemaAwareAdapter<{ tables: Schema }>;
-const tables = betterTablesV1({ database: fakeAdapter });
+const tables = betterTables({ database: fakeAdapter });
 
-describe('table-def-v1 prototype (plan 011)', () => {
+describe('table-def-v1 prototype (plan 011), retargeted to production types (plan 018)', () => {
   describe('Paths<T> -- runtime path semantics lifted to the type level', () => {
     it('includes plain fields, a to-one relation path, and a to-many relation path', () => {
       const p1: Paths<User> = 'role';
@@ -104,14 +114,14 @@ describe('table-def-v1 prototype (plan 011)', () => {
 
   describe('t.number() -- path autocomplete restricted to numeric paths', () => {
     it('accepts a numeric path', () => {
-      const def = defineTableV1<typeof tables>()('users', (t) => ({
+      const def = defineTable<typeof tables>()('users', (t) => ({
         columns: [t.number('age').range(0, 130)],
       }));
       expect(def.tableName).toBe('users');
     });
 
     it('rejects a non-numeric path (the literal example from the design doc)', () => {
-      defineTableV1<typeof tables>()('users', (t) => ({
+      defineTable<typeof tables>()('users', (t) => ({
         // @ts-expect-error - 'firstName' is a string path, not numeric
         columns: [t.number('firstName')],
       }));
@@ -121,7 +131,7 @@ describe('table-def-v1 prototype (plan 011)', () => {
 
   describe('t.option() -- value type inferred from the path, options() checked against it', () => {
     it('infers the literal union `"admin" | "editor"` from the `role` path', () => {
-      const def = defineTableV1<typeof tables>()('users', (t) => ({
+      const def = defineTable<typeof tables>()('users', (t) => ({
         columns: [
           t.option('role').options([
             { value: 'admin', label: 'Admin' },
@@ -133,7 +143,7 @@ describe('table-def-v1 prototype (plan 011)', () => {
     });
 
     it('rejects an option value outside the literal union', () => {
-      defineTableV1<typeof tables>()('users', (t) => ({
+      defineTable<typeof tables>()('users', (t) => ({
         columns: [
           // @ts-expect-error - 'bogus' is not a member of 'admin' | 'editor'
           t.option('role').options([{ value: 'bogus', label: 'Bogus' }]),
@@ -143,26 +153,22 @@ describe('table-def-v1 prototype (plan 011)', () => {
     });
   });
 
-  describe('t.count() -- restricted to array-relation paths', () => {
+  describe('ArrayRelationPaths<T> -- restricted to array-relation paths (t.count()/t.sum() substrate; the builders themselves are deferred, plan 018)', () => {
     it('accepts a path to an array relation', () => {
-      const def = defineTableV1<typeof tables>()('users', (t) => ({
-        columns: [t.count('posts')],
-      }));
-      expect(def.tableName).toBe('users');
+      const p: ArrayRelationPaths<User> = 'posts';
+      expect(p).toBe('posts');
     });
 
     it('rejects a path to a non-array (to-one) relation', () => {
-      defineTableV1<typeof tables>()('users', (t) => ({
-        // @ts-expect-error - 'profile' is a to-one relation, not an array
-        columns: [t.count('profile')],
-      }));
-      expect(true).toBe(true);
+      // @ts-expect-error - 'profile' is a to-one relation, not an array
+      const bad: ArrayRelationPaths<User> = 'profile';
+      expect(typeof bad).toBe('string');
     });
   });
 
-  describe('defineTableV1 -- table-name safety and the tier-2 escape hatch', () => {
+  describe('defineTable -- table-name safety and the tier-2 escape hatch', () => {
     it('rejects a table name absent from the schema catalog', () => {
-      defineTableV1<typeof tables>()(
+      defineTable<typeof tables>()(
         // @ts-expect-error - 'widgets' is not a key of Schema
         'widgets',
         (t) => ({ columns: [t.text('firstName')] })
@@ -170,17 +176,39 @@ describe('table-def-v1 prototype (plan 011)', () => {
       expect(true).toBe(true);
     });
 
-    it('the tier-2 explicit-row form compiles for a schema-less (REST-style) adapter', () => {
+    it('the tier-2 explicit-row form compiles for a schema-less (REST-style) adapter, without $types', () => {
       interface RestCustomer {
         id: string;
         email: string;
       }
 
-      const def = defineTableRowV1<RestCustomer>()('customers', (t) => ({
+      const def = defineTableRow<RestCustomer>()('customers', (t) => ({
         columns: [t.text('email')],
       }));
 
       expect(def.tableName).toBe('customers');
+    });
+  });
+
+  describe('$infer surface', () => {
+    it('$infer.ColumnId accepts real path literals and free-form computed ids', () => {
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('firstName'), t.number('age')],
+      }));
+
+      // ColumnId = Paths<Row> | string -- TypeScript's union-literal
+      // absorption rule collapses this to plain `string` (the `| string`
+      // member subsumes every literal member of `Paths<Row>` in the same
+      // union), which is the design's INTENDED behavior, not a defect: real
+      // paths and free-form computed ids must both be valid ColumnId values,
+      // and computed ids are unconstrained strings. Verified here two ways:
+      // the resolved type is exactly `string`, and representative real path
+      // literals type-check as assignable to it.
+      expectTypeOf<(typeof usersTable)['$infer']['ColumnId']>().toEqualTypeOf<string>();
+
+      const realPath: (typeof usersTable)['$infer']['ColumnId'] = 'profile.location';
+      const computedId: (typeof usersTable)['$infer']['ColumnId'] = 'anyFreeFormId';
+      expect([realPath, computedId]).toEqual(['profile.location', 'anyFreeFormId']);
     });
   });
 });
