@@ -18,25 +18,22 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 23 plans (001–007, 010–024, 027–028) — verification
-  baseline through join pagination, facets, virtualization offsets, null-filter
-  Option A, timezone conversion, manager emitter, loud inference. Remaining in
-  flight: 025 (UI perf), 026 (strictness flags).
+- **Done and merged**: 24 plans (001–007, 010–025, 027–028) — only 026 still in
+  flight (strictness flags). Backlog wave 020–028 nearly complete; Prisma hold remains.
 - **Gates on main**: root typecheck 11/11 · core 1119/0 · toolkit 96/0 · drizzle
-  SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
+  SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 17/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
   pre-publish steps are the maintainer runbook at the bottom of `MIGRATION.md`
   (toolkit version choice, one changeset train, restore remote, first CI run).
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: 025, 026.
+- **In flight**: 026 only.
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
 | 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | 023+024 (DONE) | IN FLIGHT — wave 3 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
@@ -81,6 +78,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 024 | Virtualization offset correctness | `e68b9fd` | Lazy prefix offsets; no stale start/end; O(log n) position lookup; core 1118/0 |
 | 027 | Null-filter semantics (Option A) | `8cad0b4` | includeNull satisfies value req; FilterHandler null-only gate fix; core 1119/0 |
 | 021 | Filter-aware facets | merged 2026-07-13 | Additive FacetQueryParams; self-exclusion + distinct under joins; no UI callers yet |
+| 025 | UI render performance | merged 2026-07-13 | Memo rows/observers; effect churn cut; render harness; ui 17/0 |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -141,10 +139,8 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
   **FIXED in 027 (Option A)**: includeNull satisfies value requirement;
   supportsNull rejects includeNull on valueCount-0 ops; FilterHandler
   pre-gate no longer drops null-only leaves.
-- **UI-05/06/08** (M each): render perf — unmemoized rows/cells; VirtualizedTable
-  recreates per-row ResizeObservers every render; auto-show + callback-bridge
-  effect churn. **PLANNED as 025** (includes building the render-count harness —
-  none exists in the repo).
+- **UI-05/06/08** (M each): ~~render perf — unmemoized rows/cells; unstable
+  ResizeObservers; effect churn~~ — **FIXED in 025**.
 - **DX-10** (M): enable `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`
   — **PLANNED as 026**; blast radius measured 2026-07-13: core 78 + 28 errors
   (src+tests); adapters already run both flags.
