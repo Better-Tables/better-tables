@@ -25,7 +25,6 @@
     "lint": "biome check .",
     "lint:fix": "biome check --apply .",
     "format": "biome format --write .",
-    "type-check": "tsc --noEmit",
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
