@@ -37,6 +37,7 @@
  */
 
 import { SchemaError } from './types';
+import { calculateLevenshteinDistance } from './utils/levenshtein';
 
 /**
  * Minimal relationship-map shape `PrimaryTableResolver` needs: it only ever
@@ -65,6 +66,8 @@ export type RelationshipMapLike = Record<string, unknown>;
 export class PrimaryTableResolver<TTable = unknown> {
   private schema: Record<string, TTable>;
   private relationships: RelationshipMapLike;
+  /** Guards the "assumed primary table" warning so it fires once per instance. */
+  private hasWarnedNoColumns = false;
 
   constructor(schema: Record<string, TTable>, relationships: RelationshipMapLike) {
     this.schema = schema;
@@ -105,6 +108,8 @@ export class PrimaryTableResolver<TTable = unknown> {
    *
    * @throws {SchemaError} If no tables are found in the schema
    * @throws {SchemaError} If explicit primary table is provided but doesn't exist in schema
+   * @throws {SchemaError} If columns are provided but none of them match any table (the
+   *   typo case — guessing a table here would silently return plausible-but-wrong rows)
    *
    * @example
    * ```typescript
@@ -131,13 +136,33 @@ export class PrimaryTableResolver<TTable = unknown> {
       return explicitPrimaryTable;
     }
 
-    // If no columns specified, use the first table in schema
+    // No columns is not a typo case -- there's no signal to contradict, and
+    // some callers (e.g. a bare join-count query) legitimately have none. Keep
+    // the first-table fallback, but say so once, since it's still a guess.
     if (!columns || columns.length === 0) {
-      return this.getFirstTable();
+      const table = this.getFirstTable();
+      this.warnAssumedTable(table);
+      return table;
     }
 
     // Use improved heuristics to determine primary table
     return this.findTableWithMostMatches(columns);
+  }
+
+  /**
+   * Emit a single, deduplicated warning that the primary table was assumed
+   * (rather than derived from any column) because no columns were given.
+   */
+  private warnAssumedTable(table: string): void {
+    if (this.hasWarnedNoColumns) {
+      return;
+    }
+    this.hasWarnedNoColumns = true;
+    // biome-ignore lint: Intentional warning logging for an assumed primary table
+    console.warn(
+      `[better-tables] No columns were provided to determine the primary table; assuming "${table}" ` +
+        '(the first table in the schema). Pass the `primaryTable` option to set it explicitly.'
+    );
   }
 
   /**
@@ -213,6 +238,8 @@ export class PrimaryTableResolver<TTable = unknown> {
    * @returns {string} The name of the primary table
    *
    * @throws {SchemaError} If no tables are found in the schema
+   * @throws {SchemaError} If none of the given columns match any table — this is the
+   *   typo case, and guessing the first table would silently return wrong rows
    *
    * @example
    * ```typescript
@@ -249,10 +276,78 @@ export class PrimaryTableResolver<TTable = unknown> {
       return primaryTable;
     }
 
-    // Fallback to first table if no matches found
-    // This handles cases where all columns are accessor-based (e.g., JSONB)
-    // and don't match any direct schema columns
-    return this.getFirstTable();
+    // Zero matches: every given column is either a typo or references a
+    // relationship alias that doesn't exist. Silently falling back to the
+    // first table here would return plausible-but-wrong rows with zero
+    // signal, so fail loudly instead — with suggestions where possible.
+    throw this.buildZeroMatchError(columns);
+  }
+
+  /**
+   * Build the `SchemaError` thrown when no given column matches any table.
+   * Names the unmatched columns, the available tables, and levenshtein-nearest
+   * suggestions (e.g. "did you mean `users.name`?") to make the typo obvious.
+   */
+  private buildZeroMatchError(columns: string[]): SchemaError {
+    const unmatchedColumns = columns.filter((columnId) => columnId.length > 0);
+    const availableTables = Object.keys(this.schema);
+    const suggestions: Record<string, string[]> = {};
+
+    for (const columnId of unmatchedColumns) {
+      const nearest = this.findNearestQualifiedColumns(columnId);
+      if (nearest.length > 0) {
+        suggestions[columnId] = nearest;
+      }
+    }
+
+    const columnList = unmatchedColumns.map((columnId) => `"${columnId}"`).join(', ');
+    const suggestionText = Object.entries(suggestions)
+      .map(
+        ([columnId, matches]) =>
+          `"${columnId}" (did you mean ${matches.map((match) => `\`${match}\``).join(' or ')}?)`
+      )
+      .join('; ');
+
+    const message =
+      `Could not determine the primary table: none of the requested columns (${columnList}) ` +
+      `match any table in the schema (available tables: ${availableTables.join(', ')}).` +
+      (suggestionText ? ` ${suggestionText}.` : '') +
+      ' Set the primary table explicitly via the `primaryTable` option.';
+
+    return new SchemaError(message, { unmatchedColumns, availableTables, suggestions });
+  }
+
+  /**
+   * Find the levenshtein-nearest existing `table.column` names for a given
+   * (possibly unmatched) column identifier, to power "did you mean" hints.
+   */
+  private findNearestQualifiedColumns(columnId: string, maxDistance = 3): string[] {
+    const fieldName = columnId.includes('.') ? (columnId.split('.').pop() ?? columnId) : columnId;
+    if (!fieldName) {
+      return [];
+    }
+
+    const candidates: { qualified: string; distance: number }[] = [];
+    for (const tableName of Object.keys(this.schema)) {
+      const table = this.schema[tableName];
+      if (!table || typeof table !== 'object') {
+        continue;
+      }
+      for (const columnName of Object.keys(table as Record<string, unknown>)) {
+        if (!this.hasColumn(table, columnName)) {
+          continue;
+        }
+        const distance = calculateLevenshteinDistance(fieldName, columnName);
+        if (distance > 0 && distance <= maxDistance) {
+          candidates.push({ qualified: `${tableName}.${columnName}`, distance });
+        }
+      }
+    }
+
+    return candidates
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3)
+      .map((candidate) => candidate.qualified);
   }
 
   /**

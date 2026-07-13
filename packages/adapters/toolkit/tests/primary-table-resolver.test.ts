@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { PrimaryTableResolver } from '../src/primary-table-resolver';
 import type { RelationshipMap } from '../src/types';
@@ -114,12 +114,50 @@ describe('PrimaryTableResolver', () => {
       expect(primaryTable).toBe('assignments'); // Has direct 'title' column
     });
 
-    it('should fallback to first table when no columns match any table', () => {
+    it('should throw SchemaError instead of silently falling back when no column matches any table', () => {
       const resolver = new PrimaryTableResolver(schema, relationships);
-      // Column that doesn't exist in any table
-      const primaryTable = resolver.resolve(['nonexistentColumn']);
+      // Column that doesn't exist in any table -- this used to silently
+      // fall back to the first table (`surveys`), which returns
+      // plausible-but-wrong rows for a typo'd column. It must now fail loudly.
+      expect(() => {
+        resolver.resolve(['nonexistentColumn']);
+      }).toThrow(SchemaError);
 
-      expect(primaryTable).toBe('surveys'); // First table in schema (fallback)
+      let caught: unknown;
+      try {
+        resolver.resolve(['nonexistentColumn']);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(SchemaError);
+      const schemaError = caught as SchemaError;
+      expect(schemaError.message).toContain('nonexistentColumn');
+      expect(schemaError.message).toContain('surveys');
+      expect(schemaError.message).toContain('assignments');
+      expect(schemaError.message).toContain('users');
+      expect(schemaError.message).toContain('primaryTable');
+      expect(schemaError.details?.unmatchedColumns).toEqual(['nonexistentColumn']);
+      expect(schemaError.details?.availableTables).toEqual(['surveys', 'assignments', 'users']);
+    });
+
+    it('should suggest the nearest column name(s) via levenshtein distance on zero match', () => {
+      const resolver = new PrimaryTableResolver(schema, relationships);
+      // 'slgu' is a one-transposition typo of 'slug' (surveys) -- close enough
+      // to suggest, but not close enough to accidentally direct-match.
+      let caught: unknown;
+      try {
+        resolver.resolve(['slgu']);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(SchemaError);
+      const schemaError = caught as SchemaError;
+      expect(schemaError.message).toContain('did you mean');
+      expect(schemaError.message).toContain('surveys.slug');
+      const suggestions = schemaError.details?.suggestions as Record<string, string[]>;
+      expect(suggestions.slgu).toContain('surveys.slug');
     });
 
     it('should handle mixed direct and accessor columns correctly', () => {
@@ -203,18 +241,52 @@ describe('PrimaryTableResolver', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty columns array', () => {
+    let warnSpy: ReturnType<typeof spyOn<typeof console, 'warn'>>;
+
+    beforeEach(() => {
+      warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it('should handle empty columns array, warning once that the table was assumed', () => {
       const resolver = new PrimaryTableResolver(schema, relationships);
       const primaryTable = resolver.resolve([]);
 
       expect(primaryTable).toBe('surveys'); // First table
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('surveys');
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('primaryTable');
     });
 
-    it('should handle undefined columns', () => {
+    it('should handle undefined columns, warning once that the table was assumed', () => {
       const resolver = new PrimaryTableResolver(schema, relationships);
       const primaryTable = resolver.resolve(undefined);
 
       expect(primaryTable).toBe('surveys'); // First table
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should only warn once per resolver instance across repeated no-columns calls', () => {
+      const resolver = new PrimaryTableResolver(schema, relationships);
+
+      resolver.resolve(undefined);
+      resolver.resolve([]);
+      resolver.resolve(undefined);
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should warn independently per resolver instance', () => {
+      const resolverA = new PrimaryTableResolver(schema, relationships);
+      const resolverB = new PrimaryTableResolver(schema, relationships);
+
+      resolverA.resolve(undefined);
+      resolverB.resolve(undefined);
+
+      expect(warnSpy).toHaveBeenCalledTimes(2);
     });
 
     it('should throw error if schema is empty', () => {

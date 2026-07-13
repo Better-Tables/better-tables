@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { relations } from 'drizzle-orm';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
 import type { RelationshipMap, RelationshipPath } from '../src/types';
@@ -783,6 +785,141 @@ describe('RelationshipDetector', () => {
         }
       });
     });
+  });
+});
+
+describe('inferManyRelationshipKeys (Strategy 3 - convention-based fallback)', () => {
+  let warnSpy: ReturnType<typeof spyOn<typeof console, 'warn'>>;
+
+  beforeEach(() => {
+    warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('accepts a conventionally-named column silently when FK metadata confirms it (Strategy-1-equivalent)', () => {
+    // `orders.accountId` is the naming convention Strategy 3 would guess for
+    // a `many()` relation from `accounts` -- and it also carries a real
+    // `.references()` FK pointing at `accounts.id`. Strategy 1's own
+    // column-symbol scan doesn't recognize this real-Drizzle shape (FK info
+    // lives on the table, not the column), so this exercises Strategy 3's
+    // own verification step confirming the guess and accepting it silently.
+    const accounts = sqliteTable('accounts', {
+      id: integer('id').primaryKey(),
+      name: text('name').notNull(),
+    });
+    const orders = sqliteTable('orders', {
+      id: integer('id').primaryKey(),
+      accountId: integer('account_id')
+        .notNull()
+        .references(() => accounts.id),
+      total: integer('total'),
+    });
+    const accountsRelations = relations(accounts, ({ many }) => ({
+      orders: many(orders),
+    }));
+
+    const detector = new RelationshipDetector();
+    const relationships = detector.detectFromSchema(
+      { accounts: accountsRelations },
+      { accounts, orders }
+    );
+
+    expect(relationships['accounts.orders']).toBeDefined();
+    expect(relationships['accounts.orders']?.localKey).toBe('id');
+    expect(relationships['accounts.orders']?.foreignKey).toBe('accountId');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips a conventionally-named column when FK metadata contradicts it, leaving the relation unresolved', () => {
+    // `orders.accountId` matches the naming convention for an `accounts`
+    // relation, but its real FK metadata points at `regions`, not
+    // `accounts`. Binding the join anyway would silently produce wrong
+    // rows, so the candidate must be skipped. No other strategy or
+    // candidate matches, so the relation is left unresolved -- the
+    // pre-existing "no key found" behavior, not a new failure mode.
+    const accounts = sqliteTable('accounts', {
+      id: integer('id').primaryKey(),
+    });
+    const regions = sqliteTable('regions', {
+      id: integer('id').primaryKey(),
+    });
+    const orders = sqliteTable('orders', {
+      id: integer('id').primaryKey(),
+      accountId: integer('account_id')
+        .notNull()
+        .references(() => regions.id),
+    });
+    const accountsRelations = relations(accounts, ({ many }) => ({
+      orders: many(orders),
+    }));
+
+    const detector = new RelationshipDetector();
+    const relationships = detector.detectFromSchema(
+      { accounts: accountsRelations },
+      { accounts, regions, orders }
+    );
+
+    expect(relationships['accounts.orders']).toBeDefined();
+    expect(relationships['accounts.orders']?.localKey).toBe('');
+    expect(relationships['accounts.orders']?.foreignKey).toBe('');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('accepts a conventionally-named column with no FK metadata at all, but warns once', () => {
+    const accounts = sqliteTable('accounts', {
+      id: integer('id').primaryKey(),
+    });
+    const orders = sqliteTable('orders', {
+      id: integer('id').primaryKey(),
+      accountId: integer('account_id'), // no .references() -- no metadata to verify against
+    });
+    const accountsRelations = relations(accounts, ({ many }) => ({
+      orders: many(orders),
+    }));
+
+    const detector = new RelationshipDetector();
+    const relationships = detector.detectFromSchema(
+      { accounts: accountsRelations },
+      { accounts, orders }
+    );
+
+    expect(relationships['accounts.orders']).toBeDefined();
+    expect(relationships['accounts.orders']?.localKey).toBe('id');
+    expect(relationships['accounts.orders']?.foreignKey).toBe('accountId');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('accounts');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('orders');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('naming convention');
+
+    // Re-running detection on the same detector instance must not warn again.
+    detector.detectFromSchema({ accounts: accountsRelations }, { accounts, orders });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the real primary key column instead of hard-coding "id"', () => {
+    const accounts = sqliteTable('accounts', {
+      uid: integer('uid').primaryKey(),
+      name: text('name').notNull(),
+    });
+    const orders = sqliteTable('orders', {
+      id: integer('id').primaryKey(),
+      accountId: integer('account_id'), // no metadata -- Strategy 3 accepts + warns
+    });
+    const accountsRelations = relations(accounts, ({ many }) => ({
+      orders: many(orders),
+    }));
+
+    const detector = new RelationshipDetector();
+    const relationships = detector.detectFromSchema(
+      { accounts: accountsRelations },
+      { accounts, orders }
+    );
+
+    expect(relationships['accounts.orders']?.localKey).toBe('uid');
+    expect(relationships['accounts.orders']?.foreignKey).toBe('accountId');
   });
 });
 
