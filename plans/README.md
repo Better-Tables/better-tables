@@ -24,16 +24,14 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Gates on main**: root typecheck 10/10 turbo tasks · core 1066/0 · toolkit
   86/86 · drizzle 490 pass / 3 skip / 3 env-dependent (need DB URLs; CI provides)
   · CLI 127/0.
-- **In flight**: 009's deferred completion checklist (executor running).
-- **Next up**: plan 017 (Drizzle FilterNode translation — flips 016's reject-guard
-  into real AND/OR SQL; to be written now that 007's seams exist).
+- **In flight**: 017 (Drizzle FilterNode translation — executor running).
+- **Next up**: 018 (`betterTables()`/`defineTable` runtime), 010 (UI hooks).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 009 (remainder) | Deferred checklist: phantom tsconfig paths, drizzle dependency classes, drizzle/toolkit `sideEffects` | 007 (DONE) | IN PROGRESS — executor dispatched 2026-07-13; rest of 009 already merged at `f46baa0` |
-| 017 | Drizzle FilterNode translation (recursive and()/or() walk at the commented seams; flip `supportsFilterGroups` to true; invert the rejection test) | 007+016 (DONE) | PLAN TO BE WRITTEN — next action |
+| 017 | Drizzle FilterNode translation (recursive and()/or() walk at the commented seams; flip `supportsFilterGroups` to true; invert the rejection test) | 007+016 (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13 |
 | 018 | `betterTables()` instance + `defineTable` runtime (the 011 design's implementation: schema-aware `t.*` path builders, `$infer`, registry from `define()`) | 014 (DONE), 011+006 designs (DONE) | PLAN TO BE WRITTEN |
 | 010 | UI hooks correctness (fetch race, url-sync leaks/hydration stub) + first UI test harness | 001 (DONE) | TODO — plan ready to dispatch |
 | 019 | Migration guide for 0.6 (assemble all changeset "what breaks" sections; required by release policy) | all 0.6 work | PLAN TO BE WRITTEN — last before publish |
@@ -59,7 +57,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 014 | Literal-preserving `.id()` | `11c2ac2` | Registry keystone; `ColumnRegistry` resolves literal keys, zero new `any` |
 | 002 | Explicit mutation-table routing | `fb7654e` | `defaultMutationTable`, throw-on-ambiguity, honest meta.features, wrong-table regression test |
 | 003 | Join count inflation (MySQL/SQLite) | `acfad9d` | `countDistinct` guard both dialects; empirical proof total 4→3 |
-| 009 (partial) | DX hygiene sweep | `f46baa0` | README truth, React 19+ badge, CLI output restored, core/ui `sideEffects`; 2 steps deferred (see Outstanding) |
+| 009 | DX hygiene sweep | `f46baa0` + completion merge | README truth, React 19+ badge, CLI output restored, `sideEffects` everywhere, phantom tsconfig paths pruned, drizzle deps → peers (consumers stop compiling better-sqlite3) |
 | 015 | FilterNode core + `c2:` wire format | `39ba6d3` | Types/guards/normalize, versioned URL format w/ `c:` read fallback, CORE-06 killed — landed via 016's chain |
 | 016 | FilterNode state layer | `39ba6d3` | Tree-preserving state + URL sync, flat UI unchanged, drizzle reject-guard (§1.5), core 1066/0 |
 | 007 | Extract adapters-toolkit | post-`39ba6d3` merge | Toolkit born (86 tests); filter-handler 2169→388 (router/emitter, zero test edits); dialects −855 lines; ADAPTER-04 fixed |
