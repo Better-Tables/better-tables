@@ -23,7 +23,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design docs.
 - **Gates on main**: root typecheck · core 1077/0 · toolkit 93/0 · drizzle SQLite
   green (env DB suites skip without URLs) · CLI 127/0 · UI 7/0.
-- **In flight**: a surgical fix-up executor for 4 pre-existing ui typecheck errors (from the parallel backlog sweep; the only red gate).
+- **In flight**: 019 (migration guide — executor running). Main is FULLY GREEN: root typecheck 11/11, all suites passing.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
@@ -33,7 +33,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 019 | Migration guide for 0.6 (assemble all changeset "what breaks" sections; required by release policy) | all 0.6 work | PLAN TO BE WRITTEN — last before publish |
+| 019 | Migration guide for 0.6 (MIGRATION.md + compile-checked examples + release runbook) | all 0.6 work (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lifts of the hold | **ON HOLD** (maintainer) — last item on the board |
 
 Open questions awaiting the maintainer (from the merged design docs):
