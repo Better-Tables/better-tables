@@ -322,6 +322,7 @@ Each package is independently versioned and can be used standalone or together.
 
 ## 📖 Documentation
 
+- **[Migrating from 0.5 to 0.6](MIGRATION.md)** - Upgrading a 0.5 app? Start here.
 - **[@better-tables/core](packages/core/README.md)** - Core package with builders and managers
 - **[@better-tables/ui](packages/ui/README.md)** - React components and hooks
 - **[@better-tables/cli](packages/cli/README.md)** - The `init` command and its options
