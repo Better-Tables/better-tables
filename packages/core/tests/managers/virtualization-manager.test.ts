@@ -497,6 +497,122 @@ describe('VirtualizationManager', () => {
     });
   });
 
+  describe('offset correctness (plan 024 regression)', () => {
+    beforeEach(() => {
+      manager = new VirtualizationManager(
+        {
+          containerHeight: 400,
+          defaultRowHeight: 40,
+          overscan: 0,
+          dynamicRowHeight: true,
+        },
+        20
+      );
+    });
+
+    it('(a) reflects a downstream measurement in a previously-cached row start', () => {
+      // Cache row 10 at the default height first.
+      manager.measureRow(10, 40);
+
+      // Now grow an earlier row — row 10's cached start must shift with it.
+      manager.measureRow(2, 80); // 40px taller than default
+
+      // scrollTo(align: 'start') reads the row's start position internally;
+      // if row 10's cached start is stale it will still report 400 (10 * 40)
+      // instead of the true 440 (9 * 40 + 80).
+      manager.scrollTo({ rowIndex: 10, align: 'start' });
+
+      const state = manager.getState();
+      expect(state.scrollInfo.scrollTop).toBe(440);
+    });
+
+    it('(b) keeps total size correct across repeated re-measurements', () => {
+      const initialHeight = manager.getState().totalHeight; // 20 * 40 = 800
+
+      manager.measureRow(5, 100); // +60
+      manager.measureRow(5, 70); // net +30 (overwrite, not additive)
+      manager.measureRow(1, 55); // +15
+
+      expect(manager.getState().totalHeight).toBe(initialHeight + 30 + 15);
+    });
+
+    it('(c) findRowIndexByPosition agrees with true row starts after a downstream invalidation', () => {
+      // Cache rows 0-5 at the default height.
+      for (let i = 0; i <= 5; i++) {
+        manager.measureRow(i, 40);
+      }
+
+      // Grow row 1 — this invalidates the cached starts of rows 2-5.
+      manager.measureRow(1, 100); // +60
+
+      // True start of row 5: rows 0-4 = 40 + 100 + 40 + 40 + 40 = 260.
+      manager.updateScroll({ scrollTop: 260, clientHeight: 40 });
+
+      const state = manager.getState();
+      expect(state.startIndex).toBe(5);
+    });
+
+    it('(d) produces no overlaps or gaps across mixed measured/estimated rows', () => {
+      // Cache a block of rows at the default height.
+      for (let i = 0; i <= 5; i++) {
+        manager.measureRow(i, 40);
+      }
+
+      // Grow an early row so the cached block (1-5) and the uncached/estimated
+      // rows (6+) disagree about where the boundary between them is.
+      manager.measureRow(1, 100); // +60
+
+      manager.updateScroll({ scrollTop: 0, clientHeight: 400 });
+
+      const rows = [...manager.getVirtualRows()].sort((a, b) => a.index - b.index);
+      expect(rows.length).toBeGreaterThan(1);
+
+      for (let i = 1; i < rows.length; i++) {
+        expect(rows[i].start).toBe(rows[i - 1].end);
+      }
+    });
+  });
+
+  describe('complexity guard (plan 024)', () => {
+    it('amortizes offset revalidation instead of recomputing the whole prefix on every lookup', () => {
+      manager = new VirtualizationManager(
+        { containerHeight: 400, defaultRowHeight: 40, overscan: 0, dynamicRowHeight: true },
+        50_000
+      );
+
+      // Test-only instrumentation: `offsetFillOperations` counts individual
+      // offset slots filled by the internal linear pass; `getRowStart` is
+      // otherwise private. Both accessed via a cast, same pattern the
+      // existing resize-observer tests in this file already use.
+      const internals = manager as unknown as {
+        offsetFillOperations: number;
+        getRowStart(rowIndex: number): number;
+      };
+
+      const afterConstruction = internals.offsetFillOperations;
+
+      // Dirty the entire prefix by re-measuring the very first row.
+      manager.measureRow(0, 60);
+      const firstStart = internals.getRowStart(49_999);
+      const firstQueryCost = internals.offsetFillOperations - afterConstruction;
+
+      // The first query after a full invalidation legitimately walks
+      // (close to) the whole 50k-row prefix once.
+      expect(firstQueryCost).toBeGreaterThan(40_000);
+      expect(firstStart).toBeGreaterThan(0);
+
+      const afterFirstQuery = internals.offsetFillOperations;
+
+      // Re-measuring a row right next to the already-queried tail should
+      // only dirty a couple of slots, not the whole prefix again.
+      manager.measureRow(49_998, 70);
+      internals.getRowStart(49_999);
+      const secondQueryCost = internals.offsetFillOperations - afterFirstQuery;
+
+      expect(secondQueryCost).toBeLessThan(10);
+    });
+  });
+
   describe('cloning', () => {
     it('should clone manager with same state', () => {
       manager = new VirtualizationManager({ containerHeight: 500, defaultRowHeight: 50 }, 100);
