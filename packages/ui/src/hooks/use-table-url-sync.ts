@@ -108,7 +108,17 @@ export function useTableUrlSync(
     // Build updates object
     const updates: Parameters<typeof manager.updateState>[0] = {};
 
-    if (config.filters && deserialized.filters.length > 0) {
+    // deserialized.filters is a flat array (implicit AND) or a single
+    // FilterGroupNode tree (plan 015's c2: wire format). A FilterGroupNode
+    // has no `.length` and is never meaningfully "empty" after
+    // normalization (design core-contract-v2.md §1.4 drops empty groups),
+    // so only an empty flat array counts as "nothing to hydrate". The tree
+    // is passed through to state UNFLATTENED -- manager.updateState routes
+    // it through the tree-aware setFilterNode.
+    const hasFilters = Array.isArray(deserialized.filters)
+      ? deserialized.filters.length > 0
+      : true;
+    if (config.filters && hasFilters) {
       updates.filters = deserialized.filters;
     }
 

@@ -8,7 +8,7 @@
 
 import type { TableAdapter } from './adapter';
 import type { ColumnDefinition } from './column';
-import type { FilterState } from './filter';
+import type { FilterGroupNode, FilterState } from './filter';
 import type { PaginationState } from './pagination';
 import type { SelectionState } from './selection';
 import type { SortingState } from './sorting';
@@ -49,9 +49,10 @@ export interface BetterTablesConfig<TRecord = unknown> {
   columns?: ColumnDefinition<TRecord>[];
 
   /**
-   * Initial filter state.
+   * Initial filter state -- a flat array (implicit AND) or a single
+   * {@link FilterGroupNode} tree.
    */
-  filters?: FilterState[];
+  filters?: FilterState[] | FilterGroupNode;
 
   /**
    * Initial pagination state.

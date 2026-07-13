@@ -245,6 +245,44 @@ export type FilterState =
   | CustomFilterState;
 
 /**
+ * Boolean combinator for a {@link FilterGroupNode}. Deliberately just
+ * `'and' | 'or'` -- anything else (e.g. `'xor'`) is a compile error, and
+ * unknown logic is a runtime drop (see `isFilterNodeShape` /
+ * `normalizeFilterNode` in `utils/type-guards.ts`).
+ */
+export type FilterGroupLogic = 'and' | 'or';
+
+/**
+ * A boolean AND/OR node over other {@link FilterNode}s -- the recursive
+ * filter-group tree ("contract v2", `plans/design/core-contract-v2.md` §1.1).
+ *
+ * Named `FilterGroupNode`, **not** `FilterGroup` -- to avoid colliding with
+ * {@link FilterGroup} below, which is UI control grouping (grouping filter
+ * *controls* by column for display), not boolean logic. Do not conflate the
+ * two.
+ *
+ * `kind: 'group'` is the discriminant: no `FilterState` member has a
+ * top-level `kind` field, so a node is a group iff `kind === 'group'`.
+ */
+export interface FilterGroupNode {
+  /** Discriminant. No `FilterState` leaf has a top-level `kind`. */
+  kind: 'group';
+  /** How this group combines its children. */
+  logic: FilterGroupLogic;
+  /** Non-empty after validation; an empty/singleton group is normalized away. */
+  children: FilterNode[];
+}
+
+/**
+ * The recursive filter tree: a leaf {@link FilterState} or a boolean
+ * {@link FilterGroupNode}. A bare `FilterState[]` (implicit AND) and a
+ * single `FilterGroupNode` are the two shapes `FetchDataParams.filters`
+ * accepts (design §1.1); `FilterNode` is the shared per-node type both
+ * eventually canonicalize to.
+ */
+export type FilterNode = FilterState | FilterGroupNode;
+
+/**
  * Filter group for organizing filters
  */
 export interface FilterGroup {

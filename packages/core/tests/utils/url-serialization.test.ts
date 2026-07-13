@@ -26,8 +26,8 @@ describe('serializeTableStateToUrl', () => {
 
     expect(params.filters).toBeDefined();
     expect(typeof params.filters).toBe('string');
-    // Should be compressed (starts with "c:")
-    expect(params.filters).toStartWith('c:');
+    // Should be compressed (starts with "c2:" -- plan 015's group-aware wire format)
+    expect(params.filters).toStartWith('c2:');
     // Should not contain JSON characters
     expect(params.filters).not.toContain('{');
     expect(params.filters).not.toContain('[');
@@ -177,8 +177,11 @@ describe('deserializeTableStateFromUrl', () => {
 
     const state = deserializeTableStateFromUrl(params);
 
-    expect(state.filters).toHaveLength(1);
-    expect(state.filters[0]).toMatchObject(filters[0]);
+    // This fixture is a flat FilterState[] payload (implicit AND); narrow
+    // the union return type accordingly, per plan 015.
+    const stateFilters = state.filters as FilterState[];
+    expect(stateFilters).toHaveLength(1);
+    expect(stateFilters[0]).toMatchObject(filters[0]);
   });
 
   it('should deserialize pagination from URL parameters', () => {
@@ -310,8 +313,11 @@ describe('round-trip serialization', () => {
     const serialized = serializeTableStateToUrl(original);
     const deserialized = deserializeTableStateFromUrl(serialized);
 
-    expect(deserialized.filters).toHaveLength(1);
-    expect(deserialized.filters[0]).toMatchObject(original.filters[0]);
+    // This fixture is a flat FilterState[] payload (implicit AND); narrow
+    // the union return type accordingly, per plan 015.
+    const deserializedFilters = deserialized.filters as FilterState[];
+    expect(deserializedFilters).toHaveLength(1);
+    expect(deserializedFilters[0]).toMatchObject(original.filters[0]);
   });
 
   it('should serialize and deserialize complete state correctly', () => {
@@ -440,8 +446,11 @@ describe('compression', () => {
       expect(params.filters.length).toBeGreaterThan(0);
       // Verify it can be decompressed
       const deserialized = deserializeTableStateFromUrl({ filters: params.filters });
-      expect(deserialized.filters).toHaveLength(4);
-      expect(deserialized.filters[0]).toMatchObject(largeFilters[0]);
+      // This fixture is a flat FilterState[] payload (implicit AND); narrow
+      // the union return type accordingly, per plan 015.
+      const deserializedFilters = deserialized.filters as FilterState[];
+      expect(deserializedFilters).toHaveLength(4);
+      expect(deserializedFilters[0]).toMatchObject(largeFilters[0]);
     }
   });
 
@@ -469,9 +478,12 @@ describe('compression', () => {
 
       // Should deserialize correctly
       const deserialized = deserializeTableStateFromUrl({ filters: params.filters });
-      expect(deserialized.filters).toHaveLength(2);
-      expect(deserialized.filters[0]).toMatchObject(filters[0]);
-      expect(deserialized.filters[1]).toMatchObject(filters[1]);
+      // This fixture is a flat FilterState[] payload (implicit AND); narrow
+      // the union return type accordingly, per plan 015.
+      const deserializedFilters = deserialized.filters as FilterState[];
+      expect(deserializedFilters).toHaveLength(2);
+      expect(deserializedFilters[0]).toMatchObject(filters[0]);
+      expect(deserializedFilters[1]).toMatchObject(filters[1]);
     }
   });
 
@@ -495,8 +507,8 @@ describe('compression', () => {
 
     expect(params.filters).toBeDefined();
     if (params.filters) {
-      // Should be compressed (starts with "c:")
-      expect(params.filters).toStartWith('c:');
+      // Should be compressed (starts with "c2:" -- plan 015's group-aware wire format)
+      expect(params.filters).toStartWith('c2:');
 
       // Compressed version should be significantly shorter than JSON
       const jsonString = JSON.stringify(manyFilters);
@@ -576,11 +588,14 @@ describe('compression', () => {
     const serialized = serializeTableStateToUrl(original);
     const deserialized = deserializeTableStateFromUrl(serialized);
 
-    expect(deserialized.filters).toHaveLength(4);
-    expect(deserialized.filters[0]).toMatchObject(original.filters[0]);
-    expect(deserialized.filters[1]).toMatchObject(original.filters[1]);
-    expect(deserialized.filters[2]).toMatchObject(original.filters[2]);
-    expect(deserialized.filters[3]).toMatchObject(original.filters[3]);
+    // This fixture is a flat FilterState[] payload (implicit AND); narrow
+    // the union return type accordingly, per plan 015.
+    const deserializedFilters = deserialized.filters as FilterState[];
+    expect(deserializedFilters).toHaveLength(4);
+    expect(deserializedFilters[0]).toMatchObject(original.filters[0]);
+    expect(deserializedFilters[1]).toMatchObject(original.filters[1]);
+    expect(deserializedFilters[2]).toMatchObject(original.filters[2]);
+    expect(deserializedFilters[3]).toMatchObject(original.filters[3]);
     expect(deserialized.sorting).toEqual(original.sorting);
     expect(deserialized.columnVisibility).toEqual(original.columnVisibility);
     expect(deserialized.columnOrder).toEqual(original.columnOrder);

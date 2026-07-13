@@ -1,4 +1,4 @@
-import { parseTableSearchParams } from '@better-tables/core';
+import { flattenFilterNode, parseTableSearchParams } from '@better-tables/core';
 import { UsersTableClient } from '@/components/users-table-client';
 import { getAdapter } from '@/lib/adapter';
 import { defaultVisibleColumns } from '@/lib/columns/user-columns';
@@ -26,6 +26,14 @@ export default async function DemoPage({ searchParams }: PageProps) {
   });
 
   const { page, limit, filters, sorting } = tableParams;
+
+  // `filters` is a flat array (implicit AND) or a single FilterGroupNode
+  // tree (design core-contract-v2.md §1.1). The demo's filter bar (and the
+  // "Filters Applied" count below) stay flat in 0.6 (§1.6) -- narrow to the
+  // tree's flat LEAVES so a group-shaped `c2:` URL renders instead of
+  // crashing here. This is the smallest correct change (plan 016 §Step 2):
+  // the AND/OR structure is not represented in this display-only view.
+  const flatFilters = Array.isArray(filters) ? filters : flattenFilterNode(filters);
 
   // Fetch data using adapter
   const adapter = await getAdapter();
@@ -62,7 +70,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Filters Applied</p>
-                <p className="text-2xl font-bold text-card-foreground">{filters.length}</p>
+                <p className="text-2xl font-bold text-card-foreground">{flatFilters.length}</p>
               </div>
             </div>
           </div>
@@ -103,7 +111,7 @@ export default async function DemoPage({ searchParams }: PageProps) {
               }
             }
             initialSorting={sorting}
-            initialFilters={filters}
+            initialFilters={flatFilters}
           />
         </div>
 

@@ -19,7 +19,7 @@
  * @module utils/url-serialization
  */
 
-import type { FilterState, PaginationState, SortingState } from '@/types';
+import type { FilterGroupNode, FilterState, PaginationState, SortingState } from '@/types';
 import { compressAndEncode, decompressAndDecode } from './compression';
 import { deserializeFiltersFromURL, serializeFiltersToURL } from './filter-serialization';
 
@@ -27,8 +27,13 @@ import { deserializeFiltersFromURL, serializeFiltersToURL } from './filter-seria
  * Table state that can be serialized to URL parameters
  */
 export interface SerializableTableState {
-  /** Active filters */
-  filters?: FilterState[];
+  /**
+   * Active filters -- a flat array (implicit AND) or a single
+   * {@link FilterGroupNode} expressing OR/nesting (design
+   * `plans/design/core-contract-v2.md` §1.1). Delegates to
+   * `serializeFiltersToURL`, which always emits the `c2:` wire format.
+   */
+  filters?: FilterState[] | FilterGroupNode;
   /** Pagination state */
   pagination?: PaginationState;
   /** Sorting configuration */
@@ -43,8 +48,11 @@ export interface SerializableTableState {
  * Deserialized table state from URL parameters
  */
 export interface DeserializedTableState {
-  /** Active filters */
-  filters: FilterState[];
+  /**
+   * Active filters -- a flat array (implicit AND) or a single
+   * {@link FilterGroupNode} expressing OR/nesting.
+   */
+  filters: FilterState[] | FilterGroupNode;
   /** Pagination state (partial - only page and limit from URL) */
   pagination: Partial<PaginationState>;
   /** Sorting configuration */
@@ -97,15 +105,21 @@ export function serializeTableStateToUrl(
   const params: Record<string, string | null> = {};
 
   // Serialize filters (compressed and encoded) - use core serialization function
-  if (state.filters && state.filters.length > 0) {
-    try {
-      params.filters = serializeFiltersToURL(state.filters);
-    } catch {
-      // Silently ignore serialization errors
+  if (state.filters !== undefined) {
+    // A FilterGroupNode has no `.length` and (per design §1.4) is never
+    // meaningfully "empty" after validation, so only an empty FilterState[]
+    // array counts as "nothing to serialize".
+    const isEmptyArray = Array.isArray(state.filters) && state.filters.length === 0;
+    if (!isEmptyArray) {
+      try {
+        params.filters = serializeFiltersToURL(state.filters);
+      } catch {
+        // Silently ignore serialization errors
+      }
+    } else {
+      // Empty array - set to null to indicate it should be removed from URL
+      params.filters = null;
     }
-  } else if (state.filters !== undefined) {
-    // Empty array - set to null to indicate it should be removed from URL
-    params.filters = null;
   }
 
   // Serialize pagination (plain strings for page and limit)

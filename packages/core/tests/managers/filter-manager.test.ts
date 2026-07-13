@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { FilterManager } from '../../src/managers/filter-manager';
 import type { ColumnDefinition } from '../../src/types/column';
-import type { FilterState } from '../../src/types/filter';
+import type { FilterGroupNode, FilterState } from '../../src/types/filter';
 
 interface TestData {
   name: string;
@@ -711,6 +711,115 @@ describe('FilterManager', () => {
 
       expect(cloned.getFilters()).toEqual(filterManager.getFilters());
       expect(cloned).not.toBe(filterManager); // Different instances
+    });
+  });
+
+  describe('FilterNode state layer (plan 016)', () => {
+    // A representative tree: status AND (name OR age). Two levels, valid
+    // logic, no singletons/empties -- normalization leaves it untouched.
+    const statusLeaf: FilterState = {
+      columnId: 'status',
+      type: 'option',
+      operator: 'is',
+      values: ['active'],
+    };
+    const nameLeaf: FilterState = {
+      columnId: 'name',
+      type: 'text',
+      operator: 'contains',
+      values: ['John'],
+    };
+    const ageLeaf: FilterState = {
+      columnId: 'age',
+      type: 'number',
+      operator: 'greaterThan',
+      values: [30],
+    };
+    const tree: FilterGroupNode = {
+      kind: 'group',
+      logic: 'and',
+      children: [
+        statusLeaf,
+        { kind: 'group', logic: 'or', children: [nameLeaf, ageLeaf] },
+      ],
+    };
+
+    it('flat regression: setFilters(flat) -> getFilters() behaves exactly as before', () => {
+      // Behavioral snapshot of today's flat semantics: valid filters kept
+      // in order, non-filterable dropped, and the tree accessor mirrors
+      // the same flat array.
+      filterManager.setFilters([
+        nameLeaf,
+        { columnId: 'readonly', type: 'text', operator: 'contains', values: ['x'] },
+        ageLeaf,
+      ]);
+
+      expect(filterManager.getFilters()).toEqual([nameLeaf, ageLeaf]);
+      expect(filterManager.getFilterNode()).toEqual([nameLeaf, ageLeaf]);
+      expect(filterManager.getFilteredColumnIds()).toEqual(['name', 'age']);
+    });
+
+    it('tree round-trip: setFilterNode(tree) -> getFilterNode() structurally equal; getFilters() returns depth-first leaves', () => {
+      filterManager.setFilterNode(tree);
+
+      expect(filterManager.getFilterNode()).toEqual(tree);
+      // Depth-first, order-preserving flat leaf view (display only).
+      expect(filterManager.getFilters()).toEqual([statusLeaf, nameLeaf, ageLeaf]);
+      expect(filterManager.hasFilter('name')).toBe(true);
+      expect(filterManager.getFilter('age')).toEqual(ageLeaf);
+    });
+
+    it('replace semantic: legacy flat setFilters([x]) replaces a stored tree entirely', () => {
+      filterManager.setFilterNode(tree);
+      expect(filterManager.getFilterNode()).toEqual(tree);
+
+      filterManager.setFilters([nameLeaf]);
+
+      // The stored value is exactly the new flat array -- the tree is gone,
+      // deterministically, with no silent merging into groups.
+      expect(filterManager.getFilterNode()).toEqual([nameLeaf]);
+      expect(filterManager.getFilters()).toEqual([nameLeaf]);
+    });
+
+    it('normalization on set: empty groups and unknown-logic nodes are dropped, singleton groups unwrapped', () => {
+      const dirtyTree = {
+        kind: 'group',
+        logic: 'and',
+        children: [
+          statusLeaf,
+          { kind: 'group', logic: 'or', children: [] }, // empty -> dropped
+          { kind: 'group', logic: 'xor', children: [nameLeaf] }, // unknown logic -> dropped
+        ],
+      } as unknown as FilterGroupNode;
+
+      filterManager.setFilterNode(dirtyTree);
+
+      // After dropping both invalid children the root is a single-child
+      // group, which unwraps to its sole leaf; a bare leaf is stored as a
+      // length-1 flat array. Assert the outcome, not the mechanism.
+      expect(filterManager.getFilterNode()).toEqual([statusLeaf]);
+      expect(filterManager.getFilters()).toEqual([statusLeaf]);
+    });
+
+    it('events: setFilterNode notifies subscribers exactly once', () => {
+      const subscriber: ReturnType<typeof mock> = mock();
+      filterManager.subscribe(subscriber);
+
+      filterManager.setFilterNode(tree);
+
+      expect(subscriber).toHaveBeenCalledTimes(1);
+      expect(subscriber.mock.calls[0][0]).toEqual({
+        type: 'filters_replaced',
+        filters: tree,
+      });
+    });
+
+    it('cloning preserves a stored tree (tree stays a tree)', () => {
+      filterManager.setFilterNode(tree);
+      const cloned = filterManager.clone();
+
+      expect(cloned.getFilterNode()).toEqual(tree);
+      expect(cloned).not.toBe(filterManager);
     });
   });
 

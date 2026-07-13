@@ -8,7 +8,7 @@
  * @module utils/server-url-params
  */
 
-import type { FilterState, SortingState } from '@/types';
+import type { FilterGroupNode, FilterState, SortingState } from '@/types';
 import { deserializeTableStateFromUrl } from './url-serialization';
 
 /**
@@ -19,8 +19,11 @@ export interface ParsedTableSearchParams {
   page: number;
   /** Items per page */
   limit: number;
-  /** Active filters */
-  filters: FilterState[];
+  /**
+   * Active filters -- a flat array (implicit AND) or a single
+   * {@link FilterGroupNode} expressing OR/nesting.
+   */
+  filters: FilterState[] | FilterGroupNode;
   /** Sorting configuration */
   sorting: SortingState;
   /** Column visibility state */
