@@ -30,6 +30,9 @@ export const tickets = sqliteTable('support_tickets', {
   // plan 027) filters for.
   assigneeId: integer('assignee_id').references(() => assignees.id),
   slaBreached: integer('sla_breached', { mode: 'boolean' }).notNull().default(false),
+  // A direct (non-relation) numeric column -- the `facets` example needs at
+  // least one to demonstrate `getMinMaxValues` alongside `getFacetedValues`.
+  reopenCount: integer('reopen_count').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

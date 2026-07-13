@@ -12,7 +12,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
     },
     {
+      url: `${protocol}://${domain}/examples`,
+      lastModified: new Date(),
+    },
+    {
       url: `${protocol}://${domain}/examples/relationship-filtering`,
+      lastModified: new Date(),
+    },
+    {
+      url: `${protocol}://${domain}/examples/query-groups`,
+      lastModified: new Date(),
+    },
+    {
+      url: `${protocol}://${domain}/examples/big-board`,
+      lastModified: new Date(),
+    },
+    {
+      url: `${protocol}://${domain}/examples/facets`,
       lastModified: new Date(),
     },
     {

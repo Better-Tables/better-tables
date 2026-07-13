@@ -50,6 +50,11 @@ export async function fetchTickets({
       // (not just the default-visible ones) because column visibility
       // toggling is client-side only, with no refetch.
       columns: allTicketColumnIds,
+      // DX-FINDING-16: `supportTables.database.fetchData()` has no per-call
+      // generic tying it to a specific table's row type -- always
+      // `FetchDataResult<unknown>`, even though `ticketsTable.$infer.Row`
+      // already computed the exact right type. See
+      // plans/findings/029-dx-findings.md #16.
     })) as FetchDataResult<TicketWithRelations>;
 
     return {

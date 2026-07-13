@@ -277,6 +277,19 @@ separate low-level primitive on purpose, document it explicitly as
 "bring your own filtering/sorting/pagination" so the next person doesn't
 spend time looking for the integration that isn't there.
 
+**Addendum, found while actually rendering the date column:** `renderCell`
+receives the RAW cell value (`item[column.id]`), not a value already run
+through the column's own configured formatter — the `createdAt` column's
+`.dateTime({ timeZone: 'America/New_York' })` config is silently ignored
+unless the caller's `renderCell` explicitly reformats it. `<BetterTable>`
+applies column formatters automatically; `<VirtualizedTable>` does not. The
+fix was a one-liner once found — `getFormatterForType(column.type, value,
+column.meta)` (`packages/core/src/lib/format-utils.ts`, the SAME formatter
+`<BetterTable>` uses internally, and already exported publicly) — but
+nothing surfaces that this is necessary; a raw `Date.toString()`
+(`"Wed Dec 31 2025 19:05:30 GMT-0500 (Eastern Standard Time)"`) renders with
+no error, so the only way to notice is to actually look at the page.
+
 ---
 
 ## 7. Facets have no UI consumer yet — the whole sidebar is hand-built against a route handler
@@ -550,6 +563,62 @@ via `DrizzleAdapterConfig<TSchema, TDriver>['db']` instead
 
 ---
 
+## 12. `$infer.Row` (and `RowOf<...>`) includes recursive relation back-references the app never requested — a schema-derived row type that doesn't match what a specific `columns` selection actually returns
+
+**Tried:** `export const ticketColumns = ticketsTable.columns;` — expecting
+`ticketsTable.columns` (typed against `RowOf<SupportTables, 'tickets'>`,
+`defineTable()`'s schema-derived row inference) to line up with
+`TicketWithRelations`, the hand-declared row type `fetch-tickets.ts` and
+every UI component already use for the SAME data.
+
+**Happened:**
+
+```
+error TS2322: Type 'TicketWithRelations[]' is not assignable to type
+'{ id: number; ...; customer: { name: string; id: number; company: string;
+plan: "starter" | "pro" | "enterprise"; region: ...; } | { ...; tickets:
+({ ... } | { ... })[]; } | ... 1 more ...; ... }[]'.
+  Type 'TicketWithRelations' is not assignable to type '{ ...; customer: ...
+}'.
+    Types of property 'customer' are incompatible.
+      Type '{ ... } | null | undefined' is not assignable to type
+      '{ ... } | { ...; tickets: (...)[]; }'.
+```
+
+`tickets` and `customers` have a two-way relation
+(`customersRelations: { tickets: many(tickets) }`,
+`ticketsRelations: { customer: one(customers, ...) }`). `RelationAwareRow`
+(`RowOf`'s underlying computation, default depth 3) walks relations
+recursively: `tickets.customer.tickets.customer...`, producing a row type
+where `customer` is a UNION between "customer without a back-reference" and
+"customer WITH its own `tickets: Ticket[]` back-reference" depending on
+recursion depth — a nested shape `fetch-tickets.ts` never actually produces
+(it only requests `customer.plan`/`.company`/`.region` via `columns`, never
+`customer.tickets`) and that the app's hand-declared `TicketWithRelations`
+(`customer?: SupportCustomer | null`, no back-reference) doesn't match.
+`$infer.Row`/`RowOf` describe "everything reachable from this table through
+relations," not "the shape THIS query, with THIS `columns` selection,
+actually returns" — there is no way to narrow it to match a specific fetch.
+
+**Workaround shipped:** One explicit, audited erasure —
+`ticketsTable.columns as unknown as ColumnDefinition<TicketWithRelations,
+unknown>[]` (`columns.tsx`, `// DX-FINDING-12`) — bridging the
+schema-derived column type to the app's own hand-shaped fetch/render type.
+The underlying runtime objects are identical either way; only the static
+type disagrees.
+
+**Proposed fix:** Two independent angles: (a) cap relation-back-reference
+recursion more aggressively by default, or make it opt-in (most row
+consumers want the FORWARD relations they filtered/selected by, not
+reverse "what points back at me" edges); (b) more fundamentally, thread the
+ACTUAL `columns` selection through to a narrowed return type — e.g. a
+`RowFor<TableDefinition, TSelectedColumns>` that only includes the relations
+a specific `columns` array actually requests — so `$infer.Row` (or a fetch
+call's return type, see finding 16) reflects what a query really returns
+instead of the full relation-aware superset every time.
+
+---
+
 ## 13. MIGRATION.md's module-scope `export const tables = betterTables({...})` pattern breaks `next build` when the adapter wraps a native DB binding
 
 **Tried:** MIGRATION.md §1's example verbatim: `db.ts` constructed
@@ -689,43 +758,47 @@ misleading a caller who correctly declared it.
 
 ---
 
-## 15. Filter chips don't reappear after a client-side (soft) navigation to a preset URL, even though the fetched data and the hand-built query trail both update correctly
+## 15. Filter chips don't reappear after a client-side (soft) navigation to a new filter URL, even though the fetched data and other UI both update correctly
 
-**Tried:** Click a scenario preset button (`SupportDemoWorkspace`'s
-`applyPreset`, which calls `urlAdapter.setParams(...)` → Next.js
-`router.push` — a CLIENT-SIDE navigation, not a full page load) for the
-"Enterprise escalations" preset (`customer.plan is enterprise AND status is
-escalated`, an AND `FilterGroupNode`). Expect the built-in `<BetterTable>`
-filter bar to show two chips ("Customer plan Is Enterprise", "Status Is
-Escalated"), matching what a fresh page load with the same URL shows.
+**Tried:** Any client-side URL change to a table's `filters` param via
+`urlAdapter.setParams(...)` (Next.js `router.push` — a soft navigation, not
+a full page load) while the page stays mounted: (a) clicking a scenario
+preset button on `/examples/relationship-filtering` for "Enterprise
+escalations" (`customer.plan is enterprise AND status is escalated`, an AND
+`FilterGroupNode`); (b) clicking a facet checkbox on `/examples/facets`
+("escalated" under Status — a single FLAT `FilterState`, no group at all).
+Expect the built-in `<BetterTable>` filter bar to show the matching chip(s),
+the same way a fresh page load at the resulting URL does.
 
-**Happened:** Confirmed twice via a real browser (screenshots), immediately
-after the soft-navigation click: the table data WAS correctly filtered (3 of
-20 tickets, all matching), and the hand-built "Query trail" sidebar
-correctly showed "customer.plan is enterprise" — but the `<BetterTable>`
-filter bar showed no chips at all, just the plain "Add filter" button, as if
-no filters were active. Navigating to the EXACT SAME URL
-(`?filters=c2:...&page=1&limit=10`) via a fresh/hard page load DID show both
-chips correctly ("Customer plan Is Enterprise" / "Status Is Escalated"),
-confirming the URL and the deserialized filter state are both correct — only
-the SOFT-navigation path failed to update the filter bar's chip display.
+**Happened:** Confirmed for BOTH cases via a real browser. After clicking
+"Enterprise escalations": the table data was correctly filtered (3 of 20
+tickets), the hand-built "Query trail" sidebar correctly showed
+"customer.plan is enterprise" — but the `<BetterTable>` filter bar showed no
+chips, just "Add filter", as if nothing were active. After clicking the
+"escalated" facet checkbox on the FACETS page (confirming this is NOT
+group-specific): `window.location.href` correctly gained
+`?filters=c2:...&page=1`, the table correctly narrowed to 3 escalated
+tickets, the OTHER facets correctly self-excluded/re-narrowed (Priority:
+high 1, urgent 2; Customer plan: enterprise 3; Reopens: 3–4) — but the
+`<BetterTable>` filter bar again showed "No filters active." In both cases,
+navigating to the EXACT SAME URL via a fresh/hard page load DID show the
+correct chip(s), confirming the URL and the deserialized filter state are
+both correct — only the SOFT-navigation path fails to update the filter
+bar's own chip display.
 
-**Scope of what was verified (audited claim, not overclaimed):** this was
-observed with an AND `FilterGroupNode` preset. I did not conclusively
-isolate whether a FLAT (non-group) preset shows the same soft-navigation
-symptom — a follow-up click on the flat "SLA breaches" preset did not
-reliably register through the browser automation used for this check (no
-new network request logged), so that comparison is inconclusive rather than
-negative. This finding should be read as "confirmed for a group preset
-under soft navigation," not "confirmed group-specific."
+**Root cause, not group-specific:** confirmed independent of whether the
+filter is flat or a `FilterGroupNode` — this is a general soft-navigation /
+`useTableUrlSync` re-hydration gap, not something plan 029's group-filtering
+work introduced or is specific to.
 
 **Workaround shipped:** None applied to the app code — this is a report-only
 finding since I could not isolate a root cause precise enough to safely work
 around without risking a wrong fix (e.g. forcing a hard navigation for every
-preset click would fix the chip display but defeat the point of `useTableUrlSync`
-and would need packages/ui changes to do properly anyway, which is out of
-scope). Documented here so the maintainer can reproduce: click "Enterprise
-escalations" on `/examples/relationship-filtering`, compare against a hard
+preset/facet click would fix the chip display but defeat the point of
+`useTableUrlSync` and would need packages/ui changes to do properly anyway,
+which is out of scope). Documented here so the maintainer can reproduce:
+click "Enterprise escalations" on `/examples/relationship-filtering`, OR
+click any facet checkbox on `/examples/facets`, and compare against a hard
 reload of the resulting URL.
 
 **Proposed fix:** Worth a targeted investigation in `useTableUrlSync`'s
@@ -737,6 +810,81 @@ correctly seeds the FIRST render (matching the hard-reload case) but nothing
 re-syncs the store on subsequent client-side URL changes to the SAME
 mounted table id — which would explain exactly this symptom, independent of
 whether the filters are flat or a group.
+
+---
+
+## 16. No way to get a table-scoped, typed `fetchData()` — every call returns `FetchDataResult<unknown>`, needing a manual cast to the table's own inferred row type
+
+**Tried:** After `ticketsTable = defineTable<SupportTables>()('tickets', ...)`,
+the natural expectation is that fetching through the SAME flagship instance
+returns data already typed as `ticketsTable.$infer.Row` — the whole point of
+`defineTable()` computing that type in the first place.
+
+**Happened:** `supportTables.database` is a single, generic
+`SchemaAwareAdapter`-typed adapter instance shared by EVERY table in the
+schema (`customers`, `assignees`, `tickets`, `bulkTickets`) — `.fetchData()`
+has no per-call generic parameter tying a specific call to a specific
+table's row type, so it always returns `FetchDataResult<unknown>`. Every
+fetch helper in this app (`fetch-tickets.ts`, `fetch-bulk-tickets.ts`,
+the pre-existing `fetch-users.ts`) ends with a manual
+`as FetchDataResult<TicketWithRelations>` (or the equivalent for its own
+row type) to recover a usable type — `defineTable()` computed the exact
+right type (`$infer.Row`) but there's no ergonomic path from "I have a
+`TableDefinition`" to "calling fetchData through it returns that type."
+
+**Workaround shipped:** Manual `as FetchDataResult<TRow>` casts at every
+fetch call site (`// DX-FINDING-16` in `fetch-tickets.ts`,
+`fetch-bulk-tickets.ts`, `fetch-users.ts`).
+
+**Proposed fix:** A typed convenience on `TableDefinition` itself --
+e.g. `ticketsTable.fetchData(tables, params)` (or
+`tables.database.fetchData<TRow>(params)` with an explicit generic) that
+returns `FetchDataResult<TableDefinition['$infer']['Row']>` without a manual
+cast, reusing the SAME `$infer.Row` computation `defineTable()` already did
+at definition time instead of asking every call site to restate the target
+type by hand.
+
+---
+
+## 17. `FilterState.values` (a discriminated union field) can't be used generically without narrowing by `type` first — even for simple value-equality checks
+
+**Tried:** Given an array of `FilterState[]`, check whether a specific
+`(columnId, value)` pair is already an active filter:
+`activeFilters.some((f) => f.columnId === columnId && f.values.includes(value))`.
+
+**Happened:**
+
+```
+error TS2345: Argument of type 'string' is not assignable to parameter of type 'never'.
+```
+
+`FilterState` is a discriminated union (`TextFilterState | NumberFilterState
+| ... `), and each member's `values` field has a DIFFERENT element type
+(`string[]`, `number[]`, `boolean[]`, `(Date | string | number)[]`, ...).
+Without narrowing `f` by `f.type` first, TypeScript can only offer the
+INTERSECTION of every member's `values` element type for a generic
+`.includes()` call, which collapses to `never` — even though every branch's
+runtime behavior (array membership check against a caller-supplied string)
+is identical and type-safe in practice for the option/text columns this
+sidebar cares about.
+
+**Workaround shipped:** `(f.values as unknown[]).includes(value)`
+(`facets-sidebar.tsx`, `// DX-FINDING-17`) — a narrow, deliberate cast
+rather than a `switch` over every `FilterState` member just to satisfy the
+type checker for a single generic comparison. The SAME root issue (a leaf
+literal's `values` array needing a specific member type inferred from a
+non-literal `type` variable) also required
+`{ columnId, type: config.type, operator: 'is', values: [value] } as FilterState`
+when constructing a NEW filter from a generic `FacetColumnConfig` — see
+finding 1 for the broader "restating the column's type" pattern this
+compounds.
+
+**Proposed fix:** A generic `FilterState<TType extends ColumnType =
+ColumnType>` helper, or a standalone `filterHasValue(filter: FilterState,
+value: unknown): boolean` utility exported from the library, would remove
+the need for every consumer to independently rediscover this cast for what
+is a common, simple operation (checking whether a filter already targets a
+given value).
 
 ---
 
@@ -758,4 +906,6 @@ whether the filters are flat or a group.
 | 12 | `$infer.Row`/`RowOf` includes recursive relation back-references never requested via `columns`, mismatching the app's own hand-shaped row type | Schema-derived type describes "everything reachable," not "what this query returns" |
 | 13 | MIGRATION.md's module-scope `betterTables()` pattern breaks `next build` when the adapter wraps a native DB binding (build-time page-data collection runs the constructor) | **Real gap** -- doc pattern unsafe for this class of adapter; pre-existing demo code already worked around it silently |
 | 14 | Auto-detected relationships silently mismatch (`tables` keyed by schema key, `relations` keyed by SQL table name) whenever a table's JS export name differs from its SQL name | **Highest-value fix candidate** -- breaks the fully-automatic `drizzleAdapter(db)` path for a common, encouraged schema pattern, with a misleading error message |
-| 15 | Filter chips don't reappear after a soft (client-side) navigation to a preset URL, though data and the hand-built trail both update correctly | Confirmed for a group preset; root cause not conclusively isolated (see finding for scope) |
+| 15 | Filter chips don't reappear after a soft (client-side) navigation to a new filter URL, though data and other UI both update correctly | Confirmed for BOTH a group preset and a flat facet click -- general soft-nav gap, not group-specific |
+| 16 | No table-scoped, typed `fetchData()` -- every call returns `FetchDataResult<unknown>`, needing a manual cast to the table's own `$infer.Row` | Ergonomics gap; `defineTable()` already computed the right type |
+| 17 | `FilterState.values` (discriminated union) can't be used generically (e.g. `.includes()`) without narrowing by `type` first | Minor type-ergonomics friction, same shape as finding 1 |

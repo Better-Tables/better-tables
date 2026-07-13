@@ -37,6 +37,9 @@ export async function fetchUsers({
       pagination: { page, limit },
       filters,
       sorting,
+      // DX-FINDING-16: `fetchData()` returns `FetchDataResult<unknown>`
+      // regardless of adapter/table -- see
+      // plans/findings/029-dx-findings.md #16.
     })) as FetchDataResult<UserWithRelations>;
 
     return {

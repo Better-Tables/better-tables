@@ -16,7 +16,7 @@ export function Header() {
           <span className="font-semibold text-lg">{siteConfig.name}</span>
         </Link>
         <div className="hidden lg:flex items-center gap-6">
-          <Link href="/examples/relationship-filtering" className="text-sm text-muted-foreground hover:text-foreground">
+          <Link href="/examples" className="text-sm text-muted-foreground hover:text-foreground">
             Examples
           </Link>
           <Link

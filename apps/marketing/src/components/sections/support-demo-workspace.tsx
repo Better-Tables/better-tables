@@ -9,7 +9,6 @@ import {
   supportScenarioPresets,
 } from '@/lib/demo/support/relationship-trail';
 import { serializeSupportPresetToUrl } from '@/lib/demo/support/serialize-preset';
-import type { TicketWithRelations } from '@/lib/demo/support/schema';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 import { cn } from '@/lib/utils';
 import type { FetchTicketsResult } from '@/lib/demo/support/fetch-tickets';
@@ -54,7 +53,7 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
           ) : null}
 
           <TicketsTableClient
-            data={(result.data ?? []) as TicketWithRelations[]}
+            data={result.data ?? []}
             totalCount={result.total ?? 0}
             initialPagination={
               result.pagination ?? {

@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import { parseTableSearchParams } from '@better-tables/core';
+import { SourceView } from '@/components/sections/source-view';
 import { SupportDemoWorkspace } from '@/components/sections/support-demo-workspace';
+import { readSourceFile } from '@/lib/demo/read-source';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { supportSeed } from '@/lib/demo/support/seed-data';
 import { constructMetadata } from '@/lib/utils';
@@ -36,6 +38,9 @@ export default async function RelationshipFilteringPage({
     sorting: tableParams.sorting,
   });
 
+  const columnsSource = readSourceFile('src/lib/demo/support/columns.tsx');
+  const dbSource = readSourceFile('src/lib/demo/support/db.ts');
+
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
       <div className="mb-10 max-w-3xl">
@@ -56,6 +61,16 @@ export default async function RelationshipFilteringPage({
       <Suspense fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}>
         <SupportDemoWorkspace fetchResult={fetchResult} />
       </Suspense>
+
+      <div className="mt-6">
+        <SourceView
+          title="Implementation: table definition and flagship betterTables() instance"
+          files={[
+            { label: 'src/lib/demo/support/columns.tsx', code: columnsSource },
+            { label: 'src/lib/demo/support/db.ts', code: dbSource },
+          ]}
+        />
+      </div>
     </div>
   );
 }

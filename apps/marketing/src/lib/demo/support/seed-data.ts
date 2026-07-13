@@ -28,6 +28,7 @@ export const supportSeed = {
       customerId: 1,
       assigneeId: 3,
       slaBreached: true,
+      reopenCount: 3,
       createdAt: new Date('2026-07-10T09:12:00Z'),
     },
     {
@@ -39,6 +40,7 @@ export const supportSeed = {
       customerId: 6,
       assigneeId: 1,
       slaBreached: false,
+      reopenCount: 1,
       createdAt: new Date('2026-07-11T14:30:00Z'),
     },
     {
@@ -50,6 +52,7 @@ export const supportSeed = {
       customerId: 3,
       assigneeId: 5,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-11T16:05:00Z'),
     },
     {
@@ -61,6 +64,7 @@ export const supportSeed = {
       customerId: 2,
       assigneeId: 2,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-12T08:40:00Z'),
     },
     {
@@ -72,6 +76,7 @@ export const supportSeed = {
       customerId: 4,
       assigneeId: 2,
       slaBreached: false,
+      reopenCount: 1,
       createdAt: new Date('2026-07-08T11:20:00Z'),
     },
     {
@@ -83,6 +88,7 @@ export const supportSeed = {
       customerId: 6,
       assigneeId: 1,
       slaBreached: true,
+      reopenCount: 2,
       createdAt: new Date('2026-07-12T19:45:00Z'),
     },
     {
@@ -94,6 +100,7 @@ export const supportSeed = {
       customerId: 5,
       assigneeId: 4,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-09T13:10:00Z'),
     },
     {
@@ -105,6 +112,7 @@ export const supportSeed = {
       customerId: 1,
       assigneeId: 3,
       slaBreached: true,
+      reopenCount: 4,
       createdAt: new Date('2026-07-12T22:18:00Z'),
     },
     {
@@ -116,6 +124,7 @@ export const supportSeed = {
       customerId: 4,
       assigneeId: 2,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-07T10:05:00Z'),
     },
     {
@@ -127,6 +136,7 @@ export const supportSeed = {
       customerId: 3,
       assigneeId: 5,
       slaBreached: false,
+      reopenCount: 1,
       createdAt: new Date('2026-07-13T07:55:00Z'),
     },
     {
@@ -138,6 +148,7 @@ export const supportSeed = {
       customerId: 3,
       assigneeId: 3,
       slaBreached: true,
+      reopenCount: 2,
       createdAt: new Date('2026-07-13T09:30:00Z'),
     },
     {
@@ -149,6 +160,7 @@ export const supportSeed = {
       customerId: 5,
       assigneeId: 4,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-10T23:40:00Z'),
     },
     {
@@ -160,6 +172,7 @@ export const supportSeed = {
       customerId: 2,
       assigneeId: 1,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-06T15:22:00Z'),
     },
     {
@@ -171,6 +184,7 @@ export const supportSeed = {
       customerId: 6,
       assigneeId: 5,
       slaBreached: false,
+      reopenCount: 1,
       createdAt: new Date('2026-07-12T12:08:00Z'),
     },
     {
@@ -182,6 +196,7 @@ export const supportSeed = {
       customerId: 1,
       assigneeId: 3,
       slaBreached: true,
+      reopenCount: 3,
       createdAt: new Date('2026-07-13T11:05:00Z'),
     },
     {
@@ -193,6 +208,7 @@ export const supportSeed = {
       customerId: 2,
       assigneeId: 2,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-11T09:18:00Z'),
     },
     {
@@ -204,6 +220,7 @@ export const supportSeed = {
       customerId: 4,
       assigneeId: 4,
       slaBreached: false,
+      reopenCount: 1,
       createdAt: new Date('2026-07-13T03:12:00Z'),
     },
     {
@@ -215,6 +232,7 @@ export const supportSeed = {
       customerId: 6,
       assigneeId: 1,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-05T18:44:00Z'),
     },
     {
@@ -226,6 +244,7 @@ export const supportSeed = {
       customerId: 5,
       assigneeId: null,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-13T13:02:00Z'),
     },
     {
@@ -237,6 +256,7 @@ export const supportSeed = {
       customerId: 2,
       assigneeId: null,
       slaBreached: false,
+      reopenCount: 0,
       createdAt: new Date('2026-07-13T14:47:00Z'),
     },
   ] satisfies SupportTicket[],

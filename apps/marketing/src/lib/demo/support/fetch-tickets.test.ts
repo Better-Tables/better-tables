@@ -79,6 +79,7 @@ async function createTestAdapter(): Promise<DrizzleAdapter<typeof supportSchema,
     customer_id INTEGER NOT NULL,
     assignee_id INTEGER,
     sla_breached INTEGER NOT NULL DEFAULT 0,
+    reopen_count INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     FOREIGN KEY (customer_id) REFERENCES support_customers(id),
     FOREIGN KEY (assignee_id) REFERENCES support_assignees(id)
@@ -159,6 +160,11 @@ describe('support ticket fetch/filter pipeline (bun:sqlite fixture -- see file d
     });
 
     expect(result.total).toBeGreaterThan(0);
+    // DX-FINDING-16: `adapter.fetchData()` returns `FetchDataResult<unknown>`
+    // -- every `as TicketWithRelations` cast in this file narrows a result
+    // row for test assertions, same root cause as the production casts in
+    // `fetch-tickets.ts`/`fetch-bulk-tickets.ts`. See
+    // plans/findings/029-dx-findings.md #16.
     for (const ticket of result.data) {
       expect((ticket as TicketWithRelations).customer?.plan).toBe('enterprise');
     }

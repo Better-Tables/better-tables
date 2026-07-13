@@ -38,7 +38,7 @@ export function MobileDrawer() {
         </DrawerHeader>
         <DrawerFooter className="gap-3">
           <Link
-            href="/examples/relationship-filtering"
+            href="/examples"
             className={cn(buttonVariants({ variant: 'outline' }), 'rounded-full')}
           >
             Examples

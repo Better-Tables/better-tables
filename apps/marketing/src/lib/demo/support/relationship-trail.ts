@@ -176,3 +176,10 @@ export const noAssigneeFilterPreset: SupportScenarioPreset = {
     },
   ],
 };
+
+/** Every preset the `query-groups` example showcases: AND groups, an OR
+ * group, a flat (implicit-AND) list, and the null-only filter (027). */
+export const queryGroupPresets: SupportScenarioPreset[] = [
+  ...supportScenarioPresets,
+  noAssigneeFilterPreset,
+];

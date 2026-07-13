@@ -84,6 +84,10 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .activeInactive({ activeText: 'Breached', inactiveText: 'On track', showBadges: true })
       .filterable(),
 
+    // Direct numeric column -- the `facets` example's `getMinMaxValues`
+    // showcase needs one.
+    t.number('reopenCount').displayName('Reopens').filterable().sortable(),
+
     t.text('customer.company').displayName('Customer').searchable({ includeNull: true }).filterable().sortable(),
 
     t
