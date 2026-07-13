@@ -1,6 +1,6 @@
 /**
- * @fileoverview Data transformation utilities for Drizzle ORM adapter
- * @module @better-tables/adapters-drizzle/data-transformer
+ * @fileoverview ORM-agnostic data transformation utilities
+ * @module @better-tables/adapters-toolkit/data-transformer
  *
  * @description
  * Provides utilities for transforming flat SQL query results into nested data structures
@@ -18,6 +18,12 @@
  *
  * This class is immutable and thread-safe - all methods accept primaryTable as a parameter
  * rather than storing it as mutable state, preventing race conditions in concurrent requests.
+ *
+ * ORM-specific concerns are pushed to the edges via two small ports:
+ * - {@link RelationshipManagerPort}: relationship-path resolution (an adapter's
+ *   own relationship manager, e.g. Drizzle's, satisfies this structurally)
+ * - {@link SchemaIntrospectionPort}: column-name / foreign-key / primary-key
+ *   lookups for the adapter's own table objects
  *
  * @example
  * ```typescript
@@ -39,14 +45,13 @@
  * @since 1.0.0
  */
 
-import type { RelationshipManager } from './relationship-manager';
-import type { AggregateColumn, AnyTableType, ColumnPath } from './types';
+import type {
+  AggregateColumn,
+  ColumnPath,
+  RelationshipManagerPort,
+  SchemaIntrospectionPort,
+} from './types';
 import { generateAlias } from './utils/alias-generator';
-import {
-  getColumnNames,
-  getForeignKeyColumns,
-  getPrimaryKeyColumns,
-} from './utils/drizzle-schema-utils';
 
 /**
  * Data transformer that converts flat SQL results to nested structures.
@@ -54,24 +59,31 @@ import {
  * @class DataTransformer
  * @description Converts flat SQL join results into nested, relationship-aware data structures
  *
- * @property {Record<string, AnyTableType>} schema - The schema containing all tables
- * @property {RelationshipManager} relationshipManager - Manager for resolving relationships
+ * @property schema - The schema containing all tables, keyed by table name
+ * @property relationshipManager - Port for resolving relationships (e.g. an adapter's own manager)
+ * @property schemaPort - Port for reading column/foreign-key/primary-key info off `TTable`
  *
  * @example
  * ```typescript
- * const transformer = new DataTransformer(schema, relationshipManager);
+ * const transformer = new DataTransformer(schema, relationshipManager, drizzleSchemaPort);
  * const nested = transformer.transformToNested(flatResults, 'users', ['email', 'profile.bio']);
  * ```
  *
  * @since 1.0.0
  */
-export class DataTransformer {
-  private schema: Record<string, AnyTableType>;
-  private relationshipManager: RelationshipManager;
+export class DataTransformer<TTable = unknown> {
+  private schema: Record<string, TTable>;
+  private relationshipManager: RelationshipManagerPort;
+  private schemaPort: SchemaIntrospectionPort<TTable>;
 
-  constructor(schema: Record<string, AnyTableType>, relationshipManager: RelationshipManager) {
+  constructor(
+    schema: Record<string, TTable>,
+    relationshipManager: RelationshipManagerPort,
+    schemaPort: SchemaIntrospectionPort<TTable>
+  ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
+    this.schemaPort = schemaPort;
   }
 
   /**
@@ -800,7 +812,7 @@ export class DataTransformer {
       // Extract only columns that are present in the record (requested columns)
       // Instead of extracting all columns, only extract what's actually in the record
       const relatedTableSchema = this.schema[realTableName];
-      const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
+      const relatedColumns = relatedTableSchema ? this.schemaPort.getColumnNames(relatedTableSchema) : [];
 
       for (const col of relatedColumns) {
         const flatKey = generateAlias(relationshipPath, col);
@@ -925,7 +937,9 @@ export class DataTransformer {
           }
         } else {
           // Fallback: extract all columns from schema that are present in the record
-          const relatedColumns = relatedTableSchema ? getColumnNames(relatedTableSchema) : [];
+          const relatedColumns = relatedTableSchema
+            ? this.schemaPort.getColumnNames(relatedTableSchema)
+            : [];
           for (const col of relatedColumns) {
             const flatKey = generateAlias(relationshipPath, col);
             // Only extract if the value is defined and not null
@@ -1056,11 +1070,11 @@ export class DataTransformer {
           // Check if key starts with tableName_
           if (key.startsWith(`${tableName}_`)) {
             const field = key.substring(tableName.length + 1);
-            // Use Drizzle schema utilities to verify the field exists
+            // Use the adapter's schema introspection port to verify the field exists
             const tableSchema = this.schema[tableName];
-            if (tableSchema && getColumnNames(tableSchema).includes(field)) {
-              // Check if this is a foreign key column using Drizzle schema utilities
-              const foreignKeyColumns = getForeignKeyColumns(tableSchema);
+            if (tableSchema && this.schemaPort.getColumnNames(tableSchema).includes(field)) {
+              // Check if this is a foreign key column via the schema introspection port
+              const foreignKeyColumns = this.schemaPort.getForeignKeyColumns(tableSchema);
               const isForeignKey = foreignKeyColumns.some((fk) => fk.name === field);
 
               if (!isForeignKey) {
@@ -1315,11 +1329,11 @@ export class DataTransformer {
   }
 
   /**
-   * Get primary key name from table schema using Drizzle utilities
+   * Get primary key name from table schema via the schema introspection port
    * @returns The primary key column name, or 'id' as fallback if not found or invalid
    */
-  private getPrimaryKeyName(tableSchema: AnyTableType): string {
-    const primaryKeyColumns = getPrimaryKeyColumns(tableSchema);
+  private getPrimaryKeyName(tableSchema: TTable): string {
+    const primaryKeyColumns = this.schemaPort.getPrimaryKeyColumns(tableSchema);
     // Return the first primary key column name, or 'id' as fallback
     // CRITICAL: Ensure we always return a string, even if name is undefined/null
     if (

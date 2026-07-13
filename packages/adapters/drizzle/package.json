@@ -28,6 +28,7 @@
     "clean": "git clean -xdf .cache dist .turbo node_modules"
   },
   "dependencies": {
+    "@better-tables/adapters-toolkit": "workspace:*",
     "better-sqlite3": "^12.4.6",
     "drizzle-orm": "^0.45.1"
   },

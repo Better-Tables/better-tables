@@ -11,6 +11,7 @@
  * @since 1.0.0 (expanded to support all MySQL drivers in 1.1.0)
  */
 
+import { generateAlias } from '@better-tables/adapters-toolkit';
 import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
 import type { MySqlColumn, MySqlTable } from 'drizzle-orm/mysql-core';
 import type { RelationshipManager } from '../relationship-manager';
@@ -25,7 +26,6 @@ import type {
   QueryContext,
 } from '../types';
 import { QueryError } from '../types';
-import { generateAlias } from '../utils/alias-generator';
 import { BaseQueryBuilder } from './base-query-builder';
 
 /**

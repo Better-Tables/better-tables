@@ -125,6 +125,7 @@
       "name": "@better-tables/adapters-drizzle",
       "version": "0.5.31",
       "dependencies": {
+        "@better-tables/adapters-toolkit": "workspace:*",
         "better-sqlite3": "^12.4.6",
         "drizzle-orm": "^0.45.1",
       },
@@ -150,6 +151,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@better-tables/core": "workspace:*",
+        "drizzle-orm": "^0.45.1",
         "tsdown": "catalog:",
         "typescript": "catalog:",
       },

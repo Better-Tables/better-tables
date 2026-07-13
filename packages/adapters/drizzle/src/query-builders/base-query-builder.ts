@@ -10,6 +10,13 @@
  */
 
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
+import {
+  calculateLevenshteinDistance,
+  escapeSqlIdentifier,
+  generateAlias,
+  generatePathKey,
+  getPrimaryKeyMap,
+} from '@better-tables/adapters-toolkit';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import { and, asc, avg, count, countDistinct, desc, eq, max, min, sum } from 'drizzle-orm';
 import { FilterHandler } from '../filter-handler';
@@ -30,11 +37,11 @@ import type {
   SQLiteQueryBuilderWithJoins,
 } from '../types';
 import { QueryError } from '../types';
-import { generateAlias, generatePathKey } from '../utils/alias-generator';
-import { getColumnNames } from '../utils/drizzle-schema-utils';
-import { calculateLevenshteinDistance } from '../utils/levenshtein';
-import { getPrimaryKeyMap } from '../utils/schema-introspection';
-import { escapeSqlIdentifier } from '../utils/sql-utils';
+import {
+  getColumnNames,
+  getForeignKeyColumns,
+  getPrimaryKeyColumns,
+} from '../utils/drizzle-schema-utils';
 
 /**
  * Abstract base class for query builders.
@@ -60,7 +67,11 @@ export abstract class BaseQueryBuilder {
     this.relationshipManager = relationshipManager;
     this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType, hooks);
     // Primary keys are auto-detected from the schema
-    this.primaryKeyMap = getPrimaryKeyMap(schema);
+    this.primaryKeyMap = getPrimaryKeyMap(schema, {
+      getColumnNames,
+      getForeignKeyColumns,
+      getPrimaryKeyColumns,
+    });
   }
 
   /**

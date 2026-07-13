@@ -13,6 +13,7 @@
  * @since 1.0.0 (expanded to support all PostgreSQL drivers in 1.1.0)
  */
 
+import { generateAlias } from '@better-tables/adapters-toolkit';
 import {
   and,
   count,
@@ -37,7 +38,6 @@ import type {
   QueryContext,
 } from '../types';
 import { QueryError } from '../types';
-import { generateAlias } from '../utils/alias-generator';
 import { BaseQueryBuilder } from './base-query-builder';
 
 /**

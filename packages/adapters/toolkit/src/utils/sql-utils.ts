@@ -1,6 +1,6 @@
 /**
  * @fileoverview SQL utility functions for safe SQL generation
- * @module @better-tables/drizzle-adapter/utils/sql-utils
+ * @module @better-tables/adapters-toolkit/utils/sql-utils
  *
  * @description
  * Utility functions for safely working with SQL identifiers and expressions.

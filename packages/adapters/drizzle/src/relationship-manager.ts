@@ -47,6 +47,7 @@
  * @since 1.0.0
  */
 
+import { calculateLevenshteinDistance } from '@better-tables/adapters-toolkit';
 import type { SQL } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import type {
@@ -61,7 +62,6 @@ import type {
 } from './types';
 import { RelationshipError } from './types';
 import { getColumnNames } from './utils/drizzle-schema-utils';
-import { calculateLevenshteinDistance } from './utils/levenshtein';
 
 /**
  * Relationship manager that handles column path resolution and join optimization.

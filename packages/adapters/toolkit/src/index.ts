@@ -12,3 +12,21 @@
  * small ORM-specific "ports" and compose them with these primitives instead
  * of re-implementing this logic from scratch.
  */
+
+export { DataTransformer } from './data-transformer';
+export { PrimaryTableResolver, type RelationshipMapLike } from './primary-table-resolver';
+export type {
+  AggregateColumn,
+  ColumnInfoLike,
+  ColumnPath,
+  PrimaryKeyInfo,
+  RelationshipManagerPort,
+  RelationshipMap,
+  RelationshipPath,
+  SchemaIntrospectionPort,
+} from './types';
+export { SchemaError } from './types';
+export { generateAlias, generatePathAlias, generatePathKey } from './utils/alias-generator';
+export { calculateLevenshteinDistance } from './utils/levenshtein';
+export { getPrimaryKeyInfo, getPrimaryKeyMap } from './utils/schema-introspection';
+export { escapeSqlIdentifier } from './utils/sql-utils';

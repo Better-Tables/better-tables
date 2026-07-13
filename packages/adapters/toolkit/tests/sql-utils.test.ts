@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tests for SQL utility functions
- * @module @better-tables/drizzle-adapter/tests/sql-utils
+ * @module @better-tables/adapters-toolkit/tests/sql-utils
  *
  * Tests for SQL identifier escaping and other SQL utility functions.
  */

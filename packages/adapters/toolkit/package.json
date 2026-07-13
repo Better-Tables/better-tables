@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@better-tables/core": "workspace:*",
+    "drizzle-orm": "^0.45.1",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },

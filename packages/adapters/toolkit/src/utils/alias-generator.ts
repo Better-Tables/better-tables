@@ -1,6 +1,6 @@
 /**
  * @fileoverview Utility for generating unique column aliases
- * @module @better-tables/drizzle-adapter/utils/alias-generator
+ * @module @better-tables/adapters-toolkit/utils/alias-generator
  *
  * @description
  * Provides utilities for generating unique column aliases that include

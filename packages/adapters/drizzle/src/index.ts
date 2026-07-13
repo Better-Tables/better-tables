@@ -40,7 +40,9 @@
 
 // Main exports
 
-export { DataTransformer } from './data-transformer';
+// Re-exported from @better-tables/adapters-toolkit: DataTransformer's flat->nested
+// transformation logic moved there in plan 007 (it was already ORM-agnostic).
+export { DataTransformer } from '@better-tables/adapters-toolkit';
 export { DrizzleAdapter } from './drizzle-adapter';
 export { createDrizzleAdapter, drizzleAdapter } from './factory';
 export { FilterHandler } from './filter-handler';
