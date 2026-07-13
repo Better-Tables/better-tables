@@ -18,11 +18,11 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 19 plans (001–007, 010–019, 022–023, 028) — verification
+- **Done and merged**: 20 plans (001–007, 010–020, 022–023, 028) — verification
   baseline, CI gating, URL hardening, type-inference stack, FilterNode through
   core state + Drizzle AND/OR, adapter toolkit extraction, UI hooks harness,
   both design docs, instance API, migration guide, real timezone conversion,
-  shared manager emitter, loud relationship inference.
+  shared manager emitter, loud relationship inference, join pagination fix.
 - **Gates on main**: root typecheck 11/11 · core 1107/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
@@ -31,14 +31,13 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: 020, 025, 024, 027. **Next**: 021←020; 026←023+024.
+- **In flight**: 021, 024, 025, 027. **Next**: 026←023+024.
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 020 | Fix page under-fill on one-to-many joins (ADAPTER-03) | 007/017 (DONE) | IN FLIGHT — wave 1 |
-| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | **020 merged** (same file) | PLANNED — wave 2; rides 0.6 |
+| 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | 020 (DONE) | IN FLIGHT — wave 2; rides 0.6 |
 | 024 | Virtualization offsets: stale positions + O(n) scans (CORE-03/09) | 023 (DONE) | IN FLIGHT — wave 2 |
 | 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
 | 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3 |
@@ -82,6 +81,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 028 | Real timezone conversion | `d06fee9` | `@date-fns/tz` TZDate conversion in formatDateWithConfig/range; UTC builder default honored (MIGRATION §11); soft-fail unknown zones; core 1104/0 |
 | 023 | Shared subscription emitter | `f657c6c` | `Subscribable` base; six managers migrated; log-never-swallow + snapshot notify; core 1107/0 |
 | 022 | Relationship inference honesty | merged 2026-07-13 | Zero-match throws SchemaError + suggestions; Strategy 3 FK-verified; toolkit 96/0 |
+| 020 | Join pagination under-fill | `8e15c00` | Two-phase fan-out pagination; many-to-one path unchanged; SQLite 520/0 |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -112,9 +112,8 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 
 Status key: still open unless noted. Struck / FIXED lines stay so nobody re-files.
 
-- **ADAPTER-03** (L, biggest open correctness item): manual-join data queries
-  paginate over row-multiplied results on one-to-many joins — pages under-fill
-  even though 003 fixed `total`. **PLANNED as 020.**
+- **ADAPTER-03** (L, biggest open correctness item): ~~manual-join data queries
+  paginate over row-multiplied results on one-to-many joins~~ — **FIXED in 020.**
 - **ADAPTER-05** (M): ~~primary-table resolver `break`s on first relationship
   match~~ — **FIXED (alias-scan slice + 022)**: zero-match throws; Strategy 3
   FK-verified; no-columns warns once.
