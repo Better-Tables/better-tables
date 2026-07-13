@@ -462,10 +462,11 @@ is a condensed checklist, not a replacement.
    publish together: `bun run changeset:version`, review the resulting
    version bumps and changelog entries, then `bun run changeset:release` (or
    the repo's equivalent `release` script). Do not partially publish.
-3. **Restore the git remote before publishing.** This worktree currently has
-   no git remote configured — that's expected during plan-driven development,
-   but the first real CI run (and the publish itself) needs it restored
-   first.
+3. **Restore the git remote before publishing.** The repository currently has
+   no git remote configured — that's deliberate during local plan-driven
+   development, but the first real CI run (and the publish itself) needs it
+   restored first
+   (`git remote add origin git@github.com:Better-Tables/better-tables.git`).
 4. **Lint gate.** The CI lint step is `continue-on-error` until Biome residue
    hits 0 across the repo. As of the last audit, `apps/marketing`,
    `apps/docs`, and `packages/ui` are Biome-clean; remaining residue is

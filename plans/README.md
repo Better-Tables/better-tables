@@ -18,23 +18,26 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 14 plans (001–007, 010–017) — verification baseline, CI
+- **Done and merged**: 16 plans (001–007, 010–019) — verification baseline, CI
   gating, URL hardening, type-inference stack, FilterNode through core state +
-  Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design docs.
-- **Gates on main**: root typecheck · core 1077/0 · toolkit 93/0 · drizzle SQLite
-  green (env DB suites skip without URLs) · CLI 127/0 · UI 7/0.
-- **In flight**: 019 (migration guide — executor running). Main is FULLY GREEN: root typecheck 11/11, all suites passing.
+  Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design
+  docs, instance API, migration guide.
+- **Gates on main**: root typecheck 11/11 · core 1098/0 · toolkit 93/0 · drizzle
+  SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
+- **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
+  pre-publish steps are the maintainer runbook at the bottom of `MIGRATION.md`
+  (toolkit version choice, one changeset train, restore remote, first CI run).
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **Next up**: 019 (migration guide — the last release-policy obligation before 0.6),
-  then the 020–028 backlog wave (plans written 2026-07-13, none dispatched yet).
+- **Next up**: the 020–028 backlog wave (plans written 2026-07-13, none
+  dispatched yet); publish 0.6 whenever the maintainer chooses (before or after
+  the wave — 021 rides the train if it lands pre-publish).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 019 | Migration guide for 0.6 (MIGRATION.md + compile-checked examples + release runbook) | all 0.6 work (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13 |
 | 020 | Fix page under-fill on one-to-many joins (ADAPTER-03) | 007/017 (DONE) | PLANNED — P1, wave 1 |
 | 023 | Shared subscription emitter for six managers (CORE-08) | 018 (DONE) | PLANNED — wave 1 (parallel: core managers) |
 | 028 | Real timezone conversion (CORE-04 remainder) | — | PLANNED — wave 1 (parallel: core lib); has a builder-default STOP gate |
@@ -79,6 +82,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 018 | `betterTables()` instance + `defineTable` runtime | merged 2026-07-13 | Reviewer APPROVED — path builders compile to fluent builders under the structural invariant; legacy shell removed outright (zero external consumers); drizzle `$types` compile-verified; perf gate 289k inst/0.85s (14.5% of budget); core 1071/0. Flags: `$infer.ColumnId` displays as `string` (union absorption — the future registry derives from the TUPLE's TId instead), `t.computed()` is runtime-honest (no `.range()`/`.options()` chaining), `.label()` alias skipped. Deferred: aggregates, json-path, runtime enum options, RSC bridge, plugin hooks, ui `table=` prop, app migration |
 | 010 | UI hooks correctness + first UI test harness | `cf80ce7` | Maintainer-executed; reviewer post-merge verified: dead-ref code gone, `FetchDataParams.signal` added, harness + 7 tests (smoke + 6 characterization), CI test-ui job wired |
 | 017 | Drizzle FilterNode group translation | post-`dde0070` merge | Placement (a): generic walk in toolkit router (Prisma inherits it); joins fed from all tree leaves; count/data agreement proven by paginated walk; `supportsFilterGroups: true`, depth cap 3; 7 row-set integration tests |
+| 019 | 0.5→0.6 migration guide | merged 2026-07-13 | MIGRATION.md (10 breaking surfaces, not-changed section, capabilities closer, maintainer runbook); every example compile-checked in CI (core 16 tests + drizzle 5, old APIs pinned dead via @ts-expect-error, 0.5 examples verified against the `@better-tables/core@0.5.3` tag); changeset audit found ZERO gaps; core suite 1077→1098 |
 
 ## Carry-forward notes for the 0.6 release
 
