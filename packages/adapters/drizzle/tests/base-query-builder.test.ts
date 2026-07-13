@@ -462,6 +462,65 @@ describe('BaseQueryBuilder', () => {
     });
   });
 
+  describe('Fan-Out Pagination Gate (plan 020, ADAPTER-03)', () => {
+    it('reports no fan-out for a many-to-one-only join order (users -> profile)', () => {
+      const context = relationshipManager.buildQueryContext({ columns: ['profile.bio'] }, 'users');
+      const joinOrder = relationshipManager.optimizeJoinOrder(context.joinPaths, 'users');
+
+      expect(joinOrder.length).toBeGreaterThan(0);
+      expect(joinOrder.every((path) => path.cardinality === 'one')).toBe(true);
+
+      const hasFanOutJoin = (
+        queryBuilder as unknown as { hasFanOutJoin: (order: typeof joinOrder) => boolean }
+      ).hasFanOutJoin(joinOrder);
+
+      expect(hasFanOutJoin).toBe(false);
+    });
+
+    it('reports fan-out for a one-to-many join order (users -> posts)', () => {
+      const context = relationshipManager.buildQueryContext({ columns: ['posts.title'] }, 'users');
+      const joinOrder = relationshipManager.optimizeJoinOrder(context.joinPaths, 'users');
+
+      expect(joinOrder.length).toBeGreaterThan(0);
+      expect(joinOrder.some((path) => path.cardinality === 'many')).toBe(true);
+
+      const hasFanOutJoin = (
+        queryBuilder as unknown as { hasFanOutJoin: (order: typeof joinOrder) => boolean }
+      ).hasFanOutJoin(joinOrder);
+
+      expect(hasFanOutJoin).toBe(true);
+    });
+
+    it('reports fan-out for an array-FK join order even if cardinality were missing', () => {
+      const arrayJoinOrder = [
+        {
+          from: 'events',
+          to: 'users',
+          foreignKey: 'id',
+          localKey: 'organizerId',
+          cardinality: 'many' as const,
+          isArray: true,
+        },
+      ];
+
+      const hasFanOutJoin = (
+        queryBuilder as unknown as {
+          hasFanOutJoin: (order: typeof arrayJoinOrder) => boolean;
+        }
+      ).hasFanOutJoin(arrayJoinOrder);
+
+      expect(hasFanOutJoin).toBe(true);
+    });
+
+    it('reports no fan-out for an empty join order (no joins at all)', () => {
+      const hasFanOutJoin = (
+        queryBuilder as unknown as { hasFanOutJoin: (order: []) => boolean }
+      ).hasFanOutJoin([]);
+
+      expect(hasFanOutJoin).toBe(false);
+    });
+  });
+
   describe('Complete Query Building', () => {
     it('should build complete query with all parameters', () => {
       const { dataQuery, countQuery, columnMetadata } = queryBuilder.buildCompleteQuery({
