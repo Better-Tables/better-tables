@@ -849,6 +849,24 @@ export interface FilterHandlerHooks {
 }
 
 export interface DrizzleAdapterOptions {
+  /**
+   * The table that record mutations (createRecord, updateRecord, deleteRecord,
+   * bulkUpdate, bulkDelete) should target.
+   *
+   * Required when the schema contains more than one table — mutation methods
+   * have no per-call table hint, so the adapter cannot infer which table to
+   * write to. Schemas with exactly one table don't need this set; that single
+   * table is used automatically.
+   *
+   * @example
+   * ```typescript
+   * const adapter = drizzleAdapter(db, {
+   *   options: { defaultMutationTable: 'users' }
+   * });
+   * ```
+   */
+  defaultMutationTable?: string;
+
   /** Query caching configuration */
   cache?: {
     enabled: boolean;
