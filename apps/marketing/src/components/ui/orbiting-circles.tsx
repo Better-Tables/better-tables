@@ -23,10 +23,12 @@ export default function OrbitingCircles({
     <>
       {path && (
         <svg
+          aria-hidden
           xmlns="http://www.w3.org/2000/svg"
           version="1.1"
           className="pointer-events-none absolute inset-0 size-full"
         >
+          <title>Orbit path</title>
           <circle
             className="stroke-border stroke-1 dark:stroke-border"
             cx="50%"

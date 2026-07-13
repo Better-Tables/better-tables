@@ -1,7 +1,7 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -58,44 +58,19 @@
   --bg-size-grid-5: 20% 100%;
   --bg-size-grid-6: calc(100% / 6) 100%;
 
-  --bg-image-grid-1: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-2: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-3: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-4: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-5: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-6: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
+  --bg-image-grid-1: linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px);
+  --bg-image-grid-2: linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px);
+  --bg-image-grid-3: linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px);
+  --bg-image-grid-4: linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px);
+  --bg-image-grid-5: linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px);
+  --bg-image-grid-6: linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px);
 
   --animate-marquee: marquee var(--duration) linear infinite;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
   --animate-border-beam: border-beam calc(var(--duration) * 1s) infinite linear;
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
-  --animate-ripple: ripple var(--duration, 2s) ease calc(var(--i, 0) * 0.2s)
-    infinite;
+  --animate-ripple: ripple var(--duration, 2s) ease calc(var(--i, 0) * 0.2s) infinite;
   --animate-orbit: orbit calc(var(--duration) * 1s) linear infinite;
   --animate-aurora: aurora 8s ease-in-out infinite alternate;
 
@@ -162,8 +137,7 @@
     }
 
     100% {
-      transform: rotate(360deg) translateY(calc(var(--radius) * 1px))
-        rotate(-360deg);
+      transform: rotate(360deg) translateY(calc(var(--radius) * 1px)) rotate(-360deg);
     }
   }
 

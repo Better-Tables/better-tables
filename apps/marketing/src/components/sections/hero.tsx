@@ -27,6 +27,7 @@ function HeroPill() {
       </div>
       <p className="text-xs font-medium text-primary sm:text-sm">Introducing Better Tables</p>
       <svg
+        aria-hidden
         width="12"
         height="12"
         className="ml-1"
@@ -34,6 +35,7 @@ function HeroPill() {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
+        <title>Arrow</title>
         <path
           d="M8.78141 5.33312L5.20541 1.75712L6.14808 0.814453L11.3334 5.99979L6.14808 11.1851L5.20541 10.2425L8.78141 6.66645H0.666748V5.33312H8.78141Z"
           fill="hsl(var(--primary))"

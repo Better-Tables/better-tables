@@ -7,6 +7,7 @@ interface BunIconProps {
 export function BunIcon({ className, size = 16 }: BunIconProps) {
   return (
     <svg
+      aria-hidden
       data-testid="geist-icon"
       height={size}
       strokeLinejoin="round"

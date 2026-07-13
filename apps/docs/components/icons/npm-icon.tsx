@@ -7,6 +7,7 @@ interface NpmIconProps {
 export function NpmIcon({ className, size = 16 }: NpmIconProps) {
   return (
     <svg
+      aria-hidden
       width={size}
       height={size}
       viewBox="0 0 24 24"

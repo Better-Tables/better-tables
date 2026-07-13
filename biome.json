@@ -8,11 +8,13 @@
       "!!**/node_modules",
       "!!**/.next",
       "!!**/.claude",
+      "!!**/.source",
       "!!**/build",
       "!!coverage",
       "!!bun.lock",
       "!!.git",
-      "!!.turbo"
+      "!!.turbo",
+      "!!**/next-env.d.ts"
     ]
   },
   "linter": {
@@ -86,6 +88,34 @@
             "noLabelWithoutControl": "off",
             "useKeyWithClickEvents": "off",
             "useSemanticElements": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/marketing/src/components/ui/**",
+        "apps/docs/src/components/ui/**"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noLabelWithoutControl": "off",
+            "useKeyWithClickEvents": "off",
+            "useSemanticElements": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/docs/components/icons/**",
+        "apps/marketing/src/components/icons.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noSvgWithoutTitle": "off"
           }
         }
       }

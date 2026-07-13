@@ -22,9 +22,7 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
   });
 
   const { page, limit, filters: filterNode, sorting } = tableParams;
-  const filters = isFilterGroupNode(filterNode)
-    ? flattenFilterNode(filterNode)
-    : filterNode;
+  const filters = isFilterGroupNode(filterNode) ? flattenFilterNode(filterNode) : filterNode;
 
   // Fetch data from API route
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

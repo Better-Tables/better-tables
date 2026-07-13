@@ -40,6 +40,7 @@ export function Statistics() {
             >
               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-full -translate-y-full group-hover:translate-x-0 group-hover:translate-y-0 duration-300 ease-in-out">
                 <svg
+                  aria-hidden
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
                   height="24"
@@ -50,6 +51,7 @@ export function Statistics() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
+                  <title>Trend up</title>
                   <line x1="7" y1="17" x2="17" y2="7"></line>
                   <polyline points="7 7 17 7 17 17"></polyline>
                 </svg>

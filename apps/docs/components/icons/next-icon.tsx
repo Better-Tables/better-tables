@@ -7,6 +7,7 @@ interface NextIconProps {
 export function NextIcon({ className, size = 16 }: NextIconProps) {
   return (
     <svg
+      aria-hidden
       data-testid="geist-icon"
       height={size}
       strokeLinejoin="round"

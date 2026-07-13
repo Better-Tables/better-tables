@@ -1,6 +1,7 @@
 export function ReactIcon() {
   return (
     <svg
+      aria-hidden
       data-testid="geist-icon"
       height="16"
       strokeLinejoin="round"

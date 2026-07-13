@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
 
       <img
         src={`${siteConfig.url}/cube.png`}
+        alt=""
         width={500}
         style={{
           position: 'relative',
