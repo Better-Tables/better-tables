@@ -23,17 +23,16 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   Drizzle AND/OR, adapter toolkit extraction, UI hooks harness, both design docs.
 - **Gates on main**: root typecheck · core 1077/0 · toolkit 93/0 · drizzle SQLite
   green (env DB suites skip without URLs) · CLI 127/0 · UI 7/0.
-- **In flight**: 018 (instance API runtime — executor running).
-- **Maintainer backlog sweeps (uncommitted / parallel to 018)**: CORE-02, CORE-04
+- **In flight**: a surgical fix-up executor for 4 pre-existing ui typecheck errors (from the parallel backlog sweep; the only red gate).
+- **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **Next up**: finish 018 (`betterTables()`/`defineTable` runtime).
+- **Next up**: 019 (migration guide — the last release-policy obligation before 0.6).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 018 | `betterTables()` instance + `defineTable` runtime (the 011 design's implementation: schema-aware `t.*` path builders, `$infer`, registry from `define()`) | 014 (DONE), 011+006 designs (DONE) | IN PROGRESS — plan written, executor dispatched 2026-07-13. Deferred within it: aggregates, json-path, runtime enum options, RSC bridge, plugin hooks, ui `table=` prop, app migration |
 | 019 | Migration guide for 0.6 (assemble all changeset "what breaks" sections; required by release policy) | all 0.6 work | PLAN TO BE WRITTEN — last before publish |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lifts of the hold | **ON HOLD** (maintainer) — last item on the board |
 
@@ -61,6 +60,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 015 | FilterNode core + `c2:` wire format | `39ba6d3` | Types/guards/normalize, versioned URL format w/ `c:` read fallback, CORE-06 killed — landed via 016's chain |
 | 016 | FilterNode state layer | `39ba6d3` | Tree-preserving state + URL sync, flat UI unchanged, drizzle reject-guard (§1.5), core 1066/0 |
 | 007 | Extract adapters-toolkit | `81ca876` | Toolkit born (86 tests); filter-handler 2169→388 (router/emitter, zero test edits); dialects −855 lines; ADAPTER-04 fixed |
+| 018 | `betterTables()` instance + `defineTable` runtime | merged 2026-07-13 | Reviewer APPROVED — path builders compile to fluent builders under the structural invariant; legacy shell removed outright (zero external consumers); drizzle `$types` compile-verified; perf gate 289k inst/0.85s (14.5% of budget); core 1071/0. Flags: `$infer.ColumnId` displays as `string` (union absorption — the future registry derives from the TUPLE's TId instead), `t.computed()` is runtime-honest (no `.range()`/`.options()` chaining), `.label()` alias skipped. Deferred: aggregates, json-path, runtime enum options, RSC bridge, plugin hooks, ui `table=` prop, app migration |
 | 010 | UI hooks correctness + first UI test harness | `cf80ce7` | Maintainer-executed; reviewer post-merge verified: dead-ref code gone, `FetchDataParams.signal` added, harness + 7 tests (smoke + 6 characterization), CI test-ui job wired |
 | 017 | Drizzle FilterNode group translation | post-`dde0070` merge | Placement (a): generic walk in toolkit router (Prisma inherits it); joins fed from all tree leaves; count/data agreement proven by paginated walk; `supportsFilterGroups: true`, depth cap 3; 7 row-set integration tests |
 
