@@ -412,13 +412,57 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
+   * Resolve the full join order a facet query needs (plan 021, ADAPTER-06):
+   * joins required by the facet `columnId` itself, plus joins required by
+   * every leaf in `filters` (expected to already be self-excluded by the
+   * caller -- see `pruneFilterNodeForColumn` in `filter-handler.ts`, which
+   * `DrizzleAdapter.getFacetedValues`/`getMinMaxValues`/`getFilterOptions`
+   * apply before reaching here). Reuses
+   * `RelationshipManager.buildQueryContext`/`optimizeJoinOrder`, the same
+   * join-planning path `buildCompleteQuery` uses for the main data/count
+   * queries, so a facet query and the main query agree on how a given
+   * column combination joins.
+   */
+  protected buildFacetJoinOrder(
+    columnId: string,
+    primaryTable: string,
+    filters?: FilterState[] | FilterGroupNode
+  ): RelationshipPath[] {
+    const context = this.relationshipManager.buildQueryContext(
+      {
+        columns: [columnId],
+        filters: collectFilterLeaves(filters).map((filter) => ({ columnId: filter.columnId })),
+      },
+      primaryTable
+    );
+    return this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+  }
+
+  /**
    * Build aggregate query for faceted values.
    * Shared implementation for all dialects.
+   *
+   * `filters` (plan 021, ADAPTER-06) is optional and, when present, is
+   * expected to already be self-excluded for `columnId` by the caller. It's
+   * ANDed with the column's own `isNotNull` guard via `applyFilters`'
+   * `additionalConditions` -- one combined `WHERE`, not two competing
+   * `.where()` calls (Drizzle's query builder only keeps the last `.where()`
+   * call, it does not chain them).
+   *
+   * Join-inflation guard: under a join (whether from `columnId` itself or
+   * from a filter leaf), a plain `count()` over-counts rows fanned out by
+   * the join. When `aggregateFunction` is `'count'` and a join is present,
+   * this uses `countDistinct(primaryKey)` instead -- the same guard
+   * `buildCountQuery` already applies to pagination totals. Other aggregate
+   * functions (`sum`/`avg`/`min`/`max`/`distinct`) are unaffected; guarding
+   * those against join fan-out is a separate, pre-existing concern outside
+   * this plan's scope (facet *counts* specifically).
    */
   buildAggregateQuery<TColumnId extends string>(
     columnId: TColumnId,
     aggregateFunction: AggregateFunction = 'count',
-    primaryTable: string
+    primaryTable: string,
+    filters?: FilterState[] | FilterGroupNode
   ): QueryBuilderWithJoins {
     this.validateColumnId(columnId, primaryTable);
     this.validateAggregateFunction(aggregateFunction);
@@ -436,7 +480,12 @@ export abstract class BaseQueryBuilder {
     }
 
     const column = columnReference.column;
-    const aggregateFn = this.getAggregateFunction(column, aggregateFunction);
+    const joinOrder = this.buildFacetJoinOrder(columnId, primaryTable, filters);
+    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
+    const aggregateFn =
+      aggregateFunction === 'count' && joinOrder.length > 0 && primaryKeyInfo
+        ? countDistinct(primaryKeyInfo.column)
+        : this.getAggregateFunction(column, aggregateFunction);
 
     const baseQuery = this.getDb()
       .select({
@@ -445,20 +494,25 @@ export abstract class BaseQueryBuilder {
       })
       .from(mainTableSchema);
 
-    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
-      columnPath,
-      primaryTable
-    );
-    const query = this.applyJoinConfigs(baseQuery, requiredJoins);
+    const joinedQuery = this.applyJoins(baseQuery, joinOrder);
+    const query = this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
 
-    return query.where(isNotNull(column)).groupBy(column).orderBy(column);
+    return query.groupBy(column).orderBy(column);
   }
 
   /**
    * Build filter options query.
    * Shared implementation for all dialects.
+   *
+   * See {@link buildAggregateQuery}'s docs for the `filters` self-exclusion
+   * expectation and the combined-`WHERE`/distinct-guard rationale, both
+   * shared verbatim by this method's `count` column.
    */
-  buildFilterOptionsQuery(columnId: string, primaryTable: string): QueryBuilderWithJoins {
+  buildFilterOptionsQuery(
+    columnId: string,
+    primaryTable: string,
+    filters?: FilterState[] | FilterGroupNode
+  ): QueryBuilderWithJoins {
     const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
     const column = this.getColumn(columnPath);
 
@@ -473,32 +527,37 @@ export abstract class BaseQueryBuilder {
       });
     }
 
+    const joinOrder = this.buildFacetJoinOrder(columnId, primaryTable, filters);
+    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
+    const countFn =
+      joinOrder.length > 0 && primaryKeyInfo ? countDistinct(primaryKeyInfo.column) : count();
+
     const baseQuery = this.getDb()
       .select({
         value: column,
-        count: count(),
+        count: countFn,
       })
       .from(primaryTableSchema);
 
-    let query: QueryBuilderWithJoins = baseQuery;
-    if (columnPath.isNested && columnPath.relationshipPath) {
-      const joinOrder = this.relationshipManager.optimizeJoinOrder(
-        new Map([[columnPath.table, columnPath.relationshipPath || []]]),
-        primaryTable
-      );
-      query = this.applyJoins(query, joinOrder);
-    }
+    const joinedQuery = this.applyJoins(baseQuery, joinOrder);
+    const query = this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
 
-    return query.where(isNotNull(column)).groupBy(column).orderBy(column);
+    return query.groupBy(column).orderBy(column);
   }
 
   /**
    * Build min/max values query.
    * Shared implementation for all dialects.
+   *
+   * `filters` (plan 021, ADAPTER-06) follows the same self-exclusion
+   * expectation as {@link buildAggregateQuery}. No distinct-guard is needed
+   * here: `MIN`/`MAX` of a value duplicated by a fan-out join is identical
+   * to `MIN`/`MAX` of the de-duplicated set, unlike `count()`.
    */
   buildMinMaxQuery<TColumnId extends string>(
     columnId: TColumnId,
-    primaryTable: string
+    primaryTable: string,
+    filters?: FilterState[] | FilterGroupNode
   ): QueryBuilderWithJoins {
     this.validateColumnId(columnId, primaryTable);
 
@@ -523,13 +582,9 @@ export abstract class BaseQueryBuilder {
       })
       .from(primaryTableSchema);
 
-    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
-      columnPath,
-      primaryTable
-    );
-    const query = this.applyJoinConfigs(baseQuery, requiredJoins);
-
-    return query.where(isNotNull(column));
+    const joinOrder = this.buildFacetJoinOrder(columnId, primaryTable, filters);
+    const joinedQuery = this.applyJoins(baseQuery, joinOrder);
+    return this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
   }
 
   /**

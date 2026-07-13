@@ -40,7 +40,7 @@
 
 import { FilterRouter, FilterRouterError } from '@better-tables/adapters-toolkit';
 import type { ColumnType, FilterGroupNode, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
-import { flattenFilterNode, validateOperatorValues } from '@better-tables/core';
+import { flattenFilterNode, isFilterGroupNode, validateOperatorValues } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import { and, or, sql } from 'drizzle-orm';
 import { DrizzlePredicateEmitter } from './drizzle-predicate-emitter';
@@ -78,6 +78,76 @@ export function collectFilterLeaves(
     return filters;
   }
   return flattenFilterNode(filters);
+}
+
+/**
+ * Recursively drop every leaf targeting `excludeColumnId` from a
+ * {@link FilterNode}, per plan 021's self-exclusion faceting convention (see
+ * `FacetQueryParams` in `@better-tables/core`): a group that becomes empty
+ * after pruning its children is itself dropped (returns `null`), and a
+ * group left with exactly one surviving child is unwrapped to that child --
+ * the same normalization core's own `normalizeFilterNode` uses for
+ * empty/singleton groups, kept consistent here rather than left as a
+ * dangling single-child group.
+ *
+ * The current {@link FilterGroupNode} shape only has boolean `'and'/'or'`
+ * groups over leaves or nested groups -- there is no NOT-like negation
+ * construct a leaf could hide behind, so "is this leaf's columnId the
+ * excluded one" is an unambiguous, purely structural check at every level
+ * of the tree; this function never needs to special-case a shape it
+ * doesn't recognize.
+ */
+function pruneNodeForColumn(node: FilterNode, excludeColumnId: string): FilterNode | null {
+  if (isFilterGroupNode(node)) {
+    const prunedChildren = node.children
+      .map((child) => pruneNodeForColumn(child, excludeColumnId))
+      .filter((child): child is FilterNode => child !== null);
+
+    if (prunedChildren.length === 0) {
+      return null;
+    }
+    if (prunedChildren.length === 1) {
+      // and/or of one thing is that thing -- unwrap the singleton, mirroring
+      // normalizeFilterNode's convention for empty/singleton groups.
+      return prunedChildren[0] as FilterNode;
+    }
+    return { kind: 'group', logic: node.logic, children: prunedChildren };
+  }
+
+  return node.columnId === excludeColumnId ? null : node;
+}
+
+/**
+ * Self-exclusion for facet queries (plan 021, ADAPTER-06): given the
+ * caller's full active `filters` (flat array or {@link FilterGroupNode}
+ * tree) and the `columnId` a facet is being computed for, return the same
+ * filters with every leaf targeting `columnId` removed -- so a facet for a
+ * column never has its own active filter applied against it (the standard
+ * faceting convention: a multi-select facet keeps showing its sibling
+ * options/counts instead of collapsing to only what's already selected).
+ *
+ * Returns `undefined` unchanged for `undefined` input, an (possibly empty)
+ * array for flat input, and either a `FilterGroupNode` or a flat array for
+ * tree input -- mirroring `DrizzleAdapter`'s own
+ * `normalizeIncomingFilters` convention of wrapping a lone surviving leaf
+ * in a single-element array rather than returning a bare `FilterState`.
+ */
+export function pruneFilterNodeForColumn(
+  filters: FilterState[] | FilterGroupNode | undefined,
+  excludeColumnId: string
+): FilterState[] | FilterGroupNode | undefined {
+  if (filters === undefined) {
+    return undefined;
+  }
+  if (Array.isArray(filters)) {
+    return filters.filter((filter) => filter.columnId !== excludeColumnId);
+  }
+
+  const pruned = pruneNodeForColumn(filters, excludeColumnId);
+  if (pruned === null) {
+    return [];
+  }
+  return isFilterGroupNode(pruned) ? pruned : [pruned];
 }
 
 /**

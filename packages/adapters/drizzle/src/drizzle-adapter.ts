@@ -58,6 +58,7 @@ import type {
   DataEvent,
   ExportParams,
   ExportResult,
+  FacetQueryParams,
   FetchDataParams,
   FetchDataResult,
   FilterGroupNode,
@@ -69,7 +70,7 @@ import type {
 } from '@better-tables/core';
 import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
-import { collectFilterLeaves } from './filter-handler';
+import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
@@ -740,13 +741,31 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   }
 
   /**
+   * Get the caller's active `filters` (if any), normalized and with every
+   * leaf targeting `columnId` pruned out -- the self-exclusion convention
+   * `FacetQueryParams` documents (plan 021, ADAPTER-06): a facet for a
+   * column must never have its own active filter applied against it.
+   * Shared by all three facet methods below.
+   *
+   * @private
+   */
+  private buildFacetFilters(
+    columnId: string,
+    params: FacetQueryParams | undefined
+  ): FilterState[] | FilterGroupNode | undefined {
+    const normalized = this.normalizeIncomingFilters(params?.filters);
+    return pruneFilterNodeForColumn(normalized, columnId);
+  }
+
+  /**
    * Get available filter options for a column
    */
-  async getFilterOptions(columnId: string): Promise<FilterOption[]> {
+  async getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]> {
     try {
       // Determine primary table from the column
       const primaryTable = this.primaryTableResolver.resolve([columnId]);
-      const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable);
+      const facetFilters = this.buildFacetFilters(columnId, params);
+      const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable, facetFilters);
       const results = await query.execute();
 
       return results.map((row: Record<string, unknown>) => ({
@@ -765,11 +784,20 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   /**
    * Get faceted values for a column
    */
-  async getFacetedValues(columnId: string): Promise<Map<string, number>> {
+  async getFacetedValues(
+    columnId: string,
+    params?: FacetQueryParams
+  ): Promise<Map<string, number>> {
     try {
       // Determine primary table from the column
       const primaryTable = this.primaryTableResolver.resolve([columnId]);
-      const query = this.queryBuilder.buildAggregateQuery(columnId, 'count', primaryTable);
+      const facetFilters = this.buildFacetFilters(columnId, params);
+      const query = this.queryBuilder.buildAggregateQuery(
+        columnId,
+        'count',
+        primaryTable,
+        facetFilters
+      );
       const results = await query.execute();
 
       const facetMap = new Map<string, number>();
@@ -791,11 +819,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   /**
    * Get min/max values for number columns
    */
-  async getMinMaxValues(columnId: string): Promise<[number, number]> {
+  async getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]> {
     try {
       // Determine primary table from the column
       const primaryTable = this.primaryTableResolver.resolve([columnId]);
-      const query = this.queryBuilder.buildMinMaxQuery(columnId, primaryTable);
+      const facetFilters = this.buildFacetFilters(columnId, params);
+      const query = this.queryBuilder.buildMinMaxQuery(columnId, primaryTable, facetFilters);
       const results = await query.execute();
       const result = results[0] as { min: number | null; max: number | null } | undefined;
 
