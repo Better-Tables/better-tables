@@ -28,12 +28,23 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: none.
+- **Post-merge adversarial review of 020–028 (2026-07-13, three parallel
+  reviewers)**: 8/9 SOUND against done criteria. ONE confirmed bug in 020
+  (fan-out phase-2 row order not reconciled with phase-1 key order —
+  reproduced empirically; fix in flight). 028's UTC-default STOP was resolved
+  by honoring the default (breaking display change, accurately documented in
+  changeset + MIGRATION §11). User fix-ups (React-19 pin supersession,
+  ui `unbundle: true` killing the global "use client" banner) verified
+  coherent — 41/41 dist files carry per-file directives.
+- **In flight**: 020-ORDER fix (`fix-fanout-order-reconciliation`), 029
+  marketing showcase (`marketing-showcase`, from WIP at `b1300d7`).
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
+| 020-ORDER | Fan-out pagination: reorder phase-2 groups by phase-1 key order (multi-column-sort / tie / empty-sort inconsistency) | 020 (merged) | IN PROGRESS — surgical executor dispatched 2026-07-13 |
+| 029 | Marketing showcase examples as DX dogfood (4 example pages + `plans/findings/029-dx-findings.md`) | 018–028 merged | IN PROGRESS — builds on maintainer WIP (`marketing-examples-wip` @ `b1300d7`); every workaround logged as a library finding |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
 Wave logic: within a wave, plans touch disjoint files and can run in parallel
@@ -154,6 +165,24 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
   keep as the seed for the future tuple-derived registry (018's `ColumnId` flag).
 - **Hygiene (2026-07-13)**: date-presets `getPresetById()!` assertions removed
   (`presetsByIds` helper) — Biome `noNonNullAssertion` clean in that file.
+- **From the 020–028 post-merge review (2026-07-13, minor, all open)**:
+  - **UI-09** (S): `filter-bar.tsx:202-215` rebuilds `handleUpdateFilter`/
+    `handleRemoveFilter` on `[filters, onFiltersChange]` — any real filter
+    change re-renders EVERY badge, partially defeating 025's
+    `MemoizedFilterBadge` (test used stable noops, so it passes). Stable
+    handlers taking the filter key as an arg fix it.
+  - Experimental `contract-v2.ts:228-230` still has the pre-021 param-less
+    facet signatures (test-only prototype; update when the registry work
+    resumes).
+  - Resolver "did you mean" suggestions require `distance > 0` — a correct
+    column behind a wrong table prefix (`user.name` vs `users`) throws with
+    no suggestion (`primary-table-resolver.ts`, from 022).
+  - Watch item: all-accessor (e.g. pure-JSONB) column sets now hit 022's
+    zero-match throw; the error names the `primaryTable` escape hatch. If an
+    external consumer reports it, that's the knob.
+  - Drizzle pg/mysql integration suites FAIL (not skip) without env DBs,
+    contrary to CLAUDE.md's "skipped otherwise" — pre-existing; either add
+    skip-guards or fix the CLAUDE.md claim.
 
 ## Considered and rejected (so nobody re-audits)
 
