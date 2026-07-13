@@ -148,6 +148,58 @@ export interface FetchDataResult<TData = unknown> {
 }
 
 /**
+ * Optional parameters for the three facet-query methods on {@link TableAdapter}
+ * (`getFilterOptions`, `getFacetedValues`, `getMinMaxValues`).
+ *
+ * @description
+ * A facet describes the distribution of values in a column -- the options a
+ * multi-select filter offers, how many rows match each option, or the
+ * numeric range a slider spans. Without `filters`, a facet describes the
+ * WHOLE table, independent of whatever the user has currently filtered by.
+ * Passing the caller's active filter state here makes the facet
+ * FILTER-AWARE: the returned options/counts/range reflect only rows that
+ * would match those filters -- the standard behavior users expect from a
+ * filtering UI (e.g. faceted search sidebars).
+ *
+ * **Self-exclusion is mandatory for conforming implementations.** When
+ * computing the facet for `columnId` (the method's first argument), every
+ * filter leaf targeting that SAME column must be excluded from the filters
+ * applied here -- apply every other leaf, but never a leaf whose own
+ * `columnId` equals the facet's `columnId`. This is what lets a multi-select
+ * facet on the column you're actively filtering keep showing its sibling
+ * options (and their counts) instead of collapsing to only the option(s)
+ * already selected. For a {@link FilterGroupNode} tree, self-exclusion means
+ * pruning matching leaves out of the tree (dropping a group that becomes
+ * empty as a result, and unwrapping a group left with a single child) --
+ * not rejecting the whole tree. `getMinMaxValues` and `getFilterOptions`
+ * follow the identical rule.
+ *
+ * @example
+ * ```typescript
+ * // User has filtered status = 'active'. Fetching facets for the 'role'
+ * // column should only count roles among active users...
+ * const roleFacets = await adapter.getFacetedValues('role', {
+ *   filters: [{ columnId: 'status', operator: 'equals', values: ['active'], type: 'option' }],
+ * });
+ * // ...but fetching facets for 'status' itself must ignore its own filter
+ * // (self-exclusion), so every status option still shows its true count:
+ * const statusFacets = await adapter.getFacetedValues('status', {
+ *   filters: [{ columnId: 'status', operator: 'equals', values: ['active'], type: 'option' }],
+ * });
+ * ```
+ */
+export interface FacetQueryParams {
+  /**
+   * The caller's current filter state, in either shape
+   * {@link FetchDataParams.filters} accepts (a flat implicit-AND array or a
+   * {@link FilterGroupNode} tree). Pass your full active filter state
+   * unmodified -- self-exclusion (see interface docs) is the adapter's
+   * responsibility, not the caller's.
+   */
+  filters?: FilterState[] | FilterGroupNode;
+}
+
+/**
  * Parameters for data export operations.
  *
  * Configures how data should be exported including format,
@@ -245,20 +297,31 @@ export interface TableAdapter<TData = unknown> {
    * Get available filter options for a specific column.
    *
    * @param columnId - The column identifier
+   * @param params - Optional facet parameters. See {@link FacetQueryParams}
+   *   for the filter-aware, self-exclusion semantics an implementation must
+   *   follow when `params.filters` is provided.
    * @returns Promise resolving to filter options
    *
    * @example
    * ```typescript
    * const options = await adapter.getFilterOptions('status');
    * // Returns: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]
+   *
+   * // Filter-aware: options for 'role' among currently-active users only.
+   * const activeRoleOptions = await adapter.getFilterOptions('role', {
+   *   filters: [{ columnId: 'status', operator: 'equals', values: ['active'], type: 'option' }],
+   * });
    * ```
    */
-  getFilterOptions(columnId: string): Promise<FilterOption[]>;
+  getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]>;
 
   /**
    * Get faceted values for a column (count of each unique value).
    *
    * @param columnId - The column identifier
+   * @param params - Optional facet parameters. See {@link FacetQueryParams}
+   *   for the filter-aware, self-exclusion semantics an implementation must
+   *   follow when `params.filters` is provided.
    * @returns Promise resolving to faceted values map
    *
    * @example
@@ -267,12 +330,15 @@ export interface TableAdapter<TData = unknown> {
    * // Returns: Map { 'active' => 120, 'inactive' => 30 }
    * ```
    */
-  getFacetedValues(columnId: string): Promise<Map<string, number>>;
+  getFacetedValues(columnId: string, params?: FacetQueryParams): Promise<Map<string, number>>;
 
   /**
    * Get minimum and maximum values for numeric columns.
    *
    * @param columnId - The column identifier
+   * @param params - Optional facet parameters. See {@link FacetQueryParams}
+   *   for the filter-aware, self-exclusion semantics an implementation must
+   *   follow when `params.filters` is provided.
    * @returns Promise resolving to [min, max] tuple
    *
    * @example
@@ -281,7 +347,7 @@ export interface TableAdapter<TData = unknown> {
    * // Returns: [18, 65]
    * ```
    */
-  getMinMaxValues(columnId: string): Promise<[number, number]>;
+  getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]>;
 
   /**
    * Create a new record (optional operation).
