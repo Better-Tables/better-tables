@@ -37,7 +37,7 @@ language, this policy wins.
 | 002  | Stop mutations targeting the first schema table | P1 | M | — (001 rec.) | TODO |
 | 003  | Fix join count inflation on MySQL/SQLite | P1 | S | — | TODO |
 | 004  | Validate URL-deserialized state, fail closed | P1 | M | baseline (merged) | DONE (2026-07-13: reviewer APPROVED — `isFilterStateShape` boundary guard, fail-closed drops w/ value-free warnings, pagination clamping, 7 new tests (core 1007/0); merged to local main at `ce9f1ea`) |
-| 005  | Builder type inference end-to-end | P1 | L | 001 (DONE) | PAUSED (2026-07-13: executor stopped by maintainer moments after dispatch, before any commits — re-dispatch fresh from current main when resuming; step 3 skipped per 011 decision) |
+| 005  | Builder type inference end-to-end | P1 | L | 001 (DONE) | IN PROGRESS (2026-07-13: fresh dispatch from main; step 3 skipped per 011; step 4 assertion 3 dropped) |
 | 006  | Design: contract v2 — typed registry + AND/OR groups | P1 | L (design) | 005 | TODO |
 | 007  | Extract ORM-agnostic adapter toolkit | P2 | L | 002, 003 (006 rec.) | TODO |
 | 008  | Prisma adapter spike (read path) | P2 | L (spike) | 007 (hard), 006, 005 | TODO |

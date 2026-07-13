@@ -148,7 +148,7 @@ In `packages/core/tests/types/builder-inference.test.ts` (mirroring the conventi
 
 1. `cb.option().id('role').accessor((u: User) => u.role)` → `cellRenderer(({ value }) => ...)` sees `value: 'admin' | 'editor' | 'viewer'` (use a `type Expect<T extends true> = T` / `Equal` helper if one exists in the existing type tests — reuse theirs, don't invent a second one).
 2. `.options([{ value: 'admin', label: 'A' }, { value: 'bogus', label: 'B' }])` after that accessor → `@ts-expect-error`.
-3. `.build()` without `.accessor()` → `@ts-expect-error`.
+3. ~~`.build()` without `.accessor()` → `@ts-expect-error`.~~ **DROPPED (2026-07-13)** — Step 3 (compile-gated `build()`) is skipped; runtime `validateConfig()` remains the backstop. Breaking changes are in-policy for 0.6.
 4. Plain `ColumnBuilder<User, string>` legacy-style usage still compiles (back-compat).
 
 **Verify**: `cd packages/core && bun run typecheck && bun test tests/types/` → exit 0 / pass
