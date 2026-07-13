@@ -22,6 +22,7 @@ import type {
   DatabaseDriver,
   DrizzleAdapterConfig,
   DrizzleAdapterFactoryOptions,
+  DrizzleSchemaTypes,
   ExtractDriverFromDB,
   ExtractSchemaFromDB,
   FilterTablesFromSchema,
@@ -85,11 +86,25 @@ import {
  * the schema and driver from the Drizzle database instance. This eliminates the need
  * for manual configuration and 'as any' type assertions. The returned adapter instance
  * is fully typed based on the schema and driver information.
+ *
+ * The return type also carries `$types` -- a TYPE-ONLY phantom property (see
+ * `SchemaAwareAdapter` in `@better-tables/core`) exposing the relation-aware
+ * row shape for every table, per plan 011's design doc (Step 1 decision 2)
+ * and plan 018 (Step 5). It is intersected in here, not added to the
+ * `DrizzleAdapter` class itself, because computing it needs the FULL
+ * (relations-included) schema type embedded in `TDB` -- information already
+ * gone by the time it reaches the class (which only ever sees the FILTERED,
+ * tables-only `ExtractSchemaFromDB<TDB>`). `$types` is optional and never
+ * assigned at runtime, so a plain `DrizzleAdapter` instance -- with no
+ * `$types` property at all -- already satisfies this intersection; no cast
+ * or runtime change is needed.
  */
 export function drizzleAdapter<TDB>(
   db: TDB,
   factoryOptions?: DrizzleAdapterFactoryOptions<ExtractSchemaFromDB<TDB>, ExtractDriverFromDB<TDB>>
-): DrizzleAdapter<ExtractSchemaFromDB<TDB>, ExtractDriverFromDB<TDB>> {
+): DrizzleAdapter<ExtractSchemaFromDB<TDB>, ExtractDriverFromDB<TDB>> & {
+  readonly $types?: DrizzleSchemaTypes<TDB>;
+} {
   // Step 1: Extract or use provided schema
   let schema = factoryOptions?.schema;
   let relations = factoryOptions?.relations;
