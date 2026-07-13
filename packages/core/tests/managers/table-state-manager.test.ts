@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { TableStateManager } from '../../src/managers/table-state-manager';
 import type { ColumnDefinition } from '../../src/types/column';
-import type { FilterState } from '../../src/types/filter';
+import type { FilterGroupNode, FilterState } from '../../src/types/filter';
 import type { SortingState } from '../../src/types/sorting';
+import {
+  deserializeFiltersFromURL,
+  serializeFiltersToURL,
+} from '../../src/utils/filter-serialization';
 
 interface TestData {
   id: string;
@@ -780,6 +784,103 @@ describe('TableStateManager', () => {
           type: 'columns_changed',
           columns: expect.any(Array),
         });
+    });
+  });
+
+  describe('FilterNode state layer (plan 016)', () => {
+    // status AND (name OR age) -- valid against mockColumns, untouched by
+    // normalization (valid logic, no empties/singletons, depth 2 <= 3).
+    const statusLeaf: FilterState = {
+      columnId: 'status',
+      type: 'option',
+      operator: 'is',
+      values: ['active'],
+    };
+    const nameLeaf: FilterState = {
+      columnId: 'name',
+      type: 'text',
+      operator: 'contains',
+      values: ['John'],
+    };
+    const ageLeaf: FilterState = {
+      columnId: 'age',
+      type: 'number',
+      operator: 'greaterThan',
+      values: [30],
+    };
+    const tree: FilterGroupNode = {
+      kind: 'group',
+      logic: 'and',
+      children: [statusLeaf, { kind: 'group', logic: 'or', children: [nameLeaf, ageLeaf] }],
+    };
+
+    beforeEach(() => {
+      manager = new TableStateManager(mockColumns);
+    });
+
+    it('stores and returns the tree via getFilterNode/getState; getFilters stays the flat leaf view', () => {
+      manager.setFilterNode(tree);
+
+      expect(manager.getFilterNode()).toEqual(tree);
+      expect(manager.getState().filters).toEqual(tree);
+      expect(manager.getFilters()).toEqual([statusLeaf, nameLeaf, ageLeaf]);
+    });
+
+    it('updateState passes a tree through to state unflattened (rule 4)', () => {
+      manager.updateState({ filters: tree });
+
+      expect(manager.getFilterNode()).toEqual(tree);
+    });
+
+    it('URL round-trip through state: tree -> c2: string -> fresh manager -> structural equality', () => {
+      manager.setFilterNode(tree);
+
+      // Serialize the state-held tree out to the wire format...
+      const url = serializeFiltersToURL(manager.getFilterNode());
+      expect(url.startsWith('c2:')).toBe(true);
+
+      // ...and hydrate a completely fresh manager from it, the way the ui
+      // url-sync hook does (deserialize -> updateState).
+      const hydrated = deserializeFiltersFromURL(url);
+      const freshManager = new TableStateManager(mockColumns);
+      freshManager.updateState({ filters: hydrated });
+
+      expect(freshManager.getFilterNode()).toEqual(tree);
+      expect(freshManager.getState().filters).toEqual(tree);
+    });
+
+    it('setFilterNode fires filters_changed exactly once', () => {
+      const subscriber: ReturnType<typeof mock> = mock();
+      manager.subscribe(subscriber);
+
+      manager.setFilterNode(tree);
+
+      const filtersChangedEvents = subscriber.mock.calls.filter(
+        (call) => (call[0] as { type: string }).type === 'filters_changed'
+      );
+      expect(filtersChangedEvents).toHaveLength(1);
+      // The event carries the flat leaf view (the legacy display contract);
+      // the tree itself is on getState().filters / getFilterNode().
+      expect((filtersChangedEvents[0][0] as { filters: FilterState[] }).filters).toEqual([
+        statusLeaf,
+        nameLeaf,
+        ageLeaf,
+      ]);
+    });
+
+    it('legacy flat setFilters replaces a stored tree at the state-manager level too', () => {
+      manager.setFilterNode(tree);
+      manager.setFilters([nameLeaf]);
+
+      expect(manager.getFilterNode()).toEqual([nameLeaf]);
+      expect(manager.getState().filters).toEqual([nameLeaf]);
+    });
+
+    it('updateColumns preserves a stored tree', () => {
+      manager.setFilterNode(tree);
+      manager.updateColumns(mockColumns);
+
+      expect(manager.getFilterNode()).toEqual(tree);
     });
   });
 
