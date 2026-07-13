@@ -126,6 +126,52 @@ export function formatPercentage(
 }
 
 /**
+ * Convert a single identifier segment (snake_case, kebab-case, and/or
+ * camelCase) into Title Case words.
+ *
+ * Used as the default label source for path-typed columns (design doc
+ * `plans/design/table-definition-dx.md`, Open question (d)): `.displayName()`
+ * defaults to `humanize(lastPathSegment(path))`, NOT `Capitalize<S>` --
+ * `Capitalize` only uppercases the first character, so `Capitalize<'created_at'>`
+ * would produce `'Created_at'` instead of `'Created At'`.
+ *
+ * @example
+ * ```typescript
+ * humanize('location');    // 'Location'
+ * humanize('created_at');  // 'Created At'
+ * humanize('first-name');  // 'First Name'
+ * humanize('firstName');   // 'First Name'
+ * ```
+ */
+export function humanize(value: string): string {
+  if (!value) return '';
+
+  const withSpaces = value
+    .replace(/[_-]+/g, ' ') // snake_case / kebab-case -> spaces
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2') // camelCase -> split at case boundary
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2'); // ABCDef -> "ABC Def" (acronym boundary)
+
+  return withSpaces
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/**
+ * Extract the last dot-notation segment of a column path.
+ *
+ * `'profile.location'` -> `'location'`; `'role'` -> `'role'` (single-segment
+ * paths are their own last segment). Used together with {@link humanize} to
+ * derive a path-typed column's default `displayName`.
+ */
+export function lastPathSegment(path: string): string {
+  const segments = path.split('.');
+  return segments[segments.length - 1] ?? path;
+}
+
+/**
  * Format an email address
  */
 export function formatEmail(email: string | null | undefined): string {
