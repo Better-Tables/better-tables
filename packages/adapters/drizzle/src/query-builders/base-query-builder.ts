@@ -31,6 +31,7 @@ import {
   countDistinct,
   desc,
   eq,
+  inArray,
   isNotNull,
   max,
   min,
@@ -75,6 +76,70 @@ export interface DialectDb {
   select(selection?: Record<string, AnyColumnType | SQL | SQLWrapper>): {
     from(table: AnyTableType): QueryBuilderWithJoins;
   };
+}
+
+/**
+ * Two-phase pagination wrapper for fan-out (one-to-many/array) joins (plan
+ * 020, ADAPTER-03). Implements {@link QueryBuilderWithJoins} so it's a
+ * drop-in `dataQuery` for `buildCompleteQuery`'s callers, which only ever
+ * call `.execute()` on it -- the join/where/orderBy/limit/offset methods
+ * are unreachable no-ops because the two phases are already fully built by
+ * the time this wrapper is constructed (see `buildFanOutPaginatedDataQuery`).
+ *
+ * `execute()` runs phase 1 (the DISTINCT-primary-key page query) first; an
+ * empty phase-1 result short-circuits to `[]` without ever issuing phase 2
+ * with an empty `IN ()` list. Otherwise phase 2 (the full data query
+ * filtered to exactly those keys, no LIMIT/OFFSET) runs and its rows --
+ * every joined row for exactly one page's worth of primary keys -- are
+ * returned for the existing flat-to-nested transform to group.
+ */
+class FanOutPaginatedQuery implements QueryBuilderWithJoins {
+  constructor(
+    private readonly phase1Query: QueryBuilderWithJoins,
+    private readonly buildPhase2Query: (keys: unknown[]) => QueryBuilderWithJoins
+  ) {}
+
+  leftJoin(_table: AnyTableType, _condition: SQL | SQLWrapper): QueryBuilderWithJoins {
+    return this;
+  }
+
+  innerJoin(_table: AnyTableType, _condition: SQL | SQLWrapper): QueryBuilderWithJoins {
+    return this;
+  }
+
+  select(_selections?: Record<string, AnyColumnType | SQL | SQLWrapper>): QueryBuilderWithJoins {
+    return this;
+  }
+
+  where(_condition: SQL | SQLWrapper): QueryBuilderWithJoins {
+    return this;
+  }
+
+  orderBy(..._clauses: (AnyColumnType | SQL | SQLWrapper)[]): QueryBuilderWithJoins {
+    return this;
+  }
+
+  limit(_count: number): QueryBuilderWithJoins {
+    return this;
+  }
+
+  offset(_count: number): QueryBuilderWithJoins {
+    return this;
+  }
+
+  groupBy(..._columns: (AnyColumnType | SQL | SQLWrapper)[]): QueryBuilderWithJoins {
+    return this;
+  }
+
+  async execute(): Promise<Record<string, unknown>[]> {
+    const keyRows = await this.phase1Query.execute();
+    if (keyRows.length === 0) {
+      return [];
+    }
+
+    const keys = keyRows.map((row) => (row as { pk: unknown }).pk);
+    return this.buildPhase2Query(keys).execute();
+  }
 }
 
 /**
@@ -682,6 +747,69 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
+   * Build the full two-phase fan-out `dataQuery` (plan 020): phase 1 (see
+   * `buildFanOutKeyPageQuery`) plus a phase-2 builder closure that reruns
+   * the normal flat select/filter/sort pipeline with an added `WHERE
+   * primaryKey IN (phase-1 keys)` and no LIMIT/OFFSET, deferred inside a
+   * {@link FanOutPaginatedQuery} so phase 1 only executes when the caller
+   * calls `.execute()` on the returned `dataQuery`.
+   */
+  protected buildFanOutPaginatedDataQuery(params: {
+    context: QueryContext;
+    joinOrder: RelationshipPath[];
+    primaryTable: string;
+    primaryKeyInfo: { columnName: string; column: AnyColumnType };
+    columns?: string[] | undefined;
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql> | undefined;
+    filters: FilterState[] | FilterGroupNode;
+    sorting: SortingParams[];
+    pagination: PaginationParams;
+    additionalConditions?: (SQL | SQLWrapper)[] | undefined;
+  }): QueryBuilderWithJoins {
+    const {
+      context,
+      joinOrder,
+      primaryTable,
+      primaryKeyInfo,
+      columns,
+      computedFields,
+      filters,
+      sorting,
+      pagination,
+      additionalConditions,
+    } = params;
+
+    const phase1Query = this.buildFanOutKeyPageQuery(
+      joinOrder,
+      primaryTable,
+      primaryKeyInfo,
+      filters,
+      sorting,
+      pagination,
+      additionalConditions,
+      computedFields
+    );
+
+    const buildPhase2Query = (keys: unknown[]): QueryBuilderWithJoins => {
+      const phase2SelectResult = this.buildSelectQuery(
+        context,
+        primaryTable,
+        columns,
+        computedFields
+      );
+      const primaryKeyInCondition = inArray(primaryKeyInfo.column, keys);
+      let phase2Query = this.applyFilters(phase2SelectResult.query, filters, primaryTable, [
+        ...(additionalConditions || []),
+        primaryKeyInCondition,
+      ]);
+      phase2Query = this.applySorting(phase2Query, sorting, primaryTable, computedFields);
+      return phase2Query;
+    };
+
+    return new FanOutPaginatedQuery(phase1Query, buildPhase2Query);
+  }
+
+  /**
    * Type helper to access columns from a table.
    * Tables in Drizzle have columns as properties, but the base type doesn't expose an index signature.
    * We use a type assertion through the table's actual structure to safely access columns.
@@ -932,21 +1060,54 @@ export abstract class BaseQueryBuilder {
       params.columns,
       params.computedFields
     );
-    const { query: dataQuery, columnMetadata, isNested } = selectResult;
-    let finalDataQuery = this.applyFilters(
-      dataQuery,
-      params.filters || [],
-      params.primaryTable,
-      params.additionalConditions
+    const { columnMetadata, isNested } = selectResult;
+
+    // Plan 020 (ADAPTER-03): under a fan-out (one-to-many/array) join,
+    // LIMIT/OFFSET on the row-multiplied flat join result under-fills pages
+    // -- a "page of `limit`" flat rows can be fewer than `limit` distinct
+    // primary rows. Gate on the join order actually carrying a fan-out
+    // relationship (never true on the Postgres relational-query path,
+    // which nests instead of flattening -- `isNested` is the signal) and
+    // rewrite pagination as two phases (see `buildFanOutPaginatedDataQuery`).
+    // A many-to-one-only join order (gate false) keeps this exact
+    // single-query path, byte-for-byte unchanged.
+    const joinOrder = this.relationshipManager.optimizeJoinOrder(
+      context.joinPaths,
+      params.primaryTable
     );
-    finalDataQuery = this.applySorting(
-      finalDataQuery,
-      params.sorting || [],
-      params.primaryTable,
-      params.computedFields
-    );
-    if (params.pagination) {
-      finalDataQuery = this.applyPagination(finalDataQuery, params.pagination);
+    const primaryKeyInfo = this.primaryKeyMap[params.primaryTable];
+    const isFanOutJoin = !isNested && this.hasFanOutJoin(joinOrder);
+
+    let finalDataQuery: QueryBuilderWithJoins;
+    if (isFanOutJoin && params.pagination && primaryKeyInfo) {
+      finalDataQuery = this.buildFanOutPaginatedDataQuery({
+        context,
+        joinOrder,
+        primaryTable: params.primaryTable,
+        primaryKeyInfo,
+        columns: params.columns,
+        computedFields: params.computedFields,
+        filters: params.filters || [],
+        sorting: params.sorting || [],
+        pagination: params.pagination,
+        additionalConditions: params.additionalConditions,
+      });
+    } else {
+      finalDataQuery = this.applyFilters(
+        selectResult.query,
+        params.filters || [],
+        params.primaryTable,
+        params.additionalConditions
+      );
+      finalDataQuery = this.applySorting(
+        finalDataQuery,
+        params.sorting || [],
+        params.primaryTable,
+        params.computedFields
+      );
+      if (params.pagination) {
+        finalDataQuery = this.applyPagination(finalDataQuery, params.pagination);
+      }
     }
 
     let countQuery = this.buildCountQuery(context, params.primaryTable);
