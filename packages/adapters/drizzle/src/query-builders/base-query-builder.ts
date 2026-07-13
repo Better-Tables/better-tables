@@ -14,10 +14,24 @@ import {
   generateAlias,
   generatePathKey,
   getPrimaryKeyMap,
+  quoteIdentifier as quoteIdentifierRaw,
 } from '@better-tables/adapters-toolkit';
 import type { FilterState, PaginationParams, SortingParams } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
-import { and, asc, avg, count, countDistinct, desc, eq, max, min, sum } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  avg,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  isNotNull,
+  max,
+  min,
+  sql,
+  sum,
+} from 'drizzle-orm';
 import { FilterHandler } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
@@ -28,6 +42,7 @@ import type {
   ComputedFieldWithResolvedSortSql,
   DatabaseDriver,
   FilterHandlerHooks,
+  JoinConfig,
   MySQLQueryBuilderWithJoins,
   PostgresQueryBuilderWithJoins,
   QueryBuilderWithJoins,
@@ -43,8 +58,29 @@ import {
 } from '../utils/drizzle-schema-utils';
 
 /**
+ * Minimal structural view of a Drizzle database's `select().from()` entry
+ * point — exactly what the shared query skeletons in {@link BaseQueryBuilder}
+ * need. All three dialect database types (Postgres/MySQL/SQLite) satisfy this
+ * at runtime; the per-dialect `asPgTable`/`asMySqlTable`/`asSQLiteTable` and
+ * column casts they used to sprinkle through triplicated method bodies were
+ * compile-time-only, so a single contained cast in each subclass's `getDb()`
+ * replaces all of them (plan 007 step 5).
+ */
+export interface DialectDb {
+  select(selection?: Record<string, AnyColumnType | SQL | SQLWrapper>): {
+    from(table: AnyTableType): QueryBuilderWithJoins;
+  };
+}
+
+/**
  * Abstract base class for query builders.
- * Contains shared logic for all database drivers.
+ * Contains shared logic for all database drivers: the manual-join SELECT
+ * skeleton, COUNT (with distinct-primary-key guard under joins), aggregate /
+ * filter-options / min-max queries, join application, filter/sort/pagination
+ * application, validation, and identifier quoting. Dialect subclasses supply
+ * only: the db handle (`getDb`), the identifier quote char, array-FK join
+ * syntax, JSON-accessor column selections, and (Postgres) relational-query
+ * support.
  *
  * @abstract
  * @class BaseQueryBuilder
@@ -104,9 +140,90 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
-   * Abstract method to build SELECT query - must be implemented by subclasses
+   * Dialect hook: the underlying Drizzle database handle, viewed through the
+   * minimal structural {@link DialectDb} interface the shared skeletons need.
+   * Each subclass implements this with a single contained cast of its own
+   * strongly-typed db instance.
    */
-  abstract buildSelectQuery(
+  protected abstract getDb(): DialectDb;
+
+  /**
+   * Dialect hook: the identifier quote character.
+   * - PostgreSQL: double quote (")
+   * - MySQL: backtick (`)
+   * - SQLite: double quote (")
+   */
+  protected abstract readonly quoteChar: '"' | '`';
+
+  /**
+   * Quote (escape-and-wrap) a SQL identifier with the dialect's quote char.
+   * Escaping happens inside the toolkit's quoteIdentifier (ADAPTER-04), so
+   * it can never be skipped or done with the wrong dialect's quote char.
+   *
+   * @param identifier - The raw identifier to quote
+   * @returns SQL expression with the quoted identifier
+   */
+  protected quoteIdentifier(identifier: string): SQL | SQLWrapper {
+    return sql.raw(quoteIdentifierRaw(identifier, this.quoteChar));
+  }
+
+  /**
+   * Apply a join order (from `optimizeJoinOrder`) to a query.
+   * Shared join-application loop hoisted from the three dialect builders
+   * (plan 007 step 5) — their copies differed only in compile-time casts.
+   */
+  protected applyJoins(
+    query: QueryBuilderWithJoins,
+    joinOrder: RelationshipPath[]
+  ): QueryBuilderWithJoins {
+    let result = query;
+    for (const relationship of joinOrder) {
+      const targetTable = this.schema[relationship.to];
+      if (!targetTable) {
+        throw new QueryError(`Target table not found: ${relationship.to}`, {
+          targetTable: relationship.to,
+        });
+      }
+
+      const joinCondition = this.buildJoinCondition(relationship);
+
+      if (relationship.joinType === 'left') {
+        result = result.leftJoin(targetTable, joinCondition);
+      } else {
+        result = result.innerJoin(targetTable, joinCondition);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Apply pre-built join configs (from `getRequiredJoinsForColumn`) to a query.
+   * Shared loop hoisted from the dialect aggregate/min-max builders.
+   */
+  protected applyJoinConfigs(
+    query: QueryBuilderWithJoins,
+    joinConfigs: JoinConfig[]
+  ): QueryBuilderWithJoins {
+    let result = query;
+    for (const joinConfig of joinConfigs) {
+      if (joinConfig.type === 'left') {
+        result = result.leftJoin(joinConfig.table, joinConfig.condition);
+      } else {
+        result = result.innerJoin(joinConfig.table, joinConfig.condition);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Build SELECT query with manual joins (flat results).
+   *
+   * Shared implementation for all dialects. PostgreSQL overrides this to
+   * first attempt Drizzle's relational query API (nested results) and falls
+   * back to this manual-join skeleton; JSON-accessor handling is injected
+   * through each dialect's `buildColumnSelections` override.
+   */
+  buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
     columns?: string[],
@@ -118,49 +235,244 @@ export abstract class BaseQueryBuilder {
       columnMapping: Record<string, string>;
     };
     isNested?: boolean; // Flag to indicate if data is already nested from relational query
-  };
+  } {
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const selections: Record<string, AnyColumnType> = {};
+    const columnMapping: Record<string, string> = {};
+
+    if (columns && columns.length > 0) {
+      Object.assign(selections, this.buildColumnSelections(columns, primaryTable));
+      for (const columnId of columns) {
+        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+
+        if (columnPath.isNested && columnPath.relationshipPath) {
+          const aliasedKey = generateAlias(columnPath.relationshipPath, columnPath.field);
+          columnMapping[aliasedKey] = columnId;
+        } else {
+          columnMapping[columnId] = columnId;
+        }
+      }
+    } else if (context.joinPaths.size > 0) {
+      Object.assign(selections, this.buildFlatSelectionsForRelationships(primaryTable));
+      for (const key of Object.keys(selections)) {
+        columnMapping[key] = key;
+      }
+    }
+
+    // Add computed field SQL expressions for sorting
+    // These need to be in SELECT so they can be referenced in ORDER BY
+    // Note: sortSql expressions are pre-resolved in DrizzleAdapter.fetchData before calling buildSelectQuery
+    // The double type assertion (as unknown as AnyColumnType) is necessary because Drizzle's type system
+    // doesn't recognize SQL expressions as valid column types, but at runtime they work correctly.
+    if (computedFields) {
+      for (const [fieldName, computedField] of Object.entries(computedFields)) {
+        // Check that the SQL expression was resolved (should always be true at this point)
+        if (computedField.__resolvedSortSql !== undefined) {
+          // Use pre-resolved SQL expression (resolved in adapter)
+          // Explicitly alias the SQL expression with the field name so it can be referenced in ORDER BY
+          // According to Drizzle docs: sql`expression`.as('alias') adds an alias to the SQL expression
+          // All SQL expressions from Drizzle support .as() method
+          // Type assertion needed: Drizzle's type system doesn't accept SQL expressions as column types,
+          // but they work correctly at runtime when used in SELECT clauses
+          const aliasedSql = (
+            computedField.__resolvedSortSql as SQL & { as: (alias: string) => SQL }
+          ).as(fieldName);
+          selections[fieldName] = aliasedSql as unknown as AnyColumnType;
+          columnMapping[fieldName] = fieldName;
+        }
+      }
+    }
+
+    const db = this.getDb();
+    const baseQuery =
+      Object.keys(selections).length > 0
+        ? db.select(selections).from(primaryTableSchema)
+        : db.select().from(primaryTableSchema);
+
+    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+    const query = this.applyJoins(baseQuery, joinOrder);
+
+    return {
+      query,
+      columnMetadata: {
+        selections,
+        columnMapping,
+      },
+      isNested: false, // Manual joins return flat data
+    };
+  }
 
   /**
-   * Abstract method to build COUNT query - must be implemented by subclasses
-   */
-  abstract buildCountQuery(context: QueryContext, primaryTable: string): QueryBuilderWithJoins;
-
-  /**
-   * Abstract method to build aggregate query - must be implemented by subclasses
-   */
-  abstract buildAggregateQuery<TColumnId extends string>(
-    columnId: TColumnId,
-    aggregateFunction: AggregateFunction,
-    primaryTable: string
-  ): QueryBuilderWithJoins;
-
-  /**
-   * Abstract method to build filter options query - must be implemented by subclasses
-   */
-  abstract buildFilterOptionsQuery(columnId: string, primaryTable: string): QueryBuilderWithJoins;
-
-  /**
-   * Abstract method to build min/max query - must be implemented by subclasses
-   */
-  abstract buildMinMaxQuery<TColumnId extends string>(
-    columnId: TColumnId,
-    primaryTable: string
-  ): QueryBuilderWithJoins;
-
-  /**
-   * Abstract method to quote SQL identifier - must be implemented by subclasses
-   * Each database uses different quote characters for identifiers:
-   * - PostgreSQL: double quotes (")
-   * - MySQL: backticks (`)
-   * - SQLite: double quotes (") or square brackets ([])
+   * Build COUNT query for pagination.
    *
-   * @param identifier - The identifier to quote (already escaped)
-   * @returns SQL expression with quoted identifier
+   * Shared implementation for all dialects, including plan 003's
+   * distinct-primary-key guard: when joins are present, COUNT(DISTINCT pk)
+   * avoids counting duplicated rows fanned out by one-to-many joins.
    */
-  protected abstract quoteIdentifier(identifier: string): SQL | SQLWrapper;
+  buildCountQuery(context: QueryContext, primaryTable: string): QueryBuilderWithJoins {
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
+
+    // If there are joins, count distinct primary keys to avoid inflated counts
+    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
+    const hasJoins = joinOrder.length > 0;
+
+    const db = this.getDb();
+    const baseQuery =
+      hasJoins && primaryKeyInfo
+        ? // Use count distinct on primary key to avoid counting duplicate rows from joins
+          db
+            .select({ count: countDistinct(primaryKeyInfo.column) })
+            .from(primaryTableSchema)
+        : db.select({ count: count() }).from(primaryTableSchema);
+
+    return this.applyJoins(baseQuery, joinOrder);
+  }
+
+  /**
+   * Build aggregate query for faceted values.
+   * Shared implementation for all dialects.
+   */
+  buildAggregateQuery<TColumnId extends string>(
+    columnId: TColumnId,
+    aggregateFunction: AggregateFunction = 'count',
+    primaryTable: string
+  ): QueryBuilderWithJoins {
+    this.validateColumnId(columnId, primaryTable);
+    this.validateAggregateFunction(aggregateFunction);
+
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
+
+    this.validateAggregateColumnCompatibility(columnReference.column, aggregateFunction);
+
+    const mainTableSchema = this.schema[primaryTable];
+    if (!mainTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const column = columnReference.column;
+    const aggregateFn = this.getAggregateFunction(column, aggregateFunction);
+
+    const baseQuery = this.getDb()
+      .select({
+        value: column,
+        count: aggregateFn,
+      })
+      .from(mainTableSchema);
+
+    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
+      columnPath,
+      primaryTable
+    );
+    const query = this.applyJoinConfigs(baseQuery, requiredJoins);
+
+    return query.where(isNotNull(column)).groupBy(column).orderBy(column);
+  }
+
+  /**
+   * Build filter options query.
+   * Shared implementation for all dialects.
+   */
+  buildFilterOptionsQuery(columnId: string, primaryTable: string): QueryBuilderWithJoins {
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const column = this.getColumn(columnPath);
+
+    if (!column) {
+      throw new QueryError(`Column not found: ${columnId}`, { columnId });
+    }
+
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const baseQuery = this.getDb()
+      .select({
+        value: column,
+        count: count(),
+      })
+      .from(primaryTableSchema);
+
+    let query: QueryBuilderWithJoins = baseQuery;
+    if (columnPath.isNested && columnPath.relationshipPath) {
+      const joinOrder = this.relationshipManager.optimizeJoinOrder(
+        new Map([[columnPath.table, columnPath.relationshipPath || []]]),
+        primaryTable
+      );
+      query = this.applyJoins(query, joinOrder);
+    }
+
+    return query.where(isNotNull(column)).groupBy(column).orderBy(column);
+  }
+
+  /**
+   * Build min/max values query.
+   * Shared implementation for all dialects.
+   */
+  buildMinMaxQuery<TColumnId extends string>(
+    columnId: TColumnId,
+    primaryTable: string
+  ): QueryBuilderWithJoins {
+    this.validateColumnId(columnId, primaryTable);
+
+    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
+
+    this.validateMinMaxColumnCompatibility(columnReference.column);
+
+    const primaryTableSchema = this.schema[primaryTable];
+    if (!primaryTableSchema) {
+      throw new QueryError(`Primary table not found: ${primaryTable}`, {
+        primaryTable: primaryTable,
+      });
+    }
+
+    const column = columnReference.column;
+
+    const baseQuery = this.getDb()
+      .select({
+        min: min(column),
+        max: max(column),
+      })
+      .from(primaryTableSchema);
+
+    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
+      columnPath,
+      primaryTable
+    );
+    const query = this.applyJoinConfigs(baseQuery, requiredJoins);
+
+    return query.where(isNotNull(column));
+  }
 
   /**
    * Apply filters to query
+   *
+   * NOTE(plan-017): this flat collect-then-and(...) is the seam where the
+   * recursive AND/OR filter-group walk from the contract-v2 design doc
+   * (plans/design/core-contract-v2.md §1.5) will slot in: a FilterNode tree
+   * replaces the flat FilterState[] here, leaves resolve through
+   * FilterHandler.buildFilterCondition, and groups combine recursively via
+   * and()/or() by node logic. The router/emitter split (plan 007 step 4)
+   * already keeps condition COMBINATION at this layer, with leaf predicate
+   * construction behind the PredicateEmitter interface.
    */
   applyFilters(
     query: QueryBuilderWithJoins,

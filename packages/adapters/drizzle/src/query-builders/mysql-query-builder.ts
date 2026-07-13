@@ -4,6 +4,10 @@
  *
  * @description
  * MySQL query builder implementation with driver-specific optimizations.
+ * The select/count/aggregate/filter-options/min-max skeletons live in
+ * `BaseQueryBuilder` (plan 007 step 5); this class supplies only the
+ * MySQL-specific pieces: JSON-array join syntax, `JSON_EXTRACT` column
+ * selections, and the backtick identifier quote character.
  *
  * Supports all MySQL-compatible Drizzle drivers:
  * - mysql2 (MySql2Database)
@@ -11,25 +15,11 @@
  * @since 1.0.0 (expanded to support all MySQL drivers in 1.1.0)
  */
 
-import {
-  generateAlias,
-  quoteIdentifier as quoteIdentifierRaw,
-} from '@better-tables/adapters-toolkit';
-import { count, countDistinct, isNotNull, max, min, type SQL, sql } from 'drizzle-orm';
-import type { MySqlColumn, MySqlTable } from 'drizzle-orm/mysql-core';
+import { type SQL, sql } from 'drizzle-orm';
+import type { MySqlColumn } from 'drizzle-orm/mysql-core';
 import type { RelationshipManager } from '../relationship-manager';
-import type {
-  AggregateFunction,
-  AnyColumnType,
-  AnyTableType,
-  ComputedFieldWithResolvedSortSql,
-  FilterHandlerHooks,
-  MySQLQueryBuilderWithJoins,
-  MySqlDatabaseType,
-  QueryContext,
-} from '../types';
-import { QueryError } from '../types';
-import { BaseQueryBuilder } from './base-query-builder';
+import type { AnyColumnType, AnyTableType, FilterHandlerHooks, MySqlDatabaseType } from '../types';
+import { BaseQueryBuilder, type DialectDb } from './base-query-builder';
 
 /**
  * MySQL query builder implementation.
@@ -44,6 +34,8 @@ import { BaseQueryBuilder } from './base-query-builder';
 export class MySQLQueryBuilder extends BaseQueryBuilder {
   private db: MySqlDatabaseType;
 
+  protected readonly quoteChar = '`' as const;
+
   constructor(
     db: MySqlDatabaseType,
     schema: Record<string, AnyTableType>,
@@ -55,11 +47,14 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
-   * Type-safe helper to cast AnyTableType to MySqlTable.
-   * At runtime, this query builder only receives MySQL tables via the factory pattern.
+   * Dialect hook: view the MySQL db handle through the structural DialectDb
+   * interface the shared skeletons use. The cast is safe because Drizzle's
+   * MySQL select builders implement every method the interface declares —
+   * the previous per-call-site `asMySqlTable`/`asMySqlColumn` casts were
+   * compile-time-only and this single cast replaces them all.
    */
-  private asMySqlTable(table: AnyTableType): MySqlTable {
-    return table as MySqlTable;
+  protected getDb(): DialectDb {
+    return this.db as unknown as DialectDb;
   }
 
   /**
@@ -90,357 +85,6 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
     // This checks if the target column value exists as a scalar in the JSON array
     // 'one' means return the first match (we just need to know if it exists)
     return sql`JSON_SEARCH(${mysqlSourceArrayColumn}, 'one', ${mysqlTargetColumn}) IS NOT NULL`;
-  }
-
-  /**
-   * Build SELECT query with joins
-   */
-  buildSelectQuery(
-    context: QueryContext,
-    primaryTable: string,
-    columns?: string[],
-    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
-  ): {
-    query: MySQLQueryBuilderWithJoins;
-    columnMetadata: {
-      selections: Record<string, AnyColumnType>;
-      columnMapping: Record<string, string>;
-    };
-    isNested?: boolean; // Flag to indicate if data is already nested from relational query
-  } {
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const selections: Record<string, AnyColumnType> = {};
-    const columnMapping: Record<string, string> = {};
-
-    if (columns && columns.length > 0) {
-      Object.assign(selections, this.buildColumnSelections(columns, primaryTable));
-      for (const columnId of columns) {
-        const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-
-        if (columnPath.isNested && columnPath.relationshipPath) {
-          const aliasedKey = generateAlias(columnPath.relationshipPath, columnPath.field);
-          columnMapping[aliasedKey] = columnId;
-        } else {
-          columnMapping[columnId] = columnId;
-        }
-      }
-    } else if (context.joinPaths.size > 0) {
-      Object.assign(selections, this.buildFlatSelectionsForRelationships(primaryTable));
-      for (const key of Object.keys(selections)) {
-        columnMapping[key] = key;
-      }
-    }
-
-    // Add computed field SQL expressions for sorting
-    // These need to be in SELECT so they can be referenced in ORDER BY
-    // Note: sortSql expressions are pre-resolved in DrizzleAdapter.fetchData before calling buildSelectQuery
-    // The double type assertion (as unknown as AnyColumnType) is necessary because Drizzle's type system
-    // doesn't recognize SQL expressions as valid column types, but at runtime they work correctly.
-    if (computedFields) {
-      for (const [fieldName, computedField] of Object.entries(computedFields)) {
-        // Check that the SQL expression was resolved (should always be true at this point)
-        if (computedField.__resolvedSortSql !== undefined) {
-          // Use pre-resolved SQL expression (resolved in adapter)
-          // Explicitly alias the SQL expression with the field name so it can be referenced in ORDER BY
-          // According to Drizzle docs: sql`expression`.as('alias') adds an alias to the SQL expression
-          // All SQL expressions from Drizzle support .as() method
-          // Type assertion needed: Drizzle's type system doesn't accept SQL expressions as column types,
-          // but they work correctly at runtime when used in SELECT clauses
-          const aliasedSql = (
-            computedField.__resolvedSortSql as SQL & { as: (alias: string) => SQL }
-          ).as(fieldName);
-          selections[fieldName] = aliasedSql as unknown as AnyColumnType;
-          columnMapping[fieldName] = fieldName;
-        }
-      }
-    }
-
-    // Cast selections to Record<string, MySqlColumn> for type-safe select
-    const mysqlSelections = selections as Record<string, MySqlColumn>;
-    const mysqlTable = this.asMySqlTable(primaryTableSchema);
-
-    const baseQuery =
-      Object.keys(selections).length > 0
-        ? this.db.select(mysqlSelections).from(mysqlTable)
-        : this.db.select().from(mysqlTable);
-
-    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const relationship of joinOrder) {
-      const targetTable = this.schema[relationship.to];
-      if (!targetTable) {
-        throw new QueryError(`Target table not found: ${relationship.to}`, {
-          targetTable: relationship.to,
-        });
-      }
-
-      const joinCondition = this.buildJoinCondition(relationship) as SQL;
-      const mysqlTargetTable = this.asMySqlTable(targetTable);
-
-      if (relationship.joinType === 'left') {
-        query = query.leftJoin(mysqlTargetTable, joinCondition);
-      } else {
-        query = query.innerJoin(mysqlTargetTable, joinCondition);
-      }
-    }
-
-    return {
-      query: this.asMySQLQueryBuilder(query),
-      columnMetadata: {
-        selections,
-        columnMapping,
-      },
-      isNested: false, // MySQL uses manual joins, returns flat data
-    };
-  }
-
-  /**
-   * Build COUNT query for pagination
-   */
-  buildCountQuery(context: QueryContext, primaryTable: string): MySQLQueryBuilderWithJoins {
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const mysqlTable = this.asMySqlTable(primaryTableSchema);
-    const joinOrder = this.relationshipManager.optimizeJoinOrder(context.joinPaths, primaryTable);
-
-    // If there are joins, count distinct primary keys to avoid inflated counts
-    // TODO(plan-007): hoist shared count logic into BaseQueryBuilder
-    const primaryKeyInfo = this.primaryKeyMap[primaryTable];
-    const hasJoins = joinOrder.length > 0;
-
-    const baseQuery =
-      hasJoins && primaryKeyInfo
-        ? (() => {
-            // Use count distinct on primary key to avoid counting duplicate rows from joins
-            const mysqlPkColumn = this.asMySqlColumn(primaryKeyInfo.column);
-            return this.db.select({ count: countDistinct(mysqlPkColumn) }).from(mysqlTable);
-          })()
-        : this.db.select({ count: count() }).from(mysqlTable);
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const relationship of joinOrder) {
-      const targetTable = this.schema[relationship.to];
-      if (!targetTable) {
-        throw new QueryError(`Target table not found: ${relationship.to}`, {
-          targetTable: relationship.to,
-        });
-      }
-
-      const joinCondition = this.buildJoinCondition(relationship) as SQL;
-      const mysqlTargetTable = this.asMySqlTable(targetTable);
-
-      if (relationship.joinType === 'left') {
-        query = query.leftJoin(mysqlTargetTable, joinCondition);
-      } else {
-        query = query.innerJoin(mysqlTargetTable, joinCondition);
-      }
-    }
-
-    return this.asMySQLQueryBuilder(query);
-  }
-
-  /**
-   * Build aggregate query for faceted values
-   */
-  buildAggregateQuery<TColumnId extends string>(
-    columnId: TColumnId,
-    aggregateFunction: AggregateFunction = 'count',
-    primaryTable: string
-  ): MySQLQueryBuilderWithJoins {
-    this.validateColumnId(columnId, primaryTable);
-    this.validateAggregateFunction(aggregateFunction);
-
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
-
-    this.validateAggregateColumnCompatibility(columnReference.column, aggregateFunction);
-
-    const mainTableSchema = this.schema[primaryTable];
-    if (!mainTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const mysqlTable = this.asMySqlTable(mainTableSchema);
-    const mysqlColumn = this.asMySqlColumn(columnReference.column);
-    const aggregateFn = this.getAggregateFunction(columnReference.column, aggregateFunction) as SQL;
-
-    const baseQuery = this.db
-      .select({
-        value: mysqlColumn,
-        count: aggregateFn,
-      })
-      .from(mysqlTable);
-
-    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
-      columnPath,
-      primaryTable
-    );
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const joinConfig of requiredJoins) {
-      const mysqlJoinTable = this.asMySqlTable(joinConfig.table);
-      const joinCondition = joinConfig.condition as SQL;
-
-      if (joinConfig.type === 'left') {
-        query = query.leftJoin(mysqlJoinTable, joinCondition);
-      } else {
-        query = query.innerJoin(mysqlJoinTable, joinCondition);
-      }
-    }
-
-    return this.asMySQLQueryBuilder(
-      query.where(isNotNull(mysqlColumn)).groupBy(mysqlColumn).orderBy(mysqlColumn)
-    );
-  }
-
-  /**
-   * Build filter options query
-   */
-  buildFilterOptionsQuery(columnId: string, primaryTable: string): MySQLQueryBuilderWithJoins {
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-    const column = this.getColumn(columnPath);
-
-    if (!column) {
-      throw new QueryError(`Column not found: ${columnId}`, { columnId });
-    }
-
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const mysqlTable = this.asMySqlTable(primaryTableSchema);
-    const mysqlColumn = this.asMySqlColumn(column);
-
-    const baseQuery = this.db
-      .select({
-        value: mysqlColumn,
-        count: count(),
-      })
-      .from(mysqlTable);
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    if (columnPath.isNested && columnPath.relationshipPath) {
-      const joinOrder = this.relationshipManager.optimizeJoinOrder(
-        new Map([[columnPath.table, columnPath.relationshipPath || []]]),
-        primaryTable
-      );
-
-      for (const relationship of joinOrder) {
-        const targetTable = this.schema[relationship.to];
-        if (!targetTable) {
-          throw new QueryError(`Target table not found: ${relationship.to}`, {
-            targetTable: relationship.to,
-          });
-        }
-
-        const joinCondition = this.buildJoinCondition(relationship) as SQL;
-        const mysqlTargetTable = this.asMySqlTable(targetTable);
-
-        if (relationship.joinType === 'left') {
-          query = query.leftJoin(mysqlTargetTable, joinCondition);
-        } else {
-          query = query.innerJoin(mysqlTargetTable, joinCondition);
-        }
-      }
-    }
-
-    return this.asMySQLQueryBuilder(
-      query.where(isNotNull(mysqlColumn)).groupBy(mysqlColumn).orderBy(mysqlColumn)
-    );
-  }
-
-  /**
-   * Build min/max values query
-   */
-  /**
-   * Quote SQL identifier for MySQL (uses backticks)
-   */
-  protected quoteIdentifier(identifier: string): SQL {
-    return sql.raw(quoteIdentifierRaw(identifier, '`'));
-  }
-
-  buildMinMaxQuery<TColumnId extends string>(
-    columnId: TColumnId,
-    primaryTable: string
-  ): MySQLQueryBuilderWithJoins {
-    this.validateColumnId(columnId, primaryTable);
-
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
-    const columnReference = this.relationshipManager.getColumnReference(columnPath, primaryTable);
-
-    this.validateMinMaxColumnCompatibility(columnReference.column);
-
-    const primaryTableSchema = this.schema[primaryTable];
-    if (!primaryTableSchema) {
-      throw new QueryError(`Primary table not found: ${primaryTable}`, {
-        primaryTable: primaryTable,
-      });
-    }
-
-    const mysqlTable = this.asMySqlTable(primaryTableSchema);
-    const mysqlColumn = this.asMySqlColumn(columnReference.column);
-
-    const baseQuery = this.db
-      .select({
-        min: min(mysqlColumn),
-        max: max(mysqlColumn),
-      })
-      .from(mysqlTable);
-
-    const requiredJoins = this.relationshipManager.getRequiredJoinsForColumn(
-      columnPath,
-      primaryTable
-    );
-
-    let query:
-      | ReturnType<typeof baseQuery.leftJoin>
-      | ReturnType<typeof baseQuery.innerJoin>
-      | typeof baseQuery = baseQuery;
-    for (const joinConfig of requiredJoins) {
-      const mysqlJoinTable = this.asMySqlTable(joinConfig.table);
-      const joinCondition = joinConfig.condition as SQL;
-
-      if (joinConfig.type === 'left') {
-        query = query.leftJoin(mysqlJoinTable, joinCondition) as ReturnType<
-          typeof baseQuery.leftJoin
-        >;
-      } else {
-        query = query.innerJoin(mysqlJoinTable, joinCondition) as ReturnType<
-          typeof baseQuery.innerJoin
-        >;
-      }
-    }
-
-    return this.asMySQLQueryBuilder(query.where(isNotNull(mysqlColumn)));
   }
 
   /**
