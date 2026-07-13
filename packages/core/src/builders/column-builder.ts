@@ -120,10 +120,13 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    * Set the data accessor function.
    *
    * Sets the function that extracts the column value from row data. This function
-   * is called for each row to get the value to display, sort, and filter.
+   * is called for each row to get the value to display, sort, and filter. The
+   * builder's value type is inferred from (and rebound to) the accessor's return
+   * type, so subsequent chained methods (e.g. `cellRenderer`, `filterable`) see
+   * the narrowed type rather than the original `TValue`.
    *
    * @param accessor - Function that extracts the column value from row data
-   * @returns This builder instance for method chaining
+   * @returns A builder rebound to the accessor's return type, for method chaining
    *
    * @example
    * ```typescript
@@ -134,9 +137,9 @@ export class ColumnBuilder<TData = unknown, TValue = unknown> {
    *   .build();
    * ```
    */
-  accessor(accessor: (data: TData) => TValue): this {
-    this.config.accessor = accessor;
-    return this;
+  accessor<V extends TValue>(accessor: (data: TData) => V): ColumnBuilder<TData, V> {
+    this.config.accessor = accessor as unknown as (data: TData) => TValue;
+    return this as unknown as ColumnBuilder<TData, V>;
   }
 
   /**

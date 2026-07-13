@@ -17,6 +17,7 @@ import { ColumnBuilder } from './column-builder';
  * including formatting, range filtering, and relative time display.
  *
  * @template TData - The type of row data
+ * @template TValue - The type of column value (defaults to `Date`; narrowed by `.accessor()`)
  *
  * @example
  * ```typescript
@@ -29,9 +30,26 @@ import { ColumnBuilder } from './column-builder';
  *   .build();
  * ```
  */
-export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Date> {
+export class DateColumnBuilder<TData = unknown, TValue extends Date = Date> extends ColumnBuilder<
+  TData,
+  TValue
+> {
   constructor() {
     super('date');
+  }
+
+  /**
+   * Set the data accessor function.
+   *
+   * Rebinds the builder's value type to the accessor's return type, so
+   * subsequent chained methods see the narrowed date type.
+   *
+   * @param accessor - Function that extracts the column value from row data
+   * @returns A `DateColumnBuilder` rebound to the accessor's return type
+   */
+  override accessor<V extends Date>(accessor: (data: TData) => V): DateColumnBuilder<TData, V> {
+    this.config.accessor = accessor as unknown as (data: TData) => TValue;
+    return this as unknown as DateColumnBuilder<TData, V>;
   }
 
   /**
@@ -179,7 +197,7 @@ export class DateColumnBuilder<TData = unknown> extends ColumnBuilder<TData, Dat
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
 
     if (minDate || maxDate) {
       this.config.meta = {

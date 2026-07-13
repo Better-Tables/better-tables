@@ -17,6 +17,7 @@ import { ColumnBuilder } from './column-builder';
  * option columns, including tags, categories, roles, and validation configurations.
  *
  * @template TData - The type of row data
+ * @template TValue - The type of column value (defaults to `string[]`; narrowed by `.accessor()`)
  *
  * @example
  * ```typescript
@@ -32,9 +33,28 @@ import { ColumnBuilder } from './column-builder';
  *   .build();
  * ```
  */
-export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string[]> {
+export class MultiOptionColumnBuilder<
+  TData = unknown,
+  TValue extends string[] = string[],
+> extends ColumnBuilder<TData, TValue> {
   constructor() {
     super('multiOption');
+  }
+
+  /**
+   * Set the data accessor function.
+   *
+   * Rebinds the builder's value type to the accessor's return type, so
+   * subsequent chained methods see the narrowed string array type.
+   *
+   * @param accessor - Function that extracts the column value from row data
+   * @returns A `MultiOptionColumnBuilder` rebound to the accessor's return type
+   */
+  override accessor<V extends string[]>(
+    accessor: (data: TData) => V
+  ): MultiOptionColumnBuilder<TData, V> {
+    this.config.accessor = accessor as unknown as (data: TData) => TValue;
+    return this as unknown as MultiOptionColumnBuilder<TData, V>;
   }
 
   /**
@@ -107,7 +127,7 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
     this.config.meta = {
       ...this.config.meta,
       options: {
@@ -222,7 +242,7 @@ export class MultiOptionColumnBuilder<TData = unknown> extends ColumnBuilder<TDa
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
     this.config.meta = {
       ...this.config.meta,
       options: {

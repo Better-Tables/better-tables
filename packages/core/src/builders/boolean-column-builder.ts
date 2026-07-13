@@ -17,6 +17,7 @@ import { ColumnBuilder } from './column-builder';
  * including display formatting, filtering options, and interactive controls.
  *
  * @template TData - The type of row data
+ * @template TValue - The type of column value (defaults to `boolean`; narrowed by `.accessor()`)
  *
  * @example
  * ```typescript
@@ -29,9 +30,28 @@ import { ColumnBuilder } from './column-builder';
  *   .build();
  * ```
  */
-export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, boolean> {
+export class BooleanColumnBuilder<
+  TData = unknown,
+  TValue extends boolean = boolean,
+> extends ColumnBuilder<TData, TValue> {
   constructor() {
     super('boolean');
+  }
+
+  /**
+   * Set the data accessor function.
+   *
+   * Rebinds the builder's value type to the accessor's return type, so
+   * subsequent chained methods see the narrowed boolean type.
+   *
+   * @param accessor - Function that extracts the column value from row data
+   * @returns A `BooleanColumnBuilder` rebound to the accessor's return type
+   */
+  override accessor<V extends boolean>(
+    accessor: (data: TData) => V
+  ): BooleanColumnBuilder<TData, V> {
+    this.config.accessor = accessor as unknown as (data: TData) => TValue;
+    return this as unknown as BooleanColumnBuilder<TData, V>;
   }
 
   /**
@@ -102,7 +122,7 @@ export class BooleanColumnBuilder<TData = unknown> extends ColumnBuilder<TData, 
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
 
     if (defaultValue !== undefined) {
       this.config.meta = {

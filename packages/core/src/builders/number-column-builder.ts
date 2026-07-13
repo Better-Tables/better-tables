@@ -17,6 +17,7 @@ import { ColumnBuilder } from './column-builder';
  * including range filtering, currency formatting, percentage display, and precision control.
  *
  * @template TData - The type of row data
+ * @template TValue - The type of column value (defaults to `number`; narrowed by `.accessor()`)
  *
  * @example
  * ```typescript
@@ -29,9 +30,26 @@ import { ColumnBuilder } from './column-builder';
  *   .build();
  * ```
  */
-export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, number> {
+export class NumberColumnBuilder<
+  TData = unknown,
+  TValue extends number = number,
+> extends ColumnBuilder<TData, TValue> {
   constructor() {
     super('number');
+  }
+
+  /**
+   * Set the data accessor function.
+   *
+   * Rebinds the builder's value type to the accessor's return type, so
+   * subsequent chained methods see the narrowed numeric type.
+   *
+   * @param accessor - Function that extracts the column value from row data
+   * @returns A `NumberColumnBuilder` rebound to the accessor's return type
+   */
+  override accessor<V extends number>(accessor: (data: TData) => V): NumberColumnBuilder<TData, V> {
+    this.config.accessor = accessor as unknown as (data: TData) => TValue;
+    return this as unknown as NumberColumnBuilder<TData, V>;
   }
 
   /**
@@ -90,7 +108,7 @@ export class NumberColumnBuilder<TData = unknown> extends ColumnBuilder<TData, n
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
     this.config.meta = {
       ...this.config.meta,
       range: { min, max, step },

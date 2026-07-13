@@ -17,6 +17,7 @@ import { ColumnBuilder } from './column-builder';
  * option columns, including status, priority, and category configurations.
  *
  * @template TData - The type of row data
+ * @template TValue - The type of column value (defaults to `string`; narrowed by `.accessor()`)
  *
  * @example
  * ```typescript
@@ -32,9 +33,26 @@ import { ColumnBuilder } from './column-builder';
  *   .build();
  * ```
  */
-export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, string> {
+export class OptionColumnBuilder<
+  TData = unknown,
+  TValue extends string = string,
+> extends ColumnBuilder<TData, TValue> {
   constructor() {
     super('option');
+  }
+
+  /**
+   * Set the data accessor function.
+   *
+   * Rebinds the builder's value type to the accessor's return type, so
+   * subsequent chained methods see the narrowed string type.
+   *
+   * @param accessor - Function that extracts the column value from row data
+   * @returns An `OptionColumnBuilder` rebound to the accessor's return type
+   */
+  override accessor<V extends string>(accessor: (data: TData) => V): OptionColumnBuilder<TData, V> {
+    this.config.accessor = accessor as unknown as (data: TData) => TValue;
+    return this as unknown as OptionColumnBuilder<TData, V>;
   }
 
   /**
@@ -87,7 +105,7 @@ export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, s
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
     this.config.meta = {
       ...this.config.meta,
       options: {
@@ -182,7 +200,7 @@ export class OptionColumnBuilder<TData = unknown> extends ColumnBuilder<TData, s
       validation,
     };
 
-    this.config.filter = { ...this.config.filter, ...filterConfig };
+    this.config.filter = { ...this.config.filter, ...filterConfig } as FilterConfig<TValue>;
     this.config.meta = {
       ...this.config.meta,
       options: {
