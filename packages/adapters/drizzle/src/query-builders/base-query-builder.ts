@@ -79,6 +79,27 @@ export interface DialectDb {
 }
 
 /**
+ * Stringify a primary-key value for use as a `Map` key, consistently
+ * between phase 1's key array and phase 2's per-row primary-key field.
+ * Mirrors the primitive-vs-complex-type handling in
+ * `DataTransformer.groupByMainTableKey` (adapters-toolkit) so the two
+ * stay in sync even though they run in separate packages.
+ */
+function fanOutKeyToString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
  * Two-phase pagination wrapper for fan-out (one-to-many/array) joins (plan
  * 020, ADAPTER-03). Implements {@link QueryBuilderWithJoins} so it's a
  * drop-in `dataQuery` for `buildCompleteQuery`'s callers, which only ever
@@ -92,11 +113,33 @@ export interface DialectDb {
  * filtered to exactly those keys, no LIMIT/OFFSET) runs and its rows --
  * every joined row for exactly one page's worth of primary keys -- are
  * returned for the existing flat-to-nested transform to group.
+ *
+ * Phase 1's key order is the *authoritative* page order: it's derived from
+ * `GROUP BY pk` with `ORDER BY` aggregates (MIN/MAX) of the requested sort
+ * columns plus a `pk asc` tiebreaker (see `buildFanOutKeyPageQuery`), which
+ * is the only ordering that's actually consistent with "one row per primary
+ * key". Phase 2 re-applies plain `applySorting` on raw, non-aggregated
+ * columns with no primary-key tiebreaker -- correct for ordering *within* a
+ * primary key's group of related rows, but not a reliable source of
+ * cross-primary-key order: it can disagree with phase 1 outright under
+ * multi-column sorts (aggregating MIN/MAX per column independently is not
+ * the same as sorting by the tuple of columns from one row), and under
+ * sort-value ties or empty `sorting` it has no explicit tiebreaker/`ORDER
+ * BY` at all, leaving primary-row order to depend on the database's
+ * unspecified default row order.
+ *
+ * So after phase 2 returns, its flat rows are stably reordered here to
+ * match phase 1's key order exactly (`Array.prototype.sort` is a stable
+ * sort per spec, so rows sharing a primary key keep the relative order
+ * phase 2's `ORDER BY` gave them -- phase 2 sorting still determines
+ * intra-group order, e.g. which of a user's posts comes first). This is
+ * O(n) with a key-to-index map and issues no extra queries.
  */
 class FanOutPaginatedQuery implements QueryBuilderWithJoins {
   constructor(
     private readonly phase1Query: QueryBuilderWithJoins,
-    private readonly buildPhase2Query: (keys: unknown[]) => QueryBuilderWithJoins
+    private readonly buildPhase2Query: (keys: unknown[]) => QueryBuilderWithJoins,
+    private readonly primaryKeyColumnName: string
   ) {}
 
   leftJoin(_table: AnyTableType, _condition: SQL | SQLWrapper): QueryBuilderWithJoins {
@@ -138,7 +181,25 @@ class FanOutPaginatedQuery implements QueryBuilderWithJoins {
     }
 
     const keys = keyRows.map((row) => (row as { pk: unknown }).pk);
-    return this.buildPhase2Query(keys).execute();
+    const phase2Rows = await this.buildPhase2Query(keys).execute();
+
+    // Reconcile phase-2 row order with phase 1's authoritative key order
+    // (see class docstring). `Array.prototype.sort` is a stable sort, so
+    // rows for the same primary key retain the relative order phase 2's
+    // `ORDER BY` produced.
+    const keyOrder = new Map<string, number>();
+    keys.forEach((key, index) => {
+      keyOrder.set(fanOutKeyToString(key), index);
+    });
+
+    const unknownKeyOrder = keys.length;
+    return [...phase2Rows].sort((a, b) => {
+      const aOrder =
+        keyOrder.get(fanOutKeyToString(a[this.primaryKeyColumnName])) ?? unknownKeyOrder;
+      const bOrder =
+        keyOrder.get(fanOutKeyToString(b[this.primaryKeyColumnName])) ?? unknownKeyOrder;
+      return aOrder - bOrder;
+    });
   }
 }
 
@@ -861,7 +922,7 @@ export abstract class BaseQueryBuilder {
       return phase2Query;
     };
 
-    return new FanOutPaginatedQuery(phase1Query, buildPhase2Query);
+    return new FanOutPaginatedQuery(phase1Query, buildPhase2Query, primaryKeyInfo.columnName);
   }
 
   /**
