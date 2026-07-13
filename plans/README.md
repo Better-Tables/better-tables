@@ -24,7 +24,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Gates on main**: root typecheck 10/10 turbo tasks · core 1066/0 · toolkit
   86/86 · drizzle 490 pass / 3 skip / 3 env-dependent (need DB URLs; CI provides)
   · CLI 127/0.
-- **In flight**: nothing — AND/OR is complete end-to-end (URL → state → adapter → SQL).
+- **In flight**: 018 (instance API runtime — executor running).
 - **Next up**: 018 (`betterTables()`/`defineTable` runtime).
 
 ## Outstanding
@@ -60,6 +60,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 015 | FilterNode core + `c2:` wire format | `39ba6d3` | Types/guards/normalize, versioned URL format w/ `c:` read fallback, CORE-06 killed — landed via 016's chain |
 | 016 | FilterNode state layer | `39ba6d3` | Tree-preserving state + URL sync, flat UI unchanged, drizzle reject-guard (§1.5), core 1066/0 |
 | 007 | Extract adapters-toolkit | `81ca876` | Toolkit born (86 tests); filter-handler 2169→388 (router/emitter, zero test edits); dialects −855 lines; ADAPTER-04 fixed |
+| 010 | UI hooks correctness + first UI test harness | `cf80ce7` | Maintainer-executed; reviewer post-merge verified: dead-ref code gone, `FetchDataParams.signal` added, harness + 7 tests (smoke + 6 characterization), CI test-ui job wired |
 | 017 | Drizzle FilterNode group translation | post-`dde0070` merge | Placement (a): generic walk in toolkit router (Prisma inherits it); joins fed from all tree leaves; count/data agreement proven by paginated walk; `supportsFilterGroups: true`, depth cap 3; 7 row-set integration tests |
 
 ## Carry-forward notes for the 0.6 release
