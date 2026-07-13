@@ -58,7 +58,6 @@ describe('PostgresQueryBuilder', () => {
       relationshipManager = new RelationshipManager(schema, relationships);
 
       // Initialize query builder with mock database
-      // @ts-expect-error - Mock database for unit tests, type mismatch expected
       queryBuilder = new PostgresQueryBuilder(mockDb, schema, relationshipManager);
     });
 
@@ -98,7 +97,6 @@ describe('PostgresQueryBuilder', () => {
 
         const arrayRelationshipManager = new RelationshipManager(testSchema, arrayRelationships);
         const arrayQueryBuilder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           mockDb as unknown as PostgresJsDatabase<typeof testSchema>,
           testSchema,
           arrayRelationshipManager
@@ -309,7 +307,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithoutQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -357,7 +354,6 @@ describe('PostgresQueryBuilder', () => {
 
         const arrayRelationshipManager = new RelationshipManager(testSchema, arrayRelationships);
         const arrayBuilder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           mockDb as unknown as PostgresJsDatabase<typeof testSchema>,
           testSchema,
           arrayRelationshipManager
@@ -421,7 +417,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -445,7 +440,6 @@ describe('PostgresQueryBuilder', () => {
 
       it('should only include requested columns in query', () => {
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           mockDb as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -526,7 +520,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -596,7 +589,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -661,7 +653,6 @@ describe('PostgresQueryBuilder', () => {
 
         const mixedRelationshipManager = new RelationshipManager(testSchema, mixedRelationships);
         const mixedBuilder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           mockDb as unknown as PostgresJsDatabase<typeof testSchema>,
           testSchema,
           mixedRelationshipManager
@@ -704,7 +695,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -754,7 +744,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -807,7 +796,6 @@ describe('PostgresQueryBuilder', () => {
         } as unknown as PostgresJsDatabase<typeof schema>;
 
         const builder = new PostgresQueryBuilder(
-          // @ts-expect-error - Mock database for unit tests, type mismatch expected
           dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
           schema,
           relationshipManager
@@ -916,7 +904,6 @@ describe('PostgresQueryBuilder', () => {
       relationshipManager = new RelationshipManager(schema, relationships);
 
       // Initialize query builder
-      // @ts-expect-error - Type mismatch between test schema and actual schema types
       queryBuilder = new PostgresQueryBuilder(db, schema, relationshipManager);
     });
 
@@ -1087,7 +1074,6 @@ describe('PostgresQueryBuilder', () => {
         };
 
         const arrayRelationshipManager = new RelationshipManager(schemaPg, arrayRelationships);
-        // @ts-expect-error - Type mismatch between test schema and actual schema types
         const arrayQueryBuilder = new PostgresQueryBuilder(db, schemaPg, arrayRelationshipManager);
 
         const context = arrayRelationshipManager.buildQueryContext(

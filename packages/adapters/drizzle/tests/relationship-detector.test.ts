@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { RelationshipDetector } from '../src/relationship-detector';
 import { RelationshipManager } from '../src/relationship-manager';
-import type { RelationshipMap } from '../src/types';
+import type { RelationshipMap, RelationshipPath } from '../src/types';
 import { relationsSchema, schema } from './helpers/test-schema';
 import { createMockArrayColumn, schemaPg } from './helpers/test-schema-array-fk';
 
@@ -1072,14 +1072,19 @@ describe('RelationshipDetector - mergeManualRelationships', () => {
     detector.mergeManualRelationships(manualRelationships);
 
     // Verify relationships are actually merged into the detector
-    const mergedRelationships = Object.fromEntries(detector.relationships);
+    // (structural cast: `relationships` is private and this test observes internal state)
+    const mergedRelationships = Object.fromEntries(
+      (detector as unknown as { relationships: Map<string, RelationshipPath> }).relationships
+    );
     expect(mergedRelationships['users.customProfile']).toBeDefined();
     expect(mergedRelationships['users.customProfile']?.joinType).toBe('inner');
     expect(mergedRelationships['users.customProfile']?.nullable).toBe(false);
 
     // Verify relationship graph is updated (for graph-based methods)
     // The graph should now include the manual relationship
-    const graph = detector.relationshipGraph;
+    // (structural cast: `relationshipGraph` is private and this test observes internal state)
+    const graph = (detector as unknown as { relationshipGraph: Map<string, Set<string>> })
+      .relationshipGraph;
     expect(graph.has('users')).toBe(true);
     expect(graph.has('profiles')).toBe(true);
     // Check that bidirectional edges are added

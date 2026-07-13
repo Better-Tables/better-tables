@@ -5,7 +5,7 @@ import { boolean, integer, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-c
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
-import type { DrizzleDatabase } from '../src/types';
+import type { DrizzleDatabase, RelationshipMap } from '../src/types';
 import type { UserWithRelations } from './helpers';
 import {
   closePostgresDatabase,
@@ -70,7 +70,9 @@ describe('DrizzleAdapter - PostgreSQL [Unit Tests]', () => {
       // Verify that relationships object exists (auto-detection ran)
       // This test verifies the fix: auto-detection should run even when relations config is omitted
       // The key fix was ensuring detectFromSchema({}, schema) is called instead of skipping detection
-      const relationships = adapter.relationships;
+      // (structural cast: `relationships` is private and this test observes internal state)
+      const relationships = (adapter as unknown as { relationships: RelationshipMap })
+        .relationships;
       expect(relationships).toBeDefined();
       expect(typeof relationships).toBe('object');
 
@@ -227,7 +229,7 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       await adapter.deleteRecord('99');
       const result = await adapter.fetchData({});
       expect(result.data).toHaveLength(3); // Original 3 users remain
-      expect(result.data.find((u: { id: number }) => u.id === 99)).toBeUndefined();
+      expect((result.data as UserWithRelations[]).find((u) => u.id === 99)).toBeUndefined();
     });
 
     it('should bulk update records', async () => {
