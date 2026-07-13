@@ -26,7 +26,7 @@ response, with URL state sync.
 
 | Purpose | Command | Notes |
 |---|---|---|
-| Install | `bun install` (root) | — |
+| Install | `bun install` (root) | Workspace catalog pins shared React, Tailwind, TypeScript, and tooling versions. |
 | Typecheck | `bun run typecheck` (root) | Runs `tsc --noEmit` in every package via turbo. |
 | Build | `bun run build` (root) | Runs all packages and apps via turbo. Use `bun run build --filter=<pkg>` to scope. |
 | Test (all) | `bun run test` (root) | Runs each package's `bun test`. |

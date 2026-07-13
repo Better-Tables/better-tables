@@ -33,7 +33,7 @@
   },
   "peerDependencies": {
     "@better-tables/core": "workspace:*",
-    "better-sqlite3": "^12.4.6",
+    "better-sqlite3": "catalog:",
     "drizzle-orm": ">=0.44.0 <0.46.0",
     "mysql2": "^3.12.0",
     "postgres": "^3.4.0"
@@ -51,12 +51,12 @@
   },
   "devDependencies": {
     "@better-tables/core": "workspace:*",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "better-sqlite3": "^12.4.6",
+    "better-sqlite3": "catalog:",
     "dotenv": "^17.2.3",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tsdown": "catalog:",

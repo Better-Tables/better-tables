@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.0.9",
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },
