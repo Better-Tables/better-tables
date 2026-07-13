@@ -18,12 +18,13 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 20 plans (001–007, 010–020, 022–023, 028) — verification
+- **Done and merged**: 21 plans (001–007, 010–020, 022–024, 028) — verification
   baseline, CI gating, URL hardening, type-inference stack, FilterNode through
   core state + Drizzle AND/OR, adapter toolkit extraction, UI hooks harness,
   both design docs, instance API, migration guide, real timezone conversion,
-  shared manager emitter, loud relationship inference, join pagination fix.
-- **Gates on main**: root typecheck 11/11 · core 1107/0 · toolkit 96/0 · drizzle
+  shared manager emitter, loud relationship inference, join pagination fix,
+  virtualization offsets.
+- **Gates on main**: root typecheck 11/11 · core 1118/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 127/0 · UI 7/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
   pre-publish steps are the maintainer runbook at the bottom of `MIGRATION.md`
@@ -31,16 +32,15 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 - **Maintainer backlog sweeps (committed at `cc7d5a3`, parallel to 018)**: CORE-02, CORE-04
   (locale + honest TZ; real conversion deferred), CORE-07, ADAPTER-07, ADAPTER-05
   alias-scan slice, date-presets Biome hygiene.
-- **In flight**: 021, 024, 025, 027. **Next**: 026←023+024.
+- **In flight**: 021, 025, 026, 027.
 
 ## Outstanding
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
 | 021 | Filter-aware facets + distinct facet counts (ADAPTER-06) | 020 (DONE) | IN FLIGHT — wave 2; rides 0.6 |
-| 024 | Virtualization offsets: stale positions + O(n) scans (CORE-03/09) | 023 (DONE) | IN FLIGHT — wave 2 |
 | 025 | UI render perf: memo rows/cells, stable observers, effect churn (UI-05/06/08) | 010 (DONE) | IN FLIGHT — wave 2 |
-| 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | **023+024 merged** (churn) | PLANNED — wave 3 |
+| 026 | noUncheckedIndexedAccess + exactOptionalPropertyTypes in core/ui/cli (DX-10) | 023+024 (DONE) | IN FLIGHT — wave 3 |
 | 027 | Null-filter semantics: includeNull satisfies value requirement (CORE-10) | 023 (DONE) | IN FLIGHT — Option A; wave 2 |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
@@ -82,6 +82,7 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
 | 023 | Shared subscription emitter | `f657c6c` | `Subscribable` base; six managers migrated; log-never-swallow + snapshot notify; core 1107/0 |
 | 022 | Relationship inference honesty | merged 2026-07-13 | Zero-match throws SchemaError + suggestions; Strategy 3 FK-verified; toolkit 96/0 |
 | 020 | Join pagination under-fill | `8e15c00` | Two-phase fan-out pagination; many-to-one path unchanged; SQLite 520/0 |
+| 024 | Virtualization offset correctness | `e68b9fd` | Lazy prefix offsets; no stale start/end; O(log n) position lookup; core 1118/0 |
 
 ## Carry-forward notes for the 0.6 release
 
@@ -124,8 +125,8 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
   present-but-wrong-type values; empty/missing still `undefined` for partial UI.
 - **CORE-02**: ~~percentage formatter `value > 1` heuristic~~ — **FIXED (2026-07-13)**:
   wires `meta.percentage.format` (`decimal` | `percentage`); default `decimal`.
-- **CORE-03** (M): dynamic row measurement leaves downstream offsets stale
-  (virtualization-manager recalculates only one row). **PLANNED as 024** (with CORE-09).
+- **CORE-03** (M): ~~dynamic row measurement leaves downstream offsets stale~~ —
+  **FIXED in 024** (with CORE-09).
 - **CORE-04** (M): ~~`locale` no-op + TZ label without conversion~~ —
   **FIXED (2026-07-13 + 028)**: locale wired; TZ suffix removed; real
   conversion via `@date-fns/tz` (builder `'UTC'` default now honored —
@@ -137,8 +138,7 @@ Status key: still open unless noted. Struck / FIXED lines stay so nobody re-file
   `state_changed`; per-field events preserved.
 - **CORE-08** (M): six managers duplicate subscribe/notify with drifted error
   policy; extract an emitter base. **FIXED in 023.**
-- **CORE-09** (L): virtualization offset math O(n) per lookup; prefix-sum/Fenwick
-  cache. **PLANNED as 024** (with CORE-03; lazy prefix + dirty watermark).
+- **CORE-09** (L): ~~virtualization offset math O(n) per lookup~~ — **FIXED in 024.**
 - **CORE-10** (M): `includeNull`/`supportsNull` dead in validation — null-only
   filters can't pass strict mode. **PLANNED as 027 — Option A chosen
   (maintainer 2026-07-13)**: includeNull satisfies the value requirement;
