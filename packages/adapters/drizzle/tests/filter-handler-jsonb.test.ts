@@ -124,30 +124,24 @@ describe('FilterHandler - JSONB Support', () => {
     });
 
     it('should handle JSONB field with isNull operator', () => {
-      // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
-      // extraction test intentionally exercises it (SQL NULL-checking
-      // works regardless of core's per-type operator taxonomy).
-      const filter = {
+      const filter: FilterState = {
         columnId: 'survey.title',
         operator: 'isNull',
         values: [],
         type: 'text',
-      } as unknown as FilterState;
+      };
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
     });
 
     it('should handle JSONB field with isNotNull operator', () => {
-      // `isNotNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
-      // extraction test intentionally exercises it (SQL NULL-checking
-      // works regardless of core's per-type operator taxonomy).
-      const filter = {
+      const filter: FilterState = {
         columnId: 'survey.title',
         operator: 'isNotNull',
         values: [],
         type: 'text',
-      } as unknown as FilterState;
+      };
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
@@ -196,15 +190,12 @@ describe('FilterHandler - JSONB Support', () => {
     });
 
     it('should handle JSON field with isNull operator', () => {
-      // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
-      // extraction test intentionally exercises it (SQL NULL-checking
-      // works regardless of core's per-type operator taxonomy).
-      const filter = {
+      const filter: FilterState = {
         columnId: 'survey.title',
         operator: 'isNull',
         values: [],
         type: 'text',
-      } as unknown as FilterState;
+      };
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
@@ -253,15 +244,12 @@ describe('FilterHandler - JSONB Support', () => {
     });
 
     it('should handle JSON field with isNull operator', () => {
-      // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
-      // extraction test intentionally exercises it (SQL NULL-checking
-      // works regardless of core's per-type operator taxonomy).
-      const filter = {
+      const filter: FilterState = {
         columnId: 'survey.title',
         operator: 'isNull',
         values: [],
         type: 'text',
-      } as unknown as FilterState;
+      };
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
@@ -681,11 +669,11 @@ describe('FilterHandler - JSONB Support', () => {
     const relationshipManager = new RelationshipManager(schema, {});
     const handler = new FilterHandler(schema, relationshipManager, 'postgres');
 
-    // `notEquals`/`isNull`/`isNotNull` aren't in core's TEXT_OPERATORS (plan
-    // 031 Step 1), but this adapter's own `supportedOperators.text`
-    // intentionally lists them (see the earlier describe blocks in this
-    // file) -- `as unknown as FilterState[]` preserves the exact runtime
-    // values for the whole mixed list.
+    // `notEquals` isn't in core's TEXT_OPERATORS (plan 031 Step 1) -- it's a
+    // number/custom operator, not universal -- but this adapter's own
+    // `supportedOperators.text` intentionally lists it (plain SQL `<>`).
+    // `isNull`/`isNotNull` ARE valid text operators now; `notEquals` is the
+    // one entry that keeps this list's `as unknown as FilterState[]` cast.
     const textOperators = [
       { columnId: 'survey.title', operator: 'contains', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'equals', values: ['test'], type: 'text' },

@@ -64,6 +64,10 @@ describe('Filter Operators', () => {
       expect(operators).toContain('endsWith');
       expect(operators).toContain('isEmpty');
       expect(operators).toContain('isNotEmpty');
+      // Universal null operators -- `isEmpty` (empty string) is NOT the same
+      // as `isNull` (SQL NULL); a nullable text column needs both.
+      expect(operators).toContain('isNull');
+      expect(operators).toContain('isNotNull');
     });
 
     it('should have proper validation for text operators', () => {
@@ -504,6 +508,27 @@ describe('Filter Operators', () => {
         };
         expect(validText.operator).toBe('contains');
 
+        // The universal null operators are legal on 'text' -- `isEmpty`
+        // (empty string) is NOT `isNull` (SQL NULL), so a nullable text
+        // column needs `isNull`/`isNotNull` too. These must COMPILE.
+        const textIsNull: FilterState = {
+          columnId: 'notes',
+          type: 'text',
+          operator: 'isNull',
+          values: [],
+        };
+        expect(textIsNull.operator).toBe('isNull');
+
+        const textIsNotNull: FilterState = {
+          columnId: 'notes',
+          type: 'text',
+          operator: 'isNotNull',
+          values: [],
+        };
+        expect(textIsNotNull.operator).toBe('isNotNull');
+
+        // ...but adding the null operators must NOT have widened 'text' to
+        // accept everything: an option-only operator is still rejected.
         // @ts-expect-error - 'isAnyOf' is an option-only operator, not legal for 'text'
         const invalidText: FilterState = {
           columnId: 'name',

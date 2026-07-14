@@ -61,6 +61,22 @@ const TEXT_OPERATORS = [
     supportsNull: false,
     validate: (values: unknown[]) => values.length === 0,
   },
+  {
+    key: 'isNull',
+    label: 'Is null',
+    description: 'No value set',
+    valueCount: 0,
+    supportsNull: true,
+    validate: (values: unknown[]) => values.length === 0,
+  },
+  {
+    key: 'isNotNull',
+    label: 'Is not null',
+    description: 'Has a value',
+    valueCount: 0,
+    supportsNull: false,
+    validate: (values: unknown[]) => values.length === 0,
+  },
 ] as const;
 
 /**

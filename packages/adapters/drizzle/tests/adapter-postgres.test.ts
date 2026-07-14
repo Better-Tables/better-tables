@@ -309,11 +309,12 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
 
     it('should filter by text notEquals', async () => {
       const result = await adapter.fetchData({
-        // `notEquals`/`isNull`/`isNotNull` aren't in core's TEXT_OPERATORS
-        // (plan 031 Step 1), but this adapter's own `supportedOperators.text`
-        // intentionally lists them (plain SQL `<>`/`IS (NOT) NULL` work for
-        // any column type) -- `as unknown as FilterState[]` preserves that
-        // adapter-level behavior/coverage unchanged.
+        // `notEquals` isn't in core's TEXT_OPERATORS (plan 031 Step 1) -- it's
+        // a number/custom operator, not universal -- but this adapter's own
+        // `supportedOperators.text` intentionally lists it (plain SQL `<>`).
+        // `as unknown as FilterState[]` preserves that adapter-level coverage.
+        // (`isNull`/`isNotNull`, tested below, ARE valid text operators and
+        // need no cast.)
         filters: [
           { columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] },
         ] as unknown as FilterState[],
@@ -328,18 +329,14 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
 
     it('should filter by text isNull', async () => {
       const result = await adapter.fetchData({
-        filters: [
-          { columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] },
-        ] as unknown as FilterState[],
+        filters: [{ columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] }],
       });
       expect(result.data.length).toBeGreaterThanOrEqual(1); // At least user without profile (Bob)
     });
 
     it('should filter by text isNotNull', async () => {
       const result = await adapter.fetchData({
-        filters: [
-          { columnId: 'profile.bio', type: 'text', operator: 'isNotNull', values: [] },
-        ] as unknown as FilterState[],
+        filters: [{ columnId: 'profile.bio', type: 'text', operator: 'isNotNull', values: [] }],
       });
       expect(result.data.length).toBeGreaterThanOrEqual(2); // Users with profiles
     });

@@ -291,20 +291,14 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
     it('should filter by text isNull', async () => {
       const result = await adapter.fetchData({
-        // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1) -- see the
-        // `notEquals` test above for why this adapter still supports it.
-        filters: [
-          { columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] },
-        ] as unknown as FilterState[],
+        filters: [{ columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] }],
       });
       expect(result.data.length).toBeGreaterThanOrEqual(1); // At least user without profile (Bob)
     });
 
     it('should filter by text isNotNull', async () => {
       const result = await adapter.fetchData({
-        filters: [
-          { columnId: 'profile.bio', type: 'text', operator: 'isNotNull', values: [] },
-        ] as unknown as FilterState[],
+        filters: [{ columnId: 'profile.bio', type: 'text', operator: 'isNotNull', values: [] }],
       });
       expect(result.data.length).toBeGreaterThanOrEqual(2); // Users with profiles
     });
