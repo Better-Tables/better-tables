@@ -877,6 +877,29 @@ export interface DrizzleAdapterOptions {
    */
   defaultMutationTable?: string;
 
+  /**
+   * The table that READ methods (fetchData, getFilterOptions,
+   * getFacetedValues, getMinMaxValues) should target when a call provides
+   * neither `columns` nor a per-call `primaryTable` to disambiguate.
+   *
+   * Required when the schema contains more than one table and callers rely
+   * on this no-signal case — those reads throw a `SchemaError` instead of
+   * silently guessing "the first table" (plan 030 / finding 9). Prefer
+   * passing `columns` or `primaryTable` per call, or querying through a
+   * table-scoped surface, where possible; this option is the adapter-level
+   * fallback for callers that can't. Schemas with exactly one table don't
+   * need this set. A per-call `primaryTable` always takes precedence over
+   * this default.
+   *
+   * @example
+   * ```typescript
+   * const adapter = drizzleAdapter(db, {
+   *   options: { defaultPrimaryTable: 'users' }
+   * });
+   * ```
+   */
+  defaultPrimaryTable?: string;
+
   /** Query caching configuration */
   cache?: {
     enabled: boolean;

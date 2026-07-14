@@ -420,10 +420,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   ): Promise<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>> {
     const startTime = Date.now();
 
-    try {
-      // Determine primary table - use explicit if provided, otherwise use resolver
-      const primaryTable = this.primaryTableResolver.resolve(params.columns, params.primaryTable);
+    // Resolved before the try block so a multi-table-ambiguity SchemaError
+    // surfaces to the caller as-is, rather than being wrapped in a
+    // QueryError below (same reasoning as resolveMutationTable's callers).
+    const primaryTable = this.resolvePrimaryTableForRead(params.columns, params.primaryTable);
 
+    try {
       // Get computed fields for this table
       const tableComputedFields = this.computedFields[primaryTable] || [];
 
@@ -761,9 +763,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Get available filter options for a column
    */
   async getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]> {
+    // Resolved before the try block so a SchemaError (e.g. no table has a
+    // matching column) surfaces as-is instead of being wrapped below.
+    const primaryTable = this.resolvePrimaryTableForRead([columnId]);
     try {
-      // Determine primary table from the column
-      const primaryTable = this.primaryTableResolver.resolve([columnId]);
       const facetFilters = this.buildFacetFilters(columnId, params);
       const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable, facetFilters);
       const results = await query.execute();
@@ -788,9 +791,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     columnId: string,
     params?: FacetQueryParams
   ): Promise<Map<string, number>> {
+    // Resolved before the try block so a SchemaError (e.g. no table has a
+    // matching column) surfaces as-is instead of being wrapped below.
+    const primaryTable = this.resolvePrimaryTableForRead([columnId]);
     try {
-      // Determine primary table from the column
-      const primaryTable = this.primaryTableResolver.resolve([columnId]);
       const facetFilters = this.buildFacetFilters(columnId, params);
       const query = this.queryBuilder.buildAggregateQuery(
         columnId,
@@ -820,9 +824,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Get min/max values for number columns
    */
   async getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]> {
+    // Resolved before the try block so a SchemaError (e.g. no table has a
+    // matching column) surfaces as-is instead of being wrapped below.
+    const primaryTable = this.resolvePrimaryTableForRead([columnId]);
     try {
-      // Determine primary table from the column
-      const primaryTable = this.primaryTableResolver.resolve([columnId]);
       const facetFilters = this.buildFacetFilters(columnId, params);
       const query = this.queryBuilder.buildMinMaxQuery(columnId, primaryTable, facetFilters);
       const results = await query.execute();
@@ -838,6 +843,63 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         { columnId, error }
       );
     }
+  }
+
+  /**
+   * Resolve the primary table for a READ entry point (fetchData,
+   * getFilterOptions, getFacetedValues, getMinMaxValues, getJoinCount).
+   *
+   * Mirrors {@link resolveMutationTable}'s throw precedent (MIGRATION.md
+   * §7) for reads: when the schema has more than one table and neither
+   * `columns`, a per-call `primaryTable`, nor `options.defaultPrimaryTable`
+   * disambiguates which table to query, silently assuming "the first
+   * table" would return plausible-but-wrong rows (plan 029 finding 9).
+   * Throw instead.
+   *
+   * Single-table schemas remain zero-config (identical to
+   * `resolveMutationTable`). `PrimaryTableResolver.resolve`'s own
+   * no-columns `warnAssumedTable` fallback (plan 022) is intentionally left
+   * in place for callers that don't go through this method — see plan 030
+   * Step 2's decision to fix at the read entry points rather than inside
+   * the shared resolver.
+   *
+   * @private
+   * @throws {SchemaError} If the schema has multiple tables and neither
+   *   `columns` nor an effective `primaryTable` (per-call, then
+   *   `options.defaultPrimaryTable`) disambiguates, or if the resolved
+   *   explicit table / matched columns don't resolve (delegated to
+   *   {@link PrimaryTableResolver.resolve}).
+   */
+  private resolvePrimaryTableForRead(columns?: string[], explicitPrimaryTable?: string): string {
+    // An explicit per-call `primaryTable`, or non-empty `columns`, already
+    // disambiguates (or the resolver throws its own, more specific error --
+    // e.g. an unknown explicit table, or a zero-column-match typo). Let
+    // that existing behavior run unmodified; `defaultPrimaryTable` must not
+    // override a real column-based match.
+    if (explicitPrimaryTable || (columns && columns.length > 0)) {
+      return this.primaryTableResolver.resolve(columns, explicitPrimaryTable);
+    }
+
+    // No columns and no per-call primaryTable: fall back to the adapter's
+    // configured default, if any.
+    if (this.options?.defaultPrimaryTable) {
+      return this.primaryTableResolver.resolve(undefined, this.options.defaultPrimaryTable);
+    }
+
+    // No signal at all. Single-table schemas stay zero-config; multi-table
+    // schemas must not silently assume "the first table" (plan 029 finding
+    // 9) -- throw instead of delegating to the resolver's warn-only
+    // `getFirstTable()` fallback.
+    const tableNames = Object.keys(this.schema);
+    if (tableNames.length > 1) {
+      throw new SchemaError(
+        "Multiple tables in schema — set 'primaryTable' (per call), 'defaultPrimaryTable' " +
+          "(in drizzleAdapter options), or pass 'columns' that disambiguate, to select which " +
+          'table to query',
+        { availableTables: tableNames }
+      );
+    }
+    return this.primaryTableResolver.resolve(columns, explicitPrimaryTable);
   }
 
   /**
@@ -1463,8 +1525,11 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       computedFieldFilters?: FilterState[];
     }
   ): number {
-    // Determine primary table from params - use explicit if provided
-    const primaryTable = this.primaryTableResolver.resolve(params.columns, params.primaryTable);
+    // Determine primary table from params - use explicit if provided.
+    // Routed through the same throwing helper as fetchData for defense in
+    // depth; in practice this is always called downstream of fetchData's
+    // own (already-validated) resolution, so this rarely fires here directly.
+    const primaryTable = this.resolvePrimaryTableForRead(params.columns, params.primaryTable);
 
     // Filter out computed fields from columns and sorts before building query context
     // Computed fields are handled separately and shouldn't be resolved as column paths

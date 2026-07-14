@@ -208,6 +208,12 @@ export function createSQLiteAdapter(
     driver: 'sqlite',
     autoDetectRelationships: true,
     relations: relationsSchema,
+    // `schema` has multiple tables (users, profiles, posts, comments, surveys);
+    // most fetchData/facet calls in the shared suite implicitly target `users`
+    // with no columns, so name it explicitly now that multi-table reads with
+    // no disambiguating signal throw (plan 030 finding 9) instead of silently
+    // assuming the first table.
+    options: { defaultPrimaryTable: 'users' },
   };
 
   return new DrizzleAdapterClass(config);
@@ -440,7 +446,10 @@ export function createPostgresAdapter(
     // `schema` has multiple tables (users, profiles, posts, comments, surveys);
     // mutation tests below target `users`, so it must be named explicitly now
     // that mutation routing no longer falls back to the first schema table.
-    options: { defaultMutationTable: 'users' },
+    // `defaultPrimaryTable` covers the analogous read-side case (plan 030
+    // finding 9): most fetchData/facet calls here implicitly target `users`
+    // with no columns.
+    options: { defaultMutationTable: 'users', defaultPrimaryTable: 'users' },
   };
 
   return new DrizzleAdapterClass(config);
@@ -702,7 +711,10 @@ export function createMySQLAdapter(
     // `schema` has multiple tables (users, profiles, posts, comments, surveys);
     // mutation tests below target `users`, so it must be named explicitly now
     // that mutation routing no longer falls back to the first schema table.
-    options: { defaultMutationTable: 'users' },
+    // `defaultPrimaryTable` covers the analogous read-side case (plan 030
+    // finding 9): most fetchData/facet calls here implicitly target `users`
+    // with no columns.
+    options: { defaultMutationTable: 'users', defaultPrimaryTable: 'users' },
   };
 
   return new DrizzleAdapterClass(config);
