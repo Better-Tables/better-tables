@@ -1,7 +1,7 @@
 'use client';
 
 import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
-import { getColumnStyle } from '@better-tables/core';
+import { getColumnStyle, getFormatterForType } from '@better-tables/core';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
@@ -141,7 +141,9 @@ function VirtualizedRow<T>({
               maxWidth: colStyle.maxWidth,
             }}
           >
-            {renderCell ? renderCell(value, column, item, index) : String(value || '')}
+            {renderCell
+              ? renderCell(value, column, item, index)
+              : getFormatterForType(column.type, value, column.meta)}
           </TableCell>
         );
       })}
