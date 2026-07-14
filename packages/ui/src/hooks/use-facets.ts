@@ -1,0 +1,203 @@
+'use client';
+
+import type { FilterGroupNode, FilterState, TableAdapter } from '@better-tables/core';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+/** A single faceted option: a distinct value and how many rows match it. */
+export interface FacetOption {
+  value: string;
+  count: number;
+}
+
+export interface UseFacetsOptions<TData = unknown> {
+  /** Table adapter -- must implement `getFacetedValues`/`getMinMaxValues`. */
+  adapter: TableAdapter<TData>;
+
+  /**
+   * Column IDs to fetch checkbox-style faceted value counts for (via
+   * `adapter.getFacetedValues`). May be a fresh array literal on every
+   * render (e.g. `columnIds={['status', 'priority']}`) -- internally
+   * interned by content, no memoization required.
+   */
+  columnIds?: string[];
+
+  /**
+   * Column IDs to fetch a `[min, max]` range for (via
+   * `adapter.getMinMaxValues`) -- typically numeric/date columns. Same
+   * "fresh array literal is fine" guarantee as `columnIds`.
+   */
+  rangeColumnIds?: string[];
+
+  /**
+   * The caller's full, current active filter state. Passed UNMODIFIED to
+   * the adapter for every column queried -- per the `FacetQueryParams`
+   * contract (`@better-tables/core`), self-exclusion (a column's own
+   * filter never narrows its own facet) is the ADAPTER's responsibility,
+   * not this hook's. Do not pre-filter this array per column; that would
+   * fight the adapter's own self-exclusion logic instead of relying on it.
+   * Pass a referentially stable array when possible (e.g. from
+   * `useTableFilters`, which already is one).
+   */
+  filters?: FilterState[] | FilterGroupNode;
+
+  /** Whether to fetch facets automatically. */
+  enabled?: boolean;
+}
+
+export interface UseFacetsResult {
+  /** `columnId -> [{ value, count }, ...]`, converted from the adapter's `Map<string, number>`. */
+  facets: Record<string, FacetOption[]>;
+
+  /** `columnId -> [min, max]`. */
+  ranges: Record<string, [number, number]>;
+
+  /** Loading state (true while any facet/range request is in flight). */
+  loading: boolean;
+
+  /** Error state (the first rejection among the in-flight batch, if any). */
+  error: Error | null;
+
+  /** Manually trigger a refetch of every configured column. */
+  refetch: () => Promise<void>;
+
+  /** Clear error state. */
+  clearError: () => void;
+}
+
+const EMPTY_IDS: string[] = [];
+
+/**
+ * Fetches faceted filter data (checkbox option counts + numeric/date
+ * ranges) for a set of columns, re-fetching whenever the caller's active
+ * `filters` change.
+ *
+ * This is the reusable version of the fetch/self-exclusion/`Map`-to-array
+ * plumbing every faceted-sidebar consumer otherwise hand-builds (plan 032,
+ * finding 7): it owns the `Promise.all` batching, the race guard (only the
+ * newest request's results are applied), and the `Map<string, number>` ->
+ * `FacetOption[]` conversion. It does NOT own filter STATE -- pass your
+ * `filters` in (e.g. from `useTableFilters`) and use the returned
+ * `facets`/`ranges` to render checkboxes/ranges that toggle real filters
+ * via your own `onFiltersChange`/`setFilters`.
+ *
+ * @example
+ * ```tsx
+ * const { filters, setFilters } = useTableFilters('tickets');
+ * const { facets, ranges, loading } = useFacets({
+ *   adapter,
+ *   columnIds: ['status', 'priority'],
+ *   rangeColumnIds: ['reopenCount'],
+ *   filters,
+ * });
+ *
+ * // facets.status -- e.g. [{ value: 'open', count: 42 }, ...] -- reflects
+ * // every OTHER active filter; a `status` filter never narrows
+ * // `facets.status` itself (self-exclusion, proven by the adapter).
+ * ```
+ */
+export function useFacets<TData = unknown>({
+  adapter,
+  columnIds = EMPTY_IDS,
+  rangeColumnIds = EMPTY_IDS,
+  filters,
+  enabled = true,
+}: UseFacetsOptions<TData>): UseFacetsResult {
+  const [facets, setFacets] = useState<Record<string, FacetOption[]>>({});
+  const [ranges, setRanges] = useState<Record<string, [number, number]>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const requestIdRef = useRef(0);
+
+  // columnIds/rangeColumnIds are near-always inline array literals at the
+  // call site (e.g. columnIds={['status', 'priority']}), which is a fresh
+  // reference every render. Intern by content (a space-joined key -- column
+  // IDs can't contain spaces, so this can't collide the way a
+  // delimiter-less join('') could) instead of requiring the caller to
+  // memoize, so fetchFacets's identity -- and the fetch effect below --
+  // doesn't change (and re-fire) on every render.
+  const columnIdsKey = columnIds.join(' ');
+  const rangeColumnIdsKey = rangeColumnIds.join(' ');
+  const stableColumnIds = useMemo(() => columnIds, [columnIdsKey]);
+  const stableRangeColumnIds = useMemo(() => rangeColumnIds, [rangeColumnIdsKey]);
+
+  // Same footgun as above applies to `filters`: an inline `filters={[]}` (or
+  // any other freshly-computed array/tree) would otherwise change identity
+  // every render and re-fire the fetch effect indefinitely. Intern by JSON
+  // content -- filter state is small and this only runs on identity change,
+  // not on every fetch.
+  const filtersKey = JSON.stringify(filters ?? null);
+  const stableFilters = useMemo(() => filters, [filtersKey]);
+
+  const fetchFacets = useCallback(async () => {
+    if (!enabled || (stableColumnIds.length === 0 && stableRangeColumnIds.length === 0)) {
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+
+    setLoading(true);
+    setError(null);
+
+    // `exactOptionalPropertyTypes` forbids `{ filters: undefined }` for an
+    // optional `filters?:` property -- only include the key when it has a
+    // real value.
+    const facetParams = stableFilters !== undefined ? { filters: stableFilters } : {};
+
+    try {
+      const [facetResults, rangeResults] = await Promise.all([
+        Promise.all(
+          stableColumnIds.map(async (columnId) => {
+            const map = await adapter.getFacetedValues(columnId, facetParams);
+            const options: FacetOption[] = Array.from(map, ([value, count]) => ({ value, count }));
+            return [columnId, options] as const;
+          })
+        ),
+        Promise.all(
+          stableRangeColumnIds.map(async (columnId) => {
+            const range = await adapter.getMinMaxValues(columnId, facetParams);
+            return [columnId, range] as const;
+          })
+        ),
+      ]);
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setFacets(Object.fromEntries(facetResults));
+      setRanges(Object.fromEntries(rangeResults));
+    } catch (err) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setError(err instanceof Error ? err : new Error('Failed to fetch facets'));
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [adapter, stableColumnIds, stableRangeColumnIds, stableFilters, enabled]);
+
+  const refetch = useCallback(async () => {
+    await fetchFacets();
+  }, [fetchFacets]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    void fetchFacets();
+  }, [fetchFacets]);
+
+  return {
+    facets,
+    ranges,
+    loading,
+    error,
+    refetch,
+    clearError,
+  };
+}

@@ -1,4 +1,5 @@
 export * from './active-filters';
+export * from './faceted-filter-sidebar';
 export * from './filter-bar';
 export * from './filter-button';
 export * from './filter-dropdown';
