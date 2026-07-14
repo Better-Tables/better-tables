@@ -11,6 +11,7 @@ import {
   type PaginationState,
   type SortingState,
   type TableConfig,
+  type TableDefinition,
   type UrlSyncAdapter,
   type UrlSyncConfig,
 } from '@better-tables/core';
@@ -46,7 +47,20 @@ import { TableProviders } from './table-providers';
  * State is now managed internally with Zustand
  */
 export interface BetterTableProps<TData = unknown>
-  extends Omit<TableConfig<TData>, 'adapter' | 'columns'> {
+  extends Omit<TableConfig<TData>, 'adapter' | 'columns' | 'id' | 'name'> {
+  /**
+   * Unique identifier for the table instance. Optional when `table` is
+   * provided -- defaults to `table.tableName`. One of `id`/`table` is
+   * required.
+   */
+  id?: string;
+
+  /**
+   * Human-readable display name. Optional when `table` is provided --
+   * defaults to `table.tableName`.
+   */
+  name?: string;
+
   /**
    * Column definitions with mixed value types (string, number, Date, etc.).
    *
@@ -56,8 +70,28 @@ export interface BetterTableProps<TData = unknown>
    * `defineColumns<TData>()([...])` from `@better-tables/core`, which infers each
    * column's value type independently and erases it to `unknown` in one audited
    * place.
+   *
+   * Optional when `table` is provided -- defaults to `table.columns`. One of
+   * `columns`/`table` is required.
    */
-  columns: ColumnDefinition<TData, unknown>[];
+  columns?: ColumnDefinition<TData, unknown>[];
+
+  /**
+   * A `defineTable()`/`tables.define()` table definition. Sugar for
+   * `columns={table.columns}`, and defaults `id`/`name` to
+   * `table.tableName` when they're unset. An explicit `columns`/`id`/`name`
+   * prop still wins over `table`'s values when both are given.
+   *
+   * @example
+   * ```tsx
+   * const usersTable = defineTable<typeof tables>()('users', (t) => ({
+   *   columns: [t.text('name'), t.text('email')],
+   * }));
+   *
+   * <BetterTable table={usersTable} data={data} adapter={adapter} />
+   * ```
+   */
+  table?: TableDefinition<string, TData>;
 
   /** Table data */
   data: TData[];
@@ -273,8 +307,10 @@ const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
 
 export function BetterTable<TData = unknown>({
   // Core table config (minus adapter)
-  id,
-  columns,
+  id: idProp,
+  name: nameProp,
+  columns: columnsProp,
+  table,
   features = {},
   rowConfig,
   emptyState,
@@ -316,6 +352,33 @@ export function BetterTable<TData = unknown>({
   isFilterProtected,
   ...props
 }: BetterTableProps<TData>) {
+  // `table` (a defineTable() result) is sugar for columns={table.columns},
+  // and for id/name defaulting to table.tableName -- an explicit
+  // columns/id/name prop still wins when both are given (plan 032,
+  // finding 5). `columns`/`id` were REQUIRED props before `table` existed;
+  // one of columns/table and one of id/table is still required at runtime
+  // (now enforced here instead of by the type system, since both became
+  // optional to allow `table` to satisfy them).
+  const columns = columnsProp ?? table?.columns;
+  if (!columns) {
+    throw new Error(
+      'BetterTable requires either a "columns" prop or a "table" prop (from defineTable()).'
+    );
+  }
+
+  const id = idProp ?? table?.tableName;
+  if (!id) {
+    throw new Error(
+      'BetterTable requires either an "id" prop or a "table" prop (id defaults to table.tableName).'
+    );
+  }
+
+  // `name` isn't otherwise read by BetterTable itself -- it flows through
+  // to the root element below (same as before `table` existed, via
+  // `...props`). Still default it from table.tableName for symmetry with
+  // `id`; re-merged into the spread below since it's destructured here.
+  const name = nameProp ?? table?.tableName;
+
   const {
     filtering = true,
     sorting: sortingEnabled = true,
@@ -767,7 +830,11 @@ export function BetterTable<TData = unknown>({
     (headerContextMenu?.showSortToggle || headerContextMenu?.showColumnVisibility);
 
   const tableContent = (
-    <div className={cn('space-y-4', className)} {...props}>
+    <div
+      className={cn('space-y-4', className)}
+      {...props}
+      {...(name !== undefined && { name })}
+    >
       {/* Screen reader announcement for sort changes */}
       {sortAnnouncement && (
         <div aria-live="polite" aria-atomic="true" className="sr-only">
