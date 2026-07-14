@@ -6,6 +6,7 @@ import {
   type UrlSyncConfig,
 } from '@better-tables/core';
 import { act, render, renderHook, waitFor } from '@testing-library/react';
+import { useTableFilters } from '../../src/hooks/use-table-store';
 import { useTableUrlSync } from '../../src/hooks/use-table-url-sync';
 import { createFakeUrlAdapter, mockColumns, urlFilterForName } from '../helpers/url-sync';
 
@@ -122,5 +123,60 @@ describe('useTableUrlSync', () => {
     }
 
     expect(subscribeCount).toBe(1);
+  });
+
+  it('re-hydrates the store and filter-bar chips after a post-mount URL change (soft nav), with no write-back loop', async () => {
+    createStore();
+    const filtersA = urlFilterForName('alpha');
+    const filtersB = urlFilterForName('bravo');
+    const { adapter, params, setParamsCalls } = createFakeUrlAdapter({ filters: filtersA });
+    const config: UrlSyncConfig = { filters: true };
+
+    function TestComponent() {
+      useTableUrlSync(TABLE_ID, config, adapter);
+      const { filters } = useTableFilters(TABLE_ID);
+      return (
+        <div data-testid="chips">{filters.map((f) => String(f.values?.[0] ?? '')).join(',')}</div>
+      );
+    }
+
+    const { rerender, getByTestId } = render(<TestComponent />);
+
+    // Mount-time hydration: store + chips reflect filters=A.
+    await waitFor(() => expect(getByTestId('chips').textContent).toBe('alpha'));
+
+    const store = getTableStore(TABLE_ID);
+    expect(store).toBeDefined();
+    if (!store) {
+      throw new Error('Expected table store');
+    }
+
+    // Simulate a soft nav: the URL's filters param changes to B behind the
+    // adapter (as it would when Next.js's useSearchParams() reflects a new
+    // router.push), then the component re-renders (as it would on a real
+    // client-side navigation).
+    params.set('filters', filtersB);
+    rerender(<TestComponent />);
+
+    // The store AND the filter-bar chips (rendered from useTableFilters, the
+    // same hook `<FilterBar>` uses) must pick up B -- not just re-fetch data
+    // while chips stay stale.
+    await waitFor(() => expect(getByTestId('chips').textContent).toBe('bravo'));
+    expect(store.getState().manager.getFilters()).toHaveLength(1);
+    expect(store.getState().manager.getFilters()[0]?.values).toEqual(['bravo']);
+
+    // No hydrate -> serialize -> hydrate loop: setParams may be called once
+    // more to echo the already-current state back to the URL (harmless -- a
+    // real adapter would write the same value it just read), but must not
+    // keep growing.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    const callsAfterSettling = setParamsCalls.length;
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    expect(setParamsCalls.length).toBe(callsAfterSettling);
   });
 });
