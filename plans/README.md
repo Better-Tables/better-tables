@@ -18,9 +18,13 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 28 plans (001–007, 010–030, 032) — 020–028 backlog +
-  029 showcase + 030 (multi-table) + 032 (UI integration). **031** (filter
-  type-safety) in flight. **008 Prisma** remains on hold.
+- **Done and merged**: 29 plans (001–007, 010–032) — 020–028 backlog + 029
+  showcase + the full **030–032 findings wave** (multi-table, filter
+  type-safety, UI integration). Only **008 Prisma** remains (on hold). All 17
+  029 findings now shipped or explicitly backlogged.
+- **Gates on main (2026-07-13, post-wave)**: root typecheck 11/11 (cold+warm) ·
+  core 1169/0 · toolkit 96/0 · cli 137/0 · ui 41/0 · drizzle 586/0 SQLite
+  (3 pg/mysql env-DB suites fail without URLs — expected, unchanged).
 - **New capabilities from 030 (multi-table done right)**: `tables.fetchData(table, params)`
   injects `primaryTable` + returns a typed row (no cast); `drizzleAdapter(db)`
   auto-detect now works when SQL table name ≠ JS export key (finding-14 keying
@@ -97,7 +101,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
 | 030 | Multi-table identity, safety throw, typed table-scoped fetch surface, auto-embed, construction validation (findings 9/10/11/14/16) | 018/021/022 (DONE) | **MERGED 2026-07-13** — reviewed (read-resolver preserves 022's warn, throws only multi-table-no-signal; `defaultPrimaryTable` escape hatch mirrors `defaultMutationTable`); core 1137/0, drizzle new suites 26/0 |
-| 031 | Filter-authoring type-safety (findings 1/2/8/12/17) | none hard; parallel-safe | IN PROGRESS — has a type-perf gate (Step 1) |
+| 031 | Filter-authoring type-safety (findings 1/2/8/12/17) | none hard; parallel-safe | **MERGED 2026-07-13** — per-type operator unions (wrong operator = compile error), `filterHasValue`, filter `id`, typed `buildFilter`; perf gate held (208k inst/1.0s). REVISE round 1: `TEXT_OPERATORS` was missing universal `isNull`/`isNotNull` — fixed (text null-filtering now types + shows in UI dropdown). Finding 12 (row back-ref noise) deferred with a design-doc addendum |
 | 032 | UI integration gaps (findings 5/6/7/15) | 025 (DONE); finding-5 prop pairs with 030 | **MERGED 2026-07-13** — reviewed (finding-15 loop guard = URL-value signature re-run + per-field deep-equal no-op; browser-verified); ui 41/0. Chose 3b (useVirtualizedTableData hook + docs) over integrated renderMode per STOP condition |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
