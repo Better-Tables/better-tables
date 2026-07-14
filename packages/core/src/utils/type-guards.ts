@@ -55,6 +55,10 @@ export function isFilterStateShape(value: unknown): value is FilterState {
 
   const candidate = value as Record<string, unknown>;
 
+  if (candidate.id !== undefined && typeof candidate.id !== 'string') {
+    return false;
+  }
+
   if (typeof candidate.columnId !== 'string' || candidate.columnId.length === 0) {
     return false;
   }

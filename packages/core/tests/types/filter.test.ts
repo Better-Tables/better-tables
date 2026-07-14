@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'bun:test';
 import type {
   ColumnDefinition,
   ColumnType,
+  DateFilterOperator,
   FilterComponentProps,
   FilterConfig,
   FilterGroup,
@@ -9,12 +10,14 @@ import type {
   FilterOperatorDefinition,
   FilterOption,
   FilterState,
+  NumberFilterOperator,
+  TextFilterOperator,
 } from '../../src/types';
 
 describe('Filter Types', () => {
   describe('FilterOperator', () => {
     it('should include all text operators', () => {
-      const textOperators: FilterOperator[] = [
+      const textOperators: TextFilterOperator[] = [
         'contains',
         'equals',
         'startsWith',
@@ -30,12 +33,12 @@ describe('Filter Types', () => {
           operator: op,
           values: ['test'],
         };
-        expectTypeOf(filter.operator).toEqualTypeOf<FilterOperator>();
+        expect(filter.operator).toBe(op);
       }
     });
 
     it('should include all number operators', () => {
-      const numberOperators: FilterOperator[] = [
+      const numberOperators: NumberFilterOperator[] = [
         'equals',
         'notEquals',
         'greaterThan',
@@ -58,7 +61,7 @@ describe('Filter Types', () => {
     });
 
     it('should include all date operators', () => {
-      const dateOperators: FilterOperator[] = [
+      const dateOperators: DateFilterOperator[] = [
         'is',
         'isNot',
         'before',

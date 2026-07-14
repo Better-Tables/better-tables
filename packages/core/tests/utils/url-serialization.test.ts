@@ -16,7 +16,7 @@ describe('serializeTableStateToUrl', () => {
       filters: [
         {
           columnId: 'status',
-          operator: 'equals',
+          operator: 'is',
           values: ['active'],
           type: 'option',
         },
@@ -133,7 +133,7 @@ describe('serializeTableStateToUrl', () => {
       filters: [
         {
           columnId: 'status',
-          operator: 'equals',
+          operator: 'is',
           values: ['active'],
           type: 'option',
         },
@@ -166,7 +166,7 @@ describe('deserializeTableStateFromUrl', () => {
     const filters: FilterState[] = [
       {
         columnId: 'status',
-        operator: 'equals',
+        operator: 'is',
         values: ['active'],
         type: 'option',
       },
@@ -270,7 +270,7 @@ describe('deserializeTableStateFromUrl', () => {
     const filters: FilterState[] = [
       {
         columnId: 'status',
-        operator: 'equals',
+        operator: 'is',
         values: ['active'],
         type: 'option',
       },
@@ -304,7 +304,7 @@ describe('round-trip serialization', () => {
       filters: [
         {
           columnId: 'status',
-          operator: 'equals',
+          operator: 'is',
           values: ['active'],
           type: 'option',
         },
@@ -328,7 +328,7 @@ describe('round-trip serialization', () => {
       filters: [
         {
           columnId: 'status',
-          operator: 'equals',
+          operator: 'is',
           values: ['active'],
           type: 'option',
         },
@@ -360,7 +360,7 @@ describe('round-trip serialization', () => {
     const complexFilters: FilterState[] = [
       {
         columnId: 'status',
-        operator: 'equals',
+        operator: 'is',
         values: ['active', 'pending', 'inactive'],
         type: 'option',
       },
@@ -463,7 +463,7 @@ describe('compression', () => {
     const filters: FilterState[] = [
       {
         columnId: 'status',
-        operator: 'equals',
+        operator: 'is',
         values: ['active'],
         type: 'option',
       },

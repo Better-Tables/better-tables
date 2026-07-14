@@ -343,7 +343,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
               operator: 'invalidOperator' as FilterOperator,
               values: ['test'],
             },
-          ],
+          ] as unknown as FilterState[],
         })
       ).rejects.toThrow();
     });
@@ -533,6 +533,11 @@ describe('DrizzleAdapter - SQLite Integration', () => {
                   .from(postCountsSubquery)
                   .where(condition);
 
+                // `isAnyOf` is an 'option'-only operator in core's taxonomy
+                // (plan 031 Step 1); this computed field reuses it against a
+                // 'text' id column to express "id IN (matchingUsers)" -- a
+                // pre-existing choice this test doesn't change. `as unknown
+                // as FilterState[]` preserves the exact runtime values.
                 return [
                   {
                     columnId: 'id',
@@ -540,7 +545,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
                     values: matchingUsers.map((u: { userId: number }) => String(u.userId)),
                     type: 'text',
                   },
-                ];
+                ] as unknown as FilterState[];
               },
             },
           ],

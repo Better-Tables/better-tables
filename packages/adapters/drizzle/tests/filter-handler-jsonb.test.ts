@@ -669,7 +669,12 @@ describe('FilterHandler - JSONB Support', () => {
     const relationshipManager = new RelationshipManager(schema, {});
     const handler = new FilterHandler(schema, relationshipManager, 'postgres');
 
-    const textOperators: FilterState[] = [
+    // `notEquals` isn't in core's TEXT_OPERATORS (plan 031 Step 1) -- it's a
+    // number/custom operator, not universal -- but this adapter's own
+    // `supportedOperators.text` intentionally lists it (plain SQL `<>`).
+    // `isNull`/`isNotNull` ARE valid text operators now; `notEquals` is the
+    // one entry that keeps this list's `as unknown as FilterState[]` cast.
+    const textOperators = [
       { columnId: 'survey.title', operator: 'contains', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'equals', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'startsWith', values: ['test'], type: 'text' },
@@ -679,7 +684,7 @@ describe('FilterHandler - JSONB Support', () => {
       { columnId: 'survey.title', operator: 'notEquals', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'isNull', values: [], type: 'text' },
       { columnId: 'survey.title', operator: 'isNotNull', values: [], type: 'text' },
-    ];
+    ] as unknown as FilterState[];
 
     it('should handle all text operators with JSONB fields', () => {
       for (const filter of textOperators) {

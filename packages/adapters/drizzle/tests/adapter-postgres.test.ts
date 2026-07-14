@@ -309,7 +309,15 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
 
     it('should filter by text notEquals', async () => {
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] }],
+        // `notEquals` isn't in core's TEXT_OPERATORS (plan 031 Step 1) -- it's
+        // a number/custom operator, not universal -- but this adapter's own
+        // `supportedOperators.text` intentionally lists it (plain SQL `<>`).
+        // `as unknown as FilterState[]` preserves that adapter-level coverage.
+        // (`isNull`/`isNotNull`, tested below, ARE valid text operators and
+        // need no cast.)
+        filters: [
+          { columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] },
+        ] as unknown as FilterState[],
       });
       // Verify that 'John Doe' is excluded from results
       expect(result.data).toBeDefined();
@@ -1214,7 +1222,7 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
               operator: 'invalidOp' as FilterOperator,
               values: ['test'],
             },
-          ],
+          ] as unknown as FilterState[],
         })
       ).rejects.toThrow();
     });
@@ -1415,6 +1423,11 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
                   .from(postCountsSubquery)
                   .where(condition);
 
+                // `isAnyOf` is an 'option'-only operator in core's taxonomy
+                // (plan 031 Step 1); this computed field reuses it against a
+                // 'text' id column to express "id IN (matchingUsers)" -- a
+                // pre-existing choice this test doesn't change. `as unknown
+                // as FilterState[]` preserves the exact runtime values.
                 return [
                   {
                     columnId: 'id',
@@ -1422,7 +1435,7 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
                     values: matchingUsers.map((u: { userId: number }) => String(u.userId)),
                     type: 'text',
                   },
-                ];
+                ] as unknown as FilterState[];
               },
             },
           ],

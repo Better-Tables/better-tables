@@ -1,11 +1,29 @@
 import type { ComponentType } from 'react';
 import type { ColumnDefinition } from './column';
 import type { IconComponent } from './common';
+import type {
+  BooleanFilterOperator,
+  DateFilterOperator,
+  JsonFilterOperator,
+  MultiOptionFilterOperator,
+  NumberFilterOperator,
+  OptionFilterOperator,
+  TextFilterOperator,
+} from './filter-operators';
 
 /**
- * Filter operators available for different column types
+ * Filter operators available across all column types (the flat union).
  * NOTE: This must stay in sync with centralized filter operator definitions
- * in filter-operators.ts. Tests ensure consistency.
+ * in filter-operators.ts -- `filter-operators.test.ts`'s "Type Safety" suite
+ * asserts `FilterOperator` equals the union of every `*_OPERATORS` array's
+ * derived keys (`FilterOperatorKey`). Per-type `FilterState` members
+ * (`TextFilterState`, `NumberFilterState`, ...) do NOT use this flat union
+ * for their `operator` field -- they use the narrower, DERIVED
+ * `TextFilterOperator`/`NumberFilterOperator`/etc. from `filter-operators.ts`
+ * (plan 031 Step 1), so a wrong operator for a column type is a compile
+ * error. This flat union remains useful as the "any legal operator, don't
+ * care which type" type (e.g. `CustomFilterState.operator`, adapter
+ * `supportedOperators: Record<ColumnType, FilterOperator[]>`).
  */
 export type FilterOperator =
   // Text operators
@@ -143,6 +161,19 @@ export interface FilterMetadata {
  * Base filter state with common properties
  */
 export interface BaseFilterState {
+  /**
+   * Stable per-filter identity (plan 031 Step 3, finding 2). Optional --
+   * `columnId` alone doesn't disambiguate two filters on the same column
+   * inside one {@link FilterGroupNode} (e.g. `age > 18 OR age < 5`), which a
+   * UI iterating filters by `columnId` can't key correctly. When present,
+   * `id` round-trips unchanged through `serializeFiltersToURL`/
+   * `deserializeFiltersFromURL` (compression's key map carries it) and
+   * survives `structuredClone`/`JSON.stringify` like every other field.
+   * Callers that don't populate `id` should key by {@link filterKey}
+   * (`utils/filter-value.ts`) instead of `columnId` alone.
+   */
+  id?: string;
+
   /** Column ID being filtered */
   columnId: string;
 
@@ -158,9 +189,16 @@ export interface BaseFilterState {
 
 /**
  * Text filter state (text, email, url, phone)
+ *
+ * `operator` is narrowed to {@link TextFilterOperator} (plan 031 Step 1,
+ * finding 8) -- derived from `TEXT_OPERATORS` in `filter-operators.ts`, the
+ * single source of truth. `{ type: 'text', operator: 'isAnyOf' }` (an
+ * option-only operator) is now a COMPILE error instead of a runtime-only
+ * validation failure.
  */
 export interface TextFilterState extends BaseFilterState {
   type: 'text' | 'email' | 'url' | 'phone';
+  operator: TextFilterOperator;
   values: string[];
 }
 
@@ -169,6 +207,7 @@ export interface TextFilterState extends BaseFilterState {
  */
 export interface NumberFilterState extends BaseFilterState {
   type: 'number' | 'currency' | 'percentage';
+  operator: NumberFilterOperator;
   values: number[];
 }
 
@@ -177,6 +216,7 @@ export interface NumberFilterState extends BaseFilterState {
  */
 export interface DateFilterState extends BaseFilterState {
   type: 'date';
+  operator: DateFilterOperator;
   values: (Date | string | number)[];
 }
 
@@ -185,6 +225,7 @@ export interface DateFilterState extends BaseFilterState {
  */
 export interface BooleanFilterState extends BaseFilterState {
   type: 'boolean';
+  operator: BooleanFilterOperator;
   values: boolean[];
 }
 
@@ -193,6 +234,7 @@ export interface BooleanFilterState extends BaseFilterState {
  */
 export interface OptionFilterState extends BaseFilterState {
   type: 'option';
+  operator: OptionFilterOperator;
   values: string[];
 }
 
@@ -201,6 +243,7 @@ export interface OptionFilterState extends BaseFilterState {
  */
 export interface MultiOptionFilterState extends BaseFilterState {
   type: 'multiOption';
+  operator: MultiOptionFilterOperator;
   values: string[];
 }
 
@@ -209,11 +252,17 @@ export interface MultiOptionFilterState extends BaseFilterState {
  */
 export interface JsonFilterState extends BaseFilterState {
   type: 'json';
+  operator: JsonFilterOperator;
   values: (object | string)[];
 }
 
 /**
  * Custom filter state (fallback for custom types)
+ *
+ * `operator` stays the flat {@link FilterOperator} union -- `custom` has no
+ * fixed operator set in `filter-operators.ts` (`FILTER_OPERATORS.custom` is
+ * `[]`; operators are user-defined per column via `FilterConfig.operators`),
+ * so there is nothing narrower to derive.
  */
 export interface CustomFilterState extends BaseFilterState {
   type: 'custom';

@@ -186,12 +186,17 @@ export function FilterBar<TData = unknown>({
           ? customOperators[0]
           : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
 
-      const newFilter: FilterState = {
+      // `column.type`/`defaultOperator` are widened (`ColumnType`/`FilterOperator`)
+      // at this dynamic call site -- there's no single column known at compile
+      // time to narrow `FilterState`'s per-type `operator` field against (plan
+      // 031 Step 1). Runtime behavior is unchanged; `as FilterState` mirrors
+      // the same dynamic-merge cast `handleUpdateFilter` already uses below.
+      const newFilter = {
         columnId,
         type: column.type,
         operator: defaultOperator,
         values: [],
-      };
+      } as FilterState;
 
       onFiltersChange([...filters, newFilter]);
       setIsDropdownOpen(false);

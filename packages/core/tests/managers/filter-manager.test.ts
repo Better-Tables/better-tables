@@ -380,7 +380,7 @@ describe('FilterManager', () => {
       const filter: FilterState = {
         columnId: 'name',
         type: 'text',
-        operator: 'isNull', // Not in allowed operators
+        operator: 'isEmpty', // Valid text operator, but not in this column's allowed operators
         values: [],
       };
 

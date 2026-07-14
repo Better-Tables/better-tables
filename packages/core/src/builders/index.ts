@@ -14,9 +14,15 @@ export {
   createActionBuilders,
   deleteAction,
 } from './action-factory';
-
 // Column builders
 export { BooleanColumnBuilder } from './boolean-column-builder';
+// Typed filter builder (plan 031 Step 4)
+export {
+  type BuildFilterOptions,
+  buildFilter,
+  type DefaultColumnTypeForValue,
+  type FilterStateForType,
+} from './build-filter';
 export { ColumnBuilder } from './column-builder';
 // Column factory and utilities
 export {

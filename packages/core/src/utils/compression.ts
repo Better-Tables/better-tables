@@ -32,6 +32,7 @@ export const COMPRESSION_KEY_MAP: Record<string, string> = {
   kind: 'k', // For FilterGroupNode (contract v2)
   logic: 'l', // For FilterGroupNode (contract v2)
   children: 'h', // For FilterGroupNode ('g' would read as "group"; 'h' avoids any future group -> g)
+  id: 'i', // For BaseFilterState.id (plan 031 Step 3, finding 2) -- optional, so absent on most filters
 };
 
 /**

@@ -272,7 +272,7 @@ describe('edge cases', () => {
       {
         columnId: 'date',
         type: 'date',
-        operator: 'equals',
+        operator: 'is',
         values: ['2024-01-01'],
       },
       {
@@ -553,5 +553,73 @@ describe('contract v2 -- filter groups (plan 015)', () => {
     const deserialized = deserializeFiltersFromURL(serialized);
 
     expect(deserialized).toEqual([filter]);
+  });
+});
+
+describe('filter identity (plan 031 Step 3, finding 2)', () => {
+  it('round-trips a single filter with an id through the flat FilterState[] wire format', () => {
+    const filters: FilterState[] = [
+      { id: 'f-1', columnId: 'status', type: 'option', operator: 'is', values: ['active'] },
+    ];
+
+    const serialized = serializeFiltersToURL(filters);
+    const deserialized = deserializeFiltersFromURL(serialized);
+
+    expect(deserialized).toEqual(filters);
+    expect(Array.isArray(deserialized) && deserialized[0]?.id).toBe('f-1');
+  });
+
+  it('preserves distinct ids on two filters targeting the same columnId inside one OR group', () => {
+    const tree: FilterGroupNode = {
+      kind: 'group',
+      logic: 'or',
+      children: [
+        { id: 'age-lt-5', columnId: 'age', type: 'number', operator: 'lessThan', values: [5] },
+        {
+          id: 'age-gt-18',
+          columnId: 'age',
+          type: 'number',
+          operator: 'greaterThan',
+          values: [18],
+        },
+      ],
+    };
+
+    const serialized = serializeFiltersToURL(tree);
+    const deserialized = deserializeFiltersFromURL(serialized);
+
+    expect(deserialized).toEqual(tree);
+    expect(isFilterGroupNode(deserialized)).toBe(true);
+    if (isFilterGroupNode(deserialized)) {
+      const ids = deserialized.children.map((child) =>
+        isFilterGroupNode(child) ? undefined : child.id
+      );
+      // Both ids survived AND stayed distinct -- columnId alone ('age' on
+      // both) could not have disambiguated these two filters.
+      expect(ids).toEqual(['age-lt-5', 'age-gt-18']);
+      expect(new Set(ids).size).toBe(2);
+    }
+  });
+
+  it('omits id from the wire payload when absent (no size regression for id-less filters)', () => {
+    const withoutId: FilterState[] = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['john'] },
+    ];
+    const withId: FilterState[] = [
+      { id: 'x', columnId: 'name', type: 'text', operator: 'contains', values: ['john'] },
+    ];
+
+    const serializedWithout = serializeFiltersToURL(withoutId);
+    const serializedWith = serializeFiltersToURL(withId);
+
+    // An id-less filter must round-trip with no `id` key at all (not
+    // `id: undefined`) -- exactOptionalPropertyTypes semantics.
+    const deserializedWithout = deserializeFiltersFromURL(serializedWithout);
+    expect(Array.isArray(deserializedWithout) && 'id' in (deserializedWithout[0] ?? {})).toBe(
+      false
+    );
+    // The id-bearing payload should be no shorter than (and typically a hair
+    // longer than) the id-less one -- adding the field costs bytes only when used.
+    expect(serializedWith.length).toBeGreaterThanOrEqual(serializedWithout.length);
   });
 });
