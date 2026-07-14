@@ -3,15 +3,23 @@ import type { FilterOperator, FilterOperatorDefinition } from './filter';
 
 /**
  * Text filter operators with validation
+ *
+ * `as const` (no `FilterOperatorDefinition[]` annotation) deliberately keeps
+ * each `key` a string LITERAL instead of widening to `FilterOperator` -- this
+ * is what lets {@link ExtractOperatorKeys} below derive a real per-type
+ * operator union (`TextFilterOperator` etc.) instead of the flat
+ * `FilterOperator` union. `validate`'s `values` param is explicitly typed
+ * (rather than left to infer from a `FilterOperatorDefinition` context type)
+ * for the same reason -- `as const` removes that context.
  */
-const TEXT_OPERATORS: FilterOperatorDefinition[] = [
+const TEXT_OPERATORS = [
   {
     key: 'contains',
     label: 'Contains',
     description: 'Includes this text',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'string',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'string',
   },
   {
     key: 'equals',
@@ -19,7 +27,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Exact match',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null,
   },
   {
     key: 'startsWith',
@@ -27,7 +35,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Begins with this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'string',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'string',
   },
   {
     key: 'endsWith',
@@ -35,7 +43,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Finishes with this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'string',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'string',
   },
   {
     key: 'isEmpty',
@@ -43,7 +51,7 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Blank or null',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotEmpty',
@@ -51,21 +59,21 @@ const TEXT_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Has content',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * Number filter operators with validation
  */
-const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
+const NUMBER_OPERATORS = [
   {
     key: 'equals',
     label: 'Equals',
     description: 'Exact match',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null,
   },
   {
     key: 'notEquals',
@@ -73,7 +81,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: "Doesn't match",
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'number',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'number',
   },
   {
     key: 'greaterThan',
@@ -81,7 +89,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'More than this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'number',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'number',
   },
   {
     key: 'greaterThanOrEqual',
@@ -89,7 +97,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'At least this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'number',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'number',
   },
   {
     key: 'lessThan',
@@ -97,7 +105,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Under this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'number',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'number',
   },
   {
     key: 'lessThanOrEqual',
@@ -105,7 +113,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'At most this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'number',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'number',
   },
   {
     key: 'between',
@@ -113,7 +121,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Between two values',
     valueCount: 2,
     supportsNull: false,
-    validate: (values) => {
+    validate: (values: unknown[]) => {
       if (values.length !== 2) return false;
       const [lower, upper] = values;
       if (typeof lower !== 'number' || typeof upper !== 'number') return false;
@@ -126,7 +134,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Outside this range',
     valueCount: 2,
     supportsNull: false,
-    validate: (values) => {
+    validate: (values: unknown[]) => {
       if (values.length !== 2) return false;
       const [lower, upper] = values;
       if (typeof lower !== 'number' || typeof upper !== 'number') return false;
@@ -139,7 +147,7 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'No value set',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotNull',
@@ -147,21 +155,21 @@ const NUMBER_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Has a value',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * Date filter operators with validation
  */
-const DATE_OPERATORS: FilterOperatorDefinition[] = [
+const DATE_OPERATORS = [
   {
     key: 'is',
     label: 'Is',
     description: 'Exact date match',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] instanceof Date,
+    validate: (values: unknown[]) => values.length === 1 && values[0] instanceof Date,
   },
   {
     key: 'isNot',
@@ -169,7 +177,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Any except this',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] instanceof Date,
+    validate: (values: unknown[]) => values.length === 1 && values[0] instanceof Date,
   },
   {
     key: 'before',
@@ -177,7 +185,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Earlier than',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] instanceof Date,
+    validate: (values: unknown[]) => values.length === 1 && values[0] instanceof Date,
   },
   {
     key: 'after',
@@ -185,7 +193,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Later than',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] instanceof Date,
+    validate: (values: unknown[]) => values.length === 1 && values[0] instanceof Date,
   },
   {
     key: 'between',
@@ -193,7 +201,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Between two dates',
     valueCount: 2,
     supportsNull: false,
-    validate: (values) => {
+    validate: (values: unknown[]) => {
       if (values.length !== 2) return false;
       const [start, end] = values;
       if (!(start instanceof Date) || !(end instanceof Date)) return false;
@@ -206,7 +214,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Outside date range',
     valueCount: 2,
     supportsNull: false,
-    validate: (values) => {
+    validate: (values: unknown[]) => {
       if (values.length !== 2) return false;
       const [start, end] = values;
       if (!(start instanceof Date) || !(end instanceof Date)) return false;
@@ -219,7 +227,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Current day',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isYesterday',
@@ -227,7 +235,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Previous day',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isThisWeek',
@@ -235,7 +243,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Current week',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isThisMonth',
@@ -243,7 +251,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Current month',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isThisYear',
@@ -251,7 +259,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Current year',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNull',
@@ -259,7 +267,7 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'No date set',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotNull',
@@ -267,21 +275,21 @@ const DATE_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Date exists',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * Option filter operators with validation
  */
-const OPTION_OPERATORS: FilterOperatorDefinition[] = [
+const OPTION_OPERATORS = [
   {
     key: 'is',
     label: 'Is',
     description: 'Matches option',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null && values[0] !== '',
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null && values[0] !== '',
   },
   {
     key: 'isNot',
@@ -289,7 +297,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Excludes option',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null && values[0] !== '',
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null && values[0] !== '',
   },
   {
     key: 'isAnyOf',
@@ -297,7 +305,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Matches any selected',
     valueCount: 'variable',
     supportsNull: false,
-    validate: (values) => values.length >= 1 && values.every((v) => v != null),
+    validate: (values: unknown[]) => values.length >= 1 && values.every((v) => v != null),
   },
   {
     key: 'isNoneOf',
@@ -305,7 +313,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Excludes all selected',
     valueCount: 'variable',
     supportsNull: false,
-    validate: (values) => values.length >= 1 && values.every((v) => v != null),
+    validate: (values: unknown[]) => values.length >= 1 && values.every((v) => v != null),
   },
   {
     key: 'isNull',
@@ -313,7 +321,7 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'No option set',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotNull',
@@ -321,21 +329,21 @@ const OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Option selected',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * Multi-option filter operators with validation
  */
-const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
+const MULTI_OPTION_OPERATORS = [
   {
     key: 'includes',
     label: 'Includes',
     description: 'Contains value',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null,
   },
   {
     key: 'excludes',
@@ -343,7 +351,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Missing value',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null,
   },
   {
     key: 'includesAny',
@@ -351,7 +359,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Contains any selected',
     valueCount: 'variable',
     supportsNull: false,
-    validate: (values) => values.length >= 1 && values.every((v) => v != null),
+    validate: (values: unknown[]) => values.length >= 1 && values.every((v) => v != null),
   },
   {
     key: 'includesAll',
@@ -359,7 +367,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Contains all selected',
     valueCount: 'variable',
     supportsNull: false,
-    validate: (values) => values.length >= 1 && values.every((v) => v != null),
+    validate: (values: unknown[]) => values.length >= 1 && values.every((v) => v != null),
   },
   {
     key: 'excludesAny',
@@ -367,7 +375,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Missing any selected',
     valueCount: 'variable',
     supportsNull: false,
-    validate: (values) => values.length >= 1 && values.every((v) => v != null),
+    validate: (values: unknown[]) => values.length >= 1 && values.every((v) => v != null),
   },
   {
     key: 'excludesAll',
@@ -375,7 +383,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Missing all selected',
     valueCount: 'variable',
     supportsNull: false,
-    validate: (values) => values.length >= 1 && values.every((v) => v != null),
+    validate: (values: unknown[]) => values.length >= 1 && values.every((v) => v != null),
   },
   {
     key: 'isNull',
@@ -383,7 +391,7 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'No values set',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotNull',
@@ -391,21 +399,21 @@ const MULTI_OPTION_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Has values',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * Boolean filter operators with validation
  */
-const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
+const BOOLEAN_OPERATORS = [
   {
     key: 'isTrue',
     label: 'Is true',
     description: 'Checked/enabled',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isFalse',
@@ -413,7 +421,7 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Unchecked/disabled',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNull',
@@ -421,7 +429,7 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
     description: 'No value set',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotNull',
@@ -429,21 +437,21 @@ const BOOLEAN_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Has value',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * JSON filter operators with validation
  */
-const JSON_OPERATORS: FilterOperatorDefinition[] = [
+const JSON_OPERATORS = [
   {
     key: 'contains',
     label: 'Contains',
     description: 'Includes text',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && typeof values[0] === 'string',
+    validate: (values: unknown[]) => values.length === 1 && typeof values[0] === 'string',
   },
   {
     key: 'equals',
@@ -451,7 +459,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Exact match',
     valueCount: 1,
     supportsNull: false,
-    validate: (values) => values.length === 1 && values[0] != null,
+    validate: (values: unknown[]) => values.length === 1 && values[0] != null,
   },
   {
     key: 'isEmpty',
@@ -459,7 +467,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Empty object/array',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotEmpty',
@@ -467,7 +475,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Has data',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNull',
@@ -475,7 +483,7 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
     description: 'No value set',
     valueCount: 0,
     supportsNull: true,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
   {
     key: 'isNotNull',
@@ -483,14 +491,14 @@ const JSON_OPERATORS: FilterOperatorDefinition[] = [
     description: 'Has value',
     valueCount: 0,
     supportsNull: false,
-    validate: (values) => values.length === 0,
+    validate: (values: unknown[]) => values.length === 0,
   },
-];
+] as const;
 
 /**
  * Centralized filter operators registry by column type
  */
-export const FILTER_OPERATORS: Record<ColumnType, FilterOperatorDefinition[]> = {
+export const FILTER_OPERATORS: Record<ColumnType, readonly FilterOperatorDefinition[]> = {
   // Text-based columns
   text: TEXT_OPERATORS,
   url: TEXT_OPERATORS,
@@ -520,7 +528,7 @@ export const FILTER_OPERATORS: Record<ColumnType, FilterOperatorDefinition[]> = 
 /**
  * Get all available operators for a column type
  */
-export function getOperatorsForType(type: ColumnType): FilterOperatorDefinition[] {
+export function getOperatorsForType(type: ColumnType): readonly FilterOperatorDefinition[] {
   return FILTER_OPERATORS[type] || [];
 }
 
@@ -648,7 +656,7 @@ export function validateOperatorValues(
  * Create a new operator definition registry
  */
 export function createOperatorRegistry(
-  operators: FilterOperatorDefinition[]
+  operators: readonly FilterOperatorDefinition[]
 ): Map<FilterOperator, FilterOperatorDefinition> {
   const registry = new Map<FilterOperator, FilterOperatorDefinition>();
   for (const op of operators) {
@@ -675,17 +683,38 @@ export function getAllOperators(): FilterOperatorDefinition[] {
 /**
  * Extract all filter operator keys as a union type
  * This ensures FilterOperator type stays in sync with our definitions
+ *
+ * Only extracts real literal unions when `T` is a literal (`as const`) tuple
+ * type -- e.g. `typeof TEXT_OPERATORS`. Applied to a widened
+ * `FilterOperatorDefinition[]` this would collapse to the single `key: K`
+ * field's declared type instead of a per-element union, which is exactly the
+ * bug plan 031 Step 1 fixes by making the `*_OPERATORS` arrays `as const`.
  */
 type ExtractOperatorKeys<T> = T extends readonly { key: infer K }[] ? K : never;
 
+/**
+ * Per-type operator key unions (plan 031 Step 1), derived from the
+ * `*_OPERATORS` arrays above -- the SINGLE source of truth for which
+ * operators are legal on which `FilterState` member. `filter.ts`'s
+ * `TextFilterState['operator']` etc. import these directly rather than
+ * hand-listing the same literals a second time.
+ */
+export type TextFilterOperator = ExtractOperatorKeys<typeof TEXT_OPERATORS>;
+export type NumberFilterOperator = ExtractOperatorKeys<typeof NUMBER_OPERATORS>;
+export type DateFilterOperator = ExtractOperatorKeys<typeof DATE_OPERATORS>;
+export type OptionFilterOperator = ExtractOperatorKeys<typeof OPTION_OPERATORS>;
+export type MultiOptionFilterOperator = ExtractOperatorKeys<typeof MULTI_OPTION_OPERATORS>;
+export type BooleanFilterOperator = ExtractOperatorKeys<typeof BOOLEAN_OPERATORS>;
+export type JsonFilterOperator = ExtractOperatorKeys<typeof JSON_OPERATORS>;
+
 type AllOperatorKeys =
-  | ExtractOperatorKeys<typeof TEXT_OPERATORS>
-  | ExtractOperatorKeys<typeof NUMBER_OPERATORS>
-  | ExtractOperatorKeys<typeof DATE_OPERATORS>
-  | ExtractOperatorKeys<typeof OPTION_OPERATORS>
-  | ExtractOperatorKeys<typeof MULTI_OPTION_OPERATORS>
-  | ExtractOperatorKeys<typeof BOOLEAN_OPERATORS>
-  | ExtractOperatorKeys<typeof JSON_OPERATORS>;
+  | TextFilterOperator
+  | NumberFilterOperator
+  | DateFilterOperator
+  | OptionFilterOperator
+  | MultiOptionFilterOperator
+  | BooleanFilterOperator
+  | JsonFilterOperator;
 
 /**
  * All available filter operators (auto-generated from centralized definitions)

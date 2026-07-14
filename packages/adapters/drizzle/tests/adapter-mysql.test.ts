@@ -273,7 +273,13 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
     it('should filter by text notEquals', async () => {
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] }],
+        // `notEquals` isn't in core's TEXT_OPERATORS (plan 031 Step 1), but this
+        // adapter's own `supportedOperators.text` intentionally lists it (SQL
+        // `<>` works for any column type) -- `as unknown as FilterState`
+        // preserves that adapter-level behavior/coverage unchanged.
+        filters: [
+          { columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] },
+        ] as unknown as FilterState[],
       });
       // Note: notEquals may return all results if not properly implemented
       // Just verify it returns data and doesn't crash
@@ -285,14 +291,20 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
     it('should filter by text isNull', async () => {
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] }],
+        // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1) -- see the
+        // `notEquals` test above for why this adapter still supports it.
+        filters: [
+          { columnId: 'profile.bio', type: 'text', operator: 'isNull', values: [] },
+        ] as unknown as FilterState[],
       });
       expect(result.data.length).toBeGreaterThanOrEqual(1); // At least user without profile (Bob)
     });
 
     it('should filter by text isNotNull', async () => {
       const result = await adapter.fetchData({
-        filters: [{ columnId: 'profile.bio', type: 'text', operator: 'isNotNull', values: [] }],
+        filters: [
+          { columnId: 'profile.bio', type: 'text', operator: 'isNotNull', values: [] },
+        ] as unknown as FilterState[],
       });
       expect(result.data.length).toBeGreaterThanOrEqual(2); // Users with profiles
     });
@@ -858,7 +870,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
               operator: 'invalidOp' as FilterOperator,
               values: ['test'],
             },
-          ],
+          ] as unknown as FilterState[],
         })
       ).rejects.toThrow();
     });
@@ -1056,6 +1068,11 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
                   .from(postCountsSubquery)
                   .where(condition);
 
+                // `isAnyOf` is an 'option'-only operator in core's taxonomy
+                // (plan 031 Step 1); this computed field reuses it against a
+                // 'text' id column to express "id IN (matchingUsers)" -- a
+                // pre-existing choice this test doesn't change. `as unknown
+                // as FilterState[]` preserves the exact runtime values.
                 return [
                   {
                     columnId: 'id',
@@ -1063,7 +1080,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
                     values: matchingUsers.map((u: { userId: number }) => String(u.userId)),
                     type: 'text',
                   },
-                ];
+                ] as unknown as FilterState[];
               },
             },
           ],

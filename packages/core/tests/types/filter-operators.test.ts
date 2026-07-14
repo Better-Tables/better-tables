@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 import type { ColumnType } from '../../src/types/column';
-import type { FilterOperator } from '../../src/types/filter';
+import type { FilterOperator, FilterState } from '../../src/types/filter';
 import {
   BOOLEAN_OPERATORS,
   createOperatorRegistry,
@@ -487,6 +487,100 @@ describe('Filter Operators', () => {
       // This ensures the manual FilterOperator type in filter.ts
       // stays in sync with the derived AllOperatorKeys type
       expectTypeOf<FilterOperator>().toEqualTypeOf<FilterOperatorKey>();
+    });
+
+    // Plan 031 Step 1 (finding 8): each `FilterState` member's `operator`
+    // field is a per-type union derived from these arrays, not the flat
+    // `FilterOperator`. A wrong operator for a column's `type` is now a
+    // COMPILE error instead of a runtime-only `validateFilter` failure.
+    // ACCEPTING the bad shape fails the build (the directive becomes unused).
+    describe('per-type operator narrowing (finding 8)', () => {
+      it('accepts a valid operator for each type and rejects a wrong one', () => {
+        const validText: FilterState = {
+          columnId: 'name',
+          type: 'text',
+          operator: 'contains',
+          values: ['a'],
+        };
+        expect(validText.operator).toBe('contains');
+
+        // @ts-expect-error - 'isAnyOf' is an option-only operator, not legal for 'text'
+        const invalidText: FilterState = {
+          columnId: 'name',
+          type: 'text',
+          operator: 'isAnyOf',
+          values: ['a'],
+        };
+        expect(invalidText).toBeDefined();
+
+        const validOption: FilterState = {
+          columnId: 'status',
+          type: 'option',
+          operator: 'is',
+          values: ['active'],
+        };
+        expect(validOption.operator).toBe('is');
+
+        // @ts-expect-error - 'equals' is a text/number/json operator, not legal for 'option'
+        const invalidOption: FilterState = {
+          columnId: 'status',
+          type: 'option',
+          operator: 'equals',
+          values: ['active'],
+        };
+        expect(invalidOption).toBeDefined();
+
+        const validNumber: FilterState = {
+          columnId: 'age',
+          type: 'number',
+          operator: 'greaterThan',
+          values: [18],
+        };
+        expect(validNumber.operator).toBe('greaterThan');
+
+        // @ts-expect-error - 'contains' is a text/json operator, not legal for 'number'
+        const invalidNumber: FilterState = {
+          columnId: 'age',
+          type: 'number',
+          operator: 'contains',
+          values: [18],
+        };
+        expect(invalidNumber).toBeDefined();
+
+        const validDate: FilterState = {
+          columnId: 'createdAt',
+          type: 'date',
+          operator: 'before',
+          values: [new Date()],
+        };
+        expect(validDate.operator).toBe('before');
+
+        // @ts-expect-error - 'isTrue' is a boolean-only operator, not legal for 'date'
+        const invalidDate: FilterState = {
+          columnId: 'createdAt',
+          type: 'date',
+          operator: 'isTrue',
+          values: [new Date()],
+        };
+        expect(invalidDate).toBeDefined();
+
+        const validBoolean: FilterState = {
+          columnId: 'active',
+          type: 'boolean',
+          operator: 'isTrue',
+          values: [true],
+        };
+        expect(validBoolean.operator).toBe('isTrue');
+
+        // @ts-expect-error - 'startsWith' is a text-only operator, not legal for 'boolean'
+        const invalidBoolean: FilterState = {
+          columnId: 'active',
+          type: 'boolean',
+          operator: 'startsWith',
+          values: [true],
+        };
+        expect(invalidBoolean).toBeDefined();
+      });
     });
   });
 });

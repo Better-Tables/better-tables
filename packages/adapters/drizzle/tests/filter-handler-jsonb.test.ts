@@ -124,24 +124,30 @@ describe('FilterHandler - JSONB Support', () => {
     });
 
     it('should handle JSONB field with isNull operator', () => {
-      const filter: FilterState = {
+      // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
+      // extraction test intentionally exercises it (SQL NULL-checking
+      // works regardless of core's per-type operator taxonomy).
+      const filter = {
         columnId: 'survey.title',
         operator: 'isNull',
         values: [],
         type: 'text',
-      };
+      } as unknown as FilterState;
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
     });
 
     it('should handle JSONB field with isNotNull operator', () => {
-      const filter: FilterState = {
+      // `isNotNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
+      // extraction test intentionally exercises it (SQL NULL-checking
+      // works regardless of core's per-type operator taxonomy).
+      const filter = {
         columnId: 'survey.title',
         operator: 'isNotNull',
         values: [],
         type: 'text',
-      };
+      } as unknown as FilterState;
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
@@ -190,12 +196,15 @@ describe('FilterHandler - JSONB Support', () => {
     });
 
     it('should handle JSON field with isNull operator', () => {
-      const filter: FilterState = {
+      // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
+      // extraction test intentionally exercises it (SQL NULL-checking
+      // works regardless of core's per-type operator taxonomy).
+      const filter = {
         columnId: 'survey.title',
         operator: 'isNull',
         values: [],
         type: 'text',
-      };
+      } as unknown as FilterState;
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
@@ -244,12 +253,15 @@ describe('FilterHandler - JSONB Support', () => {
     });
 
     it('should handle JSON field with isNull operator', () => {
-      const filter: FilterState = {
+      // `isNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1); this JSONB
+      // extraction test intentionally exercises it (SQL NULL-checking
+      // works regardless of core's per-type operator taxonomy).
+      const filter = {
         columnId: 'survey.title',
         operator: 'isNull',
         values: [],
         type: 'text',
-      };
+      } as unknown as FilterState;
 
       const condition = handler.buildFilterCondition(filter, 'surveys');
       expect(condition).toBeDefined();
@@ -669,7 +681,12 @@ describe('FilterHandler - JSONB Support', () => {
     const relationshipManager = new RelationshipManager(schema, {});
     const handler = new FilterHandler(schema, relationshipManager, 'postgres');
 
-    const textOperators: FilterState[] = [
+    // `notEquals`/`isNull`/`isNotNull` aren't in core's TEXT_OPERATORS (plan
+    // 031 Step 1), but this adapter's own `supportedOperators.text`
+    // intentionally lists them (see the earlier describe blocks in this
+    // file) -- `as unknown as FilterState[]` preserves the exact runtime
+    // values for the whole mixed list.
+    const textOperators = [
       { columnId: 'survey.title', operator: 'contains', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'equals', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'startsWith', values: ['test'], type: 'text' },
@@ -679,7 +696,7 @@ describe('FilterHandler - JSONB Support', () => {
       { columnId: 'survey.title', operator: 'notEquals', values: ['test'], type: 'text' },
       { columnId: 'survey.title', operator: 'isNull', values: [], type: 'text' },
       { columnId: 'survey.title', operator: 'isNotNull', values: [], type: 'text' },
-    ];
+    ] as unknown as FilterState[];
 
     it('should handle all text operators with JSONB fields', () => {
       for (const filter of textOperators) {

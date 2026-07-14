@@ -7,6 +7,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import type { FilterState } from '@better-tables/core';
 import type { SQL } from 'drizzle-orm';
 import { json, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
@@ -486,6 +487,9 @@ describe('MySQLQueryBuilder', () => {
         );
 
         const { query } = queryBuilder.buildSelectQuery(context, 'surveys', ['slug']);
+        // `isNotNull` isn't in core's TEXT_OPERATORS (plan 031 Step 1), but
+        // this adapter's own `supportedOperators.text` intentionally lists it
+        // -- `as unknown as FilterState[]` preserves the exact runtime values.
         const filteredQuery = queryBuilder.applyFilters(
           query,
           [
@@ -495,7 +499,7 @@ describe('MySQLQueryBuilder', () => {
               operator: 'isNotNull',
               values: [],
             },
-          ],
+          ] as unknown as FilterState[],
           'surveys'
         );
 

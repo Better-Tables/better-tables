@@ -272,7 +272,7 @@ describe('edge cases', () => {
       {
         columnId: 'date',
         type: 'date',
-        operator: 'equals',
+        operator: 'is',
         values: ['2024-01-01'],
       },
       {

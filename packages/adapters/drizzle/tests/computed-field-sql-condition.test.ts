@@ -218,6 +218,11 @@ describe('Computed Field filterSql', () => {
             compute: async () => null,
             filter: async () => {
               filterCalled = true;
+              // `isAnyOf` is an 'option'-only operator in core's taxonomy
+              // (plan 031 Step 1); this computed field reuses it against a
+              // 'text' id column -- a pre-existing choice this test doesn't
+              // change. `as unknown as FilterState[]` preserves the exact
+              // runtime values.
               return [
                 {
                   columnId: 'id',
@@ -225,7 +230,7 @@ describe('Computed Field filterSql', () => {
                   values: [],
                   type: 'text',
                 },
-              ];
+              ] as unknown as FilterState[];
             },
           },
         ],
