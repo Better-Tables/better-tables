@@ -41,7 +41,10 @@ export interface ExtractedSchema {
  * const db = drizzle(connection, { schema: { users, usersRelations } });
  * const extracted = extractSchemaFromDB(db);
  * // { tables: { users }, relations: { users }, hasSchema: true }
- * // Note: Relations are keyed by table name, not the relation property name
+ * // Note: both `tables` and `relations` are keyed by the schema object's
+ * // JS key (`users` above), not the relation property name and not the
+ * // underlying SQL table name -- these can differ, e.g.
+ * // `export const users = sqliteTable('app_users', ...)`.
  * ```
  */
 export function extractSchemaFromDB(db: unknown): ExtractedSchema {
@@ -86,7 +89,22 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
     return result;
   }
 
-  // Separate tables from relations
+  // Pass 1: classify every schema entry and key table entries by the schema
+  // OBJECT (JS) key -- the same key callers reference in `columns`,
+  // `filters`, and `primaryTable`. Also index each table object by identity
+  // so pass 2 (relation wrappers) can resolve which JS key its `.table`
+  // points to, instead of trusting the Drizzle SQL table name (which can
+  // legitimately differ from the JS export key, e.g. `export const tickets
+  // = sqliteTable('support_tickets', ...)`). Before this fix, relation
+  // wrappers were keyed by the SQL name while table entries were keyed by
+  // the JS key, so `result.tables` and `result.relations` disagreed
+  // whenever the two differed -- breaking relationship lookups for
+  // `drizzleAdapter(db)` auto-detection (plan 029 finding 14).
+  const tableEntries: Array<{ qualifiedKey: string; value: AnyTableType }> = [];
+  const relationEntries: Array<Relations> = [];
+  const plainEntries: Array<{ key: string; value: AnyTableType }> = [];
+  const tableObjectToQualifiedKey = new Map<object, string>();
+
   for (const [key, value] of Object.entries(schemaObj)) {
     if (!value || typeof value !== 'object') continue;
 
@@ -110,55 +128,73 @@ export function extractSchemaFromDB(db: unknown): ExtractedSchema {
         // This preserves the original behavior for SQLite while adding schema support for PostgreSQL
         const qualifiedKey = schemaName && tableName ? `${schemaName}.${tableName}` : key;
 
-        result.tables[qualifiedKey] = value as AnyTableType;
+        tableEntries.push({ qualifiedKey, value: value as AnyTableType });
+        tableObjectToQualifiedKey.set(value as object, qualifiedKey);
       }
     }
     // Check if this is a relation wrapper with a 'table' property
     else if ('table' in potentialTable && potentialTable.table) {
-      // This is a relation object, like `usersRelations`.
-      try {
-        const relationObject = value as Relations;
-        const tableObject = relationObject.table as AnyTableType;
+      // This is a relation object, like `usersRelations`. Defer processing
+      // to pass 2, once every table entry's JS key is known.
+      relationEntries.push(value as Relations);
+    }
+    // If no _ property, treat as table (handles flattened schema structures,
+    // and -- in current Drizzle versions, which store table metadata under
+    // `Symbol.for('drizzle:*')` rather than an own `_` property -- this is
+    // the branch EVERY plain table actually takes, not just a fallback).
+    else {
+      plainEntries.push({ key, value: value as AnyTableType });
+      tableObjectToQualifiedKey.set(value as object, key);
+    }
+  }
 
-        // Check if tableObject exists and has a _ property before accessing it
-        if (!tableObject || typeof tableObject !== 'object') {
-          continue;
-        }
+  for (const { qualifiedKey, value } of tableEntries) {
+    result.tables[qualifiedKey] = value;
+  }
+  for (const { key, value } of plainEntries) {
+    result.tables[key] = value;
+  }
 
-        // Use Drizzle symbols to get table metadata
+  // Pass 2: key each relation wrapper by the SAME qualified key as the table
+  // it points to, so `result.relations` and `result.tables` always agree.
+  for (const relationObject of relationEntries) {
+    try {
+      const tableObject = relationObject.table as AnyTableType;
+
+      // Check if tableObject exists and has a _ property before accessing it
+      if (!tableObject || typeof tableObject !== 'object') {
+        continue;
+      }
+
+      // Prefer an identity match against a table entry already found in
+      // this schema object -- guarantees the relation is keyed exactly like
+      // `result.tables`, regardless of whether the SQL table name matches
+      // the JS export key.
+      let qualifiedKey = tableObjectToQualifiedKey.get(tableObject as object);
+
+      if (!qualifiedKey) {
+        // Fallback: the relation's table wasn't found among this schema
+        // object's own table entries (e.g. a relations file imported
+        // without its table alongside it). Fall back to the SQL name via
+        // Drizzle's symbols, same as the pre-fix behavior, and register the
+        // table under that key so it's still queryable.
         const tableSymbol = Symbol.for('drizzle:Name');
         const schemaSymbol = Symbol.for('drizzle:Schema');
         const tableObjectWithSymbols = tableObject as unknown as Record<symbol, unknown>;
 
-        // Get the table name from the Drizzle symbol
         const tableName = tableObjectWithSymbols[tableSymbol];
-
-        // Get the schema name from the Drizzle symbol (if available)
         const schemaName = tableObjectWithSymbols[schemaSymbol];
 
-        // Ensure tableName is a string, skip if not
         if (typeof tableName !== 'string' || tableName.length === 0) {
           continue;
         }
 
-        const qualifiedKey =
-          typeof schemaName === 'string' ? `${schemaName}.${tableName}` : tableName;
+        qualifiedKey = typeof schemaName === 'string' ? `${schemaName}.${tableName}` : tableName;
+        result.tables[qualifiedKey] = tableObject;
+      }
 
-        // Use the qualified key to avoid collisions between tables with the same name in different schemas.
-        if (qualifiedKey) {
-          // Store the table object, keyed by its qualified name.
-          result.tables[qualifiedKey] = tableObject as AnyTableType;
-
-          // Store the relation object, also keyed by the qualified table name.
-          // This ensures the relationship detector can find it later.
-          result.relations[qualifiedKey] = relationObject;
-        }
-      } catch {}
-    }
-    // If no _ property, treat as table (handles flattened schema structures)
-    else {
-      result.tables[key] = value as AnyTableType;
-    }
+      result.relations[qualifiedKey] = relationObject;
+    } catch {}
   }
 
   result.hasSchema = Object.keys(result.tables).length > 0;
