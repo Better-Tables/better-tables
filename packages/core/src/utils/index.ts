@@ -11,6 +11,7 @@ export * from './column-visibility';
 export * from './compression';
 export * from './equality';
 export * from './filter-serialization';
+export * from './filter-value';
 export * from './meta-accessors';
 export * from './server-url-params';
 export * from './state-change-detection';
