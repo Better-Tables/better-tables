@@ -25,7 +25,8 @@ type TestSchema = {
   users: { row: TestRecord };
 };
 
-const createMockAdapter = (): TableAdapter<TestRecord> & SchemaAwareAdapter<{ tables: TestSchema }> =>
+const createMockAdapter = (): TableAdapter<TestRecord> &
+  SchemaAwareAdapter<{ tables: TestSchema }> =>
   ({
     fetchData: async () => ({
       data: [],
@@ -136,8 +137,16 @@ describe('betterTables() instance', () => {
 
       expect(usersTable.tableName).toBe('users');
       expect(usersTable.columns).toHaveLength(2);
-      expect(usersTable.columns[0]).toMatchObject({ id: 'name', displayName: 'Name', type: 'text' });
-      expect(usersTable.columns[1]).toMatchObject({ id: 'age', displayName: 'Age', type: 'number' });
+      expect(usersTable.columns[0]).toMatchObject({
+        id: 'name',
+        displayName: 'Name',
+        type: 'text',
+      });
+      expect(usersTable.columns[1]).toMatchObject({
+        id: 'age',
+        displayName: 'Age',
+        type: 'number',
+      });
     });
 
     it('the derived accessor reads the row value', () => {
@@ -194,7 +203,9 @@ describe('betterTables() instance', () => {
       }));
 
       expect(viaMethod.tableName).toBe(viaCurried.tableName);
-      expect(viaMethod.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))).toEqual(
+      expect(
+        viaMethod.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))
+      ).toEqual(
         viaCurried.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))
       );
     });

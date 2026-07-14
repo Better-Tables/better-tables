@@ -22,7 +22,7 @@ import { defineColumns } from '../../src/builders/column-factory';
 import { OptionColumnBuilder } from '../../src/builders/option-column-builder';
 import { betterTables, defineTable } from '../../src/factory';
 import { FilterManager } from '../../src/managers/filter-manager';
-import type { FetchDataParams } from '../../src/types/adapter';
+import type { FetchDataParams, FetchDataResult, TableAdapter } from '../../src/types/adapter';
 import type { ColumnDefinition } from '../../src/types/column';
 import { deserializeFiltersFromURL, serializeFiltersToURL } from '../../src/utils/filter-serialization';
 import type { FilterGroupNode, FilterState } from '../../src/types/filter';
@@ -340,5 +340,90 @@ describe('MIGRATION.md §6 — filter state layer semantics', () => {
     expect(filterManager.getFilterNode()).toEqual([ // 0.6
       { columnId: 'status', type: 'text', operator: 'equals', values: ['inactive'] },
     ]);
+  });
+});
+
+// ============================================================================
+// §12 (core portion) — tables.fetchData(table, params): the recommended read
+// pattern. The Drizzle-specific multi-table throw + defaultPrimaryTable half
+// of §12 lives in the drizzle package's own migration-guide-examples.test.ts
+// (needs a real adapter/driver), same split as §7/§9 above.
+// ============================================================================
+
+describe('MIGRATION.md §12 — tables.fetchData(table, params)', () => {
+  type Schema = { users: { row: User } };
+
+  // A minimal, functional (not just type-cast) fake adapter: the guide's
+  // example actually calls `tables.fetchData(...)`, which needs a real
+  // `fetchData` underneath -- `{} as SchemaAwareAdapter` (§1's fixture) is
+  // enough for pure `defineTable` type tests, but not here.
+  const fakeFunctionalAdapter: TableAdapter<unknown> & SchemaAwareAdapter<{ tables: Schema }> = {
+    fetchData: async (params) => ({
+      data: [],
+      total: 0,
+      pagination: { page: 1, limit: 20, totalPages: 0, hasNext: false, hasPrev: false },
+      meta: { receivedPrimaryTable: params.primaryTable },
+    }),
+    getFilterOptions: async () => [],
+    getFacetedValues: async () => new Map(),
+    getMinMaxValues: async () => [0, 0],
+    meta: {
+      name: 'Fake Adapter',
+      version: '1.0.0',
+      features: {
+        create: false,
+        read: true,
+        update: false,
+        delete: false,
+        bulkOperations: false,
+        realTimeUpdates: false,
+        export: false,
+        transactions: false,
+      },
+      supportedColumnTypes: ['text'],
+      supportedOperators: {
+        text: ['equals'],
+        number: ['equals'],
+        date: ['equals'],
+        boolean: ['equals'],
+        option: ['equals'],
+        multiOption: ['equals'],
+        currency: ['equals'],
+        percentage: ['equals'],
+        url: ['equals'],
+        email: ['equals'],
+        phone: ['equals'],
+        json: ['equals'],
+        custom: ['equals'],
+      },
+    },
+    $types: undefined as unknown as { tables: Schema },
+  };
+
+  it('0.6: tables.fetchData(usersTable, params) injects primaryTable and returns a typed row, no cast', async () => {
+    const tables = betterTables({ database: fakeFunctionalAdapter }); // 0.6
+    const usersTable = defineTable<typeof tables>()('users', (t) => ({
+      columns: [t.text('name'), t.text('email')],
+    }));
+
+    const result = await tables.fetchData(usersTable, { // 0.6
+      pagination: { page: 1, limit: 20 },
+    });
+
+    expectTypeOf(result).toEqualTypeOf<FetchDataResult<User>>(); // 0.6 -- User, not unknown, no cast
+    expect(result.meta?.receivedPrimaryTable).toBe('users'); // 0.6 -- injected automatically
+  });
+
+  it('0.5: passing primaryTable to tables.fetchData no longer type-checks -- it is injected, not a caller param', async () => {
+    const tables = betterTables({ database: fakeFunctionalAdapter });
+    const usersTable = defineTable<typeof tables>()('users', (t) => ({
+      columns: [t.text('name')],
+    }));
+
+    tables.fetchData(usersTable, {
+      // @ts-expect-error - MIGRATION.md §12: primaryTable is injected from
+      // usersTable.tableName; TableScopedFetchDataParams omits it entirely.
+      primaryTable: 'someOtherTable',
+    });
   });
 });

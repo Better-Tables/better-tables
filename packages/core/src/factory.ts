@@ -222,8 +222,10 @@ function defineTableImpl<TRow>(
  * `ColumnBuilder.id()`/`.accessor()` already cross internally.
  */
 export function defineTable<TInstance>(): DefineTableCurried<TInstance> {
-  return ((tableName: string, factory: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>) =>
-    defineTableImpl(tableName, factory)) as unknown as DefineTableCurried<TInstance>;
+  return ((
+    tableName: string,
+    factory: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>
+  ) => defineTableImpl(tableName, factory)) as unknown as DefineTableCurried<TInstance>;
 }
 
 /**

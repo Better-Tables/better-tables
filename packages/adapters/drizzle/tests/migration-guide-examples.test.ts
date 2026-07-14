@@ -1,7 +1,7 @@
 /**
  * Compile-checked (and, where cheap, executing) examples for `MIGRATION.md`
- * §7 (plan 019) -- the Drizzle-specific guide sections that need real
- * adapter/driver types `@better-tables/core`'s own examples file
+ * §7 and §12 (plans 019, 030) -- the Drizzle-specific guide sections that
+ * need real adapter/driver types `@better-tables/core`'s own examples file
  * (`packages/core/tests/types/migration-guide-examples.test.ts`) doesn't
  * depend on.
  *
@@ -126,5 +126,89 @@ describe('MIGRATION.md §7 — defaultMutationTable is required for multi-table 
     // fix-mutation-table-routing.md fixed.
     const adapter = buildAdapter(db); // no defaultMutationTable configured
     await expect(adapter.updateRecord('1', { bio: 'x' })).rejects.toThrow(SchemaError);
+  });
+});
+
+describe('MIGRATION.md §12 (Drizzle portion) — multi-table read throw + defaultPrimaryTable', () => {
+  let db: BunSQLiteDatabase;
+  let sqlite: Database;
+
+  beforeEach(async () => {
+    const created = createTestDatabase();
+    db = created.db;
+    sqlite = created.sqlite;
+    await setupTestDatabase(db);
+  });
+
+  afterEach(() => {
+    closeDatabase(sqlite);
+  });
+
+  function buildReadAdapter(
+    defaultPrimaryTable?: string
+  ): DrizzleAdapter<typeof multiTableSchema, 'sqlite'> {
+    const config: DrizzleAdapterConfig<typeof multiTableSchema, 'sqlite'> = {
+      db: db as unknown as DrizzleDatabase<'sqlite'>,
+      schema: multiTableSchema,
+      driver: 'sqlite',
+      autoDetectRelationships: false,
+      ...(defaultPrimaryTable !== undefined ? { options: { defaultPrimaryTable } } : {}),
+    };
+    return new DrizzleAdapter(config);
+  }
+
+  it('0.6: a multi-table schema with no columns/primaryTable throws a SchemaError naming the fix', async () => {
+    // 0.6 - equivalent to `drizzleAdapter(db).fetchData({ pagination: ... })`
+    const adapter = buildReadAdapter();
+
+    await expect(
+      adapter.fetchData({ pagination: { page: 1, limit: 10 } }) // 0.6
+    ).rejects.toThrow(SchemaError);
+    await expect(adapter.fetchData({ pagination: { page: 1, limit: 10 } })).rejects.toThrow(
+      /'primaryTable'.*'defaultPrimaryTable'/
+    );
+  });
+
+  it('0.6: configuring defaultPrimaryTable lets reads with no columns/primaryTable target the right table', async () => {
+    // 0.6 - equivalent to `drizzleAdapter(db, { options: { defaultPrimaryTable: 'profiles' } })`
+    const adapter = buildReadAdapter('profiles'); // 0.6
+
+    const result = await adapter.fetchData({ pagination: { page: 1, limit: 10 } }); // 0.6
+
+    expect(result.data.length).toBeGreaterThan(0);
+    for (const row of result.data as unknown as Record<string, unknown>[]) {
+      expect(row).toHaveProperty('bio'); // profiles-only field -- confirms the right table
+    }
+  });
+
+  it('0.6: an explicit per-call primaryTable never throws, with or without defaultPrimaryTable', async () => {
+    const adapter = buildReadAdapter(); // no defaultPrimaryTable configured
+
+    const result = await adapter.fetchData({ primaryTable: 'profiles' }); // 0.6
+    expect(result.data.length).toBeGreaterThan(0);
+  });
+
+  it('0.6: a single-table schema needs no defaultPrimaryTable configuration', async () => {
+    const singleTableConfig: DrizzleAdapterConfig<typeof singleTableSchema, 'sqlite'> = {
+      db: db as unknown as DrizzleDatabase<'sqlite'>,
+      schema: singleTableSchema,
+      driver: 'sqlite',
+      autoDetectRelationships: false,
+    };
+    const adapter = new DrizzleAdapter(singleTableConfig); // 0.6 - no `options` needed
+
+    const result = await adapter.fetchData({}); // 0.6
+    expect(result.data.length).toBeGreaterThan(0);
+  });
+
+  it('0.5: multi-table reads used to silently target the first schema table instead of throwing', async () => {
+    // There is no compile-time signal for this one (the 0.5 behavior was a
+    // runtime footgun, not a type). Pinning the CURRENT (0.6) behavior here
+    // is the guide's drift alarm -- same reasoning as §7's mutation-routing
+    // pin above, applied to reads (plan 030 finding 9).
+    const adapter = buildReadAdapter(); // no defaultPrimaryTable configured
+    await expect(adapter.fetchData({ pagination: { page: 1, limit: 10 } })).rejects.toThrow(
+      SchemaError
+    );
   });
 });

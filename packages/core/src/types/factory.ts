@@ -230,14 +230,12 @@ export interface TableDefinition<TName extends string, TRow> {
  * must be supplied explicitly while `TName` is inferred from the call
  * (design doc Step 1 decision 3).
  */
-export interface DefineTableCurried<TInstance> {
-  <TName extends TableNamesOf<TInstance>>(
-    tableName: TName,
-    factory: (
-      t: PathColumnFactory<RowOf<TInstance, TName>>
-    ) => TableDefResult<RowOf<TInstance, TName>>
-  ): TableDefinition<TName, RowOf<TInstance, TName>>;
-}
+export type DefineTableCurried<TInstance> = <TName extends TableNamesOf<TInstance>>(
+  tableName: TName,
+  factory: (
+    t: PathColumnFactory<RowOf<TInstance, TName>>
+  ) => TableDefResult<RowOf<TInstance, TName>>
+) => TableDefinition<TName, RowOf<TInstance, TName>>;
 
 /**
  * Tier-2 escape hatch for adapters without `$types` (REST, memory): an
@@ -245,11 +243,9 @@ export interface DefineTableCurried<TInstance> {
  * unconstrained `string` (there's no schema catalog to check it against),
  * but columns remain fully path-typed against `TRow`.
  */
-export interface DefineTableRowCurried<TRow> {
-  (
-    tableName: string,
-    factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
-  ): TableDefinition<string, TRow>;
-}
+export type DefineTableRowCurried<TRow> = (
+  tableName: string,
+  factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
+) => TableDefinition<string, TRow>;
 
 export type { AdapterTableTypes, AdapterTypes, SchemaAwareAdapter, SchemaOf } from './paths';

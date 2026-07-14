@@ -25,6 +25,7 @@ read correctly. See [What did NOT change](#what-did-not-change).
 | `@better-tables/adapters-toolkit` | New package; the Drizzle adapter is restructured on top of it. Public `DrizzleAdapter`/`drizzleAdapter()` surface is unchanged — only direct instantiators of `DataTransformer` are affected. | [§9](#9-adapters-toolkit-extraction-internal-restructure) |
 | React | 19+ only. | [§10](#10-react-19) |
 | Date column `timeZone` | Now actually converts (`@date-fns/tz`) instead of being accepted-but-ignored, including the builder's pre-existing `'UTC'` default on `.format()`/`.dateTime()`/`.timeOnly()`. | [§11](#11-date-formatting-timezone-is-now-actually-applied) |
+| Reading a specific table | New recommended pattern: `tables.fetchData(usersTable, params)` — injects `primaryTable` and returns a typed row, no cast. Drizzle's `database.fetchData`/facet reads now throw on a multi-table schema when nothing disambiguates the table (mirrors §7's mutation throw). | [§12](#12-reading-a-specific-table-tablesfetchdata-and-the-drizzle-multi-table-read-throw) |
 
 ## 1. Table setup: `betterTables` + `defineTable`
 
@@ -63,7 +64,13 @@ export const usersTable = defineTable<typeof tables>()('users', (t) => ({
 }));
 // also supported: tables.define('users', (t) => ({ ... })) — method form
 
-const result = await tables.database.fetchData({ columns: ['name', 'email'] });
+// Recommended: query THROUGH the table definition (see §12) — primaryTable
+// is injected automatically and the result is typed to usersTable's own row,
+// no cast:
+const result = await tables.fetchData(usersTable, { columns: ['name', 'email'] });
+// `tables.database.fetchData(...)` (the raw adapter) still works too, and is
+// still the only path for cross-table queries that don't belong to one
+// defineTable() — see §12 for when it throws on a multi-table schema.
 ```
 
 Why: the per-table shell couldn't express a multi-table app without the
@@ -416,6 +423,117 @@ viewer-local behavior, don't set `timeZone` on `.dateOnly()`/`.relative()`
 unrecognized IANA zone name doesn't throw — it warns once via
 `console.warn` and falls back to unconverted rendering.
 
+## 12. Reading a specific table: `tables.fetchData()` and the Drizzle multi-table read throw
+
+Marketing-showcase dogfooding turned up a real footgun: `database.fetchData({
+pagination })` on a multi-table schema silently returned the FIRST table's
+rows (customer rows typed and shaped as tickets, a correct-looking `total`,
+and a single easy-to-miss `console.warn`) whenever a call didn't disambiguate
+which table to query. §7 already fixed the analogous problem for
+mutations — this section brings reads up to the same bar, and adds the
+ergonomic fix on top: query THROUGH the table you defined, so the mistake
+becomes unreachable.
+
+**New: `tables.fetchData(table, params)`.** Query through a `defineTable()`
+result instead of the raw adapter:
+
+```typescript
+// 0.6 — recommended
+const result = await tables.fetchData(usersTable, {
+  pagination: { page: 1, limit: 20 },
+});
+// result: FetchDataResult<User> — usersTable's own row type, no cast
+```
+
+`primaryTable` is injected from `usersTable.tableName` automatically —
+`TableScopedFetchDataParams` (the params type this method accepts) omits
+`primaryTable` entirely, so there's nothing to pass, and nothing to get
+wrong. The old pattern required both a manual `primaryTable` (easy to
+forget on a multi-table schema) and a manual cast at every call site:
+
+```typescript
+// 0.5 / still works, but no longer the recommended path
+const result = (await tables.database.fetchData({
+  primaryTable: 'users', // easy to omit; wrong-table risk if it's wrong or missing
+  pagination: { page: 1, limit: 20 },
+})) as FetchDataResult<User>; // manual cast — the adapter can't know which table you meant
+```
+
+`tables.getFacetedValues(table, columnId, params)`/`getMinMaxValues(...)`/
+`getFilterOptions(...)` are the same idea for facet reads: `columnId` is
+typed against `table.$infer.ColumnId`, so a wrong-table column id is a
+compile error. These can't inject `primaryTable` (the adapter contract's
+`FacetQueryParams` has no such field) — the type safety is the win here, not
+a new runtime guarantee.
+
+**Drizzle: multi-table reads with no disambiguating signal now throw.**
+`database.fetchData`/`getFilterOptions`/`getFacetedValues`/`getMinMaxValues`
+on a schema with more than one table, called with neither `columns` nor
+`primaryTable`, now throw a `SchemaError` instead of silently assuming "the
+first table" (the same fix §7 already applied to mutations):
+
+```typescript
+// 0.5 — silently returned `users` rows on a { users, profiles, ... } schema
+const adapter = drizzleAdapter(db);
+await adapter.fetchData({ pagination: { page: 1, limit: 20 } }); // wrong table, one console.warn
+```
+
+```typescript
+// 0.6 — throws a SchemaError until something disambiguates the table
+const adapter = drizzleAdapter(db); // 0.6
+await adapter.fetchData({ pagination: { page: 1, limit: 20 } });
+// SchemaError: Multiple tables in schema — set 'primaryTable' (per call),
+// 'defaultPrimaryTable' (in drizzleAdapter options), or pass 'columns' that
+// disambiguate, to select which table to query
+
+// Fixes: pass `columns` that resolve to one table, pass `primaryTable`
+// per call, configure a `defaultPrimaryTable` adapter-wide, or (recommended)
+// query through `tables.fetchData(usersTable, params)` above.
+const fixedAdapter = drizzleAdapter(db, { // 0.6
+  options: { defaultPrimaryTable: 'users' },
+});
+await fixedAdapter.fetchData({ pagination: { page: 1, limit: 20 } }); // targets `users`
+```
+
+**Schemas with exactly one table are unaffected** — no configuration needed.
+`PrimaryTableResolver`'s own no-columns fallback (the `console.warn` you may
+have seen before) is unchanged for callers that don't go through these five
+entry points.
+
+**Also fixed alongside this:** filtering or sorting by a relation column that
+isn't in `columns` (e.g. `filters: [{ columnId: 'customer.plan', ... }]` with
+`customer` not requested via `columns`) used to silently drop that relation
+from the result rows even though it correctly narrowed the result set. It's
+now embedded in every returned row, the same as if you'd requested one of its
+fields via `columns` — with no over-fetching of relations you didn't filter,
+sort, or select.
+
+**Deployment note: lazy-init a module-scope instance wrapping a native
+binding.** If `betterTables()`/`drizzleAdapter()` are constructed eagerly at
+module scope (`export const tables = betterTables({ database: drizzleAdapter(db) })`)
+and `db` wraps a native binding (e.g. `better-sqlite3`), that constructor
+runs at IMPORT time. Under `next build`, Next.js's page-data collection phase
+imports route modules in a constrained environment that doesn't always tolerate
+a native binding's eager side effects, and the build can fail or hang.
+Wrap construction in a lazy getter instead, so the native binding is only
+touched when a request actually needs it:
+
+```typescript
+// Breaks under `next build`'s page-data collection
+export const tables = betterTables({ database: drizzleAdapter(db) });
+```
+
+```typescript
+// 0.6 — lazy getter
+let _tables: ReturnType<typeof betterTables> | undefined;
+export function getTables() {
+  if (!_tables) {
+    _tables = betterTables({ database: drizzleAdapter(getDb()) });
+  }
+  return _tables;
+}
+```
+
 ## What did NOT change
 
 Migration guides that only list breakage overstate the pain. In 0.6:
@@ -434,7 +552,8 @@ Migration guides that only list breakage overstate the pain. In 0.6:
   implicit-AND array. Newly serialized URLs always write `c2:`.
 - **Single-table Drizzle schemas need no `defaultMutationTable` configuration**
   ([§7](#7-drizzle-defaultmutationtable-is-now-required-for-multi-table-mutations)) —
-  the one table is used automatically.
+  the one table is used automatically. The same is true for reads
+  ([§12](#12-reading-a-specific-table-tablesfetchdata-and-the-drizzle-multi-table-read-throw)).
 - **The filter bar UI stays flat.** You don't need to touch anything in your
   UI layer to pick up 0.6 — the reactive store's `filters` field and
   `filters_changed` event are unchanged, flat `FilterState[]`.
