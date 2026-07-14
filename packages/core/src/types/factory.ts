@@ -17,7 +17,9 @@
 
 import type { ColumnBuilder } from '../builders/column-builder';
 import type { PathColumnFactory } from '../builders/path-builders';
+import type { FacetQueryParams, FetchDataParams, FetchDataResult } from './adapter';
 import type { ColumnDefinition } from './column';
+import type { FilterOption } from './filter';
 import type { AdapterTableTypes, Paths, SchemaAwareAdapter, SchemaOf } from './paths';
 
 // ============================================================================
@@ -79,7 +81,77 @@ export interface BetterTablesInstance<TAdapter extends SchemaAwareAdapter = Sche
   readonly $types: SchemaOf<TAdapter>;
   /** The method form of `defineTable` -- see {@link DefineTableCurried}. */
   define: DefineTableCurried<BetterTablesInstance<TAdapter>>;
+
+  /**
+   * Query THROUGH a table definition instead of the raw adapter (plan 030,
+   * findings 9 + 16): `tables.fetchData(usersTable, params)` injects
+   * `primaryTable: usersTable.tableName` automatically -- the caller never
+   * supplies (or omits) it -- and returns `FetchDataResult<TRow>` typed to
+   * the table's own row, with no `as FetchDataResult<...>` cast.
+   *
+   * This is the ergonomic path multi-table schemas should use for reads.
+   * `database.fetchData(...)` (the raw adapter method) remains available
+   * for callers who need to bypass a single table (e.g. a cross-table
+   * report query); on a multi-table schema, THAT path throws a
+   * `SchemaError` rather than guessing when neither `columns` nor
+   * `primaryTable` disambiguates it (see the Drizzle adapter's
+   * `resolvePrimaryTableForRead`) -- this method makes that failure mode
+   * unreachable by construction, since `primaryTable` is always supplied.
+   *
+   * @example
+   * ```typescript
+   * // No cast, no primaryTable to get wrong -- ticketsTable.$infer.Row is
+   * // inferred automatically as the return row type.
+   * const { data, total } = await tables.fetchData(ticketsTable, {
+   *   pagination: { page: 1, limit: 20 },
+   * });
+   * ```
+   */
+  fetchData<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    params?: TableScopedFetchDataParams
+  ): Promise<FetchDataResult<TRow>>;
+
+  /**
+   * Table-scoped `getFacetedValues`: `columnId` is typed against
+   * `table.$infer.ColumnId`, so a typo'd or wrong-table column id is a
+   * compile error. `database.getFacetedValues(columnId, params)` has no
+   * `primaryTable` parameter at the adapter-contract level (unlike
+   * `fetchData`), so this wrapper cannot inject one -- it delegates to the
+   * SAME runtime column-based resolution `database.getFacetedValues`
+   * already does. The value here is the typed `columnId`, not a new
+   * runtime disambiguation guarantee.
+   */
+  getFacetedValues<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    columnId: TableDefInfer<TName, TRow>['ColumnId'],
+    params?: FacetQueryParams
+  ): Promise<Map<string, number>>;
+
+  /** Table-scoped `getMinMaxValues` -- see {@link BetterTablesInstance.getFacetedValues}. */
+  getMinMaxValues<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    columnId: TableDefInfer<TName, TRow>['ColumnId'],
+    params?: FacetQueryParams
+  ): Promise<[number, number]>;
+
+  /** Table-scoped `getFilterOptions` -- see {@link BetterTablesInstance.getFacetedValues}. */
+  getFilterOptions<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    columnId: TableDefInfer<TName, TRow>['ColumnId'],
+    params?: FacetQueryParams
+  ): Promise<FilterOption[]>;
 }
+
+/**
+ * Params for {@link BetterTablesInstance.fetchData}: identical to
+ * `FetchDataParams` minus `primaryTable`, which the table-scoped method
+ * injects itself from `table.tableName` -- a caller-supplied `primaryTable`
+ * here would either be redundant or (worse) contradict the table being
+ * queried through, so it's removed from the surface entirely rather than
+ * silently ignored or validated at runtime.
+ */
+export type TableScopedFetchDataParams = Omit<FetchDataParams, 'primaryTable'>;
 
 // ============================================================================
 // 2. defineTable() -- schema-aware (curried) and explicit-row (tier-2)

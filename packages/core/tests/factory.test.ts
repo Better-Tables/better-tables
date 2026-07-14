@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { betterTables, defineTable, defineTableRow } from '../src/factory';
-import type { TableAdapter } from '../src/types/adapter';
+import type { FetchDataParams, TableAdapter } from '../src/types/adapter';
 import type { SchemaAwareAdapter } from '../src/types/paths';
 
 /**
@@ -197,6 +197,62 @@ describe('betterTables() instance', () => {
       expect(viaMethod.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))).toEqual(
         viaCurried.columns.map((c) => ({ id: c.id, displayName: c.displayName, type: c.type }))
       );
+    });
+  });
+
+  describe('tables.fetchData(table, params) -- table-scoped read surface (plan 030)', () => {
+    it('injects primaryTable: table.tableName into the underlying database.fetchData call', async () => {
+      let capturedParams: FetchDataParams | undefined;
+      const adapter = createMockAdapter();
+      adapter.fetchData = async (params) => {
+        capturedParams = params;
+        return {
+          data: [],
+          total: 0,
+          pagination: { page: 1, limit: 20, totalPages: 0, hasNext: false, hasPrev: false },
+        };
+      };
+      const tables = betterTables({ database: adapter });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name')],
+      }));
+
+      await tables.fetchData(usersTable, { pagination: { page: 2, limit: 5 } });
+
+      expect(capturedParams?.primaryTable).toBe('users');
+      expect(capturedParams?.pagination).toEqual({ page: 2, limit: 5 });
+    });
+
+    it('returns exactly what database.fetchData resolves to', async () => {
+      const adapter = createMockAdapter();
+      const expected = {
+        data: [{ id: '1', name: 'Ada', email: 'ada@example.com', age: 30 }],
+        total: 1,
+        pagination: { page: 1, limit: 20, totalPages: 1, hasNext: false, hasPrev: false },
+      };
+      adapter.fetchData = async () => expected;
+      const tables = betterTables({ database: adapter });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name')],
+      }));
+
+      const result = await tables.fetchData(usersTable, {});
+
+      expect(result).toEqual(expected);
+    });
+
+    it('a per-call primaryTable is not accepted -- TableScopedFetchDataParams omits it', () => {
+      const tables = betterTables({ database: createMockAdapter() });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name')],
+      }));
+
+      tables.fetchData(usersTable, {
+        // @ts-expect-error - primaryTable is injected from usersTable.tableName,
+        // not a caller-supplied param on this surface (plan 030 Step 3).
+        primaryTable: 'someOtherTable',
+      });
+      expect(true).toBe(true);
     });
   });
 

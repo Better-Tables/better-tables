@@ -39,6 +39,7 @@
 import type { ColumnBuilder } from './builders/column-builder';
 import { validateColumns } from './builders/column-factory';
 import { createPathColumnFactory, type PathColumnFactory } from './builders/path-builders';
+import type { FacetQueryParams, TableAdapter } from './types/adapter';
 import type { ColumnDefinition } from './types/column';
 import type {
   BetterTablesConfig,
@@ -50,6 +51,7 @@ import type {
   TableDefinition,
   TableDefResult,
   TableNamesOf,
+  TableScopedFetchDataParams,
 } from './types/factory';
 import type { SchemaAwareAdapter } from './types/paths';
 
@@ -81,7 +83,64 @@ export function betterTables<TAdapter extends SchemaAwareAdapter>(
     BetterTablesInstance<TAdapter>
   >;
 
+  // The table-scoped read surface (plan 030, findings 9 + 16): every method
+  // here injects `primaryTable: table.tableName` (where the adapter
+  // contract supports it -- see `TableScopedFetchDataParams`'s doc comment)
+  // and returns a result typed to the TABLE's own row/columnId, not the
+  // whole-schema union `TAdapter` is generic over. `asTableAdapter` is the
+  // single audited erasure point bridging `config.database` (typed only as
+  // `SchemaAwareAdapter`, i.e. carrying no compile-time guarantee of
+  // `fetchData` et al.) to the real `TableAdapter` interface every
+  // concrete adapter (Drizzle, REST, memory, ...) implements at runtime --
+  // the same trust boundary `defineTableImpl`'s cast documents above.
+  instance.fetchData = (async (
+    table: TableDefinition<string, unknown>,
+    params?: TableScopedFetchDataParams
+  ) => {
+    return asTableAdapter(config.database).fetchData({
+      ...params,
+      primaryTable: table.tableName,
+    });
+  }) as unknown as BetterTablesInstance<TAdapter>['fetchData'];
+
+  instance.getFacetedValues = (async (
+    _table: TableDefinition<string, unknown>,
+    columnId: string,
+    params?: FacetQueryParams
+  ) => {
+    return asTableAdapter(config.database).getFacetedValues(columnId, params);
+  }) as unknown as BetterTablesInstance<TAdapter>['getFacetedValues'];
+
+  instance.getMinMaxValues = (async (
+    _table: TableDefinition<string, unknown>,
+    columnId: string,
+    params?: FacetQueryParams
+  ) => {
+    return asTableAdapter(config.database).getMinMaxValues(columnId, params);
+  }) as unknown as BetterTablesInstance<TAdapter>['getMinMaxValues'];
+
+  instance.getFilterOptions = (async (
+    _table: TableDefinition<string, unknown>,
+    columnId: string,
+    params?: FacetQueryParams
+  ) => {
+    return asTableAdapter(config.database).getFilterOptions(columnId, params);
+  }) as unknown as BetterTablesInstance<TAdapter>['getFilterOptions'];
+
   return instance;
+}
+
+/**
+ * Single audited erasure point: `SchemaAwareAdapter` (the generic
+ * constraint `betterTables<TAdapter>` is written against) only guarantees a
+ * `$types` phantom, not the real `fetchData`/`getFacetedValues`/... methods
+ * every concrete adapter implements. Every real adapter DOES implement
+ * `TableAdapter` at runtime (it's how `database.fetchData(...)` already
+ * worked before this table-scoped surface existed); this cast documents
+ * that fact once, rather than re-asserting it at each call site above.
+ */
+function asTableAdapter(database: unknown): TableAdapter<unknown> {
+  return database as TableAdapter<unknown>;
 }
 
 /**
