@@ -265,3 +265,83 @@ export function filterTablesFromSchema(
 
   return filtered;
 }
+
+/**
+ * Find schema-object keys whose value is a `Relations` wrapper that has
+ * CLOBBERED the real table it should be keyed under -- i.e. a genuine
+ * collision, not the common (and fully supported) pattern of including a
+ * relations wrapper under a differently-named key alongside its table
+ * (e.g. `{ users, usersRelations }`, per `filterTablesFromSchema`'s own
+ * documented example).
+ *
+ * @description
+ * A `schema` object passed to `drizzleAdapter()`/`new DrizzleAdapter()`
+ * may legitimately mix tables and relations under DIFFERENT keys -- that's
+ * the normal, widely-used pattern (`filterTablesFromSchema` strips the
+ * relations entries out at runtime, byte for byte, in that case; nothing
+ * to flag). The construction MISTAKE this function targets (plan 030,
+ * finding 11) is specifically spreading a relations map keyed by table
+ * name OVER a tables map, e.g. `{ ...tables, ...relationsKeyedByTableName }`:
+ * the later spread silently overwrites each colliding key's real table
+ * object with a same-named `Relations` object, so the table that should
+ * live at that key is simply GONE.
+ *
+ * Distinguishing the two: a `Relations` wrapper's `.table` property points
+ * at the table it describes, and that table carries its own SQL name via
+ * `Symbol.for('drizzle:Name')` (the same symbol `extractSchemaFromDB`
+ * reads). If a schema key `K` holds a `Relations` wrapper whose OWN
+ * described table's SQL name is ALSO `K`, that wrapper is self-referentially
+ * "the relations for the table that belongs at key K" -- exactly the
+ * clobbering signature (`users: usersRelations`, where `usersRelations`
+ * describes the `users` table). A suffixed key like `usersRelations` never
+ * matches this (the described table's SQL name is `'users'`, not
+ * `'usersRelations'`), so the common supported pattern is never flagged.
+ *
+ * This intentionally does not catch every possible clobbering shape (e.g.
+ * a mismatched-SQL-name table clobbered under its JS key -- finding 14's
+ * scenario -- isn't self-referentially detectable this way without also
+ * cross-referencing a separately-passed `relations` config), but it does
+ * catch the exact `{ ...tables, ...relationsKeyedByTableName }` pattern
+ * finding 11 describes, with zero false positives against the supported
+ * pattern.
+ *
+ * @param schema - The schema object as passed to the adapter/factory
+ * @returns The schema-object keys whose value is a `Relations` wrapper
+ *   self-referentially describing the table that should be at that same
+ *   key (empty if none)
+ */
+export function findRelationsShapedSchemaKeys(schema: Record<string, unknown>): string[] {
+  const relationsShapedKeys: string[] = [];
+  const tableSymbol = Symbol.for('drizzle:Name');
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (!value || typeof value !== 'object') continue;
+
+    const potentialTable = value as Record<string, unknown>;
+
+    // A real table (this Drizzle version's shape -- no `_` property; see
+    // filterTablesFromSchema's `_`-based branch for the legacy shape this
+    // mirrors) never has a `.table` property. A `Relations` wrapper always
+    // does.
+    const hasUnderscoreMeta =
+      '_' in potentialTable && potentialTable._ && typeof potentialTable._ === 'object';
+    if (hasUnderscoreMeta || !('table' in potentialTable && potentialTable.table)) {
+      continue;
+    }
+
+    try {
+      const describedTable = (value as Relations).table as unknown;
+      if (!describedTable || typeof describedTable !== 'object') continue;
+
+      const describedTableSqlName = (describedTable as Record<symbol, unknown>)[tableSymbol];
+      if (typeof describedTableSqlName === 'string' && describedTableSqlName === key) {
+        relationsShapedKeys.push(key);
+      }
+    } catch {
+      // Not a real Relations object (or an incompatible shape) -- ignore,
+      // same tolerance filterTablesFromSchema/extractSchemaFromDB apply.
+    }
+  }
+
+  return relationsShapedKeys;
+}

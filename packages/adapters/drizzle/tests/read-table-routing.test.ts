@@ -66,7 +66,7 @@ describe('DrizzleAdapter - read table routing', () => {
   });
 
   describe('multi-table schema, no columns and no primaryTable configured', () => {
-    it('fetchData rejects with a SchemaError naming the available tables (not the first table\'s rows)', async () => {
+    it("fetchData rejects with a SchemaError naming the available tables (not the first table's rows)", async () => {
       const adapter = buildAdapter(db, multiTableSchema);
       await expect(adapter.fetchData({})).rejects.toThrow(SchemaError);
       await expect(adapter.fetchData({ pagination: { page: 1, limit: 10 } })).rejects.toThrow(

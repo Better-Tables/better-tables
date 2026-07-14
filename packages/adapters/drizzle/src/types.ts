@@ -1244,17 +1244,18 @@ export type ExtractDriverFromDB<TDB> =
  * alongside the plain tables in the SAME schema object passed to
  * `drizzle(connection, { schema })`.
  */
-export type ExtractRawSchemaFromDB<TDB> = TDB extends PostgresJsDatabase<infer S>
-  ? S
-  : TDB extends NodePgDatabase<infer S>
+export type ExtractRawSchemaFromDB<TDB> =
+  TDB extends PostgresJsDatabase<infer S>
     ? S
-    : TDB extends NeonHttpDatabase<infer S>
+    : TDB extends NodePgDatabase<infer S>
       ? S
-      : TDB extends MySql2Database<infer S>
+      : TDB extends NeonHttpDatabase<infer S>
         ? S
-        : TDB extends BetterSQLite3Database<infer S>
+        : TDB extends MySql2Database<infer S>
           ? S
-          : Record<string, unknown>;
+          : TDB extends BetterSQLite3Database<infer S>
+            ? S
+            : Record<string, unknown>;
 
 /**
  * Depth-decrement lookup, matching `@better-tables/core`'s `Prev` (used by

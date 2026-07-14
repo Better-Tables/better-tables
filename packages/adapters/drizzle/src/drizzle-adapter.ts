@@ -96,7 +96,7 @@ import {
   getForeignKeyColumns,
   getPrimaryKeyColumns,
 } from './utils/drizzle-schema-utils';
-import { filterTablesFromSchema } from './utils/schema-extractor';
+import { filterTablesFromSchema, findRelationsShapedSchemaKeys } from './utils/schema-extractor';
 
 /**
  * Drizzle adapter implementation for Better Tables.
@@ -207,6 +207,30 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
   constructor(config: DrizzleAdapterConfig<TSchema, TDriver>) {
     this.db = config.db;
+
+    // Detect a schema key whose value is a Relations wrapper rather than a
+    // table (plan 030, finding 11) -- e.g. `{ ...tables, ...relationsKeyedByTableName }`,
+    // where the later spread silently overwrote a real table object with a
+    // same-named Relations object. filterTablesFromSchema (below) already
+    // tolerates this by dropping such keys entirely, which means the
+    // colliding table would otherwise silently vanish from the adapter's
+    // schema instead of surfacing the construction mistake. Fail loudly
+    // here, naming the colliding key(s), rather than letting it surface
+    // far away at a confusing defineTable() type error.
+    const relationsShapedKeys = findRelationsShapedSchemaKeys(
+      config.schema as Record<string, unknown>
+    );
+    if (relationsShapedKeys.length > 0) {
+      throw new SchemaError(
+        `Schema key(s) ${relationsShapedKeys.map((key) => `'${key}'`).join(', ')} contain a ` +
+          'Relations object where a table was expected. This usually means a relations map ' +
+          '(keyed by table name) was spread over the tables map -- e.g. ' +
+          '{ ...tables, ...relationsKeyedByTableName } -- silently overwriting the real table(s). ' +
+          'Pass tables in `schema` and relations separately via the `relations` option.',
+        { relationsShapedKeys }
+      );
+    }
+
     // Filter out relations from schema at runtime - schema may include both tables and relations
     this.schema = filterTablesFromSchema(config.schema) as FilterTablesFromSchema<TSchema>;
     this.options = config.options || {};

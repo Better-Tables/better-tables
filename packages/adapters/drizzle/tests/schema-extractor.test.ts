@@ -104,7 +104,9 @@ describe('extractSchemaFromDB', () => {
       // Before the fix, `relations` was keyed by the SQL name
       // ('support_tickets', 'customer_accounts') instead of the JS key.
       expect(Object.keys(extracted.relations).sort()).toEqual(['customer', 'tickets']);
-      expect(new Set(Object.keys(extracted.tables))).toEqual(new Set(Object.keys(extracted.relations)));
+      expect(new Set(Object.keys(extracted.tables))).toEqual(
+        new Set(Object.keys(extracted.relations))
+      );
       expect(extracted.relations.tickets).toBe(ticketsRelations);
       expect(extracted.relations.customer).toBe(customerRelations);
     } finally {
@@ -139,7 +141,11 @@ describe('extractSchemaFromDB', () => {
   it('returns an empty, invalid result for a non-db value', () => {
     expect(extractSchemaFromDB(null)).toEqual({ tables: {}, relations: {}, hasSchema: false });
     expect(extractSchemaFromDB(undefined)).toEqual({ tables: {}, relations: {}, hasSchema: false });
-    expect(extractSchemaFromDB('not a db')).toEqual({ tables: {}, relations: {}, hasSchema: false });
+    expect(extractSchemaFromDB('not a db')).toEqual({
+      tables: {},
+      relations: {},
+      hasSchema: false,
+    });
   });
 });
 

@@ -1241,7 +1241,9 @@ export abstract class BaseQueryBuilder {
     // explicitly-requested relation column already does.
     const autoEmbedColumns = this.computeAutoEmbedColumns(params.columns, context);
     const columnsForSelect =
-      autoEmbedColumns.length > 0 ? [...(params.columns ?? []), ...autoEmbedColumns] : params.columns;
+      autoEmbedColumns.length > 0
+        ? [...(params.columns ?? []), ...autoEmbedColumns]
+        : params.columns;
 
     const selectResult = this.buildSelectQuery(
       context,
