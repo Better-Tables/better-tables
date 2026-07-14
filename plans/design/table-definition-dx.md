@@ -957,3 +957,106 @@ they exist):
   is marked inline and should be treated as "best understanding, pending
   plan 008 verification against the actual Prisma client API" — not as
   verified fact the way the Drizzle recipe is.
+
+---
+
+## Addendum (plan 031, 2026-07-13): reverse-relation path noise (finding 12)
+
+Plan 029 (dogfooding) filed finding 12: `Paths<T, D>`/`RowOf` surface
+recursive relation back-references, so a `customer` field "becomes a union
+of with/without back-ref that no real `columns` selection produces,"
+forcing an `as unknown as` bridge in consumers. Plan 031 Step 5 was scoped
+to investigate and either (a) cap back-reference recursion more
+aggressively within `packages/core/src/types/paths.ts` (shippable), or (b)
+write up a `RowFor<TableDefinition, TSelectedColumns>` narrowing design and
+defer. This addendum records the (a)-vs-(b) investigation; **(a) was not
+shippable as a clean, correctly-scoped fix, so this STOPS on (b) per the
+plan's own STOP condition** ("do NOT half-build a narrowed-row type").
+
+### What's actually happening, verified
+
+Using a synthetic 2-entity mutual relation (`Table1.rel2: Table2[]`,
+`Table2.rel1?: Table1 | null` — the same shape as
+`tests/types/table-def-perf-fixture.ts`'s deliberate mutual-recursion
+pair), forcing `tsc` to print the full expansion of `Paths<Table1>`
+confirms it includes `'rel2.rel1'`, `'rel2.rel1.name'`,
+`'rel2.rel1.score'`, and `'rel2.rel1.rel2'` — i.e., a 2-hop path that walks
+FORWARD across `rel2` then BACKWARD across `rel1`, landing back on a
+`Table1`-shaped object one hop "into" itself. This is within the existing
+depth-3 cap (Step 2 section 2 above; a THIRD hop back out, e.g.
+`rel2.rel1.rel2.score`, is correctly excluded) — it is not a cap-tuning
+bug, it is `Paths<T, D>` doing exactly what its docstring promises
+(enumerate every reachable dotted path up to depth `D`), on a schema shape
+that happens to be symmetric.
+
+### Why (a) — capping within `paths.ts` — is not a clean fix
+
+`Paths<T, D>` is intentionally schema-agnostic: it walks whatever nested
+object/array shape `T` has, with no concept of "this nested field came
+from a forward relation" vs. "a reverse/back-reference relation." That
+distinction does not exist in `T`'s plain TS shape — it is knowledge the
+ADAPTER had (Drizzle's `relations()` config knows which side is the
+"local"/owning side and which is the referencing side) that is erased by
+the time `T` reaches `Paths`. Two levers were considered and rejected:
+
+1. **Lower the global depth cap (3 -> 2).** This was already considered
+   and explicitly rejected in Open question (c) above (10x instantiation
+   headroom, no performance case for 2). It is also the wrong tool for
+   THIS problem regardless of performance: it is not direction-aware, so
+   it would remove legitimate depth-3 FORWARD chains (e.g.
+   `order.customer.company.name`) exactly as readily as it removes the
+   reverse-edge noise, while a 2-entity mutual pair's `rel2.rel1` back-hop
+   is only ONE relation hop deep and would survive a cap of 2 anyway (it
+   would take a cap of 1 to remove it, which breaks nearly every
+   multi-relation use case this design exists for).
+2. **Filter reverse edges out of `Paths<T, D>`'s traversal.** Not
+   expressible without direction metadata `Paths<T, D>`'s generic contract
+   doesn't have. A hypothetical `Paths<T, D, TExcludeKeys>` parameter
+   could exclude a NAMED key at each level, but the caller (the Drizzle
+   `$types` recipe, `RelationAwareRow`/`DeepWith` in
+   `packages/adapters/drizzle/src/types.ts`) would have to supply that
+   exclusion list per table from `relations()` config, making this
+   primarily an ADAPTER-side change threaded through `paths.ts`'s generic
+   signature, not a self-contained `paths.ts` fix -- and adapter query
+   translation is explicitly out of plan 031's scope.
+
+Verified separately: `RelationAwareRow`/`DeepWith` (the Drizzle adapter's
+own relation-aware row recipe) recurses into EVERY relation symmetrically
+at each depth level with no forward/reverse distinction either — the root
+cause is upstream of `paths.ts`, in how the relation-aware row `T` itself
+is constructed before `Paths<T, D>` ever sees it. Also worth noting: a
+2-hop back-reference is not ALWAYS noise -- for a genuine
+Order/Customer-shaped bidirectional relation, `customer.orders.status`
+("does this order's customer have other orders in status X") is a
+legitimate, useful query pattern. Only a same-depth "come back to my own
+record" cycle (this synthetic fixture's shape) is pure noise. Distinguishing
+the two requires the relation's semantic direction, which is exactly the
+metadata `Paths<T, D>` doesn't have.
+
+### Recommendation: (b), a selection-narrowed row type
+
+The clean fix is `RowFor<TableDefinition, TSelectedColumns>` (option b) --
+narrow the row type to what a table's ACTUAL `columns` selection returns,
+rather than every path the schema's full relation graph could theoretically
+reach. This requires `TableDefinition['columns']` to be a literal-preserving
+tuple (not today's `ColumnDefinition<TRow, unknown>[]`, `types/factory.ts:151`)
+so a selection can be typed as `TColumns[number]['id']` -- the SAME
+literal-id-preservation gap plan 031 Step 4's `buildFilter` module doc
+already identifies as blocking full per-column type inference (both are
+downstream of the same missing plan 006 registry lift). This is
+design-doc-sized (a new type recipe, plus the tuple-preservation follow-up
+it depends on, plus verifying it against the Drizzle `$types` recipe) --
+out of scope to half-build inside plan 031. Recommend a follow-up plan,
+sequenced after (or combined with) whatever plan lands literal-preserving
+column ids, scoped to: (1) the tuple-preservation follow-up itself, (2)
+`RowFor`, (3) re-verifying `RelationAwareRow`/`DeepWith` against it so the
+Drizzle `$types` recipe's row type narrows the same way.
+
+**STOP condition invoked**: plan 031 Step 5 stops here per its own
+allowance ("Ship (a) if it's clean and within the perf budget; otherwise
+write up (b) as a design-doc input and STOP on it"). `paths.ts` is
+unmodified by plan 031 Step 5; the perf budget was never the blocker (the
+existing depth-3 default already has 10x/2.5x headroom per Open question
+(c)) -- the blocker is that a correctly-scoped fix needs adapter-supplied
+relation-direction metadata and/or literal-preserving column ids, neither
+of which plan 031 owns.
