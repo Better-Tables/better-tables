@@ -161,6 +161,19 @@ export interface FilterMetadata {
  * Base filter state with common properties
  */
 export interface BaseFilterState {
+  /**
+   * Stable per-filter identity (plan 031 Step 3, finding 2). Optional --
+   * `columnId` alone doesn't disambiguate two filters on the same column
+   * inside one {@link FilterGroupNode} (e.g. `age > 18 OR age < 5`), which a
+   * UI iterating filters by `columnId` can't key correctly. When present,
+   * `id` round-trips unchanged through `serializeFiltersToURL`/
+   * `deserializeFiltersFromURL` (compression's key map carries it) and
+   * survives `structuredClone`/`JSON.stringify` like every other field.
+   * Callers that don't populate `id` should key by {@link filterKey}
+   * (`utils/filter-value.ts`) instead of `columnId` alone.
+   */
+  id?: string;
+
   /** Column ID being filtered */
   columnId: string;
 

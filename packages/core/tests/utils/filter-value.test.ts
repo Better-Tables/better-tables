@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { FilterState } from '../../src/types/filter';
-import { filterHasValue } from '../../src/utils/filter-value';
+import { filterHasValue, filterKey } from '../../src/utils/filter-value';
 
 describe('filterHasValue', () => {
   it('checks membership on a text filter without narrowing by type', () => {
@@ -114,5 +114,51 @@ describe('filterHasValue', () => {
 
     expect(filterHasValue(filter, 'two')).toBe(true);
     expect(filterHasValue(filter, 'three')).toBe(false);
+  });
+});
+
+describe('filterKey', () => {
+  it('uses the explicit id when present, ignoring index/columnId', () => {
+    const filter: FilterState = {
+      id: 'my-id',
+      columnId: 'status',
+      type: 'option',
+      operator: 'is',
+      values: ['active'],
+    };
+
+    expect(filterKey(filter, 0)).toBe('my-id');
+    expect(filterKey(filter, 7)).toBe('my-id');
+  });
+
+  it('falls back to columnId + position when id is absent', () => {
+    const filter: FilterState = {
+      columnId: 'status',
+      type: 'option',
+      operator: 'is',
+      values: ['active'],
+    };
+
+    expect(filterKey(filter, 0)).toBe('status#0');
+    expect(filterKey(filter, 3)).toBe('status#3');
+  });
+
+  it('disambiguates two id-less filters on the same columnId by position', () => {
+    const first: FilterState = {
+      columnId: 'age',
+      type: 'number',
+      operator: 'lessThan',
+      values: [5],
+    };
+    const second: FilterState = {
+      columnId: 'age',
+      type: 'number',
+      operator: 'greaterThan',
+      values: [18],
+    };
+
+    const keys = [filterKey(first, 0), filterKey(second, 1)];
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(new Set(keys).size).toBe(2);
   });
 });

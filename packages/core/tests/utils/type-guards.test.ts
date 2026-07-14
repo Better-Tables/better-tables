@@ -9,6 +9,7 @@ import {
   isDateLike,
   isFilterGroupNode,
   isFilterNodeShape,
+  isFilterStateShape,
   isFilterValuesOfType,
   isJsonFilterState,
   isMultiOptionFilterState,
@@ -638,6 +639,38 @@ describe('Type Guards', () => {
 
     it('should handle ISO date string', () => {
       expect(isDateLike('2023-01-01')).toBe(true);
+    });
+  });
+
+  describe('isFilterStateShape - id field (plan 031 Step 3, finding 2)', () => {
+    it('accepts a filter with no id (backwards compatible)', () => {
+      expect(
+        isFilterStateShape({ columnId: 'name', type: 'text', operator: 'contains', values: [] })
+      ).toBe(true);
+    });
+
+    it('accepts a filter with a string id', () => {
+      expect(
+        isFilterStateShape({
+          id: 'f-1',
+          columnId: 'name',
+          type: 'text',
+          operator: 'contains',
+          values: [],
+        })
+      ).toBe(true);
+    });
+
+    it('rejects a filter with a non-string id', () => {
+      expect(
+        isFilterStateShape({
+          id: 42,
+          columnId: 'name',
+          type: 'text',
+          operator: 'contains',
+          values: [],
+        })
+      ).toBe(false);
     });
   });
 });
