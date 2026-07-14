@@ -18,9 +18,20 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 ## Status at a glance (2026-07-13)
 
-- **Done and merged**: 26 plans (001–007, 010–029) — 020–028 backlog wave +
-  029 showcase dogfood complete. **030–032** in flight (dispatched from the 029
-  findings). **008 Prisma** remains on hold.
+- **Done and merged**: 28 plans (001–007, 010–030, 032) — 020–028 backlog +
+  029 showcase + 030 (multi-table) + 032 (UI integration). **031** (filter
+  type-safety) in flight. **008 Prisma** remains on hold.
+- **New capabilities from 030 (multi-table done right)**: `tables.fetchData(table, params)`
+  injects `primaryTable` + returns a typed row (no cast); `drizzleAdapter(db)`
+  auto-detect now works when SQL table name ≠ JS export key (finding-14 keying
+  fix); raw multi-table `fetchData`/facets throw `SchemaError` on ambiguity
+  (new `defaultPrimaryTable` escape hatch mirrors `defaultMutationTable`);
+  relations referenced only in filters/sorting are auto-embedded in result
+  rows; Relations-clobbering-tables schema throws at construction. MIGRATION §12.
+- **New capabilities from 032**: soft-nav filter-URL changes now re-hydrate the
+  filter-bar chips (was a mount-only bug); `<VirtualizedTable>` applies column
+  formatters; `useFacets` hook + `<FacetedFilterSidebar>` (first reusable facet
+  UI); `<BetterTable table={def}>` accepts a `TableDefinition`.
 - **Gates on main**: root typecheck 11/11 · core 1127/0 · toolkit 96/0 · drizzle
   SQLite green (env DB suites fail without URLs — expected) · CLI 137/0 · UI 17/0.
 - **0.6 IS SHIPPABLE**: every release-policy obligation is met. Remaining
@@ -85,9 +96,9 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
 
 | Item | What | Depends on | Status |
 |------|------|------------|--------|
-| 030 | Multi-table identity, safety throw, typed table-scoped fetch surface, auto-embed, construction validation (findings 9/10/11/14/16) | 018/021/022 (DONE) | IN PROGRESS — P0, "key to the whole product"; land before 032's `table` prop |
+| 030 | Multi-table identity, safety throw, typed table-scoped fetch surface, auto-embed, construction validation (findings 9/10/11/14/16) | 018/021/022 (DONE) | **MERGED 2026-07-13** — reviewed (read-resolver preserves 022's warn, throws only multi-table-no-signal; `defaultPrimaryTable` escape hatch mirrors `defaultMutationTable`); core 1137/0, drizzle new suites 26/0 |
 | 031 | Filter-authoring type-safety (findings 1/2/8/12/17) | none hard; parallel-safe | IN PROGRESS — has a type-perf gate (Step 1) |
-| 032 | UI integration gaps (findings 5/6/7/15) | 025 (DONE); finding-5 prop pairs with 030 | IN PROGRESS — soft-nav chip fix is a correctness bug |
+| 032 | UI integration gaps (findings 5/6/7/15) | 025 (DONE); finding-5 prop pairs with 030 | **MERGED 2026-07-13** — reviewed (finding-15 loop guard = URL-value signature re-run + per-field deep-equal no-op; browser-verified); ui 41/0. Chose 3b (useVirtualizedTableData hook + docs) over integrated renderMode per STOP condition |
 | 008 | Prisma adapter spike (read path) | 007 (DONE), lift of the hold | **ON HOLD** (maintainer) — last item on the board |
 
 Backlog from the 029 findings not in 030–032: **finding 4** — no in-repo
