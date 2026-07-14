@@ -1129,6 +1129,61 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
+   * Auto-embed (plan 030, finding 10): compute synthetic `alias.column`
+   * entries for every relation `context.joinPaths` collected from
+   * `filters`/`sorting` that is NOT already represented in `columns`.
+   *
+   * Before this, projection was driven ONLY by `columns`
+   * (`buildColumnSelections`/`buildFlatSelectionsForRelationships`) even
+   * though join planning (`RelationshipManager.buildQueryContext`) already
+   * knows about every relation a filter or sort touches — so filtering by
+   * `customer.plan` without `customer` in `columns` joined the table (for
+   * the WHERE clause) but never selected or nested it, silently dropping
+   * it from the result rows.
+   *
+   * Feeding the returned synthetic entries into the SAME `columns` array
+   * used for both `buildColumnSelections` (below) and
+   * `DataTransformer.transformToNested` reuses their EXISTING per-relation
+   * embedding logic unchanged (full related-row selection, one-to-one vs
+   * one-to-many nesting) rather than adding a second, parallel embedding
+   * mechanism -- a relation explicitly requested via `columns` and one only
+   * referenced by `filters`/`sorting` end up going through identical code.
+   *
+   * A relation neither filtered, sorted, nor selected never appears in
+   * `context.joinPaths`, so it's never added here -- no over-fetching every
+   * relation on every query.
+   */
+  protected computeAutoEmbedColumns(
+    columns: string[] | undefined,
+    context: QueryContext
+  ): string[] {
+    const columnAliases = new Set(
+      (columns ?? [])
+        .filter((columnId) => columnId.includes('.'))
+        .map((columnId) => columnId.split('.')[0] as string)
+    );
+
+    const autoEmbedColumns: string[] = [];
+    for (const [alias, relationshipPath] of context.joinPaths) {
+      if (columnAliases.has(alias)) {
+        // Already selected via an explicit `columns` entry for this alias.
+        continue;
+      }
+      const lastHop = relationshipPath[relationshipPath.length - 1];
+      if (!lastHop) continue;
+
+      const relatedTableSchema = this.schema[lastHop.to];
+      if (!relatedTableSchema) continue;
+
+      for (const columnName of getColumnNames(relatedTableSchema)) {
+        autoEmbedColumns.push(`${alias}.${columnName}`);
+      }
+    }
+
+    return autoEmbedColumns;
+  }
+
+  /**
    * Build complete query with all parameters
    */
   buildCompleteQuery(params: {
@@ -1147,6 +1202,15 @@ export abstract class BaseQueryBuilder {
       columnMapping: Record<string, string>;
     };
     isNested?: boolean; // Flag to indicate if data is already nested from relational query
+    /**
+     * Synthetic `alias.column` entries added for relations referenced only
+     * by `filters`/`sorting` (plan 030, finding 10) -- empty when nothing
+     * was auto-embedded. Callers that also drive `DataTransformer.transformToNested`
+     * (e.g. `DrizzleAdapter.fetchData`) should append these to the `columns`
+     * array they pass it, so the transform nests the same relation this
+     * query selected.
+     */
+    autoEmbedColumns: string[];
   } {
     // Filter out computed fields from sorts before building query context
     // Computed fields are handled separately in applySorting
@@ -1170,10 +1234,19 @@ export abstract class BaseQueryBuilder {
       params.primaryTable
     );
 
+    // Auto-embed (finding 10): fold in synthetic columns for any relation
+    // `filters`/`sorting` touches that `columns` didn't already cover, so
+    // both the SELECT (below) and the eventual transformToNested call
+    // (via the returned `autoEmbedColumns`) embed it the same way an
+    // explicitly-requested relation column already does.
+    const autoEmbedColumns = this.computeAutoEmbedColumns(params.columns, context);
+    const columnsForSelect =
+      autoEmbedColumns.length > 0 ? [...(params.columns ?? []), ...autoEmbedColumns] : params.columns;
+
     const selectResult = this.buildSelectQuery(
       context,
       params.primaryTable,
-      params.columns,
+      columnsForSelect,
       params.computedFields
     );
     const { columnMetadata, isNested } = selectResult;
@@ -1201,7 +1274,7 @@ export abstract class BaseQueryBuilder {
         joinOrder,
         primaryTable: params.primaryTable,
         primaryKeyInfo,
-        columns: params.columns,
+        columns: columnsForSelect,
         computedFields: params.computedFields,
         filters: params.filters || [],
         sorting: params.sorting || [],
@@ -1238,6 +1311,7 @@ export abstract class BaseQueryBuilder {
       dataQuery: finalDataQuery,
       countQuery,
       columnMetadata,
+      autoEmbedColumns,
       ...(isNested !== undefined && { isNested }),
     };
   }

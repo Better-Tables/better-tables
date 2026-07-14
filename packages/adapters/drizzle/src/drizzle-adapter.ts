@@ -664,7 +664,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       if (Object.keys(computedFieldsForSorting).length > 0) {
         queryParams.computedFields = computedFieldsForSorting;
       }
-      const { dataQuery, countQuery, columnMetadata, isNested } =
+      const { dataQuery, countQuery, columnMetadata, isNested, autoEmbedColumns } =
         this.queryBuilder.buildCompleteQuery(queryParams);
 
       // Execute queries in parallel
@@ -685,9 +685,19 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       if (isNested !== undefined) {
         transformerMetadata.isNested = isNested;
       }
+      // Auto-embed (plan 030, finding 10): a relation the query builder
+      // selected because filters/sorting referenced it (not because it was
+      // in `columns`) needs the SAME synthetic columns fed to the
+      // transformer, or transformToNested's `columns.length > 0` branch
+      // (data-transformer.ts) would ignore the joined data it isn't told
+      // about and drop the relation from the result rows.
+      const columnsForTransform =
+        autoEmbedColumns.length > 0
+          ? [...columnsWithoutComputed, ...autoEmbedColumns]
+          : columnsWithoutComputed;
       const transformedData = this.dataTransformer.transformToNested<
         InferSelectModelFromFilteredSchema<TSchema>
-      >(data, primaryTable, columnsWithoutComputed, transformerMetadata);
+      >(data, primaryTable, columnsForTransform, transformerMetadata);
 
       // Build pagination info
       const paginationInfo = params.pagination

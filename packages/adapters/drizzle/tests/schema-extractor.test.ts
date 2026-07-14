@@ -158,11 +158,13 @@ describe('drizzleAdapter(db) auto-detection -- finding-14 repro', () => {
       const result = await adapter.fetchData({
         primaryTable: 'tickets',
         columns: ['subject', 'customer.plan'],
-        filters: [{ columnId: 'customer.plan', operator: 'equals', values: ['enterprise'] }],
+        filters: [
+          { columnId: 'customer.plan', operator: 'equals', values: ['enterprise'], type: 'text' },
+        ],
       });
 
       expect(result.data).toHaveLength(1);
-      expect((result.data[0] as { subject: string }).subject).toBe('Login broken');
+      expect((result.data[0] as unknown as { subject: string }).subject).toBe('Login broken');
     } finally {
       sqlite.close();
     }
