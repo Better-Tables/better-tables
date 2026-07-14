@@ -372,6 +372,53 @@ export class DrizzlePredicateEmitter
         return this.buildDateCondition(column, 'thisMonth');
       case 'isThisYear':
         return this.buildDateCondition(column, 'thisYear');
+      case 'between':
+      case 'notBetween': {
+        // Two-value range operators: match records within (or outside) the
+        // span from the START of the first date's day to the END of the
+        // second date's day, inclusive — the same day-granularity the
+        // single-value operators above use.
+        if (values.length < 2 || values[0] === undefined || values[1] === undefined) {
+          return undefined;
+        }
+        const toDate = (raw: unknown): Date => {
+          const parsed = this.parseFilterDate(raw);
+          return typeof parsed === 'string' || typeof parsed === 'number'
+            ? new Date(parsed)
+            : parsed;
+        };
+        const startDate = toDate(values[0]);
+        const endDate = toDate(values[1]);
+        const startOfDay = new Date(
+          Date.UTC(
+            startDate.getUTCFullYear(),
+            startDate.getUTCMonth(),
+            startDate.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        const endOfDay = new Date(
+          Date.UTC(
+            endDate.getUTCFullYear(),
+            endDate.getUTCMonth(),
+            endDate.getUTCDate(),
+            23,
+            59,
+            59,
+            999
+          )
+        );
+        if (operator === 'between') {
+          return this.createDateRangeCondition(column, startOfDay, endOfDay);
+        }
+        return or(
+          this.createDateComparisonCondition(column, '<', startOfDay),
+          this.createDateComparisonCondition(column, '>', endOfDay)
+        );
+      }
       default:
         return undefined;
     }
@@ -801,20 +848,33 @@ export class DrizzlePredicateEmitter
     operator: '=' | '!=' | '<' | '>' | '>=' | '<=',
     value: Date | number | string
   ): SQL | SQLWrapper {
-    // For SQLite with timestamp mode, compare as numbers if value is number
-    if (this.databaseType === 'sqlite' && typeof value === 'number') {
-      return sql`${column} ${sql.raw(operator)} ${value}`;
+    if (this.databaseType === 'sqlite') {
+      // Bind a Date and let Drizzle's typed operators run it through the
+      // COLUMN's `mapToDriverValue` — which stores `mode: 'timestamp'` as Unix
+      // SECONDS and `mode: 'timestamp_ms'` as milliseconds. Passing a raw
+      // number binds the wrong unit (a `getTime()` millisecond value never
+      // matches a seconds-mode column), and passing a pre-`getTime()`'d number
+      // through `gte`/`lte` crashes the mapper's `value.getTime()` call. A
+      // number filter value is treated as JS-epoch milliseconds.
+      const dateObj = value instanceof Date ? value : new Date(value);
+      switch (operator) {
+        case '=':
+          return eq(column, dateObj);
+        case '!=':
+          return not(eq(column, dateObj));
+        case '<':
+          return lt(column, dateObj);
+        case '>':
+          return gt(column, dateObj);
+        case '>=':
+          return gte(column, dateObj);
+        case '<=':
+          return lte(column, dateObj);
+      }
     }
 
-    // Convert Date objects to ISO strings for PostgreSQL and MySQL
-    const dateValue =
-      value instanceof Date
-        ? this.databaseType === 'sqlite'
-          ? value.getTime()
-          : value.toISOString()
-        : value;
-
-    // For PostgreSQL and MySQL, ensure proper casting
+    // PostgreSQL / MySQL: cast an ISO string at the SQL level.
+    const dateValue = value instanceof Date ? value.toISOString() : value;
     const castValue = this.castToDateSQL(dateValue);
     return sql`${column} ${sql.raw(operator)} ${castValue}`;
   }
@@ -827,29 +887,25 @@ export class DrizzlePredicateEmitter
     startDate: Date | string,
     endDate: Date | string
   ): SQL | SQLWrapper {
-    // Format dates for SQL
-    const startVal =
-      typeof startDate === 'string'
-        ? startDate
-        : this.databaseType === 'sqlite'
-          ? startDate.getTime()
-          : startDate.toISOString();
-
-    const endVal =
-      typeof endDate === 'string'
-        ? endDate
-        : this.databaseType === 'sqlite'
-          ? endDate.getTime()
-          : endDate.toISOString();
-
     if (this.databaseType === 'postgres' || this.databaseType === 'mysql') {
+      // Format dates for SQL: keep strings as-is, Dates as ISO strings.
+      const startVal = typeof startDate === 'string' ? startDate : startDate.toISOString();
+      const endVal = typeof endDate === 'string' ? endDate : endDate.toISOString();
       const startCast = this.castToDateSQL(startVal);
       const endCast = this.castToDateSQL(endVal);
       return sql`${column} >= ${startCast} AND ${column} <= ${endCast}`;
     }
 
-    // Generic fallback (works for SQLite number timestamps too)
-    const condition = and(gte(column, startVal), lte(column, endVal));
+    // SQLite: bind Date objects (not pre-converted numbers) so Drizzle's typed
+    // operators run them through the column's `mapToDriverValue`, which stores
+    // `mode: 'timestamp'` as Unix SECONDS and `mode: 'timestamp_ms'` as
+    // milliseconds. Passing `startDate.getTime()` here bound the wrong unit AND
+    // crashed the mapper (`value.getTime is not a function`) when the number
+    // reached `mapToDriverValue`'s Date path. A string bound is normalized to a
+    // Date first.
+    const startObj = startDate instanceof Date ? startDate : new Date(startDate);
+    const endObj = endDate instanceof Date ? endDate : new Date(endDate);
+    const condition = and(gte(column, startObj), lte(column, endObj));
     if (!condition) {
       // Should effectively never happen with valid inputs
       throw new QueryError('Failed to create date range condition');

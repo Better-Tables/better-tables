@@ -1269,6 +1269,8 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         'isNot',
         'before',
         'after',
+        'between',
+        'notBetween',
         'isToday',
         'isYesterday',
         'isThisWeek',

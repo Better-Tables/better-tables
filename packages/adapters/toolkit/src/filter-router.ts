@@ -264,6 +264,12 @@ export class FilterRouter<TColumn, TPredicate> {
     // Dispatch to the emitter's leaf handler for this operator's category
     if (this.isTextOperator(operator)) {
       condition = this.emitter.textOperator(column, operator, values);
+    } else if (columnType === 'date' && (operator === 'between' || operator === 'notBetween')) {
+      // `between`/`notBetween` are shared between number and date columns. On a
+      // date column they need the date handler's day-range semantics — the
+      // numeric handler would treat the ISO/Date values as raw numbers and
+      // silently drop the filter (matching every row).
+      condition = this.emitter.dateOperator(column, operator, values, columnType);
     } else if (this.isNumberOperator(operator)) {
       condition = this.emitter.numberOperator(column, operator, values);
     } else if (this.isDateOperator(operator)) {
@@ -421,6 +427,8 @@ export class FilterRouter<TColumn, TPredicate> {
           'isNot',
           'before',
           'after',
+          'between',
+          'notBetween',
           'isToday',
           'isYesterday',
           'isThisWeek',
