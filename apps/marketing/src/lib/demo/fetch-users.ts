@@ -37,6 +37,23 @@ export async function fetchUsers({
       pagination: { page, limit },
       filters,
       sorting,
+      // Every DB-backed field any column can render must be requested here:
+      // `columns` drives which relations are SELECTed and embedded in the
+      // result rows (plan 030, finding 10), and column visibility is
+      // client-side, so hidden-but-toggleable columns need their data too.
+      // (profile.hasBio and roleTags are computed client-side from these.)
+      columns: [
+        'name',
+        'email',
+        'age',
+        'role',
+        'status',
+        'createdAt',
+        'profile.bio',
+        'profile.website',
+        'profile.location',
+        'profile.github',
+      ],
       // DX-FINDING-16: `fetchData()` returns `FetchDataResult<unknown>`
       // regardless of adapter/table -- see
       // plans/findings/029-dx-findings.md #16.

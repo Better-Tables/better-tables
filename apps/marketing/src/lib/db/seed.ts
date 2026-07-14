@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { seed } from 'drizzle-seed';
 import type { getDatabase } from './index';
 import { schema } from './schema';
@@ -32,12 +33,17 @@ export async function seedDatabase(db: DatabaseType) {
         }),
       },
       with: {
+        // drizzle-seed (>=0.1.3) rejects `count: 0` in a weighted relation
+        // spec ("maxRepeatedValuesCount should be greater than zero"), so we
+        // seed every user with a profile and 1+ posts here, then delete a
+        // deterministic ~30% of profiles below to restore the "some users
+        // have no profile" shape the demo relies on (null-safe joined columns
+        // like profile.hasBio / profile.location).
         profiles: [
-          { weight: 0.7, count: 1 }, // 70% of users have 1 profile
-          { weight: 0.3, count: 0 }, // 30% of users have no profile
+          { weight: 1, count: 1 }, // every user gets a profile (thinned below)
         ],
         posts: [
-          { weight: 0.3, count: [0, 1, 2] }, // 30% chance of 0-2 posts
+          { weight: 0.3, count: [1, 2] }, // 30% chance of 1-2 posts
           { weight: 0.4, count: [3, 4, 5] }, // 40% chance of 3-5 posts
           { weight: 0.2, count: [6, 7, 8] }, // 20% chance of 6-8 posts
           { weight: 0.1, count: [9, 10, 11, 12] }, // 10% chance of 9-12 posts
@@ -123,4 +129,10 @@ export async function seedDatabase(db: DatabaseType) {
       },
     },
   }));
+
+  // Restore the "~30% of users have no profile" distribution that the seed
+  // step can no longer express directly (see the `profiles` note above).
+  // Deterministic (by user_id) so the demo data stays reproducible; FK-safe
+  // because profiles reference users, not the reverse.
+  await db.run(sql`DELETE FROM profiles WHERE user_id % 10 < 3`);
 }

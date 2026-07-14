@@ -12,7 +12,13 @@ export async function getAdapter() {
 
   const { db } = await getDatabase();
 
-  adapterInstance = drizzleAdapter(db);
+  // The demo schema has three tables (users, profiles, posts); this adapter
+  // only ever serves the users table. `defaultPrimaryTable` names it so a
+  // parameterless read resolves unambiguously instead of throwing the
+  // multi-table SchemaError (plan 030, finding 9).
+  adapterInstance = drizzleAdapter(db, {
+    options: { defaultPrimaryTable: 'users' },
+  });
 
   return adapterInstance;
 }
