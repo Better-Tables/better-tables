@@ -7,3 +7,4 @@ export * from './use-table-store';
 export { useTableColumnOrder } from './use-table-store';
 export * from './use-table-url-sync';
 export * from './use-virtualization';
+export * from './use-virtualized-table-data';
