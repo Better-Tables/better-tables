@@ -53,7 +53,13 @@
  *   deepEqual,
  *   shallowEqualArrays,
  *   serializeFiltersToURL,
- *   deserializeFiltersFromURL
+ *   deserializeFiltersFromURL,
+ *   // Filters-only pair above; serializeTableStateToUrl/deserializeTableStateFromUrl
+ *   // below cover the FULL table state (filters + sorting + pagination +
+ *   // columnVisibility + columnOrder) in one call -- prefer these two for
+ *   // URL state sync unless you specifically need filters in isolation.
+ *   serializeTableStateToUrl,
+ *   deserializeTableStateFromUrl
  * } from '@better-tables/core';
  *
  * // Create a table with comprehensive functionality

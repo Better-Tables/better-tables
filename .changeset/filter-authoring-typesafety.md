@@ -1,0 +1,14 @@
+---
+"@better-tables/core": minor
+---
+
+Type-safe filter authoring: per-type `FilterState` operators, a `filterHasValue` helper, stable filter identity, and a typed `buildFilter`.
+
+**What's new:**
+
+- **Per-type operator narrowing (breaking).** Each `FilterState` member's `operator` field is now a per-type union derived from `filter-operators.ts`'s `*_OPERATORS` arrays (`TextFilterOperator`, `NumberFilterOperator`, `DateFilterOperator`, `OptionFilterOperator`, `MultiOptionFilterOperator`, `BooleanFilterOperator`, `JsonFilterOperator`, all newly exported), instead of the flat `FilterOperator` union. `{ type: 'option', operator: 'contains' }` is now a **compile error** instead of a runtime-only `validateFilter` failure. `CustomFilterState.operator` stays the flat `FilterOperator` union (no fixed operator set for `custom`). If you construct `FilterState` values dynamically from a widely-typed `operator`/`type` pair (not literals), you may need an `as FilterState` cast at that call site — the discriminated-union check is stricter for literal-typed constructions than before.
+- **`filterHasValue(filter, value)`** — checks `filter.values` for a value without narrowing by `filter.type` first, replacing the `(filter.values as unknown[]).includes(value)` escape hatch.
+- **`FilterState.id?: string`** — optional stable per-filter identity. Round-trips through `serializeFiltersToURL`/`deserializeFiltersFromURL` (a new `id` -> `'i'` compression key), absent from the wire payload when unset. `filterKey(filter, index)` gives every filter a stable key (the explicit `id` when present, `columnId#position` otherwise) for list rendering/identity even before `id` is populated.
+- **`buildFilter(table, columnId, operator, values, options?)`** — builds a type-safe `FilterState` for a `defineTable()` column. `columnId` is checked against the table's real row paths (a typo is a compile error); `operator`/`values` are inferred from the path's resolved value shape for `number`/`boolean`/`date`/`json`/generic-`text` columns, no restating `type`. A second overload, `buildFilter(table, columnId, type, operator, values, options?)`, covers `'option'`/`'multiOption'` and other cases a raw value shape can't disambiguate (e.g. an `'email'` column) — still fully checked against the stated `type`. See `packages/core/src/builders/build-filter.ts`'s module doc for the precise gap this doesn't close (full per-column type inference needs the still-unbuilt `$infer.FilterState` registry) and why.
+
+**Migration:** most existing `FilterState` literals are unaffected (the previous test/fixture audit across this repo found the flat-union check was already this strict in practice for the vast majority of literals — only genuinely wrong operator/type combinations, which were latent runtime bugs, now fail to compile). `getOperatorsForType`/`FILTER_OPERATORS` return `readonly` arrays now (mutation was never a supported use).

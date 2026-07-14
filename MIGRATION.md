@@ -265,6 +265,13 @@ if (Array.isArray(filters)) {
 (filters as FilterState[])[0]?.columnId; // 0.6
 ```
 
+`serializeFiltersToURL`/`deserializeFiltersFromURL` handle filters in
+isolation. If you're syncing the WHOLE table's URL state (filters +
+sorting + pagination + column visibility + column order), use
+`serializeTableStateToUrl`/`deserializeTableStateFromUrl`
+(`utils/url-serialization.ts`) instead — one call each way, filters
+included, same `c2:` wire format under the hood.
+
 Depth is capped at 3 (mirrors `defineTable()`'s path-depth cap). An adapter
 that doesn't support groups (`AdapterMeta.supportsFilterGroups` absent or
 `false`) rejects a non-AND tree with a typed error rather than silently
@@ -464,6 +471,24 @@ full design rather than repeating it here:
   `columnId -> valueType` filter registry is designed but not yet wired
   through `defineTable()`; see `plans/design/core-contract-v2.md`, "Step 2 —
   Typed column registry".)
+- **Type-safe filter authoring.** A wrong operator for a column's `type`
+  (`{ type: 'option', operator: 'contains' }`) is now a compile error, not
+  a runtime-only `validateFilter` failure — `FilterState`'s per-type
+  members (`TextFilterState`, `OptionFilterState`, ...) narrow `operator`
+  to the operators actually legal for that type. `buildFilter(table,
+  columnId, operator, values)` goes further for a known `defineTable()`
+  column: `columnId` is checked against the table's real row paths, and
+  `operator`/`values` are inferred from the path's value shape for
+  `number`/`boolean`/`date`/`json`/generic-`text` columns (no restating
+  `type`); `buildFilter(table, columnId, type, operator, values)` covers
+  `'option'`/`'multiOption'` and the other cases a raw string/number/etc.
+  shape can't disambiguate on its own (still fully checked against that
+  `type`). `filterHasValue(filter, value)` checks `filter.values` for a
+  value without narrowing by `filter.type` first, and an optional
+  `FilterState.id` gives filters a stable identity that survives two
+  filters on the same `columnId` inside one `FilterGroupNode` and
+  round-trips through URL serialization. See
+  `packages/core/src/builders/build-filter.ts`.
 - **Null-only filters.** A filter with `includeNull: true` and no `values`
   is now a valid strict-mode filter meaning "match rows where this column
   is null" — the same shape the include-unknown UI checkbox already
