@@ -1,7 +1,7 @@
 'use client';
 
 import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
-import { getColumnStyle } from '@better-tables/core';
+import { getColumnStyle, getFormatterForType } from '@better-tables/core';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
@@ -141,7 +141,9 @@ function VirtualizedRow<T>({
               maxWidth: colStyle.maxWidth,
             }}
           >
-            {renderCell ? renderCell(value, column, item, index) : String(value || '')}
+            {renderCell
+              ? renderCell(value, column, item, index)
+              : getFormatterForType(column.type, value, column.meta)}
           </TableCell>
         );
       })}
@@ -187,7 +189,31 @@ const MemoizedVirtualizedRow = memo(
 ) as typeof VirtualizedRow;
 
 /**
- * High-performance virtualized table component for large datasets
+ * High-performance virtualized table component for large datasets.
+ *
+ * This is a deliberate low-level rendering primitive: it takes a flat
+ * `data` array and renders only the visible rows, full stop. Unlike
+ * `<BetterTable>`, it has NO adapter/filter/sort/pagination/URL-sync
+ * integration of its own and does not read from a `TableStateManager`
+ * store -- "bring your own filtering/sorting" is the intended contract
+ * (plan 032, finding 6). Its default cell rendering DOES run values through
+ * the same `getFormatterForType` formatter `<BetterTable>` uses, and an
+ * explicit `renderCell` still overrides that default per cell.
+ *
+ * To drive `data` from an adapter and a table store's filters/sorting (the
+ * same store a sibling `<FilterBar>`/`useTableFilters`/`useTableSorting`
+ * consumer reads and writes), see `useVirtualizedTableData` -- it fetches
+ * one capped page of matching rows (virtualization already handles
+ * rendering arbitrarily many rows; there's no page-by-page UI here) and
+ * refetches whenever the store's filters/sorting change.
+ *
+ * A fully integrated `<BetterTable renderMode="virtualized">` (reusing
+ * `<BetterTable>`'s own store/URL-sync machinery and swapping only its row
+ * rendering) was considered and deferred: `<BetterTable>`'s render body
+ * (header sort UI, column-reorder DnD, row-selection checkbox column, the
+ * 025 per-row memoization contract) is deep enough that folding
+ * virtualization into it risked regressing that memoization. Tracked as a
+ * follow-up rather than forced through plan 032.
  */
 export function VirtualizedTable<T = unknown>({
   data,

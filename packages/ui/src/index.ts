@@ -1,6 +1,7 @@
 // Export utilities
 
 export * from './components/filters/active-filters';
+export * from './components/filters/faceted-filter-sidebar';
 // Export all filter components
 export * from './components/filters/filter-bar';
 export * from './components/filters/filter-button';

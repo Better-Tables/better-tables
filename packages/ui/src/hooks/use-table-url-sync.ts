@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  deepEqual,
   deserializeTableStateFromUrl,
   getColumnOrderModifications,
   getColumnVisibilityModifications,
@@ -69,7 +70,20 @@ function useStableUrlSyncConfig(config: UrlSyncConfig): UrlSyncConfig {
   );
 }
 
-function hydrateFromUrl(store: TableStore, config: UrlSyncConfig, adapter: UrlSyncAdapter): void {
+/**
+ * Read the current URL state and, if it differs from the store's current
+ * state, apply it to the store.
+ *
+ * This is called both on mount and whenever the URL changes afterwards (soft
+ * nav). To avoid a hydrate -> serialize -> hydrate loop with the store-to-URL
+ * write-out effect, each field is only included in the `updates` passed to
+ * `manager.updateState` when it deep-equals-differs from what the store
+ * already holds -- a no-op hydration therefore never calls `updateState`,
+ * never fires a `state_changed` event, and never triggers a write-back.
+ *
+ * @returns whether any state was actually applied to the store.
+ */
+function hydrateFromUrl(store: TableStore, config: UrlSyncConfig, adapter: UrlSyncAdapter): boolean {
   const manager = store.getState().manager;
 
   const urlParams: Record<string, string | undefined | null> = {};
@@ -94,38 +108,82 @@ function hydrateFromUrl(store: TableStore, config: UrlSyncConfig, adapter: UrlSy
   const updates: Parameters<typeof manager.updateState>[0] = {};
 
   const hasFilters = Array.isArray(deserialized.filters) ? deserialized.filters.length > 0 : true;
-  if (config.filters && hasFilters) {
+  if (config.filters && hasFilters && !deepEqual(deserialized.filters, manager.getFilterNode())) {
     updates.filters = deserialized.filters;
   }
 
   if (config.pagination) {
     const currentPagination = manager.getPagination();
-    updates.pagination = {
+    const nextPagination = {
       ...currentPagination,
       ...(deserialized.pagination.page !== undefined && { page: deserialized.pagination.page }),
       ...(deserialized.pagination.limit !== undefined && {
         limit: deserialized.pagination.limit,
       }),
     };
+    if (!deepEqual(nextPagination, currentPagination)) {
+      updates.pagination = nextPagination;
+    }
   }
 
-  if (config.sorting && deserialized.sorting.length > 0) {
+  if (
+    config.sorting &&
+    deserialized.sorting.length > 0 &&
+    !deepEqual(deserialized.sorting, manager.getSorting())
+  ) {
     updates.sorting = deserialized.sorting;
   }
 
   if (config.columnVisibility) {
     const { columns } = store.getState();
-    updates.columnVisibility = mergeColumnVisibility(columns, deserialized.columnVisibility);
+    const nextColumnVisibility = mergeColumnVisibility(columns, deserialized.columnVisibility);
+    if (!deepEqual(nextColumnVisibility, manager.getColumnVisibility())) {
+      updates.columnVisibility = nextColumnVisibility;
+    }
   }
 
   if (config.columnOrder) {
     const { columns } = store.getState();
-    updates.columnOrder = mergeColumnOrder(columns, deserialized.columnOrder);
+    const nextColumnOrder = mergeColumnOrder(columns, deserialized.columnOrder);
+    if (!deepEqual(nextColumnOrder, manager.getColumnOrder())) {
+      updates.columnOrder = nextColumnOrder;
+    }
   }
 
   if (Object.keys(updates).length > 0) {
     manager.updateState(updates);
+    return true;
   }
+  return false;
+}
+
+/**
+ * Build a signature string from the URL param values relevant to `config`.
+ * Used as a render-time effect dependency so the hydration effect re-runs
+ * whenever the underlying URL values change -- even if the `adapter`
+ * reference itself is stable (e.g. a vanilla adapter that reads
+ * `window.location` fresh on every call) -- not just when a framework
+ * adapter (e.g. Next.js's `useSearchParams`-backed adapter) is recreated.
+ */
+function computeUrlSignature(config: UrlSyncConfig, adapter: UrlSyncAdapter): string {
+  const parts: string[] = [];
+  if (config.filters) {
+    parts.push(`filters=${adapter.getParam('filters') ?? ''}`);
+  }
+  if (config.pagination) {
+    parts.push(`page=${adapter.getParam('page') ?? ''}`);
+    parts.push(`limit=${adapter.getParam('limit') ?? ''}`);
+  }
+  if (config.sorting) {
+    parts.push(`sorting=${adapter.getParam('sorting') ?? ''}`);
+  }
+  if (config.columnVisibility) {
+    parts.push(`columnVisibility=${adapter.getParam('columnVisibility') ?? ''}`);
+  }
+  if (config.columnOrder) {
+    parts.push(`columnOrder=${adapter.getParam('columnOrder') ?? ''}`);
+  }
+  return parts.join('&');
 }
 
 /**
@@ -158,40 +216,50 @@ export function useTableUrlSync(
   const stableConfig = useStableUrlSyncConfig(config);
   const hasHydratedFromUrl = useRef(false);
   const [storeReady, setStoreReady] = useState(() => Boolean(getTableStore(tableId)));
+  // Recomputed every render (cheap: a handful of adapter.getParam reads) so
+  // it changes whenever the URL's relevant params change, even for adapters
+  // that keep a stable reference across soft navs (e.g. a vanilla adapter
+  // reading window.location fresh each call).
+  const urlSignature = computeUrlSignature(stableConfig, adapter);
 
   useEffect(() => {
-    if (hasHydratedFromUrl.current) {
-      return undefined;
-    }
-
-    const tryHydrate = (): boolean => {
-      const store = getTableStore(tableId);
-      if (!store) {
-        return false;
-      }
-
+    // Once the store exists, re-hydrate on every run of this effect (i.e.
+    // whenever tableId/config/adapter identity/urlSignature change). This is
+    // what makes a post-mount URL change (soft nav to a new filter) re-seed
+    // the store instead of only running once at mount.
+    // `hydrateFromUrl` itself is a no-op (does not call `manager.updateState`)
+    // when the URL already matches the store, which is what prevents this
+    // from looping with the store->URL write-out effect below.
+    const store = getTableStore(tableId);
+    if (store) {
       hydrateFromUrl(store, stableConfig, adapter);
-      hasHydratedFromUrl.current = true;
-      setStoreReady(true);
-      return true;
-    };
-
-    if (tryHydrate()) {
+      if (!hasHydratedFromUrl.current) {
+        hasHydratedFromUrl.current = true;
+        setStoreReady(true);
+      }
       return undefined;
     }
 
+    // Store not created yet (e.g. it's created by a sibling component after
+    // this hook mounts) -- poll briefly until it exists.
     let attempts = 0;
     const intervalId = setInterval(() => {
       attempts += 1;
-      if (tryHydrate() || attempts >= HYDRATION_MAX_ATTEMPTS) {
+      const lateStore = getTableStore(tableId);
+      if (lateStore) {
+        hydrateFromUrl(lateStore, stableConfig, adapter);
+        hasHydratedFromUrl.current = true;
+        setStoreReady(true);
         clearInterval(intervalId);
-        if (attempts >= HYDRATION_MAX_ATTEMPTS && !getTableStore(tableId)) {
-        }
+        return;
+      }
+      if (attempts >= HYDRATION_MAX_ATTEMPTS) {
+        clearInterval(intervalId);
       }
     }, HYDRATION_RETRY_MS);
 
     return () => clearInterval(intervalId);
-  }, [tableId, stableConfig, adapter]);
+  }, [tableId, stableConfig, adapter, urlSignature]);
 
   useEffect(() => {
     if (!storeReady) {
