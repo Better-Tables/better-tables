@@ -639,11 +639,11 @@ is a condensed checklist, not a replacement.
    restored first
    (`git remote add origin git@github.com:Better-Tables/better-tables.git`).
 4. **Lint gate.** The CI lint step is `continue-on-error` until Biome residue
-   hits 0 across the repo. As of the last audit, `apps/marketing`,
-   `apps/docs`, and `packages/ui` are Biome-clean; remaining residue is
+   hits 0 across the repo. As of the last audit, `apps/marketing` and
+   `packages/ui` are Biome-clean; remaining residue is
    mostly in `core`/`cli`/`adapters`. Flip `continue-on-error` off only after
    confirming `bunx biome check .` is clean at the root.
-5. **Typecheck exclusions.** None currently recorded as debt — `apps/docs`
-   and `apps/marketing` both have working `typecheck` scripts, and
+5. **Typecheck exclusions.** None currently recorded as debt —
+   `apps/marketing` has a working `typecheck` script, and
    `packages/ui` has a `bun test` harness. No package is silently excluded
    from the gate.

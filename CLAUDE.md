@@ -12,8 +12,7 @@ here.
 | `@better-tables/ui` | `packages/ui` | **private** — distributed via CLI copy, not npm | React table/filter components (shadcn-style), hooks, stores. |
 | `@better-tables/cli` | `packages/cli` | npm (public) | `better-tables init` — copies `ui`'s components into a consumer project. |
 | `@better-tables/adapters-drizzle` | `packages/adapters/drizzle` | npm (public) | Drizzle ORM adapter: schema introspection, JOIN/filter/pagination query generation for Postgres/MySQL/SQLite. |
-| `@better-tables/site` | `apps/marketing` | private | Public marketing site with live interactive demo (in-memory SQLite + seed). |
-| `@better-tables/docs` | `apps/docs` | private | Fumadocs documentation site. Not part of the library package surface. |
+| `@better-tables/site` | `apps/marketing` | private | Public site: marketing, examples, and docs (in-memory SQLite demo + seed). |
 
 ## Data flow (one-liner)
 
@@ -56,7 +55,7 @@ for optional MySQL/Postgres integration tests).
   `@better-tables/adapters-drizzle`.
 - **Private** (`"private": true`): `@better-tables/ui` (copied via the CLI,
   not installed from npm — do not remove `private` without re-reading
-  plan 009 Step 3's reasoning), `apps/marketing`, `apps/docs`.
+  plan 009 Step 3's reasoning), `apps/marketing`.
 
 ## Deferred packaging work (plan 007 / plan 009)
 

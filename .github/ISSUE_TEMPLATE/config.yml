@@ -4,9 +4,8 @@ contact_links:
     url: https://github.com/Better-Tables/better-tables/discussions
     about: Ask questions and discuss ideas with the community
   - name: 📚 Documentation
-    url: https://github.com/Better-Tables/better-tables/tree/main/apps/docs/content/docs
+    url: https://github.com/Better-Tables/better-tables#readme
     about: Check our documentation for guides and examples
-    # TODO: Update this URL to the correct location
   - name: 🔒 Security Issues
     url: https://github.com/Better-Tables/better-tables/security/advisories/new
     about: Please report security vulnerabilities privately
