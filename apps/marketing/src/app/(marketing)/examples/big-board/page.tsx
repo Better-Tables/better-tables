@@ -1,30 +1,35 @@
+import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
 import { BigBoardClient } from '@/components/sections/big-board-client';
 import { SourceView } from '@/components/sections/source-view';
-import { fetchBulkTickets } from '@/lib/demo/support/fetch-bulk-tickets';
 import { readSourceFile } from '@/lib/demo/read-source';
+import { fetchBulkTickets } from '@/lib/demo/support/fetch-bulk-tickets';
 import { constructMetadata } from '@/lib/utils';
 
 export const metadata = constructMetadata({
   title: 'Big board example',
-  description: '12,000 virtualized rows with dynamic row heights and an expandable description cell.',
+  description:
+    '12,000 rows through the same <BetterTable> as every other example — one `virtualized` prop, with filtering and sorting intact.',
 });
 
 interface BigBoardPageProps {
   searchParams: Promise<{
-    sortColumn?: string;
-    sortDirection?: string;
+    filters?: string;
+    sorting?: string;
   }>;
 }
 
-const SORTABLE_COLUMNS = new Set(['createdAt', 'status', 'priority', 'customerName']);
-
 export default async function BigBoardPage({ searchParams }: BigBoardPageProps) {
   const params = await searchParams;
-  const sortColumnId = params.sortColumn && SORTABLE_COLUMNS.has(params.sortColumn) ? params.sortColumn : 'createdAt';
-  const sortDirection = params.sortDirection === 'desc' ? 'desc' : 'asc';
+  // The same URL-state parsing every other example uses -- the big board's
+  // filters/sorting come from `<BetterTable>`'s own filter bar and header now,
+  // not a hand-built toolbar with bespoke params.
+  const tableParams = parseTableSearchParams(params, { page: 1, limit: 12_500 });
 
-  const { data, total, error } = await fetchBulkTickets([{ columnId: sortColumnId, direction: sortDirection }]);
+  const { data, total, filters, sorting, error } = await fetchBulkTickets({
+    filters: tableParams.filters,
+    sorting: tableParams.sorting,
+  });
 
   const bulkColumnsSource = readSourceFile('src/lib/demo/support/bulk-columns.tsx');
   const bigBoardClientSource = readSourceFile('src/components/sections/big-board-client.tsx');
@@ -39,10 +44,11 @@ export default async function BigBoardPage({ searchParams }: BigBoardPageProps) 
           12,000 rows, smooth scrolling
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          A deterministic synthetic dataset of {total.toLocaleString()} tickets, all fetched and
-          rendered at once via <code>&lt;VirtualizedTable&gt;</code> -- only the rows in (and near)
-          the viewport are ever mounted. Click a row to expand its description and watch the row
-          height animate.
+          A deterministic synthetic dataset of {total.toLocaleString()} tickets, fetched in one
+          query and rendered through the same <code>&lt;BetterTable&gt;</code> as every other
+          example -- the only difference is the <code>virtualized</code> prop, so just the rows in
+          (and near) the viewport are ever mounted. Filtering and sorting still work exactly as they
+          do everywhere else.
         </p>
       </div>
 
@@ -55,8 +61,15 @@ export default async function BigBoardPage({ searchParams }: BigBoardPageProps) 
         </div>
       ) : null}
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading big board...</div>}>
-        <BigBoardClient data={data} total={total} sortColumnId={sortColumnId} sortDirection={sortDirection} />
+      <Suspense
+        fallback={<div className="text-sm text-muted-foreground">Loading big board...</div>}
+      >
+        <BigBoardClient
+          data={data}
+          total={total}
+          initialFilters={filters}
+          initialSorting={sorting}
+        />
       </Suspense>
 
       <div className="mt-6">

@@ -2,14 +2,17 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
-import { defaultVisibleTicketColumns, ticketColumns } from '@/lib/demo/support/columns';
-import type { TicketWithRelations } from '@/lib/demo/support/schema';
+import {
+  defaultVisibleTicketColumns,
+  type TicketRow,
+  ticketsTable,
+} from '@/lib/demo/support/columns';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'query-groups-table';
 
 interface QueryGroupsTableClientProps {
-  data: TicketWithRelations[];
+  data: TicketRow[];
   totalCount: number;
   initialPagination: PaginationState;
   initialSorting: SortingState;
@@ -41,7 +44,7 @@ export function QueryGroupsTableClient({
     <BetterTable
       id={TABLE_ID}
       name="Tickets"
-      columns={ticketColumns}
+      table={ticketsTable}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}

@@ -126,7 +126,7 @@ export function TableHeaderContextMenu<TData = unknown>({
               }}
               className="flex items-center gap-2 pl-8"
             >
-              <ArrowUp className="h-4 w-4 ml-[-4px]" />
+              <ArrowUp size={10} className="ml-[-2px] shrink-0" strokeWidth={2} />
               Sort Ascending
             </ContextMenuCheckboxItem>
 
@@ -137,7 +137,7 @@ export function TableHeaderContextMenu<TData = unknown>({
               }}
               className="flex items-center gap-2 pl-8"
             >
-              <ArrowDown className="h-4 w-4 ml-[-4px]" />
+              <ArrowDown size={10} className="ml-[-2px] shrink-0" strokeWidth={2} />
               Sort Descending
             </ContextMenuCheckboxItem>
 

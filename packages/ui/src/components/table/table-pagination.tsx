@@ -1,5 +1,6 @@
 import type { PaginationConfig } from '@better-tables/core';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -43,6 +44,11 @@ export function TablePagination({
   showPageInfo = true,
   className,
 }: TablePaginationProps) {
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems || 0);
 
@@ -73,7 +79,7 @@ export function TablePagination({
         const nextPage = pages[index + 1];
         const key = `ellipsis-${prevPage ?? 'start'}-${nextPage ?? 'end'}`;
         return (
-          <span key={key} className="px-2 py-1 text-sm text-muted-foreground">
+          <span key={key} className="px-2 py-1 text-xs text-muted-foreground">
             ...
           </span>
         );
@@ -85,7 +91,7 @@ export function TablePagination({
           variant={currentPage === page ? 'default' : 'outline'}
           size="sm"
           onClick={() => onPageChange(page)}
-          className="w-8 h-8 p-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-8 h-8 p-0 text-xs tabular-nums focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-current={currentPage === page ? 'page' : undefined}
         >
           {page}
@@ -99,7 +105,7 @@ export function TablePagination({
       <div className="flex items-center gap-4">
         {showPageSizeSelector && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Show</span>
+            <span className="text-xs text-muted-foreground">Show</span>
             <Select
               value={pageSize.toString()}
               onValueChange={(value) => {
@@ -117,12 +123,12 @@ export function TablePagination({
                 ))}
               </SelectContent>
             </Select>
-            <span className="text-sm text-muted-foreground">entries</span>
+            <span className="text-xs text-muted-foreground">entries</span>
           </div>
         )}
 
-        {showPageInfo && totalItems && (
-          <div className="text-sm text-muted-foreground">
+        {showPageInfo && totalItems != null && totalItems > 0 && isClient && (
+          <div className="text-xs text-muted-foreground tabular-nums">
             Showing {startItem} to {endItem} of {totalItems} entries
           </div>
         )}

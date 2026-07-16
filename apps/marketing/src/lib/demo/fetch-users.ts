@@ -1,6 +1,12 @@
-import type { FetchDataResult, FilterGroupNode, FilterState, SortingState } from '@better-tables/core';
+import type {
+  FetchDataResult,
+  FilterGroupNode,
+  FilterState,
+  SortingState,
+} from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
-import { getAdapter } from '@/lib/adapter';
+import { getTables } from '@/lib/adapter';
+import { usersTable } from '@/lib/columns/user-columns';
 import type { UserWithRelations } from '@/lib/db/schema';
 
 export interface FetchUsersParams {
@@ -32,8 +38,10 @@ export async function fetchUsers({
   const flatFilters = flattenFilters(filters);
 
   try {
-    const adapter = await getAdapter();
-    const result = (await adapter.fetchData({
+    const tables = await getTables();
+    // Table-scoped: `primaryTable` comes from `usersTable` and the result is
+    // typed as its row -- no cast (findings 9 + 16).
+    const result = await tables.fetchData(usersTable, {
       pagination: { page, limit },
       filters,
       sorting,
@@ -54,10 +62,7 @@ export async function fetchUsers({
         'profile.location',
         'profile.github',
       ],
-      // DX-FINDING-16: `fetchData()` returns `FetchDataResult<unknown>`
-      // regardless of adapter/table -- see
-      // plans/findings/029-dx-findings.md #16.
-    })) as FetchDataResult<UserWithRelations>;
+    });
 
     return {
       result,

@@ -27,7 +27,7 @@
  */
 
 import { describe, expect, expectTypeOf, it } from 'bun:test';
-import { betterTables, defineTable } from '@better-tables/core';
+import { type betterTables, defineTable } from '@better-tables/core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { drizzleAdapter } from '../src/factory';
 import type { DrizzleSchemaTypes, RelationAwareRow } from '../src/types';
@@ -74,6 +74,29 @@ describe('Drizzle $types phantom (plan 018)', () => {
   it('RelationAwareRow resolves a to-many relation field', () => {
     type UsersRow = RelationAwareRow<typeof fullSchema, 'users'>;
     expectTypeOf<UsersRow>().toHaveProperty('posts');
+
+    expect(true).toBe(true);
+  });
+
+  it('excludes inverse back-reference relations from the row (finding 12)', () => {
+    // `users -> profile` is a two-way relation (`profiles.user` points back).
+    // The forward `profile` field must be present, but the profile row must
+    // NOT carry its `user` back-reference to the table we came from.
+    type UsersRow = RelationAwareRow<typeof fullSchema, 'users'>;
+    expectTypeOf<UsersRow>().toHaveProperty('profile');
+    expectTypeOf<UsersRow['profile']>().not.toHaveProperty('user');
+
+    // Same for the to-many `users -> posts` edge: each post keeps its FORWARD
+    // relations (`comments`) but drops the `user` back-reference.
+    type PostRow = UsersRow['posts'][number];
+    expectTypeOf<PostRow>().not.toHaveProperty('user');
+    expectTypeOf<PostRow>().toHaveProperty('comments');
+
+    // And the deeper forward edge (`posts -> comments`) must not re-introduce
+    // the `post`/`user` back-references either.
+    type CommentRow = PostRow['comments'][number];
+    expectTypeOf<CommentRow>().not.toHaveProperty('post');
+    expectTypeOf<CommentRow>().not.toHaveProperty('user');
 
     expect(true).toBe(true);
   });

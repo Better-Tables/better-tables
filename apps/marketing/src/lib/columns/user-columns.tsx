@@ -1,4 +1,4 @@
-import { createColumnBuilder, defineColumns } from '@better-tables/core';
+import { createColumnBuilder, defineColumns, defineTableRow } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
 import type { UserWithRelations } from '../db/schema';
 
@@ -211,6 +211,18 @@ export const userColumns = defineColumns<UserWithRelations>()([
   // Note: Computed columns are not yet supported by the adapter
   // These would need to be implemented as virtual columns or handled differently
 ]);
+
+/**
+ * The homepage demo's table definition. `defineTableRow<UserWithRelations>()`
+ * is the explicit-row form, and the already-built `userColumns` are passed
+ * straight through (the documented raw-column escape hatch) -- so
+ * `tables.fetchData(usersTable, ...)` returns a typed, cast-free result and
+ * injects `primaryTable` itself (findings 9 + 16), without rewriting these
+ * columns onto path builders.
+ */
+export const usersTable = defineTableRow<UserWithRelations>()('users', () => ({
+  columns: userColumns,
+}));
 
 // Default visible columns for the demo
 export const defaultVisibleColumns = [

@@ -41,6 +41,16 @@ import { PaginationManager } from './pagination-manager';
 export interface TableStateConfig {
   /** Pagination configuration */
   pagination?: PaginationConfig;
+
+  /** Sorting configuration */
+  sorting?: {
+    /**
+     * Allow more than one column to be sorted at once. When `false` (the
+     * default), `toggleSort` REPLACES the current sort, so the state never
+     * holds more than one column.
+     */
+    multiSort?: boolean;
+  };
 }
 
 /**
@@ -204,6 +214,7 @@ export class TableStateManager<TData = unknown> extends Subscribable<TableStateE
   private columnVisibility: ColumnVisibility = {};
   private columnOrder: ColumnOrder = [];
   private columns: ColumnDefinition<TData>[];
+  private multiSort: boolean;
 
   // Caching for structural sharing
   private cachedFilters: FilterState[] | null = null;
@@ -224,6 +235,7 @@ export class TableStateManager<TData = unknown> extends Subscribable<TableStateE
   ) {
     super('table state manager');
     this.columns = columns;
+    this.multiSort = config.sorting?.multiSort ?? false;
 
     // Initialize sub-managers
     this.filterManager = new FilterManager(columns, initialState.filters || []);
@@ -410,6 +422,14 @@ export class TableStateManager<TData = unknown> extends Subscribable<TableStateE
     this.notifyStateChanged();
   }
 
+  /**
+   * Cycle a column's sort: unsorted -> asc -> desc -> unsorted.
+   *
+   * In single-sort mode (the default) the result only ever holds THIS column,
+   * so sorting by a new column replaces the previous one. Only `multiSort`
+   * accumulates columns -- without that check, every header click appended and
+   * the table stayed ordered by whatever was sorted first.
+   */
   toggleSort(columnId: string): void {
     const currentSort = this.sorting.find((s) => s.columnId === columnId);
     let newSorting: SortingState;
@@ -417,16 +437,20 @@ export class TableStateManager<TData = unknown> extends Subscribable<TableStateE
     if (currentSort) {
       // Cycle through: asc -> desc -> none
       if (currentSort.direction === 'asc') {
-        newSorting = this.sorting.map((s) =>
-          s.columnId === columnId ? { ...s, direction: 'desc' as const } : s
-        );
+        newSorting = this.multiSort
+          ? this.sorting.map((s) =>
+              s.columnId === columnId ? { ...s, direction: 'desc' as const } : s
+            )
+          : [{ columnId, direction: 'desc' as const }];
       } else {
         // Remove from sorting
-        newSorting = this.sorting.filter((s) => s.columnId !== columnId);
+        newSorting = this.multiSort ? this.sorting.filter((s) => s.columnId !== columnId) : [];
       }
     } else {
-      // Add new sort (asc)
-      newSorting = [...this.sorting, { columnId, direction: 'asc' as const }];
+      // Add new sort (asc) -- replacing any other column unless multi-sorting.
+      newSorting = this.multiSort
+        ? [...this.sorting, { columnId, direction: 'asc' as const }]
+        : [{ columnId, direction: 'asc' as const }];
     }
 
     this.setSorting(newSorting);
@@ -565,96 +589,96 @@ export class TableStateManager<TData = unknown> extends Subscribable<TableStateE
     this.stateUpdateBatchDepth++;
     try {
       if (updates.filters !== undefined) {
-      // Tree-preserving (rule 4): TableState.filters is the real stored
-      // value, so a hydrated FilterGroupNode tree (e.g. from a c2: URL)
-      // must flow through unflattened. setFilterNode delegates flat arrays
-      // to setFilters verbatim (rule 1), so this is a no-op behavior change
-      // for every existing flat call path.
-      this.filterManager.setFilterNode(updates.filters);
-    }
-
-    if (updates.pagination !== undefined) {
-      const { page, limit, totalPages } = updates.pagination;
-
-      // If totalPages is provided, calculate and set total first
-      // This ensures validation works correctly when updating page
-      if (totalPages !== undefined) {
-        const currentLimit = limit ?? this.paginationManager.getPageSize();
-        const calculatedTotal = totalPages * currentLimit;
-        this.paginationManager.setTotal(calculatedTotal);
+        // Tree-preserving (rule 4): TableState.filters is the real stored
+        // value, so a hydrated FilterGroupNode tree (e.g. from a c2: URL)
+        // must flow through unflattened. setFilterNode delegates flat arrays
+        // to setFilters verbatim (rule 1), so this is a no-op behavior change
+        // for every existing flat call path.
+        this.filterManager.setFilterNode(updates.filters);
       }
 
-      if (limit !== undefined && limit !== this.paginationManager.getPageSize()) {
-        // Restoring state (e.g. from a shared URL) must never throw for a
-        // limit that isn't one of the configured pageSizeOptions - fall back
-        // to the nearest allowed size instead of letting changePageSize throw.
-        const allowedSizes = this.paginationManager.getPageSizeOptions();
-        const resolvedLimit = allowedSizes.includes(limit)
-          ? limit
-          : allowedSizes.reduce((closest, size) =>
-              Math.abs(size - limit) < Math.abs(closest - limit) ? size : closest
+      if (updates.pagination !== undefined) {
+        const { page, limit, totalPages } = updates.pagination;
+
+        // If totalPages is provided, calculate and set total first
+        // This ensures validation works correctly when updating page
+        if (totalPages !== undefined) {
+          const currentLimit = limit ?? this.paginationManager.getPageSize();
+          const calculatedTotal = totalPages * currentLimit;
+          this.paginationManager.setTotal(calculatedTotal);
+        }
+
+        if (limit !== undefined && limit !== this.paginationManager.getPageSize()) {
+          // Restoring state (e.g. from a shared URL) must never throw for a
+          // limit that isn't one of the configured pageSizeOptions - fall back
+          // to the nearest allowed size instead of letting changePageSize throw.
+          const allowedSizes = this.paginationManager.getPageSizeOptions();
+          const resolvedLimit = allowedSizes.includes(limit)
+            ? limit
+            : allowedSizes.reduce((closest, size) =>
+                Math.abs(size - limit) < Math.abs(closest - limit) ? size : closest
+              );
+
+          if (resolvedLimit !== limit) {
+            // biome-ignore lint: Intentional warning logging for clamped pagination limit
+            console.warn(
+              `[better-tables] Restored pagination limit ${limit} is not an allowed page size; falling back to nearest allowed size ${resolvedLimit}.`
             );
+          }
 
-        if (resolvedLimit !== limit) {
-          // biome-ignore lint: Intentional warning logging for clamped pagination limit
-          console.warn(
-            `[better-tables] Restored pagination limit ${limit} is not an allowed page size; falling back to nearest allowed size ${resolvedLimit}.`
-          );
+          if (resolvedLimit !== this.paginationManager.getPageSize()) {
+            this.paginationManager.changePageSize(resolvedLimit);
+          }
         }
 
-        if (resolvedLimit !== this.paginationManager.getPageSize()) {
-          this.paginationManager.changePageSize(resolvedLimit);
-        }
-      }
+        if (page !== undefined && page !== this.paginationManager.getCurrentPage()) {
+          // Restoring state must never throw for an out-of-range page (e.g. a
+          // bookmarked URL pointing past the current total) - clamp instead.
+          const totalPages = this.paginationManager.getTotalPages();
+          const resolvedPage =
+            totalPages > 0 ? Math.min(Math.max(page, 1), totalPages) : Math.max(page, 1);
 
-      if (page !== undefined && page !== this.paginationManager.getCurrentPage()) {
-        // Restoring state must never throw for an out-of-range page (e.g. a
-        // bookmarked URL pointing past the current total) - clamp instead.
-        const totalPages = this.paginationManager.getTotalPages();
-        const resolvedPage =
-          totalPages > 0 ? Math.min(Math.max(page, 1), totalPages) : Math.max(page, 1);
+          if (resolvedPage !== page) {
+            // biome-ignore lint: Intentional warning logging for clamped pagination page
+            console.warn(
+              `[better-tables] Restored pagination page ${page} is out of range; clamping to ${resolvedPage}.`
+            );
+          }
 
-        if (resolvedPage !== page) {
-          // biome-ignore lint: Intentional warning logging for clamped pagination page
-          console.warn(
-            `[better-tables] Restored pagination page ${page} is out of range; clamping to ${resolvedPage}.`
-          );
-        }
-
-        if (resolvedPage !== this.paginationManager.getCurrentPage()) {
-          this.paginationManager.goToPage(resolvedPage);
+          if (resolvedPage !== this.paginationManager.getCurrentPage()) {
+            this.paginationManager.goToPage(resolvedPage);
+          }
         }
       }
-    }
 
-    if (updates.sorting !== undefined) {
-      this.sorting = updates.sorting;
-      this.notify({ type: 'sorting_changed', sorting: this.sorting });
-    }
+      if (updates.sorting !== undefined) {
+        this.sorting = updates.sorting;
+        this.notify({ type: 'sorting_changed', sorting: this.sorting });
+      }
 
-    if (updates.selectedRows !== undefined) {
-      this.selectedRows = new Set(updates.selectedRows);
-      this.notify({ type: 'selection_changed', selectedRows: this.selectedRows });
-    }
+      if (updates.selectedRows !== undefined) {
+        this.selectedRows = new Set(updates.selectedRows);
+        this.notify({ type: 'selection_changed', selectedRows: this.selectedRows });
+      }
 
-    if (updates.columnVisibility !== undefined) {
-      this.columnVisibility = { ...updates.columnVisibility };
-      this.cachedColumnVisibility = null;
-      this.notify({
-        type: 'visibility_changed',
-        columnVisibility: this.columnVisibility,
-      });
-    }
+      if (updates.columnVisibility !== undefined) {
+        this.columnVisibility = { ...updates.columnVisibility };
+        this.cachedColumnVisibility = null;
+        this.notify({
+          type: 'visibility_changed',
+          columnVisibility: this.columnVisibility,
+        });
+      }
 
-    if (updates.columnOrder !== undefined) {
-      // Normalize and validate the incoming order to ensure it's valid
-      this.columnOrder = mergeColumnOrder(this.columns, updates.columnOrder);
-      this.cachedColumnOrder = null;
-      this.notify({
-        type: 'order_changed',
-        columnOrder: this.columnOrder,
-      });
-    }
+      if (updates.columnOrder !== undefined) {
+        // Normalize and validate the incoming order to ensure it's valid
+        this.columnOrder = mergeColumnOrder(this.columns, updates.columnOrder);
+        this.cachedColumnOrder = null;
+        this.notify({
+          type: 'order_changed',
+          columnOrder: this.columnOrder,
+        });
+      }
 
       this.notifyStateChanged();
     } finally {

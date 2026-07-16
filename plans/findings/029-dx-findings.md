@@ -9,6 +9,44 @@ and `apps/marketing/src/components/sections/` unless noted otherwise.
 
 ---
 
+## Resolution ledger
+
+**All 17 findings are closed.** Every `// DX-FINDING-N:` marker is gone from the
+codebase — the workarounds they annotated were deleted, not re-documented. The
+findings below are kept verbatim as the historical record of what the dogfood
+actually hit; this ledger says where each one landed.
+
+| # | Status | Where it landed |
+|---|---|---|
+| 1 | Fixed | `buildFilter(table, path, [type,] op, values)` (031). Presets author leaves against real paths/operators. Option columns still take an explicit `'option'` — a string-shaped path can't be inferred as option. |
+| 2 | Fixed | `BaseFilterState.id` + `filterKey(filter, index)` (031). |
+| 3 | Fixed | Core's own `serializeTableStateToUrl` (filters + sorting + pagination, built-in compression). The app hand-rolls nothing; `lz-string` lives only inside core. |
+| 4 | Fixed | Example is `betterTables()` + `defineTable()` + path builders; the homepage demo uses `defineTableRow()` + the typed read surface. The marketing site's own code samples now teach the flagship API too (they taught `createColumnBuilder` with explicit `.id()/.accessor()/.build()`). |
+| 5 | Fixed | `table` prop (032). Adopted once #12 landed — it was blocked on the row type, not on the prop. |
+| 6 | Fixed | **`<BetterTable virtualized />`** — windowing under the existing filter/sort/selection/URL-sync machinery, so there's no second component to reach for. The big board migrated off `<VirtualizedTable>` and *gained* a filter bar and header sort it never had. `TableFeatures.virtualScrolling` (declared, never read by anything) is deprecated in favour of the prop. The `renderCell`-ignores-column-formatter addendum was fixed in 032. |
+| 7 | Fixed | `useFacets` + `<FacetedFilterSidebar>` (032), plus `httpAdapter`/`createAdapterRouteHandler` — the facets sidebar's whole server side is now 3 lines, and its ~160-line hand-built fetch/race-guard/`Map` plumbing is gone. |
+| 8 | Fixed | Per-type operators (031). `equals` on an option filter is a compile error. |
+| 9 | Fixed | Ambiguous multi-table reads throw (030), and `tables.fetchData(table, …)` injects `primaryTable` so the ambiguity is unreachable by construction. |
+| 10 | Fixed | `computeAutoEmbedColumns` (030) — a relation touched by `filters`/`sorting` embeds itself. Explicit `columns` is now only needed for data no filter mentions (e.g. client-side visibility toggling). |
+| 11 | Fixed | `drizzleAdapter()` throws on a `Relations` object clobbering a same-named table (030). The homepage demo still *had* the clobbering shape and was fixed here — it only worked because #14's extractor fallback rescued the tables via each relation's `.table` ref. |
+| 12 | Fixed | Relation-aware rows drop inverse back-references and keep forward relations as a clean intersection. **This is the linchpin**: `$infer.Row` became usable, so the hand-shaped `TicketWithRelations` was deleted, `ticketColumns = ticketsTable.columns` needs no cast at all, and #5/#16 unblocked. |
+| 13 | Fixed by pattern | The lazy getter is still required — `next build`'s page-data collection still imports route modules, so a module-scope native binding still breaks it. What changed: `createAdapterRouteHandler` takes a lazy factory, and clients use `httpAdapter`, so no DB binding is reachable from a client module at all. `db.ts` documents the constraint rather than flagging it. |
+| 14 | Fixed | `extractSchemaFromDB` keys tables and relations consistently (030). The example is zero-config `drizzleAdapter(db)` again, despite SQL names (`support_tickets`) differing from JS keys (`tickets`). |
+| 15 | Fixed | Soft-nav rehydration (032), **plus the clearing direction fixed here**: the `hasFilters` guard correctly protected SSR-seeded `initialFilters` on mount but also blocked *clearing*, so a soft nav that removed filters left stale chips while the data correctly refetched unfiltered. Now the clear is allowed only after the first hydration. |
+| 16 | Fixed | Table-scoped read surface (030). Every fetcher in the app is cast-free. |
+| 17 | Fixed | `filterHasValue(filter, value)` (031). |
+
+### Found while closing these (not in the original 17)
+
+| What | Status |
+|---|---|
+| `betterTables()` rejected any adapter without `$types`. `SchemaAwareAdapter` is all-optional (`{ $types?: T }`), so constraining to it tripped TypeScript's weak-type check — excluding exactly the REST/in-memory/`httpAdapter` adapters its own docs promised. Invisible because the test mock declared `& SchemaAwareAdapter<…>`. | Fixed (constraint relaxed to `object`; regression test covers a plain adapter and `httpAdapter`) |
+| No client-callable adapter: a server-only adapter can't be reached from the browser, so every app hand-wrote a fetch shim + route. | Fixed (`httpAdapter` + `handleAdapterRequest` + `createAdapterRouteHandler`) |
+| Number `equals`/`notEquals` routed to the string handler — `Invalid filter value type: expected string` on a numeric column. | Fixed (router dispatch + regression test) |
+| `sorting={{ multiSort: false }}` appended a second sort key instead of replacing, so every table stayed ordered by whatever was sorted first. `TableStateManager.toggleSort` had no `multiSort` concept — the flag lived on the unused `SortingManager` and only drove the header menu's display. | Fixed (`TableStateConfig.sorting.multiSort`, threaded from the `<BetterTable sorting>` prop; regression tests both modes) |
+
+---
+
 ## 1. Filter-group literal shape: `kind`/`logic` lost against the intuitive guess, and a leaf must restate its column's type
 
 **Tried:** The maintainer's WIP (`relationship-trail.ts`, pre-fix) wrote the

@@ -38,7 +38,7 @@ export function EmptyState({
         <Icon className="w-6 h-6 text-muted-foreground" />
       </div>
 
-      <h3 className="text-lg font-medium text-foreground mb-2">
+      <h3 className="text-base font-semibold tracking-tight text-foreground mb-1.5">
         {hasFilters ? 'No matching results' : 'No data to display'}
       </h3>
 

@@ -93,7 +93,6 @@ export type SupportAssignee = typeof assignees.$inferSelect;
 export type SupportTicket = typeof tickets.$inferSelect;
 export type BulkTicket = typeof bulkTickets.$inferSelect;
 
-export type TicketWithRelations = SupportTicket & {
-  customer?: SupportCustomer | null;
-  assignee?: SupportAssignee | null;
-};
+// No hand-shaped `TicketWithRelations` here: the row type with its relations
+// is derived from the schema as `ticketsTable.$infer.Row` (exported as
+// `TicketRow` from `./columns`), so there's no duplicate to drift (finding 12).

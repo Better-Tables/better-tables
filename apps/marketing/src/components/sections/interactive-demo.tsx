@@ -1,13 +1,10 @@
 import type { FetchDataResult } from '@better-tables/core';
-import {
-  flattenFilterNode,
-  isFilterGroupNode,
-  parseTableSearchParams,
-} from '@better-tables/core';
+import { flattenFilterNode, isFilterGroupNode, parseTableSearchParams } from '@better-tables/core';
 import Link from 'next/link';
 import { Section } from '@/components/section';
 import { buttonVariants } from '@/components/ui/button';
-import { getAdapter } from '@/lib/adapter';
+import { getTables } from '@/lib/adapter';
+import { usersTable } from '@/lib/columns/user-columns';
 import type { UserWithRelations } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 import { UsersTableClient } from './users-table-client';
@@ -29,9 +26,7 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
   });
 
   const { page, limit, filters: filterNode, sorting } = tableParams;
-  const initialFilters = isFilterGroupNode(filterNode)
-    ? flattenFilterNode(filterNode)
-    : filterNode;
+  const initialFilters = isFilterGroupNode(filterNode) ? flattenFilterNode(filterNode) : filterNode;
 
   let error: string | null = null;
   let result: FetchDataResult<UserWithRelations> = {
@@ -47,12 +42,14 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
   };
 
   try {
-    const adapter = await getAdapter();
-    result = (await adapter.fetchData({
+    const tables = await getTables();
+    // Table-scoped: `primaryTable` comes from `usersTable` and the rows are
+    // typed as its row -- no cast (findings 9 + 16).
+    result = await tables.fetchData(usersTable, {
       pagination: { page, limit },
       filters: filterNode,
       sorting,
-    })) as FetchDataResult<UserWithRelations>;
+    });
   } catch (caught) {
     error = caught instanceof Error ? caught.message : 'Failed to load users';
   }
@@ -65,8 +62,8 @@ export async function InteractiveDemo({ searchParams }: InteractiveDemoProps) {
             <div>
               <h3 className="text-2xl font-bold mb-2">Try Better Tables Live</h3>
               <p className="text-muted-foreground max-w-2xl">
-                Experience automatic relationship filtering on a seeded user directory. Filter across
-                joined profile fields without writing a single JOIN query.
+                Experience automatic relationship filtering on a seeded user directory. Filter
+                across joined profile fields without writing a single JOIN query.
               </p>
             </div>
             <Link

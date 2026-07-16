@@ -302,6 +302,48 @@ describe('TableStateManager', () => {
       expect(manager.getSorting()).toHaveLength(0);
     });
 
+    it('replaces the current sort when sorting a new column (single-sort default)', () => {
+      // Regression: `toggleSort` used to always append, so a table configured
+      // for single-sort still accumulated columns and stayed ordered by
+      // whatever was sorted first.
+      manager.setSorting([{ columnId: 'age', direction: 'asc' }]);
+      manager.toggleSort('name');
+
+      expect(manager.getSorting()).toEqual([{ columnId: 'name', direction: 'asc' }]);
+    });
+
+    it('drops other columns when cycling an existing sort in single-sort mode', () => {
+      manager.setSorting([
+        { columnId: 'age', direction: 'asc' },
+        { columnId: 'name', direction: 'asc' },
+      ]);
+      manager.toggleSort('name');
+
+      expect(manager.getSorting()).toEqual([{ columnId: 'name', direction: 'desc' }]);
+    });
+
+    it('accumulates columns when multiSort is enabled', () => {
+      const multi = new TableStateManager(mockColumns, {}, { sorting: { multiSort: true } });
+      multi.toggleSort('age');
+      multi.toggleSort('name');
+
+      expect(multi.getSorting()).toEqual([
+        { columnId: 'age', direction: 'asc' },
+        { columnId: 'name', direction: 'asc' },
+      ]);
+
+      // Cycling one column leaves the others in place.
+      multi.toggleSort('age');
+      expect(multi.getSorting()).toEqual([
+        { columnId: 'age', direction: 'desc' },
+        { columnId: 'name', direction: 'asc' },
+      ]);
+
+      // desc -> removed, and only that column goes.
+      multi.toggleSort('age');
+      expect(multi.getSorting()).toEqual([{ columnId: 'name', direction: 'asc' }]);
+    });
+
     it('should clear sorting', () => {
       manager.setSorting([{ columnId: 'age', direction: 'desc' }]);
       manager.clearSorting();

@@ -150,7 +150,12 @@ export interface TableFeatures {
   /** Enable row selection */
   rowSelection?: boolean;
 
-  /** Enable virtual scrolling for large datasets */
+  /**
+   * @deprecated Has no effect — `<BetterTable>` never read this flag. Use the
+   * top-level `virtualized` prop instead, which windows the table's rows under
+   * all the same filtering/sorting/selection/URL-sync machinery:
+   * `<BetterTable table={t} data={rows} virtualized />` (finding 6).
+   */
   virtualScrolling?: boolean;
 
   /** Enable real-time data updates */

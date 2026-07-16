@@ -1,6 +1,6 @@
 # @better-tables/site
 
-Public marketing site for Better Tables, including a live interactive demo of the full table stack.
+Public site for Better Tables — marketing, examples, and docs — including a live interactive demo of the full table stack.
 
 ## Run locally
 
@@ -26,7 +26,3 @@ Key files:
 | `src/components/sections/users-table-client.tsx` | Client table wrapper |
 | `src/components/sections/interactive-demo.tsx` | Server section on homepage |
 | `src/app/api/users/route.ts` | Data API |
-
-## Docs site
-
-Documentation lives in [`apps/docs`](../docs) (`@better-tables/docs`).

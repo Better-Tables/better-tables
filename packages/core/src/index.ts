@@ -102,6 +102,8 @@
  * ```
  */
 
+// Adapters (HTTP transport)
+export * from './adapters';
 // Builders
 export * from './builders';
 // Factory

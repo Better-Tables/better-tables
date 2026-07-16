@@ -1,5 +1,11 @@
-import type { FilterGroupNode, FilterState, SortingState } from '@better-tables/core';
-import { relationshipColumnIds } from './columns';
+import {
+  buildFilter,
+  type FilterGroupNode,
+  type FilterState,
+  filterKey,
+  type SortingState,
+} from '@better-tables/core';
+import { relationshipColumnIds, ticketsTable } from './columns';
 
 const columnLabels: Record<string, { entity: string; field: string }> = {
   'customer.company': { entity: 'customer', field: 'company' },
@@ -35,11 +41,9 @@ export function buildRelationshipTrail(filters: FilterState[]): RelationshipTrai
       const field = meta?.field ?? filter.columnId.split('.')[1] ?? filter.columnId;
 
       return {
-        // DX-FINDING-2: FilterState has no `id` field (identity is
-        // `columnId`, which isn't unique within a group) -- derive a
-        // display-only key from columnId + position instead. See
-        // plans/findings/029-dx-findings.md #2.
-        id: `${filter.columnId}-${index}`,
+        // Stable per-filter key: prefers a real `filter.id` when present,
+        // else falls back to `columnId#index` (plan 031, finding 2).
+        id: filterKey(filter, index),
         entity,
         field,
         operator: filter.operator,
@@ -57,18 +61,13 @@ export interface SupportScenarioPreset {
   sorting?: SortingState;
 }
 
-// DX-FINDING-1: the intuitive `{ type: 'group', operator: 'and', children: [{ type:
-// 'filter', columnId, operator, values }] }` shape does not exist. The real
-// shape is `{ kind: 'group', logic: 'and' | 'or', children: FilterNode[] }`
-// with BARE FilterState leaves (no `type: 'filter'` wrapper) that must each
-// restate the column's data type (`type: 'option' | 'text' | ...`). See
-// plans/findings/029-dx-findings.md #1.
-//
-// DX-FINDING-8: option-typed leaves use `is`/`isAnyOf`, not `equals` --
-// `equals` type-checks (FilterOperator is one flat union across every column
-// type) but fails FilterManager's runtime validation for an option column
-// (`OptionColumnBuilder.options()` restricts allowed operators to
-// `is`/`isNot`/`isAnyOf`/`isNoneOf`). See plans/findings/029-dx-findings.md #8.
+// `buildFilter(ticketsTable, path, [type,] operator, values)` authors each
+// leaf against the table's REAL row paths and per-type operators (plan 031):
+// a wrong path, a wrong operator for the column family (e.g. `equals` on an
+// option column -- finding 8), or a wrong value type is a COMPILE error here.
+// Option columns need the explicit `'option'` type (a string-shaped path
+// can't be inferred as option); text/boolean leaves infer from the path.
+// The `{ kind: 'group', logic }` wrapper is the real group shape (finding 1).
 export const supportScenarioPresets: SupportScenarioPreset[] = [
   {
     id: 'enterprise-escalations',
@@ -78,18 +77,8 @@ export const supportScenarioPresets: SupportScenarioPreset[] = [
       kind: 'group',
       logic: 'and',
       children: [
-        {
-          columnId: 'customer.plan',
-          type: 'option',
-          operator: 'is',
-          values: ['enterprise'],
-        },
-        {
-          columnId: 'status',
-          type: 'option',
-          operator: 'is',
-          values: ['escalated'],
-        },
+        buildFilter(ticketsTable, 'customer.plan', 'option', 'is', ['enterprise']),
+        buildFilter(ticketsTable, 'status', 'option', 'is', ['escalated']),
       ],
     },
   },
@@ -101,18 +90,8 @@ export const supportScenarioPresets: SupportScenarioPreset[] = [
       kind: 'group',
       logic: 'and',
       children: [
-        {
-          columnId: 'assignee.name',
-          type: 'text',
-          operator: 'equals',
-          values: ['Maya Chen'],
-        },
-        {
-          columnId: 'status',
-          type: 'option',
-          operator: 'is',
-          values: ['open'],
-        },
+        buildFilter(ticketsTable, 'assignee.name', 'equals', ['Maya Chen']),
+        buildFilter(ticketsTable, 'status', 'option', 'is', ['open']),
       ],
     },
   },
@@ -124,18 +103,8 @@ export const supportScenarioPresets: SupportScenarioPreset[] = [
       kind: 'group',
       logic: 'or',
       children: [
-        {
-          columnId: 'priority',
-          type: 'option',
-          operator: 'is',
-          values: ['urgent'],
-        },
-        {
-          columnId: 'slaBreached',
-          type: 'boolean',
-          operator: 'isTrue',
-          values: [],
-        },
+        buildFilter(ticketsTable, 'priority', 'option', 'is', ['urgent']),
+        buildFilter(ticketsTable, 'slaBreached', 'isTrue', []),
       ],
     },
   },
@@ -143,14 +112,7 @@ export const supportScenarioPresets: SupportScenarioPreset[] = [
     id: 'sla-breaches',
     label: 'SLA breaches',
     description: 'Tickets that breached SLA, sorted by assignee team.',
-    filters: [
-      {
-        columnId: 'slaBreached',
-        type: 'boolean',
-        operator: 'isTrue',
-        values: [],
-      },
-    ],
+    filters: [buildFilter(ticketsTable, 'slaBreached', 'isTrue', [])],
     sorting: [{ columnId: 'assignee.team', direction: 'asc' }],
   },
 ];
@@ -166,15 +128,7 @@ export const noAssigneeFilterPreset: SupportScenarioPreset = {
   id: 'no-assignee',
   label: 'No assignee (null-only filter)',
   description: 'Tickets where assignee.name is null -- nobody has picked them up yet.',
-  filters: [
-    {
-      columnId: 'assignee.name',
-      type: 'text',
-      operator: 'equals',
-      values: [],
-      includeNull: true,
-    },
-  ],
+  filters: [buildFilter(ticketsTable, 'assignee.name', 'equals', [], { includeNull: true })],
 };
 
 /** Every preset the `query-groups` example showcases: AND groups, an OR

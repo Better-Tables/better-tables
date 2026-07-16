@@ -239,9 +239,9 @@ function FilterBadge<TData = unknown>({
     >
       {/* Column Name */}
       <div className="flex items-center gap-1 px-2 py-1.5">
-        {Icon && <Icon className={cn('size-3.5', iconTone)} />}
+        {Icon && <Icon size={14} className={cn('shrink-0', iconTone)} />}
         <span className="font-medium">{column.displayName}</span>
-        {isProtected && <Lock className="size-3 text-amber-600 dark:text-amber-400" />}
+        {isProtected && <Lock size={12} className="text-amber-600 dark:text-amber-400" />}
       </div>
 
       <Separator orientation="vertical" className="h-5" />
@@ -346,7 +346,7 @@ function FilterBadge<TData = unknown>({
       {/* Remove Button */}
       {isProtected ? (
         <div className="flex h-full items-center px-2 text-muted-foreground">
-          <Lock className="size-3.5" />
+          <Lock size={14} className="shrink-0" />
         </div>
       ) : (
         <Button
@@ -356,7 +356,7 @@ function FilterBadge<TData = unknown>({
           disabled={disabled}
           aria-label={`Remove ${column.displayName} filter`}
         >
-          <X className="size-3.5" />
+          <X size={14} className="shrink-0" strokeWidth={2} />
         </Button>
       )}
     </div>

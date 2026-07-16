@@ -50,7 +50,7 @@ export function FilterOperatorSelect<TData = unknown>({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label className="text-sm font-medium px-1">Operator</Label>
+      <Label className="text-sm font-semibold tracking-tight px-1">Operator</Label>
       <Separator />
       <ScrollArea className="h-60 px-1">
         <RadioGroup

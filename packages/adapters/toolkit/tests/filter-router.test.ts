@@ -151,6 +151,23 @@ describe('FilterRouter', () => {
       const result = router.mapOperatorToCondition(column, 'is', ['2026-01-01'], false, 'date');
       expect(result?.columnType).toBe('date');
     });
+
+    // Regression: `equals`/`notEquals` are shared between text and number
+    // columns. Without a columnType guard, a number column's `equals` routed
+    // to `textOperator`, whose value-type assertion throws on a numeric value.
+    for (const operator of ['equals', 'notEquals'] as const) {
+      it(`routes '${operator}' to numberOperator when columnType is 'number'`, () => {
+        const result = router.mapOperatorToCondition(column, operator, [3], false, 'number');
+        expect(emitter.calls[0]?.method).toBe('numberOperator');
+        expect(result?.kind).toBe('numberOperator');
+      });
+
+      it(`still routes '${operator}' to textOperator without a number columnType`, () => {
+        const result = router.mapOperatorToCondition(column, operator, ['abc']);
+        expect(emitter.calls[0]?.method).toBe('textOperator');
+        expect(result?.kind).toBe('textOperator');
+      });
+    }
   });
 
   describe('Unknown operators', () => {

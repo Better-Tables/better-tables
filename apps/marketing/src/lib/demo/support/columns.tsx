@@ -1,16 +1,11 @@
-import type { ColumnDefinition } from '@better-tables/core';
 import { defineTable } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
-// DX-FINDING-4: `import type` only -- this is the RSC-safe pattern
-// MIGRATION.md documents (`factory.ts`'s doc comment): `defineTable` itself
-// has no DB-driver dependency, so a type-only import of the flagship
-// instance's TYPE (`SupportTables`, exported by `./db` alongside its lazy
-// runtime getter -- see DX-FINDING-13) keeps that driver out of any client
-// bundle that imports THIS file. Verified end to end via
-// `bun run build --filter=@better-tables/site` -- see
-// plans/findings/029-dx-findings.md #4.
+// `import type` only -- the RSC-safe pattern MIGRATION.md documents.
+// `defineTable` has no DB-driver dependency, so importing just the instance's
+// TYPE (`SupportTables`, exported by `./db` alongside its lazy runtime getter)
+// keeps `better-sqlite3` out of any client bundle that imports THIS file.
+// Verified via `bun run build --filter=@better-tables/site`.
 import type { SupportTables } from './db';
-import type { TicketWithRelations } from './schema';
 
 const statusColors: Record<string, string> = {
   open: 'border-[#60A5FA]/40 text-[#60A5FA]',
@@ -65,7 +60,9 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .filterable()
       .sortable()
       .cellRenderer(({ value }) => (
-        <span className={`font-mono text-xs uppercase ${priorityColors[value] ?? ''}`}>{value}</span>
+        <span className={`font-mono text-xs uppercase ${priorityColors[value] ?? ''}`}>
+          {value}
+        </span>
       )),
 
     t
@@ -86,9 +83,18 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
 
     // Direct numeric column -- the `facets` example's `getMinMaxValues`
     // showcase needs one.
-    t.number('reopenCount').displayName('Reopens').filterable().sortable(),
+    t
+      .number('reopenCount')
+      .displayName('Reopens')
+      .filterable()
+      .sortable(),
 
-    t.text('customer.company').displayName('Customer').searchable({ includeNull: true }).filterable().sortable(),
+    t
+      .text('customer.company')
+      .displayName('Customer')
+      .searchable({ includeNull: true })
+      .filterable()
+      .sortable(),
 
     t
       .option('customer.plan')
@@ -112,7 +118,12 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .filterable()
       .sortable(),
 
-    t.text('assignee.name').displayName('Assignee').searchable({ includeNull: true }).filterable().sortable(),
+    t
+      .text('assignee.name')
+      .displayName('Assignee')
+      .searchable({ includeNull: true })
+      .filterable()
+      .sortable(),
 
     t
       .option('assignee.team')
@@ -149,23 +160,16 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
 }));
 
 /**
- * DX-FINDING-12: `ticketsTable.columns` is typed against the SCHEMA-DERIVED
- * `RowOf<typeof supportTables, 'tickets'>` (via `$infer`/`RelationAwareRow`,
- * default depth 3) -- which, for a two-way relation
- * (`tickets -> customer -> tickets -> ...`), recurses into a back-reference
- * (`customer.tickets: Ticket[]`) that the app never actually requests via
- * `columns` (`fetch-tickets.ts` only asks for `customer.plan`/`.company`/
- * `.region`, not the customer's own ticket list) and produces a nested
- * union type incompatible with the app's own hand-shaped `TicketWithRelations`
- * (`customer?: SupportCustomer | null`). The schema-derived type describes
- * "everything reachable," not "what THIS query actually returns" -- there is
- * no way to narrow `$infer.Row` to the shape a specific `columns` selection
- * produces. See plans/findings/029-dx-findings.md #12.
+ * The ticket row type, derived straight from the SCHEMA -- there is no
+ * hand-shaped duplicate to keep in sync. `$infer.Row` now carries the forward
+ * relations (`customer`, `assignee`) as a clean intersection and omits inverse
+ * back-references, so it IS the shape a fetch actually returns (plan 030,
+ * finding 12).
  */
-export const ticketColumns = ticketsTable.columns as unknown as ColumnDefinition<
-  TicketWithRelations,
-  unknown
->[];
+export type TicketRow = typeof ticketsTable.$infer.Row;
+
+/** Typed against `TicketRow` by construction -- no cast (finding 12). */
+export const ticketColumns = ticketsTable.columns;
 
 export const defaultVisibleTicketColumns = [
   'subject',
@@ -180,11 +184,11 @@ export const defaultVisibleTicketColumns = [
 ];
 
 /**
- * DX-FINDING-10: every column id the table can render, not just the
- * default-visible subset -- column visibility toggling is client-side only
- * (no refetch), and relation data (customer/assignee) is silently absent
- * from `fetchData()` results unless its dot-path is named in `columns`. See
- * plans/findings/029-dx-findings.md #10.
+ * Every column id the table can render, not just the default-visible subset:
+ * column visibility toggling is client-side (no refetch), so a
+ * hidden-but-toggleable column still needs its data in the initial fetch.
+ * (Relations touched by filters/sorting auto-embed on their own -- finding 10
+ * -- but toggling reaches columns no filter mentions.)
  */
 export const allTicketColumnIds = ticketColumns.map((column) => column.id);
 

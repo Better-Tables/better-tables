@@ -4,15 +4,15 @@ import type { FilterState, PaginationState, SortingState } from '@better-tables/
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
 import {
   defaultVisibleTicketColumns,
-  ticketColumns,
+  type TicketRow,
+  ticketsTable,
 } from '@/lib/demo/support/columns';
-import type { TicketWithRelations } from '@/lib/demo/support/schema';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'support-tickets-table';
 
 interface TicketsTableClientProps {
-  data: TicketWithRelations[];
+  data: TicketRow[];
   totalCount: number;
   initialPagination: PaginationState;
   initialSorting: SortingState;
@@ -44,7 +44,7 @@ export function TicketsTableClient({
     <BetterTable
       id={TABLE_ID}
       name="Tickets"
-      columns={ticketColumns}
+      table={ticketsTable}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}

@@ -1,8 +1,12 @@
-import type { FetchDataResult, FilterGroupNode, FilterState, SortingState } from '@better-tables/core';
+import type {
+  FetchDataResult,
+  FilterGroupNode,
+  FilterState,
+  SortingState,
+} from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
-import { allTicketColumnIds } from './columns';
+import { allTicketColumnIds, type TicketRow, ticketsTable } from './columns';
 import { getSupportTables } from './db';
-import type { TicketWithRelations } from './schema';
 
 export interface FetchTicketsParams {
   page?: number;
@@ -12,7 +16,7 @@ export interface FetchTicketsParams {
 }
 
 export interface FetchTicketsResult {
-  result: FetchDataResult<TicketWithRelations>;
+  result: FetchDataResult<TicketRow>;
   filters: FilterState[];
   sorting: SortingState;
   error: string | null;
@@ -34,28 +38,18 @@ export async function fetchTickets({
 
   try {
     const supportTables = await getSupportTables();
-    const result = (await supportTables.database.fetchData({
+    // Table-scoped read (plan 030, findings 9 + 16): `primaryTable` is
+    // injected from `ticketsTable` (no wrong-table hazard) and the result is
+    // typed as the table's own inferred row -- no `as FetchDataResult<...>`
+    // cast. `columns` still lists every renderable column so client-side
+    // visibility toggling has the data without a refetch (relations touched
+    // by filters/sorting auto-embed on their own -- finding 10).
+    const result = await supportTables.fetchData(ticketsTable, {
       pagination: { page, limit },
       filters,
       sorting,
-      // DX-FINDING-9: omitting `primaryTable` on this multi-table schema
-      // silently returns `customers` rows (the first table in schema key
-      // order) instead of tickets, with only a console.warn -- see
-      // plans/findings/029-dx-findings.md #9.
-      primaryTable: 'tickets',
-      // DX-FINDING-10: a relation (customer/assignee) is silently ABSENT
-      // from result rows unless its dot-path is named here, even though
-      // filtering/sorting by it works without it -- see
-      // plans/findings/029-dx-findings.md #10. Every column id is passed
-      // (not just the default-visible ones) because column visibility
-      // toggling is client-side only, with no refetch.
       columns: allTicketColumnIds,
-      // DX-FINDING-16: `supportTables.database.fetchData()` has no per-call
-      // generic tying it to a specific table's row type -- always
-      // `FetchDataResult<unknown>`, even though `ticketsTable.$infer.Row`
-      // already computed the exact right type. See
-      // plans/findings/029-dx-findings.md #16.
-    })) as FetchDataResult<TicketWithRelations>;
+    });
 
     return {
       result,

@@ -50,7 +50,7 @@ export interface BetterTablesDefaults {
  * @template TAdapter - The data adapter, optionally schema-aware via `$types`
  * (see {@link SchemaAwareAdapter} in `types/paths.ts`).
  */
-export interface BetterTablesConfig<TAdapter extends SchemaAwareAdapter = SchemaAwareAdapter> {
+export interface BetterTablesConfig<TAdapter extends object = SchemaAwareAdapter> {
   /** The data adapter. Carries `$types` (the schema catalog) when schema-aware. */
   database: TAdapter;
   /** Instance-wide defaults. */
@@ -67,7 +67,7 @@ export interface BetterTablesConfig<TAdapter extends SchemaAwareAdapter = Schema
  * value everywhere is fine). The curried, type-only `defineTable<typeof
  * tables>()` free function (below) is the RSC-safe alternative.
  */
-export interface BetterTablesInstance<TAdapter extends SchemaAwareAdapter = SchemaAwareAdapter> {
+export interface BetterTablesInstance<TAdapter extends object = SchemaAwareAdapter> {
   /** The configured data adapter. */
   readonly database: TAdapter;
   /** Instance-wide defaults, as passed to `betterTables()`. */

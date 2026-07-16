@@ -1281,14 +1281,33 @@ type DeepWith<
   TConfig extends TableRelationalConfig,
   TSchema extends TablesRelationalConfig,
   D extends number,
+  Visited extends string,
 > = [D] extends [never]
   ? Record<string, never>
   : {
-      [K in keyof TConfig['relations']]?: TConfig['relations'][K] extends {
+      // Finding 12: OMIT any relation whose referenced table is already on the
+      // current path (`Visited`). Those are inverse "back-reference" edges
+      // (e.g. `customer.tickets` reached from a `tickets` row) that a row
+      // consumer almost never wants -- they explode the row type into
+      // recursive unions that no `columns` selection actually returns. Keeping
+      // only FORWARD relations makes `$infer.Row`/`RowOf` directly usable as a
+      // consumer's row type instead of forcing a hand-shaped duplicate + cast.
+      // Non-optional (`K`, not `K?`): a FORWARD relation kept here is always
+      // present in the computed row, so `BuildQueryResult` yields a clean
+      // intersection (`Post & { comments: Comment[] }`) instead of an
+      // "either selected or not" union (`Post | Post & { comments }`) that
+      // makes the inferred row awkward to consume.
+      [K in keyof TConfig['relations'] as TConfig['relations'][K] extends {
+        referencedTableName: infer RT extends string;
+      }
+        ? RT extends Visited
+          ? never
+          : K
+        : K]: TConfig['relations'][K] extends {
         referencedTableName: infer RT extends string;
       }
         ? FindTableByDBName<TSchema, RT> extends infer RC extends TableRelationalConfig
-          ? { with: DeepWith<RC, TSchema, SchemaDepthPrev[D]> }
+          ? { with: DeepWith<RC, TSchema, SchemaDepthPrev[D], Visited | RT> }
           : true
         : true;
     };
@@ -1315,7 +1334,11 @@ export type RelationAwareRow<
   D extends number = 3,
 > = ExtractTablesWithRelations<TSchema> extends infer TRel extends TablesRelationalConfig
   ? TTableName extends keyof TRel
-    ? BuildQueryResult<TRel, TRel[TTableName], { with: DeepWith<TRel[TTableName], TRel, D> }>
+    ? BuildQueryResult<
+        TRel,
+        TRel[TTableName],
+        { with: DeepWith<TRel[TTableName], TRel, D, TRel[TTableName]['dbName']> }
+      >
     : never
   : never;
 

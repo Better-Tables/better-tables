@@ -65,7 +65,7 @@ else is done; Drizzle abstraction/provider-readiness proceeds.
   reinstall. Separately: `apps/marketing` typecheck is bare `tsc --noEmit`
   and can be poisoned by a stale `.next/types/validator.ts` referencing
   deleted routes — `rm -rf apps/marketing/.next` clears it; consider
-  prepending `next typegen` like apps/docs (backlog).
+  prepending `next typegen` (backlog).
 - **029 MERGED (2026-07-13)**: four showcase examples live
   (`/examples`: relationship-filtering, query-groups, big-board, facets) on
   the flagship `betterTables()`/`defineTable()` API, every page
@@ -178,10 +178,10 @@ table param (interim answer shipped in 002's `defaultMutationTable`).
   (ESM file-to-file); per-file `'use client'` preserved (41 files); global
   banner removed.
 - **CI**: first real run happens when the git remote is restored. Lint step is
-  `continue-on-error` until biome residue hits 0. Marketing + docs + `packages/ui`
+  `continue-on-error` until biome residue hits 0. Marketing + `packages/ui`
   are Biome-clean as of 2026-07-13; remaining residue is mostly core/cli/adapters.
-- **Typecheck exclusions (recorded debt)**: none — `apps/docs` and `apps/marketing`
-  both have `typecheck` scripts; `packages/ui` now has a `bun test` harness (plan 010).
+- **Typecheck exclusions (recorded debt)**: none — `apps/marketing`
+  has a `typecheck` script; `packages/ui` now has a `bun test` harness (plan 010).
 - **Changesets accumulate for one 0.6 train** — do not partially publish.
 - Root `lint` script mutates (`biome check --write --unsafe .`); check-only is
   `bunx biome check .`. Fresh worktrees: `bun install` first; build core (and now

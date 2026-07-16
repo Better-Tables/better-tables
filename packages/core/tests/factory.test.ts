@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { httpAdapter } from '../src/adapters/http-adapter';
 import { betterTables, defineTable, defineTableRow } from '../src/factory';
 import type { FetchDataParams, TableAdapter } from '../src/types/adapter';
 import type { SchemaAwareAdapter } from '../src/types/paths';
@@ -124,6 +125,28 @@ describe('betterTables() instance', () => {
       expect(tables2.database).toBe(adapter2);
       expect(tables1.defaults).toEqual({ pageSize: 10 });
       expect(tables2.defaults).toEqual({ pageSize: 50 });
+    });
+  });
+
+  describe('non-schema-aware adapters (no `$types` phantom)', () => {
+    // `SchemaAwareAdapter` is all-optional (`{ $types?: T }`). Constraining
+    // `betterTables()` to it triggered TypeScript's weak-type detection, which
+    // REJECTED every adapter that doesn't carry `$types` ("has no properties in
+    // common") -- i.e. exactly the REST/in-memory/http adapters its own docs
+    // say are supported. These are compile-time regressions: if the constraint
+    // regresses, this file stops typechecking.
+    it('accepts a plain TableAdapter carrying no `$types`', () => {
+      const plain: TableAdapter<TestRecord> = { ...createMockAdapter() };
+      const tables = betterTables({ database: plain });
+
+      expect(tables.database).toBe(plain);
+    });
+
+    it('accepts an httpAdapter (a client-side adapter with no `$types`)', () => {
+      const tables = betterTables({ database: httpAdapter<TestRecord>({ url: '/api/tables' }) });
+
+      expect(tables.database).toBeDefined();
+      expect(tables.defaults).toEqual({});
     });
   });
 

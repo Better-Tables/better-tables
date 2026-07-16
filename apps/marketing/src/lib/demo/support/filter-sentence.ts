@@ -43,7 +43,8 @@ function describeLeaf(filter: FilterState): string {
     return `${filter.columnId} is empty`;
   }
 
-  const operatorWord = OPERATOR_WORDS[filter.operator] ?? filter.operator.replaceAll(/([A-Z])/g, ' $1').toLowerCase();
+  const operatorWord =
+    OPERATOR_WORDS[filter.operator] ?? filter.operator.replaceAll(/([A-Z])/g, ' $1').toLowerCase();
   return `${filter.columnId} ${operatorWord} ${formatValues(filter)}`;
 }
 

@@ -207,13 +207,12 @@ const MemoizedVirtualizedRow = memo(
  * rendering arbitrarily many rows; there's no page-by-page UI here) and
  * refetches whenever the store's filters/sorting change.
  *
- * A fully integrated `<BetterTable renderMode="virtualized">` (reusing
- * `<BetterTable>`'s own store/URL-sync machinery and swapping only its row
- * rendering) was considered and deferred: `<BetterTable>`'s render body
- * (header sort UI, column-reorder DnD, row-selection checkbox column, the
- * 025 per-row memoization contract) is deep enough that folding
- * virtualization into it risked regressing that memoization. Tracked as a
- * follow-up rather than forced through plan 032.
+ * **Most callers should reach for `<BetterTable ... virtualized />` instead**:
+ * it windows its own rows under the filter bar, header sort UI, selection,
+ * column visibility and URL sync it already owns, so a large dataset needs one
+ * prop rather than a separate component and a hand-built toolbar. Prefer THIS
+ * primitive only when you need rendering `<BetterTable>` doesn't do -- a
+ * non-table layout via `renderRow`, or per-row dynamic height measurement.
  */
 export function VirtualizedTable<T = unknown>({
   data,

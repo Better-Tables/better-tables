@@ -1,36 +1,27 @@
-import { sql } from 'drizzle-orm';
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 import { betterTables } from '@better-tables/core';
+import Database from 'better-sqlite3';
+import { sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { generateBulkTickets } from './bulk-seed';
 import {
   assignees,
   assigneesRelations,
   bulkTickets,
   customers,
   customersRelations,
-  supportRelationsSchema,
   supportSchema,
   tickets,
   ticketsRelations,
 } from './schema';
 import { supportSeed } from './seed-data';
-import { generateBulkTickets } from './bulk-seed';
 
 const BULK_TICKET_COUNT = 12_000;
 
-// DX-FINDING-11: relations under their OWN export names for `drizzle()`'s
-// schema config -- NOT a table-name-keyed relations object (which is what
-// `DrizzleAdapterConfig.relations` wants instead, a DIFFERENT shape for the
-// SAME underlying objects). Spreading a table-name-keyed relations object
-// here would silently clobber every real table object with its same-named
-// `Relations` object (object spread: later keys win) -- confirmed via
-// `keyof typeof supportTables.$types.tables` resolving to only the one
-// table with no matching relations entry, before this fix. See
-// plans/findings/029-dx-findings.md #11. The pre-existing (non-WIP)
-// `apps/marketing/src/lib/db/index.ts` has the SAME clobbering shape and
-// was flagged separately rather than fixed here (out of this plan's scope
-// -- see the plan 029 report).
+// Relations spread under their OWN export names (`customersRelations`, not
+// `customers: customersRelations`) so they don't clobber the same-named table
+// objects -- `drizzleAdapter()` now throws a clear SchemaError if they ever
+// did (plan 030, finding 11).
 const fullSchema = { ...supportSchema, customersRelations, assigneesRelations, ticketsRelations };
 
 function buildSupportDb(sqlite: Database.Database) {
@@ -38,39 +29,21 @@ function buildSupportDb(sqlite: Database.Database) {
 }
 
 function buildSupportTables(db: ReturnType<typeof buildSupportDb>) {
+  // Zero-config: `drizzleAdapter(db)` auto-detects schema AND relations from
+  // `db`, even though these tables use SQL names (`support_tickets`) that
+  // differ from their JS keys (`tickets`) -- the extractor keys tables and
+  // relations consistently now (plan 030, finding 14), so no explicit
+  // `schema`/`relations` pass is needed.
   return betterTables({
-    // DX-FINDING-14: `drizzleAdapter(db)` with NO options -- auto-detecting
-    // schema/relations from `db`'s internal state -- throws
-    // `RelationshipError: No relationship found from tickets to customer`
-    // even though `ticketsRelations` clearly declares that relation. Root
-    // cause: `customers`/`assignees`/`tickets` are declared as
-    // `sqliteTable('support_customers', {...})` etc -- the SQL table name
-    // (`support_tickets`) differs from the JS export key (`tickets`), a
-    // common, idiomatic Drizzle pattern (prefixing SQL names to avoid
-    // collisions while keeping ergonomic JS imports). The adapter's
-    // auto-extraction (`extractSchemaFromDB`,
-    // `packages/adapters/drizzle/src/utils/schema-extractor.ts`) keys
-    // `result.tables` by the SCHEMA OBJECT KEY (`'tickets'`) but keys
-    // `result.relations` by the table's `Symbol.for('drizzle:Name')` value
-    // (`'support_tickets'`, the SQL name) when the relation comes from a
-    // `relations()` object in the schema bag -- confirmed directly:
-    // `(tickets as any)[Symbol.for('drizzle:Name')] === 'support_tickets'`.
-    // The two maps end up keyed inconsistently, so relationship lookup for
-    // primary table `'tickets'` finds nothing. Passing `schema`/`relations`
-    // EXPLICITLY here (instead of relying on auto-detection from `db`)
-    // bypasses that symbol-based re-derivation entirely -- these two options
-    // are used AS GIVEN, keyed by schema object key throughout. See
-    // plans/findings/029-dx-findings.md #14.
-    database: drizzleAdapter(db, {
-      schema: supportSchema,
-      relations: supportRelationsSchema,
-    }),
+    database: drizzleAdapter(db),
     defaults: { pageSize: 10 },
   });
 }
 
 /**
- * DX-FINDING-13: MIGRATION.md's flagship pattern is a MODULE-SCOPE
+ * Why this is a lazy getter and not a module-scope `export const` (finding 13).
+ *
+ * MIGRATION.md's flagship pattern is a MODULE-SCOPE
  * `export const tables = betterTables({ database: drizzleAdapter(db) })` --
  * tried first, exactly like that, with `supportDb`/`supportTables`
  * constructed eagerly at import time (mirroring the doc example verbatim).
@@ -176,7 +149,7 @@ async function initSupportTables(): Promise<SupportTables> {
 /**
  * Lazy, memoized entry point to the flagship `betterTables()` instance --
  * every server-side caller (route handlers, RSC pages) awaits this instead
- * of importing a module-scope `export const` (see DX-FINDING-13 above). The
+ * of importing a module-scope `export const` (see the note above). The
  * underlying DB connection + schema + seed only run once per server
  * lifetime, on first REQUEST, never at build time.
  */

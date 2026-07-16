@@ -60,9 +60,16 @@ import type { SchemaAwareAdapter } from './types/paths';
  * object, provider decided here). See design doc Step 1 decision 1.
  *
  * `$types` is a type-only phantom -- never assigned or read at runtime; see
- * {@link SchemaAwareAdapter}.
+ * {@link SchemaAwareAdapter}. The constraint is `object`, NOT
+ * `SchemaAwareAdapter`: `SchemaAwareAdapter` is all-optional (`{ $types?: T }`),
+ * so constraining to it triggers TypeScript's weak-type detection and REJECTS
+ * every adapter that doesn't carry `$types` ("has no properties in common") --
+ * i.e. exactly the REST/in-memory/`httpAdapter` adapters `SchemaAwareAdapter`'s
+ * own docs say are supported. `SchemaOf<TAdapter>` still extracts the catalog
+ * when `$types` is present, and falls back to the untyped-name behavior (the
+ * documented `defineTable<TRow>()` escape hatch) when it isn't.
  */
-export function betterTables<TAdapter extends SchemaAwareAdapter>(
+export function betterTables<TAdapter extends object>(
   config: BetterTablesConfig<TAdapter>
 ): BetterTablesInstance<TAdapter> {
   const instance = {

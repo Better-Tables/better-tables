@@ -1,8 +1,10 @@
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { betterTables } from '@better-tables/core';
 import { getDatabase } from './db';
 
 // Module-level cache for the adapter instance
 let adapterInstance: ReturnType<typeof drizzleAdapter> | null = null;
+let tablesInstance: ReturnType<typeof betterTables> | null = null;
 
 export async function getAdapter() {
   // Return cached instance if it exists
@@ -21,4 +23,19 @@ export async function getAdapter() {
   });
 
   return adapterInstance;
+}
+
+/**
+ * The `betterTables()` instance for the homepage demo. Callers use its
+ * table-scoped read surface (`tables.fetchData(usersTable, ...)`), which
+ * injects `primaryTable` and returns rows typed as the table's own row --
+ * no cast (findings 9 + 16).
+ */
+export async function getTables() {
+  if (tablesInstance) {
+    return tablesInstance;
+  }
+
+  tablesInstance = betterTables({ database: await getAdapter() });
+  return tablesInstance;
 }

@@ -350,6 +350,15 @@ export interface FilterGroup {
   /** Whether group is collapsed by default */
   defaultCollapsed?: boolean;
 
+  /**
+   * Render this group's columns directly at the top level of the filter menu
+   * (flat, each individually selectable) instead of as a collapsible row you
+   * drill into. Useful for small or self-explanatory groups where a
+   * drill-in step adds friction. Defaults to `false` (drill-in). Combine
+   * inline and drill-in groups freely in one menu.
+   */
+  inline?: boolean;
+
   /** Group description */
   description?: string;
 }

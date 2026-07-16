@@ -1,38 +1,57 @@
-import type { SortingState } from '@better-tables/core';
-import { bulkTicketColumnIds } from './bulk-columns';
+import type { FilterGroupNode, FilterState, SortingState } from '@better-tables/core';
+import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
+import { bulkTicketColumnIds, bulkTicketsTable } from './bulk-columns';
 import { getSupportTables } from './db';
-import type { BulkTicket } from './schema';
+
+/** The big-board row, derived from the table definition -- no hand-shaped duplicate. */
+export type BulkTicketRow = typeof bulkTicketsTable.$infer.Row;
+
+export interface FetchBulkTicketsParams {
+  filters?: FilterState[] | FilterGroupNode;
+  sorting?: SortingState;
+}
 
 export interface FetchBulkTicketsResult {
-  data: BulkTicket[];
+  data: BulkTicketRow[];
   total: number;
+  filters: FilterState[];
   sorting: SortingState;
   error: string | null;
 }
 
+function flattenFilters(filters?: FilterState[] | FilterGroupNode): FilterState[] {
+  if (!filters) return [];
+  if (isFilterGroupNode(filters)) return flattenFilterNode(filters);
+  return filters;
+}
+
 /**
- * Fetches the ENTIRE big-board dataset in one request -- `<VirtualizedTable>`
- * (packages/ui) takes a flat `data: T[]` prop with no adapter/pagination
- * integration of its own (DX-FINDING-6), so windowing happens client-side
- * over the full array rather than page-by-page like the other three
- * examples.
+ * Fetches every MATCHING big-board row in one request. `<BetterTable virtualized />`
+ * windows the rows it renders, so there's no page-by-page UI here -- filtering and
+ * sorting still run in the database, driven by the table's own filter bar and header
+ * through the URL.
  */
-export async function fetchBulkTickets(sorting: SortingState = []): Promise<FetchBulkTicketsResult> {
+export async function fetchBulkTickets({
+  filters,
+  sorting = [],
+}: FetchBulkTicketsParams = {}): Promise<FetchBulkTicketsResult> {
+  const flatFilters = flattenFilters(filters);
+
   try {
     const supportTables = await getSupportTables();
-    const result = await supportTables.database.fetchData({
+    // Table-scoped: `primaryTable` comes from `bulkTicketsTable`, and the rows
+    // are typed as that table's own row -- no cast (findings 9 + 16).
+    const result = await supportTables.fetchData(bulkTicketsTable, {
       pagination: { page: 1, limit: 12_500 },
+      filters,
       sorting,
-      primaryTable: 'bulkTickets',
       columns: bulkTicketColumnIds,
     });
 
     return {
-      // DX-FINDING-16: `fetchData()` returns `FetchDataResult<unknown>`
-      // regardless of which table it queried -- see
-      // plans/findings/029-dx-findings.md #16.
-      data: result.data as BulkTicket[],
+      data: result.data,
       total: result.total,
+      filters: flatFilters,
       sorting,
       error: null,
     };
@@ -40,6 +59,7 @@ export async function fetchBulkTickets(sorting: SortingState = []): Promise<Fetc
     return {
       data: [],
       total: 0,
+      filters: flatFilters,
       sorting,
       error: error instanceof Error ? error.message : 'Failed to load big-board data',
     };

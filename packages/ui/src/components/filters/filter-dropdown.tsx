@@ -17,6 +17,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
+/** Inline size so icons render correctly even when Tailwind utilities are not scanned. */
+const FILTER_MENU_ICON_SIZE = 14;
+
 export interface FilterDropdownProps<TData = unknown> {
   /** Available columns to filter */
   columns: ColumnDefinition<TData>[];
@@ -42,6 +45,14 @@ export interface FilterDropdownProps<TData = unknown> {
   disabled?: boolean;
   /** Empty state message */
   emptyMessage?: string;
+  /**
+   * How columns not assigned to any group are shown. `'group'` (default)
+   * buckets them into a collapsible drill-in group; `'inline'` lists them
+   * directly at the top level.
+   */
+  ungroupedMode?: 'group' | 'inline';
+  /** Label for the auto-generated bucket of ungrouped columns. */
+  ungroupedLabel?: string;
 }
 
 // Internal state for tracking the current view
@@ -60,6 +71,8 @@ export function FilterDropdown<TData = unknown>({
   onSearchChange,
   disabled = false,
   emptyMessage = 'No columns found.',
+  ungroupedMode = 'group',
+  ungroupedLabel = 'Other',
 }: FilterDropdownProps<TData>) {
   const [internalSearch, setInternalSearch] = React.useState('');
   const [isMobile, setIsMobile] = React.useState(false);
@@ -105,81 +118,85 @@ export function FilterDropdown<TData = unknown>({
     );
   }, [columns, search, searchable]);
 
-  // Group columns if groups are provided - enhanced for slide navigation
-  const groupedColumns = React.useMemo(() => {
-    // If no groups, return empty array - columns will be shown directly
-    if (!groups || groups.length === 0) {
-      return [];
-    }
+  const matchesSearch = React.useCallback(
+    (col: ColumnDefinition<TData>) => {
+      if (!searchable || !search) return true;
+      const q = search.toLowerCase();
+      return col.displayName.toLowerCase().includes(q) || col.id.toLowerCase().includes(q);
+    },
+    [search, searchable]
+  );
 
-    const grouped: Array<{
-      id: string;
-      label: string;
-      icon?: React.ComponentType<{ className?: string }>;
-      columns: ColumnDefinition<TData>[];
-      description?: string;
-    }> = [];
-    const assignedColumnIds = new Set<string>();
+  // The top-level overview: an ordered, MIXED list of directly-selectable
+  // columns and drill-in groups. A group renders inline (its columns flat at
+  // the top level) when `group.inline` is set; otherwise it renders as a
+  // drill-in row. Columns in no group follow `ungroupedMode`.
+  type OverviewEntry =
+    | { kind: 'column'; column: ColumnDefinition<TData> }
+    | {
+        kind: 'group';
+        id: string;
+        label: string;
+        icon?: React.ComponentType<{ className?: string }>;
+        description?: string;
+        columns: ColumnDefinition<TData>[];
+      };
 
-    // Process each group - filter columns within each group based on search
-    groups.forEach((group) => {
-      // Get all columns that belong to this group (from original columns)
-      const groupColumnIds = group.columns;
-      const groupColumns = columns.filter((col) => groupColumnIds.includes(col.id));
+  const overviewEntries = React.useMemo<OverviewEntry[]>(() => {
+    if (!groups || groups.length === 0) return [];
 
-      // Apply search filter to the group's columns
-      const filteredGroupColumns =
-        !searchable || !search
-          ? groupColumns
-          : groupColumns.filter((col) => {
-              const searchLower = search.toLowerCase();
-              return (
-                col.displayName.toLowerCase().includes(searchLower) ||
-                col.id.toLowerCase().includes(searchLower)
-              );
-            });
+    const entries: OverviewEntry[] = [];
+    const assigned = new Set<string>();
 
-      if (filteredGroupColumns.length > 0) {
-        grouped.push({
+    for (const group of groups) {
+      // Assign against ALL of the group's columns (not just search hits) so a
+      // non-matching column never leaks into the ungrouped bucket.
+      for (const col of columns) {
+        if (group.columns.includes(col.id)) assigned.add(col.id);
+      }
+
+      const groupColumns = columns.filter(
+        (col) => group.columns.includes(col.id) && matchesSearch(col)
+      );
+      if (groupColumns.length === 0) continue;
+
+      if (group.inline) {
+        for (const column of groupColumns) entries.push({ kind: 'column', column });
+      } else {
+        entries.push({
+          kind: 'group',
           id: group.id,
           label: group.label,
-          columns: filteredGroupColumns,
+          columns: groupColumns,
           ...(group.icon !== undefined && {
             icon: group.icon as React.ComponentType<{ className?: string }>,
           }),
           ...(group.description !== undefined && { description: group.description }),
         });
-
-        filteredGroupColumns.forEach((col) => {
-          assignedColumnIds.add(col.id);
-        });
       }
-    });
-
-    // Add ungrouped columns
-    const ungroupedColumns =
-      !searchable || !search
-        ? columns.filter((col) => !assignedColumnIds.has(col.id))
-        : columns.filter((col) => {
-            const searchLower = search.toLowerCase();
-            return (
-              !assignedColumnIds.has(col.id) &&
-              (col.displayName.toLowerCase().includes(searchLower) ||
-                col.id.toLowerCase().includes(searchLower))
-            );
-          });
-
-    if (ungroupedColumns.length > 0) {
-      grouped.push({
-        id: 'other',
-        label: 'Other',
-        columns: ungroupedColumns,
-        description: 'Miscellaneous columns',
-      });
     }
 
-    return grouped;
-  }, [groups, columns, filteredColumns, search, searchable]);
+    const ungrouped = columns.filter((col) => !assigned.has(col.id) && matchesSearch(col));
+    if (ungrouped.length > 0) {
+      if (ungroupedMode === 'inline') {
+        for (const column of ungrouped) entries.push({ kind: 'column', column });
+      } else {
+        entries.push({ kind: 'group', id: 'other', label: ungroupedLabel, columns: ungrouped });
+      }
+    }
+
+    return entries;
+  }, [groups, columns, matchesSearch, ungroupedMode, ungroupedLabel]);
+
+  // The subset of overview entries that are drill-in groups — used by the
+  // detail view and keyboard navigation to resolve a group's columns.
+  const drillInGroups = React.useMemo(
+    () =>
+      overviewEntries.filter(
+        (entry): entry is Extract<OverviewEntry, { kind: 'group' }> => entry.kind === 'group'
+      ),
+    [overviewEntries]
+  );
 
   const handleSelect = React.useCallback(
     (columnId: string) => {
@@ -207,28 +224,26 @@ export function FilterDropdown<TData = unknown>({
     () => onOpenChange?.(true),
     () => onOpenChange?.(false),
     (index) => {
-      // If no groups, navigate directly to columns
-      if (!groups || groups.length === 0) {
+      // Flat list: no groups, or an active search collapses to filtered columns.
+      if (!groups || groups.length === 0 || (searchable && !!search)) {
         const column = filteredColumns[index];
-        if (column) {
-          handleSelect(column.id);
-        }
+        if (column) handleSelect(column.id);
         return;
       }
 
       if (currentView.type === 'groups') {
-        // Navigate to group
-        const group = groupedColumns[index];
-        if (group) {
-          handleGroupSelect(group.id, group.label);
+        const entry = overviewEntries[index];
+        if (!entry) return;
+        if (entry.kind === 'column') {
+          handleSelect(entry.column.id);
+        } else {
+          handleGroupSelect(entry.id, entry.label);
         }
       } else {
-        // Navigate to column within group
-        const currentGroup = groupedColumns.find((g) => g.id === currentView.groupId);
+        // Navigate to a column within the drilled-in group.
+        const currentGroup = drillInGroups.find((g) => g.id === currentView.groupId);
         const column = currentGroup?.columns[index];
-        if (column) {
-          handleSelect(column.id);
-        }
+        if (column) handleSelect(column.id);
       }
     }
   );
@@ -281,10 +296,10 @@ export function FilterDropdown<TData = unknown>({
                   value={column.id}
                   onSelect={() => handleSelect(column.id)}
                   disabled={disabled}
-                  className="flex items-center pl-4 hover:bg-accent/50 transition-colors"
+                  className="cursor-pointer pl-4 hover:bg-accent/50 transition-colors"
                 >
-                  <Check className={cn('mr-2 h-4 w-4', 'opacity-0')} />
-                  {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+                  <Check size={FILTER_MENU_ICON_SIZE} className="opacity-0" />
+                  {Icon && <Icon className="size-3.5 text-muted-foreground" />}
                   <span>{column.displayName}</span>
                 </CommandItem>
               );
@@ -308,10 +323,10 @@ export function FilterDropdown<TData = unknown>({
                   value={column.id}
                   onSelect={() => handleSelect(column.id)}
                   disabled={disabled}
-                  className="flex items-center pl-4 hover:bg-accent/50 transition-colors"
+                  className="cursor-pointer pl-4 hover:bg-accent/50 transition-colors"
                 >
-                  <Check className={cn('mr-2 h-4 w-4', 'opacity-0')} />
-                  {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+                  <Check size={FILTER_MENU_ICON_SIZE} className="opacity-0" />
+                  {Icon && <Icon className="size-3.5 text-muted-foreground" />}
                   <span>{column.displayName}</span>
                 </CommandItem>
               );
@@ -321,36 +336,49 @@ export function FilterDropdown<TData = unknown>({
       );
     }
 
-    // Otherwise, show groups as before
+    // Otherwise, show the mixed overview: top-level columns + drill-in groups.
     return (
       <CommandList>
         <CommandEmpty>{emptyMessage}</CommandEmpty>
         <CommandGroup>
-          {groupedColumns.map((group) => {
-            const Icon = group.icon;
-            const columnCount = group.columns.length;
+          {overviewEntries.map((entry) => {
+            if (entry.kind === 'column') {
+              const Icon = entry.column.icon;
+              return (
+                <CommandItem
+                  key={`col:${entry.column.id}`}
+                  value={entry.column.id}
+                  onSelect={() => handleSelect(entry.column.id)}
+                  disabled={disabled}
+                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                >
+                  {Icon && <Icon className="size-3.5 text-muted-foreground" />}
+                  <span>{entry.column.displayName}</span>
+                </CommandItem>
+              );
+            }
 
+            const Icon = entry.icon;
+            const columnCount = entry.columns.length;
             return (
               <CommandItem
-                key={group.id}
-                value={group.id}
-                onSelect={() => handleGroupSelect(group.id, group.label)}
+                key={`grp:${entry.id}`}
+                value={entry.id}
+                onSelect={() => handleGroupSelect(entry.id, entry.label)}
                 disabled={disabled}
-                className="flex items-center justify-between py-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                className="cursor-pointer"
               >
-                <div className="flex items-center">
-                  {Icon && <Icon className="mr-3 h-4 w-4 text-muted-foreground" />}
-                  <div className="flex flex-col">
-                    <span className="font-medium">{group.label}</span>
-                    {group.description && (
-                      <span className="text-xs text-muted-foreground">{group.description}</span>
-                    )}
-                  </div>
+                {Icon && <Icon className="size-3.5 text-muted-foreground" />}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="font-medium">{entry.label}</span>
+                  {entry.description && (
+                    <span className="text-xs text-muted-foreground">{entry.description}</span>
+                  )}
                 </div>
-                <div className="flex items-center text-muted-foreground">
-                  <span className="text-xs mr-1">{columnCount}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </div>
+                <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+                  {columnCount}
+                  <ChevronRight size={FILTER_MENU_ICON_SIZE} strokeWidth={2} />
+                </span>
               </CommandItem>
             );
           })}
@@ -359,7 +387,7 @@ export function FilterDropdown<TData = unknown>({
     );
   }, [
     groups,
-    groupedColumns,
+    overviewEntries,
     filteredColumns,
     disabled,
     emptyMessage,
@@ -373,7 +401,7 @@ export function FilterDropdown<TData = unknown>({
   const groupView = React.useMemo(() => {
     if (currentView.type !== 'group') return null;
 
-    const currentGroup = groupedColumns.find((g) => g.id === currentView.groupId);
+    const currentGroup = drillInGroups.find((g) => g.id === currentView.groupId);
     if (!currentGroup) return null;
 
     return (
@@ -386,11 +414,11 @@ export function FilterDropdown<TData = unknown>({
             onClick={handleBackToGroups}
             className="mr-2 h-8 w-8 p-0 hover:bg-accent/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft size={FILTER_MENU_ICON_SIZE} strokeWidth={2} />
           </Button>
           <div className="flex-1">
-            <h3 className="font-medium text-sm">{currentView.groupLabel}</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="text-sm font-semibold tracking-tight">{currentView.groupLabel}</h3>
+            <p className="text-xs text-muted-foreground tabular-nums">
               {currentGroup.columns.length} column
               {currentGroup.columns.length !== 1 ? 's' : ''}
             </p>
@@ -409,10 +437,10 @@ export function FilterDropdown<TData = unknown>({
                   value={column.id}
                   onSelect={() => handleSelect(column.id)}
                   disabled={disabled}
-                  className="flex items-center pl-4 hover:bg-accent/50 transition-colors"
+                  className="cursor-pointer pl-4 hover:bg-accent/50 transition-colors"
                 >
-                  <Check className={cn('mr-2 h-4 w-4', 'opacity-0')} />
-                  {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+                  <Check size={FILTER_MENU_ICON_SIZE} className="opacity-0" />
+                  {Icon && <Icon className="size-3.5 text-muted-foreground" />}
                   <span>{column.displayName}</span>
                 </CommandItem>
               );
@@ -421,7 +449,7 @@ export function FilterDropdown<TData = unknown>({
         </CommandList>
       </div>
     );
-  }, [currentView, groupedColumns, disabled, handleBackToGroups, handleSelect]);
+  }, [currentView, drillInGroups, disabled, handleBackToGroups, handleSelect]);
 
   // Command content component for reuse
   const commandContent = (
@@ -525,7 +553,7 @@ export function FilterDropdown<TData = unknown>({
           )
         }
       />
-      <PopoverContent className="w-[320px] p-0" align="start">
+      <PopoverContent className="w-64 p-0" align="start">
         {commandContent}
       </PopoverContent>
     </Popover>

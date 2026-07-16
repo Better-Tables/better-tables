@@ -28,6 +28,7 @@ import {
   useTableSorting,
 } from '../../hooks/use-table-store';
 import { useTableUrlSync } from '../../hooks/use-table-url-sync';
+import { useVirtualization } from '../../hooks/use-virtualization';
 import { cn } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
@@ -40,6 +41,32 @@ import { ErrorState } from './error-state';
 import { TableHeaderContextMenu } from './table-header-context-menu';
 import { TablePagination } from './table-pagination';
 import { TableProviders } from './table-providers';
+
+/** Tuning for {@link BetterTableProps.virtualized}. */
+export interface BetterTableVirtualization {
+  /** Scroll viewport height in px. Default `480`. */
+  height?: number;
+  /** Row height in px (the estimate for dynamic rows). Default `52`. */
+  rowHeight?: number;
+  /** Extra rows rendered above/below the viewport. Default `5`. */
+  overscan?: number;
+}
+
+/** Defaults for the `virtualized` prop. */
+const VIRTUAL_DEFAULT_HEIGHT = 480;
+const VIRTUAL_DEFAULT_ROW_HEIGHT = 52;
+const VIRTUAL_DEFAULT_OVERSCAN = 5;
+
+/**
+ * Style for a virtualization spacer cell. The height lives on the `<td>` (not
+ * the `<tr>`) because an empty row with no cells collapses to zero height in
+ * real layout regardless of its `height` — which would leave the scroll height
+ * equal to the rendered window instead of the whole dataset. Padding/border are
+ * zeroed so the spacer contributes nothing but the space it stands in for.
+ */
+function virtualSpacerStyle(height: number): React.CSSProperties {
+  return { height, padding: 0, border: 0 };
+}
 
 /**
  * UI-specific props for the BetterTable component
@@ -92,6 +119,25 @@ export interface BetterTableProps<TData = unknown>
    * ```
    */
   table?: TableDefinition<string, TData>;
+
+  /**
+   * Render only the rows in view instead of all of `data`, so a large `data`
+   * array stays fast. Everything else — filtering, sorting, selection, column
+   * visibility/reordering, URL sync — is unchanged: virtualization is purely a
+   * rendering detail here, not a separate component or data path.
+   *
+   * `true` uses the defaults; pass an object to tune them. Typically combined
+   * with `features.pagination: false` and one large fetch, since windowing
+   * already handles arbitrarily many rows.
+   *
+   * @example
+   * ```tsx
+   * <BetterTable table={ticketsTable} data={allTickets} virtualized />
+   * <BetterTable table={ticketsTable} data={allTickets}
+   *   virtualized={{ height: 640, rowHeight: 56 }} />
+   * ```
+   */
+  virtualized?: boolean | BetterTableVirtualization;
 
   /** Table data */
   data: TData[];
@@ -242,6 +288,12 @@ function TableRowComponent<TData>({
           <TableCell
             key={column.id}
             className={cn(
+              // Align digits down numeric/date columns (Geist has true tabular figures).
+              (column.type === 'number' ||
+                column.type === 'currency' ||
+                column.type === 'percentage' ||
+                column.type === 'date') &&
+                'tabular-nums',
               column.align === 'center' && 'text-center',
               column.align === 'right' && 'text-right'
             )}
@@ -318,6 +370,7 @@ export function BetterTable<TData = unknown>({
 
   // Data props (handled by parent)
   data,
+  virtualized = false,
   loading = false,
   error = null,
   totalCount,
@@ -388,6 +441,12 @@ export function BetterTable<TData = unknown>({
     columnReordering = false,
   } = features;
 
+  // Read before the store is created below: `multiSort` is creation-time
+  // config on the state manager (it decides whether `toggleSort` replaces the
+  // current sort or accumulates), not per-render state.
+  const sortingConfig = props.sorting;
+  const multiSortEnabled = sortingConfig?.multiSort ?? false;
+
   // Get actions from props
   const actions = props.actions || [];
 
@@ -442,6 +501,7 @@ export function BetterTable<TData = unknown>({
     ...(computedColumnVisibility !== undefined && {
       columnVisibility: computedColumnVisibility,
     }),
+    config: { sorting: { multiSort: multiSortEnabled } },
   });
 
   // Subscribe to store state
@@ -453,6 +513,56 @@ export function BetterTable<TData = unknown>({
   const { columnVisibility, toggleColumnVisibility, setColumnVisibility } =
     useTableColumnVisibility(id);
   const { columnOrder, setColumnOrder } = useTableColumnOrder(id);
+
+  // Virtualization: purely a rendering concern. The hook is always called
+  // (rules of hooks) and simply disabled when `virtualized` is off, so nothing
+  // above or below this line branches on it -- filters/sorting/selection/URL
+  // sync are identical either way.
+  const virtualOptions = typeof virtualized === 'object' ? virtualized : {};
+  const isVirtualized = virtualized !== false;
+  const virtualHeight = virtualOptions.height ?? VIRTUAL_DEFAULT_HEIGHT;
+  const virtualRowHeight = virtualOptions.rowHeight ?? VIRTUAL_DEFAULT_ROW_HEIGHT;
+  const {
+    state: virtualState,
+    virtualRows,
+    containerRef: virtualContainerRef,
+  } = useVirtualization({
+    totalRows: data.length,
+    enabled: isVirtualized,
+    defaultRowHeight: virtualRowHeight,
+    containerHeight: virtualHeight,
+    overscan: virtualOptions.overscan ?? VIRTUAL_DEFAULT_OVERSCAN,
+  });
+
+  // The rows to actually render, plus the empty space standing in for the ones
+  // that aren't. When virtualization is off this is just every row, so the
+  // render path below is identical in both modes.
+  const {
+    rows: virtualBodyRows,
+    topPad: virtualTopPad,
+    bottomPad: virtualBottomPad,
+  } = useMemo(() => {
+    if (!isVirtualized) {
+      return {
+        rows: data.map((row, index) => ({ row, index })),
+        topPad: 0,
+        bottomPad: 0,
+      };
+    }
+
+    const windowed = virtualRows
+      .map((virtualRow) => ({ row: data[virtualRow.index], index: virtualRow.index }))
+      .filter((entry): entry is { row: TData; index: number } => entry.row !== undefined);
+
+    const first = virtualRows[0];
+    const last = virtualRows[virtualRows.length - 1];
+
+    return {
+      rows: windowed,
+      topPad: first ? first.start : 0,
+      bottomPad: last ? Math.max(0, virtualState.totalHeight - last.end) : 0,
+    };
+  }, [isVirtualized, data, virtualRows, virtualState.totalHeight]);
 
   // Set up URL synchronization if adapter is provided
   // Compression/decompression is handled automatically by useTableUrlSync
@@ -711,6 +821,11 @@ export function BetterTable<TData = unknown>({
     return visible;
   }, [columnsWithDefaults, columnVisibility, columnOrder]);
 
+  // A spacer row has to span the real columns and carry its height on a CELL:
+  // a `<tr>` with a height but no cells collapses to zero, which would leave
+  // the scrollbar sized to the rendered window instead of the whole dataset.
+  const virtualSpacerColSpan = visibleColumns.length + (shouldShowRowSelection ? 1 : 0);
+
   // Render loading state
   if (loading) {
     return (
@@ -820,21 +935,13 @@ export function BetterTable<TData = unknown>({
   const allSelected =
     data.length > 0 && data.every((row, index) => selectedRows.has(getRowId(row, index)));
 
-  // Get sorting config to check multi-sort
-  const sortingConfig = props.sorting;
-  const multiSortEnabled = sortingConfig?.multiSort ?? false;
-
   // Determine if context menu should be enabled
   const shouldShowContextMenu =
     contextMenuEnabled &&
     (headerContextMenu?.showSortToggle || headerContextMenu?.showColumnVisibility);
 
   const tableContent = (
-    <div
-      className={cn('space-y-4', className)}
-      {...props}
-      {...(name !== undefined && { name })}
-    >
+    <div className={cn('space-y-4', className)} {...props} {...(name !== undefined && { name })}>
       {/* Screen reader announcement for sort changes */}
       {sortAnnouncement && (
         <div aria-live="polite" aria-atomic="true" className="sr-only">
@@ -879,9 +986,17 @@ export function BetterTable<TData = unknown>({
           />
         )}
       </div>
-      <div className="border rounded-md">
+      <div
+        className="border rounded-md"
+        {...(isVirtualized && {
+          ref: virtualContainerRef,
+          style: { height: virtualHeight, overflowY: 'auto' as const },
+        })}
+      >
         <Table>
-          <TableHeader>
+          {/* Pinned while the body scrolls underneath it, so a windowed table
+              keeps its header (and its sort UI) in view. */}
+          <TableHeader className={isVirtualized ? 'sticky top-0 z-20 bg-background' : undefined}>
             <TableRow>
               {shouldShowRowSelection && (
                 <TableHead
@@ -911,16 +1026,16 @@ export function BetterTable<TData = unknown>({
                     }),
                   })
                 ) : (
-                  <div key={`header-${column.id}`} className="flex items-center gap-2">
+                  <div key={`header-${column.id}`} className="flex items-center gap-1.5">
                     <span>{column.displayName}</span>
                     {isSortable && (
-                      <span className="flex flex-col">
+                      <span className="inline-flex shrink-0 items-center text-muted-foreground">
                         {currentSort?.direction === 'asc' ? (
-                          <ArrowUp className="h-3 w-3" />
+                          <ArrowUp size={10} strokeWidth={2} />
                         ) : currentSort?.direction === 'desc' ? (
-                          <ArrowDown className="h-3 w-3" />
+                          <ArrowDown size={10} strokeWidth={2} />
                         ) : (
-                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                          <ArrowUpDown size={10} strokeWidth={2} className="opacity-50" />
                         )}
                       </span>
                     )}
@@ -1024,7 +1139,20 @@ export function BetterTable<TData = unknown>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, index) => {
+            {/*
+              Windowed or not, rows go through the SAME `MemoizedTableRow` with
+              the SAME props -- virtualization only changes WHICH indices are
+              rendered, so the per-row memoization contract is untouched.
+              Off-screen space is held open by two spacer rows rather than by
+              absolutely positioning each row, which is what keeps native table
+              column alignment (and dynamic row heights) working.
+            */}
+            {virtualTopPad > 0 && (
+              <tr aria-hidden="true">
+                <td colSpan={virtualSpacerColSpan} style={virtualSpacerStyle(virtualTopPad)} />
+              </tr>
+            )}
+            {virtualBodyRows.map(({ row, index }) => {
               const rowId = getRowId(row, index);
               const isSelected = selectedRows.has(rowId);
 
@@ -1043,6 +1171,11 @@ export function BetterTable<TData = unknown>({
                 />
               );
             })}
+            {virtualBottomPad > 0 && (
+              <tr aria-hidden="true">
+                <td colSpan={virtualSpacerColSpan} style={virtualSpacerStyle(virtualBottomPad)} />
+              </tr>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -1161,9 +1294,9 @@ export function BetterTable<TData = unknown>({
         </span>
         <span className="flex-1 truncate">{columnName}</span>
         {sort.direction === 'asc' ? (
-          <ArrowUp className="h-3 w-3 text-muted-foreground" />
+          <ArrowUp size={10} className="shrink-0 text-muted-foreground" strokeWidth={2} />
         ) : (
-          <ArrowDown className="h-3 w-3 text-muted-foreground" />
+          <ArrowDown size={10} className="shrink-0 text-muted-foreground" strokeWidth={2} />
         )}
       </div>
     );

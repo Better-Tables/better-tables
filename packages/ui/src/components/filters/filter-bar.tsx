@@ -154,7 +154,15 @@ export function FilterBar<TData = unknown>({
         ...autoGroupConfig?.groupIcons,
       },
     };
-    return autoGroupFilters(columns, config);
+    // Default the auto-grouped layout to a "combo": the semantic groups
+    // (Search, Dates, Status & Type, Metrics, …) render their columns inline
+    // at the top level rather than forcing a drill-in for what are often just
+    // one or two columns, while the catch-all "Other" bucket stays a
+    // collapsible drill-in group. Consumers passing explicit `groups` keep
+    // full control via each group's `inline` flag.
+    return autoGroupFilters(columns, config).map((group) =>
+      group.id === 'other' ? group : { ...group, inline: true }
+    );
   }, [groups, columns, autoGroupConfig]);
 
   // Get columns that don't already have a filter

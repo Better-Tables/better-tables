@@ -19,10 +19,13 @@
  */
 import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
-import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
 import type { DrizzleAdapterConfig } from '@better-tables/adapters-drizzle';
+import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+import { betterTables, buildFilter } from '@better-tables/core';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { ticketsTable } from './columns';
+import { buildRelationshipTrail } from './relationship-trail';
 import {
   assignees,
   assigneesRelations,
@@ -33,15 +36,11 @@ import {
   tickets,
   ticketsRelations,
 } from './schema';
-import type { TicketWithRelations } from './schema';
 import { supportSeed } from './seed-data';
-import { buildRelationshipTrail } from './relationship-trail';
 
-// DX-FINDING-11: relations under their OWN export names for `drizzle()`'s
-// schema config -- NOT `supportRelationsSchema` (table-name-keyed, which is
-// what `DrizzleAdapterConfig.relations` below wants instead). Spreading
-// `supportRelationsSchema` here would clobber every real table object with
-// its same-named `Relations` object. See plans/findings/029-dx-findings.md #11.
+// Relations under their OWN export names -- a table-name-keyed map spread here
+// would clobber each real table object with its same-named `Relations` object
+// (finding 11; `drizzleAdapter()` throws a clear SchemaError on that now).
 const fullSchema = { ...supportSchema, customersRelations, assigneesRelations, ticketsRelations };
 type TestDB = ReturnType<typeof drizzle<typeof fullSchema>>;
 
@@ -107,81 +106,70 @@ async function createTestAdapter(): Promise<DrizzleAdapter<typeof supportSchema,
   return new DrizzleAdapter(config);
 }
 
+/**
+ * Wrap the fixture adapter in a `betterTables()` instance so these tests use
+ * the SAME table-scoped read surface production does:
+ * `tables.fetchData(ticketsTable, ...)` injects `primaryTable` and returns
+ * `FetchDataResult<TicketRow>` -- no `primaryTable` to get wrong, no casts
+ * (findings 9 + 16).
+ */
+async function createTestTables() {
+  const adapter = await createTestAdapter();
+  return { adapter, tables: betterTables({ database: adapter }) };
+}
+
 describe('support ticket fetch/filter pipeline (bun:sqlite fixture -- see file docblock)', () => {
   it('returns seeded tickets by default', async () => {
-    const adapter = await createTestAdapter();
-    const result = await adapter.fetchData({
+    const { tables } = await createTestTables();
+    const result = await tables.fetchData(ticketsTable, {
       pagination: { page: 1, limit: 10 },
-      primaryTable: 'tickets',
     });
-    expect(result.total).toBeGreaterThan(0);
+    expect(result.total).toBe(supportSeed.tickets.length);
     expect(result.data.length).toBeGreaterThan(0);
+    expect(result.data[0]).toHaveProperty('subject');
   });
 
-  // DX-FINDING-9: omitting BOTH `columns` and `primaryTable` on this
-  // multi-table schema silently resolves to `customers` (the first table in
-  // schema key order), not `tickets` -- a wrong-table result with only a
-  // console.warn, no thrown error. Pinned here as a regression guard for the
-  // finding. See plans/findings/029-dx-findings.md #9.
-  it('DX-FINDING-9: omitting primaryTable/columns on a multi-table schema silently returns the WRONG table', async () => {
-    const adapter = await createTestAdapter();
-    const result = await adapter.fetchData({ pagination: { page: 1, limit: 10 } });
-    // This is `customers` (6 seeded rows), not `tickets` (20 seeded rows) --
-    // demonstrating the footgun, not the desired behavior.
-    expect(result.total).toBe(supportSeed.customers.length);
-    expect(result.data[0]).toHaveProperty('company');
-    expect(result.data[0]).not.toHaveProperty('subject');
+  // Finding 9, now FIXED: a bare `fetchData()` on a multi-table schema used to
+  // silently return `customers` (the first table in key order) with only a
+  // console.warn. It throws instead -- and the table-scoped
+  // `tables.fetchData(ticketsTable, ...)` above makes the ambiguity
+  // unreachable by construction.
+  it('throws (no longer silently returns the wrong table) when the primary table is ambiguous', async () => {
+    const { adapter } = await createTestTables();
+    await expect(adapter.fetchData({ pagination: { page: 1, limit: 10 } })).rejects.toThrow(
+      /Multiple tables in schema/
+    );
   });
 
-  // DX-FINDING-1 / DX-FINDING-8: real FilterGroupNode shape (`kind`/`logic`,
-  // bare typed leaves) + a valid option operator (`is`, not `equals`). See
-  // plans/findings/029-dx-findings.md #1 and #8.
-  it('filters tickets by related customer plan', async () => {
-    const adapter = await createTestAdapter();
-    const result = await adapter.fetchData({
+  // `buildFilter` authors the leaf against the table's real paths/operators
+  // (findings 1 + 8), and no `columns` is passed: the relation the filter
+  // touches auto-embeds into the result rows (finding 10).
+  it('filters tickets by related customer plan, auto-embedding the relation', async () => {
+    const { tables } = await createTestTables();
+    const result = await tables.fetchData(ticketsTable, {
       pagination: { page: 1, limit: 20 },
-      primaryTable: 'tickets',
-      // DX-FINDING-10: `customer` is absent from result rows unless its
-      // dot-path is named here, even though filtering by it (above) doesn't
-      // need this. See plans/findings/029-dx-findings.md #10.
-      columns: ['subject', 'customer.plan'],
       filters: {
         kind: 'group',
         logic: 'and',
-        children: [
-          {
-            columnId: 'customer.plan',
-            type: 'option',
-            operator: 'is',
-            values: ['enterprise'],
-          },
-        ],
+        children: [buildFilter(ticketsTable, 'customer.plan', 'option', 'is', ['enterprise'])],
       },
     });
 
     expect(result.total).toBeGreaterThan(0);
-    // DX-FINDING-16: `adapter.fetchData()` returns `FetchDataResult<unknown>`
-    // -- every `as TicketWithRelations` cast in this file narrows a result
-    // row for test assertions, same root cause as the production casts in
-    // `fetch-tickets.ts`/`fetch-bulk-tickets.ts`. See
-    // plans/findings/029-dx-findings.md #16.
+    // No cast: `fetchData(ticketsTable, ...)` is typed as the table's row.
     for (const ticket of result.data) {
-      expect((ticket as TicketWithRelations).customer?.plan).toBe('enterprise');
+      expect(ticket.customer?.plan).toBe('enterprise');
     }
   });
 
-  it('sorts tickets by assignee team', async () => {
-    const adapter = await createTestAdapter();
-    const result = await adapter.fetchData({
+  it('sorts tickets by assignee team, auto-embedding the sorted relation', async () => {
+    const { tables } = await createTestTables();
+    const result = await tables.fetchData(ticketsTable, {
       pagination: { page: 1, limit: 20 },
-      primaryTable: 'tickets',
-      columns: ['subject', 'assignee.team'],
       sorting: [{ columnId: 'assignee.team', direction: 'asc' }],
     });
 
-    const teams = result.data
-      .map((ticket) => (ticket as TicketWithRelations).assignee?.team)
-      .filter(Boolean);
+    const teams = result.data.map((ticket) => ticket.assignee?.team).filter(Boolean);
     const sorted = [...teams].sort();
     expect(teams).toEqual(sorted);
   });
@@ -190,25 +178,15 @@ describe('support ticket fetch/filter pipeline (bun:sqlite fixture -- see file d
   // true, values: []` on a text-typed leaf means "match rows where this
   // column is null" -- here, tickets with no assignee.
   it('resolves a null-only filter (assignee.name includeNull, no values) to unassigned tickets', async () => {
-    const adapter = await createTestAdapter();
-    const result = await adapter.fetchData({
+    const { tables } = await createTestTables();
+    const result = await tables.fetchData(ticketsTable, {
       pagination: { page: 1, limit: 20 },
-      primaryTable: 'tickets',
-      columns: ['subject', 'assignee.name'],
-      filters: [
-        {
-          columnId: 'assignee.name',
-          type: 'text',
-          operator: 'equals',
-          values: [],
-          includeNull: true,
-        },
-      ],
+      filters: [buildFilter(ticketsTable, 'assignee.name', 'equals', [], { includeNull: true })],
     });
 
     expect(result.total).toBeGreaterThan(0);
     for (const ticket of result.data) {
-      expect((ticket as TicketWithRelations).assignee).toBeFalsy();
+      expect(ticket.assignee).toBeFalsy();
     }
   });
 });
@@ -216,18 +194,8 @@ describe('support ticket fetch/filter pipeline (bun:sqlite fixture -- see file d
 describe('buildRelationshipTrail', () => {
   it('describes relationship filters in plain language', () => {
     const trail = buildRelationshipTrail([
-      {
-        columnId: 'customer.plan',
-        type: 'option',
-        operator: 'is',
-        values: ['enterprise'],
-      },
-      {
-        columnId: 'assignee.name',
-        type: 'text',
-        operator: 'equals',
-        values: ['Maya Chen'],
-      },
+      buildFilter(ticketsTable, 'customer.plan', 'option', 'is', ['enterprise']),
+      buildFilter(ticketsTable, 'assignee.name', 'equals', ['Maya Chen']),
     ]);
 
     expect(trail).toHaveLength(2);

@@ -237,7 +237,7 @@ export function NumberFilterInput<TData = unknown>({
   if (needsTwoValues) {
     return (
       <div className="flex flex-col gap-3">
-        <Label className="text-sm font-medium">Range</Label>
+        <Label className="text-sm font-semibold tracking-tight">Range</Label>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor={`min-${filter.columnId}`} className="text-xs text-muted-foreground">
@@ -299,7 +299,7 @@ export function NumberFilterInput<TData = unknown>({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label className="text-sm font-medium">Value</Label>
+      <Label className="text-sm font-semibold tracking-tight">Value</Label>
       <InputGroup
         className={cn(
           !finalValidation.isValid && values.single && 'border-destructive ring-destructive/20'

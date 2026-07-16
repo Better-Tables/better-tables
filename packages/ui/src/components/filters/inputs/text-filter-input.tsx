@@ -133,7 +133,7 @@ export function TextFilterInput<TData = unknown>({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={`value-${filter.columnId}`} className="text-sm font-medium">
+      <Label htmlFor={`value-${filter.columnId}`} className="text-sm font-semibold tracking-tight">
         Value
       </Label>
       <InputGroup

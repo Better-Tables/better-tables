@@ -6,12 +6,12 @@ import { Button } from '../ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { ScrollArea } from '../ui/scroll-area';
 import { ColumnOrderList } from './column-order-list';
 
 export interface ColumnVisibilityToggleProps<TData = unknown> {
@@ -85,12 +85,19 @@ export function ColumnVisibilityToggle<TData = unknown>({
       >
         <Columns2 className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[240px]">
-        <DropdownMenuLabel>{enableReordering ? 'Columns' : 'Column Visibility'}</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-56 overflow-hidden p-1">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="py-1">
+            {enableReordering ? 'Columns' : 'Column Visibility'}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <ScrollArea className="h-60">
+        <div
+          className="max-h-52 overflow-y-auto overscroll-contain"
+          style={{ paddingTop: 6, paddingBottom: 8, paddingLeft: 8, paddingRight: 8 }}
+        >
           {columns.length === 0 ? (
-            <div className="px-2 py-1.5 text-sm text-muted-foreground text-center">No columns</div>
+            <div className="px-2 py-1 text-xs text-muted-foreground text-center">No columns</div>
           ) : (
             <ColumnOrderList
               order={order}
@@ -100,16 +107,16 @@ export function ColumnVisibilityToggle<TData = unknown>({
               enableReordering={enableReordering}
             />
           )}
-        </ScrollArea>
+        </div>
         {hasResetOption && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={onResetColumnOrder}
               disabled={disabled}
-              className="flex items-center gap-2 cursor-pointer"
+              className="cursor-pointer"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw size={14} className="shrink-0" strokeWidth={2} />
               Reset Order
             </DropdownMenuItem>
           </>

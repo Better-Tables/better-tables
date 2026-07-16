@@ -283,7 +283,7 @@ export function DateFilterInput<TData = unknown>({
   if (needsDateRange) {
     return (
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Date Range</Label>
+        <Label className="text-sm font-semibold tracking-tight">Date Range</Label>
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger
             render={
@@ -335,7 +335,7 @@ export function DateFilterInput<TData = unknown>({
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">Date</Label>
+      <Label className="text-sm font-semibold tracking-tight">Date</Label>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger
           render={

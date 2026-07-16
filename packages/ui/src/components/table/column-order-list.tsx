@@ -9,6 +9,17 @@ import { cn } from '../../lib/utils';
 import { ColumnOrderDropIndicator } from './column-order-drop-indicator';
 import { DndSortableContext } from './table-providers';
 
+/** Matches SortOrderList / context-menu reorder row spacing (gap-2, px-2 py-1.5). */
+const COLUMN_ORDER_ROW_LAYOUT = {
+  gap: 8,
+  paddingTop: 6,
+  paddingBottom: 6,
+  paddingLeft: 8,
+  paddingRight: 8,
+} as const;
+
+const COLUMN_ORDER_ICON_SIZE = 14;
+
 interface ColumnOrderListProps<TData = unknown> {
   /** Current column order */
   order: ColumnOrder;
@@ -118,6 +129,13 @@ function ColumnOrderItem<TData = unknown>({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    display: 'flex',
+    alignItems: 'center',
+    gap: COLUMN_ORDER_ROW_LAYOUT.gap,
+    paddingTop: COLUMN_ORDER_ROW_LAYOUT.paddingTop,
+    paddingBottom: COLUMN_ORDER_ROW_LAYOUT.paddingBottom,
+    paddingLeft: COLUMN_ORDER_ROW_LAYOUT.paddingLeft,
+    paddingRight: COLUMN_ORDER_ROW_LAYOUT.paddingRight,
   };
 
   return (
@@ -125,8 +143,8 @@ function ColumnOrderItem<TData = unknown>({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm',
-        'bg-muted/50 hover:bg-muted',
+        'rounded-md text-xs',
+        'hover:bg-accent hover:text-accent-foreground',
         'transition-opacity duration-200',
         isDragging && 'opacity-30 scale-95'
       )}
@@ -137,38 +155,44 @@ function ColumnOrderItem<TData = unknown>({
           type="button"
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing touch-none"
+          className="shrink-0 cursor-grab active:cursor-grabbing touch-none"
           aria-label={`Drag to reorder ${column.displayName}`}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <GripVertical
+            size={COLUMN_ORDER_ICON_SIZE}
+            className="text-muted-foreground"
+            strokeWidth={2}
+          />
         </button>
       )}
-      {!enableReordering && <div className="w-4" />}
 
-      {/* Visibility toggle */}
+      {/* Visibility toggle — h-6 w-6 slot matches sort-order priority badge width */}
       {canHide ? (
         <button
           type="button"
           onClick={() => onToggleVisibility(column.id)}
-          className="rounded-md p-0.5 hover:bg-muted-foreground/10"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted-foreground/10"
           aria-label={isVisible ? `Hide ${column.displayName}` : `Show ${column.displayName}`}
         >
           {isVisible ? (
-            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+            <Eye size={COLUMN_ORDER_ICON_SIZE} className="text-muted-foreground" strokeWidth={2} />
           ) : (
-            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+            <EyeOff size={COLUMN_ORDER_ICON_SIZE} className="text-muted-foreground" strokeWidth={2} />
           )}
         </button>
       ) : (
-        <div className="w-3.5" />
+        <span className="h-6 w-6 shrink-0" aria-hidden="true" />
       )}
 
       {/* Column icon */}
-      {column.icon && <column.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-      {!column.icon && <div className="w-3.5" />}
+      {column.icon && (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground">
+          <column.icon size={COLUMN_ORDER_ICON_SIZE} />
+        </span>
+      )}
 
       {/* Column name */}
-      <span className={cn('flex-1 truncate text-left', !isVisible && 'text-muted-foreground')}>
+      <span className={cn('min-w-0 flex-1 truncate text-left', !isVisible && 'text-muted-foreground')}>
         {column.displayName}
       </span>
     </div>

@@ -38,7 +38,7 @@ export function ErrorState({
         <AlertTriangle className="w-6 h-6 text-destructive" />
       </div>
 
-      <h3 className="text-lg font-medium text-foreground mb-2">{title}</h3>
+      <h3 className="text-base font-semibold tracking-tight text-foreground mb-1.5">{title}</h3>
 
       <p className="text-sm text-muted-foreground mb-4 max-w-md">{errorMessage}</p>
 

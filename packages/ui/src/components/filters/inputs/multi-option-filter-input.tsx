@@ -127,7 +127,7 @@ export function MultiOptionFilterInput<TData = unknown>({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Select Options</Label>
+        <Label className="text-sm font-semibold tracking-tight">Select Options</Label>
         {selectedValues.length > 0 && (
           <Button
             variant="ghost"

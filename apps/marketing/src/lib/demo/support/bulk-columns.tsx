@@ -1,18 +1,23 @@
 import { defineTable } from '@better-tables/core';
-// See columns.tsx for why this is a type-only import (RSC-safe boundary --
-// DX-FINDING-4).
+// See columns.tsx for why this is a type-only import (RSC-safe boundary).
 import type { SupportTables } from './db';
 
+const bulkStatusColors: Record<string, string> = {
+  open: 'text-[#60A5FA]',
+  pending: 'text-[#FBBF24]',
+  resolved: 'text-[#5EEAD4]',
+  escalated: 'text-destructive',
+};
+
 /**
- * The `big-board` example's flagship table definition -- same
- * `betterTables()` instance as `ticketsTable` (columns.tsx), a different
- * table (`bulkTickets`). See plans/findings/029-dx-findings.md #6 for why
- * this table's columns are NOT rendered through `<BetterTable>`: the
- * virtualization example hand-builds around `<VirtualizedTable>` instead,
- * which only wants `id`/`displayName` per column, not the full filter/sort
- * builder chain -- these columns are `filterable()`/`sortable()` anyway so
- * the SAME definitions could back a `<BetterTable>` rendering later without
- * rework.
+ * The `big-board` example's table definition -- same `betterTables()` instance
+ * as `ticketsTable` (columns.tsx), a different table (`bulkTickets`).
+ *
+ * These are ordinary column definitions: the big board renders them through
+ * `<BetterTable ... virtualized />`, so the same `filterable()`/`sortable()`/
+ * `.dateTime()` config drives the filter bar, the header sort UI, and cell
+ * formatting over 12k windowed rows -- no separate component, no per-column
+ * hand-rolled rendering.
  */
 export const bulkTicketsTable = defineTable<SupportTables>()('bulkTickets', (t) => ({
   columns: [
@@ -26,7 +31,12 @@ export const bulkTicketsTable = defineTable<SupportTables>()('bulkTickets', (t) 
         { value: 'escalated', label: 'Escalated' },
       ])
       .filterable()
-      .sortable(),
+      .sortable()
+      .cellRenderer(({ value }) => (
+        <span className={`font-mono text-xs uppercase ${bulkStatusColors[String(value)] ?? ''}`}>
+          {String(value)}
+        </span>
+      )),
     t
       .option('priority')
       .options([

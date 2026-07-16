@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { relationsSchema, schema } from './schema';
+import { postsRelations, profilesRelations, schema, usersRelations } from './schema';
 import { seedDatabase } from './seed';
 
 // Singleton pattern for in-memory database
@@ -19,7 +19,13 @@ export async function getDatabase() {
   // Enable foreign keys
   sqlite.exec('PRAGMA foreign_keys = ON;');
 
-  const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });
+  // Relations spread under their OWN export names. Spreading a
+  // TABLE-NAME-KEYED relations map here instead (`{ users: usersRelations }`)
+  // would silently overwrite every real table object with its same-named
+  // `Relations` object -- object spread, later keys win (plan 030, finding 11).
+  const db = drizzle(sqlite, {
+    schema: { ...schema, usersRelations, profilesRelations, postsRelations },
+  });
 
   // Create tables
   await db.run(sql`CREATE TABLE users (

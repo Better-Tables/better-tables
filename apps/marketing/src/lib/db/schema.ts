@@ -73,12 +73,6 @@ export const schema = {
   posts,
 };
 
-export const relationsSchema = {
-  users: usersRelations,
-  profiles: profilesRelations,
-  posts: postsRelations,
-};
-
 // Type exports
 export type User = typeof users.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;

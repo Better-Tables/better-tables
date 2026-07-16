@@ -262,7 +262,13 @@ export class FilterRouter<TColumn, TPredicate> {
     let condition: TPredicate | undefined;
 
     // Dispatch to the emitter's leaf handler for this operator's category
-    if (this.isTextOperator(operator)) {
+    if (columnType === 'number' && (operator === 'equals' || operator === 'notEquals')) {
+      // `equals`/`notEquals` are shared between text and number columns. On a
+      // number column they must go to the numeric handler — the text handler
+      // asserts a string value and would throw on a numeric one. (Mirrors the
+      // date-`between` guard below.)
+      condition = this.emitter.numberOperator(column, operator, values);
+    } else if (this.isTextOperator(operator)) {
       condition = this.emitter.textOperator(column, operator, values);
     } else if (columnType === 'date' && (operator === 'between' || operator === 'notBetween')) {
       // `between`/`notBetween` are shared between number and date columns. On a

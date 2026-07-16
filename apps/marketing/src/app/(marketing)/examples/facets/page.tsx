@@ -32,7 +32,7 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
     sorting: tableParams.sorting,
   });
 
-  const routeSource = readSourceFile('src/app/api/facets/route.ts');
+  const routeSource = readSourceFile('src/app/api/tables/tickets/route.ts');
   const sidebarSource = readSourceFile('src/components/sections/facets-sidebar.tsx');
 
   return (
@@ -42,12 +42,12 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
           Faceted search
         </p>
         <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-          Filter-aware facets, hand-built
+          Filter-aware facets
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          The sidebar calls the adapter&apos;s <code>getFacetedValues</code>/
-          <code>getMinMaxValues</code> from a route handler on every filter change. No UI component
-          ships this yet (this app is the first real caller) -- everything below is hand-built.
+          The sidebar wires <code>useFacets</code> + <code>httpAdapter</code> to a one-line{' '}
+          <code>createAdapterRouteHandler</code>: the batching, self-exclusion, and{' '}
+          <code>Map</code> handling are shipped primitives. Only the presentation below is app code.
         </p>
       </div>
 
@@ -89,9 +89,9 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
 
       <div className="mt-6">
         <SourceView
-          title="Implementation: facet route handler and sidebar"
+          title="Implementation: adapter route handler and sidebar"
           files={[
-            { label: 'src/app/api/facets/route.ts', code: routeSource },
+            { label: 'src/app/api/tables/tickets/route.ts', code: routeSource },
             { label: 'src/components/sections/facets-sidebar.tsx', code: sidebarSource },
           ]}
         />

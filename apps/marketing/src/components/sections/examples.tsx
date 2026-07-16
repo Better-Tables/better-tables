@@ -15,37 +15,32 @@ const featureOptions: FeatureOption[] = [
     title: 'Basic Table Setup',
     description:
       'Automatic server-side filtering, sorting, and pagination. Zero query writing required.',
-    code: `import { BetterTable } from '@better-tables/ui';
-import { createColumnBuilder } from '@better-tables/core';
+    code: `import { betterTables } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { BetterTable } from '@better-tables/ui';
+import { db } from '@/lib/db';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'editor' | 'viewer';
-  status: 'active' | 'inactive';
-}
+// One instance for the whole app. The adapter reads your Drizzle
+// schema, so every column path below is checked against it — and
+// the row type is derived from it. No interface to hand-maintain.
+export const tables = betterTables({ database: drizzleAdapter(db) });
 
-const cb = createColumnBuilder<User>();
-
-const columns = [
-  cb.text().id('name').displayName('Name')
-    .accessor(u => u.name).filterable().sortable().build(),
-  cb.text().id('email').displayName('Email')
-    .accessor(u => u.email).filterable().sortable().build(),
-  cb.option().id('role').displayName('Role')
-    .accessor(u => u.role)
-    .options([
+export const usersTable = tables.define('users', (t) => ({
+  columns: [
+    t.text('name').filterable().sortable(),
+    t.text('email').filterable().sortable(),
+    t.option('role').options([
       { value: 'admin', label: 'Admin' },
       { value: 'editor', label: 'Editor' },
       { value: 'viewer', label: 'Viewer' },
-    ]).filterable().build(),
-];
+    ]).filterable(),
+  ],
+}));
 
-function UserTable({ users }: { users: User[] }) {
+function UserTable({ users }: { users: typeof usersTable.$infer.Row[] }) {
   return (
     <BetterTable
-      columns={columns}
+      table={usersTable}
       data={users}
       features={{
         filtering: true,
@@ -61,42 +56,32 @@ function UserTable({ users }: { users: User[] }) {
     id: 2,
     title: 'Cross-Table Filtering',
     description: 'Automatic server-side filtering across relationships using the Drizzle adapter.',
-    code: `import { BetterTable } from '@better-tables/ui';
-import { createColumnBuilder } from '@better-tables/core';
+    code: `import { betterTables } from '@better-tables/core';
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { BetterTable } from '@better-tables/ui';
+import { db } from '@/lib/db';
 
-interface UserWithRelations {
-  id: string;
-  name: string;
-  profile?: { location: string; website: string };
-  posts?: Array<{ title: string; views: number }>;
-}
+const tables = betterTables({ database: drizzleAdapter(db) });
 
-const cb = createColumnBuilder<UserWithRelations>();
+// Dot-paths reach straight across your relations. They're typed
+// against the real schema, so 'profile.locaton' is a compile error
+// — not a silent empty column.
+export const usersTable = tables.define('users', (t) => ({
+  columns: [
+    t.text('name').sortable(),
+    t.text('profile.location').filterable().sortable(),
+    t.text('profile.website').filterable(),
+  ],
+}));
 
-// Define columns that span multiple tables
-const columns = [
-  cb.text().id('name').accessor(u => u.name).build(),
-  // Filter across relationships automatically!
-  cb.text().id('profile.location')
-    .accessor(u => u.profile?.location)
-    .filterable().build(),
-  cb.number().id('posts_count')
-    .accessor(u => u.posts?.length || 0)
-    .filterable().sortable().build(),
-];
-
-// User filters by "profile.location" - automatic JOIN generated
-// User filters by "posts_count" - automatic COUNT and JOIN
-// All handled by the adapter, zero query writing required
-
-function UserTable() {
-  const adapter = drizzleAdapter(db);
-  
+// Filtering or sorting by "profile.location" generates the JOIN for
+// you, and the joined row is embedded in the result — typed, with
+// zero query writing.
+function UserTable({ users }: { users: typeof usersTable.$infer.Row[] }) {
   return (
-    <BetterTable 
-      columns={columns} 
-      adapter={adapter}
+    <BetterTable
+      table={usersTable}
+      data={users}
       features={{ filtering: true, sorting: true }}
     />
   );
@@ -108,30 +93,24 @@ function UserTable() {
     description:
       'Automatic server-side filtering with Next.js. URL state persistence for shareable views.',
     code: `// app/users/page.tsx (Server Component)
-import { deserializeFiltersFromURL } from '@better-tables/core';
-import { getAdapter } from '@/lib/adapter';
+import { parseTableSearchParams } from '@better-tables/core';
+import { tables, usersTable } from '@/lib/tables';
 import { UsersTableClient } from './users-table-client';
 
-export default async function UsersPage({ 
-  searchParams 
-}: { 
-  searchParams: Promise<Record<string, string>> 
+export default async function UsersPage({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string>>
 }) {
-  const params = await searchParams;
+  // One call parses page, limit, filters and sorting out of the URL
+  const { page, limit, filters, sorting } = parseTableSearchParams(
+    await searchParams,
+    { page: 1, limit: 10 }
+  );
 
-  // Parse URL params for state
-  const page = Number.parseInt(params.page || '1', 10);
-  const limit = Number.parseInt(params.limit || '10', 10);
-  const filters = params.filters 
-    ? deserializeFiltersFromURL(params.filters) 
-    : [];
-  const sorting = params.sorting 
-    ? deserializeSortingFromURL(params.sorting) 
-    : [];
-
-  // Fetch data using the adapter
-  const adapter = await getAdapter();
-  const result = await adapter.fetchData({
+  // Table-scoped read: the primary table comes from usersTable, and
+  // rows come back typed as its own row — no cast.
+  const result = await tables.fetchData(usersTable, {
     pagination: { page, limit },
     filters,
     sorting,
@@ -154,47 +133,48 @@ export default async function UsersPage({
     description:
       'Virtual scrolling, custom rendering, and more. All with automatic server-side filtering.',
     code: `import { BetterTable } from '@better-tables/ui';
-import { createColumnBuilder } from '@better-tables/core';
 import { Badge } from '@/components/ui/badge';
+import { tables } from '@/lib/tables';
 
-const cb = createColumnBuilder<User>();
+export const usersTable = tables.define('users', (t) => ({
+  columns: [
+    t.text('name'),
 
-const columns = [
-  cb.text().id('name').accessor(u => u.name).build(),
-  
-  // Custom cell rendering
-  cb.option().id('role')
-    .accessor(u => u.role)
-    .cellRenderer(({ value }) => (
+    // Custom cell rendering — \`value\` is typed from the schema
+    t.option('role').cellRenderer(({ value }) => (
       <Badge variant={value === 'admin' ? 'default' : 'secondary'}>
         {value}
       </Badge>
-    )).build(),
-  
-  // Virtual scrolling for large datasets
-  cb.number().id('views')
-    .accessor(u => u.views)
-    .sortable().build(),
-];
+    )),
 
-function AdvancedTable({ users }: { users: User[] }) {
+    t.number('views').sortable(),
+  ],
+}));
+
+function AdvancedTable({ users }: { users: typeof usersTable.$infer.Row[] }) {
   return (
     <BetterTable
-      columns={columns}
+      table={usersTable}
       data={users}
       features={{
         filtering: true,
         sorting: true,
         pagination: true,
         rowSelection: true,
-        virtualization: true, // Handle millions of rows
       }}
       onRowSelect={(selectedIds) => {
         console.log('Selected:', selectedIds);
       }}
     />
   );
-}`,
+}
+
+// For 10k+ rows, drop pagination and add \`virtualized\` — the same
+// table renders only the rows in view, and filtering/sorting are
+// untouched:
+//
+//   <BetterTable table={usersTable} data={allUsers} virtualized
+//     features={{ filtering: true, sorting: true, pagination: false }} />`,
   },
   {
     id: 5,

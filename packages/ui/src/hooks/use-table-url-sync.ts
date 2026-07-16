@@ -81,9 +81,22 @@ function useStableUrlSyncConfig(config: UrlSyncConfig): UrlSyncConfig {
  * already holds -- a no-op hydration therefore never calls `updateState`,
  * never fires a `state_changed` event, and never triggers a write-back.
  *
+ * @param allowClearFilters - When true, a URL with NO filters clears the
+ *   store's filters (an intentional soft-nav "reset"). When false (the very
+ *   first, mount-time hydration), an empty URL is treated as "nothing to
+ *   apply" so it never wipes SSR-seeded `initialFilters`. Without this split,
+ *   clearing filters via a soft navigation left the store's filter chips
+ *   stale even though the data correctly refetched unfiltered (finding 15,
+ *   clearing direction).
+ *
  * @returns whether any state was actually applied to the store.
  */
-function hydrateFromUrl(store: TableStore, config: UrlSyncConfig, adapter: UrlSyncAdapter): boolean {
+function hydrateFromUrl(
+  store: TableStore,
+  config: UrlSyncConfig,
+  adapter: UrlSyncAdapter,
+  allowClearFilters: boolean
+): boolean {
   const manager = store.getState().manager;
 
   const urlParams: Record<string, string | undefined | null> = {};
@@ -108,7 +121,13 @@ function hydrateFromUrl(store: TableStore, config: UrlSyncConfig, adapter: UrlSy
   const updates: Parameters<typeof manager.updateState>[0] = {};
 
   const hasFilters = Array.isArray(deserialized.filters) ? deserialized.filters.length > 0 : true;
-  if (config.filters && hasFilters && !deepEqual(deserialized.filters, manager.getFilterNode())) {
+  // Apply when the URL actually carries filters, OR when a post-mount soft nav
+  // removed them (`allowClearFilters`) so the store's chips clear to match.
+  if (
+    config.filters &&
+    (hasFilters || allowClearFilters) &&
+    !deepEqual(deserialized.filters, manager.getFilterNode())
+  ) {
     updates.filters = deserialized.filters;
   }
 
@@ -232,7 +251,9 @@ export function useTableUrlSync(
     // from looping with the store->URL write-out effect below.
     const store = getTableStore(tableId);
     if (store) {
-      hydrateFromUrl(store, stableConfig, adapter);
+      // First hydration must not clear SSR-seeded initialFilters; later ones
+      // (soft navs) may clear (finding 15).
+      hydrateFromUrl(store, stableConfig, adapter, hasHydratedFromUrl.current);
       if (!hasHydratedFromUrl.current) {
         hasHydratedFromUrl.current = true;
         setStoreReady(true);
@@ -247,7 +268,7 @@ export function useTableUrlSync(
       attempts += 1;
       const lateStore = getTableStore(tableId);
       if (lateStore) {
-        hydrateFromUrl(lateStore, stableConfig, adapter);
+        hydrateFromUrl(lateStore, stableConfig, adapter, hasHydratedFromUrl.current);
         hasHydratedFromUrl.current = true;
         setStoreReady(true);
         clearInterval(intervalId);
