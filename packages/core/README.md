@@ -28,74 +28,29 @@ bun add @better-tables/core
 ### Basic Column Definition
 
 ```typescript
-import { createColumnBuilder } from '@better-tables/core';
+import { betterTables, defineTable } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  age: number;
-  role: 'admin' | 'editor' | 'viewer';
-  status: 'active' | 'inactive';
-  createdAt: Date;
-}
+export const tables = betterTables({ database: drizzleAdapter(db) });
 
-// Create a column builder for your data type
-const cb = createColumnBuilder<User>();
-
-// Define columns with a fluent API
-const columns = [
-  cb
-    .text()
-    .id('name')
-    .displayName('Name')
-    .accessor((user) => user.name)
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .text()
-    .id('email')
-    .displayName('Email')
-    .accessor((user) => user.email)
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .number()
-    .id('age')
-    .displayName('Age')
-    .accessor((user) => user.age)
-    .range(18, 100)
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .option()
-    .id('role')
-    .displayName('Role')
-    .accessor((user) => user.role)
-    .options([
-      { value: 'admin', label: 'Admin' },
-      { value: 'editor', label: 'Editor' },
-      { value: 'viewer', label: 'Viewer' },
-    ])
-    .filterable()
-    .sortable()
-    .build(),
-
-  cb
-    .date()
-    .id('createdAt')
-    .displayName('Joined')
-    .accessor((user) => user.createdAt)
-    .filterable()
-    .sortable()
-    .build(),
-];
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name').displayName('Name').filterable().sortable(),
+    t.text('email').displayName('Email').filterable().sortable(),
+    t.number('age').displayName('Age').range(18, 100).filterable().sortable(),
+    t
+      .option('role')
+      .displayName('Role')
+      .options([
+        { value: 'admin', label: 'Admin' },
+        { value: 'editor', label: 'Editor' },
+        { value: 'viewer', label: 'Viewer' },
+      ])
+      .filterable()
+      .sortable(),
+    t.date('createdAt').displayName('Joined').filterable().sortable(),
+  ],
+}));
 ```
 
 ### Using State Managers
@@ -146,50 +101,14 @@ paginationManager.setPage(2);
 The core package works seamlessly with adapters that support relationship filtering:
 
 ```typescript
-interface UserWithRelations extends User {
-  profile?: {
-    bio: string;
-    location: string;
-    website?: string;
-  };
-  posts?: Array<{
-    id: string;
-    title: string;
-    views: number;
-  }>;
-}
-
-const cb = createColumnBuilder<UserWithRelations>();
-
-const columns = [
-  // Direct columns
-  cb.text().id('name').accessor((u) => u.name).build(),
-
-  // One-to-one relationship
-  cb
-    .text()
-    .id('profile.bio')
-    .displayName('Bio')
-    .nullableAccessor((user) => user.profile?.bio)
-    .filterable()
-    .build(),
-
-  cb
-    .text()
-    .id('profile.location')
-    .displayName('Location')
-    .nullableAccessor((user) => user.profile?.location)
-    .filterable()
-    .build(),
-
-  // One-to-many relationship (access first item)
-  cb
-    .text()
-    .id('posts.title')
-    .displayName('Latest Post')
-    .nullableAccessor((user) => user.posts?.[0]?.title)
-    .build(),
-];
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name'),
+    t.text('profile.bio').filterable(),
+    t.text('profile.location').filterable(),
+    t.text('posts.title').displayName('Latest Post'),
+  ],
+}));
 ```
 
 ## Core Concepts
@@ -206,40 +125,27 @@ Column builders provide a fluent, type-safe API for defining table columns. Each
 - **MultiOptionColumnBuilder** - Multi-select options
 
 ```typescript
-// Text column with advanced features
-cb.text()
-  .id('name')
-  .displayName('Full Name')
-  .accessor((user) => `${user.firstName} ${user.lastName}`)
-  .searchable()
-  .filterable()
-  .sortable()
-  .truncate({ maxLength: 50, suffix: '...' })
-  .build();
-
-// Number column with range validation
-cb.number()
-  .id('age')
-  .displayName('Age')
-  .accessor((user) => user.age)
-  .range(0, 120)
-  .format('number')
-  .filterable()
-  .sortable()
-  .build();
-
-// Option column with custom rendering
-cb.option()
-  .id('status')
-  .displayName('Status')
-  .accessor((user) => user.status)
-  .options([
-    { value: 'active', label: 'Active', color: 'green' },
-    { value: 'inactive', label: 'Inactive', color: 'red' },
-  ])
-  .filterable()
-  .sortable()
-  .build();
+defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t
+      .computed('fullName', (user) => `${user.firstName} ${user.lastName}`)
+      .displayName('Full Name')
+      .searchable()
+      .filterable()
+      .sortable()
+      .truncate({ maxLength: 50, suffix: '...' }),
+    t.number('age').displayName('Age').range(0, 120).format('number').filterable().sortable(),
+    t
+      .option('status')
+      .displayName('Status')
+      .options([
+        { value: 'active', label: 'Active', color: 'green' },
+        { value: 'inactive', label: 'Inactive', color: 'red' },
+      ])
+      .filterable()
+      .sortable(),
+  ],
+}));
 ```
 
 ### State Managers
@@ -419,19 +325,13 @@ import {
 } from '@better-tables/core';
 ```
 
-#### Factory Functions
+#### Flagship API (0.6+)
 
 ```typescript
-import {
-  createColumnBuilder,
-  createColumnBuilders,
-  createTypedColumnBuilder,
-  column,
-  typed,
-  createActionBuilder,
-  createActionBuilders,
-} from '@better-tables/core';
+import { betterTables, defineTable, defineTableRow, defineColumns } from '@better-tables/core';
 ```
+
+Legacy `createColumnBuilder` / `defineColumns` remain exported but are deprecated — see [MIGRATION.md](../../MIGRATION.md).
 
 #### State Managers
 
@@ -478,45 +378,33 @@ import {
 ### Complete Example with Adapter
 
 ```typescript
-import { createColumnBuilder, type FilterState, type SortingState } from '@better-tables/core';
-import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
+import { betterTables, defineTable, type FilterState, type SortingState } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
-// Define columns
-const cb = createColumnBuilder<User>();
-const columns = [
-  cb.text().id('name').accessor((u) => u.name).filterable().sortable().build(),
-  cb.text().id('email').accessor((u) => u.email).filterable().build(),
-];
+export const tables = betterTables({ database: drizzleAdapter(db) });
 
-// Create adapter
-const adapter = new DrizzleAdapter({
-  db,
-  schema,
-  mainTable: 'users',
-  driver: 'sqlite',
-});
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name').filterable().sortable(),
+    t.text('email').filterable(),
+  ],
+}));
 
-// Fetch data with filters and sorting
 const filters: FilterState[] = [
-  {
-    columnId: 'name',
-    type: 'text',
-    operator: 'contains',
-    values: ['John'],
-  },
+  { columnId: 'name', type: 'text', operator: 'contains', values: ['John'] },
 ];
 
 const sorting: SortingState = [{ columnId: 'name', direction: 'asc' }];
 
-const result = await adapter.fetchData({
+const result = await tables.fetchData(usersTable, {
   columns: ['name', 'email'],
   filters,
   sorting,
   pagination: { page: 1, limit: 20 },
 });
 
-console.log(result.data); // Array of User records
-console.log(result.total); // Total count
+console.log(result.data);
+console.log(result.total);
 ```
 
 ### Server-Side Rendering (Next.js)
@@ -575,42 +463,32 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
 ### Custom Column Renderers
 
 ```typescript
-cb.text()
-  .id('avatar')
+t.text('name')
   .displayName('User')
-  .accessor((user) => user.name)
   .cellRenderer(({ value, row }) => (
     <div className="flex items-center gap-2">
       <img src={row.avatarUrl} alt={value} className="w-8 h-8 rounded-full" />
       <span>{value}</span>
     </div>
-  ))
-  .build();
+  )),
 ```
 
 ### Nullable Accessors
 
 ```typescript
-cb.text()
-  .id('profile.bio')
-  .displayName('Bio')
-  .nullableAccessor((user) => user.profile?.bio, '-') // Default value for null
-  .build();
+t.text('profile.bio').displayName('Bio').searchable({ includeNull: true }),
 ```
 
 ### Column Truncation
 
 ```typescript
-cb.text()
-  .id('description')
+t.text('description')
   .displayName('Description')
-  .accessor((item) => item.description)
   .truncate({
     maxLength: 100,
     suffix: '...',
-    showTooltip: true, // Show full text on hover
-  })
-  .build();
+    showTooltip: true,
+  }),
 ```
 
 ### Filter Serialization for URLs
@@ -635,19 +513,16 @@ const restoredFilters = deserializeFiltersFromURL(urlParams);
 
 For detailed documentation, see:
 
+- **[MIGRATION.md](../../MIGRATION.md)** - 0.6 flagship API (`betterTables` + `defineTable`)
 - **[HTTP Adapter](./docs/HTTP_ADAPTER.md)** - Browser `httpAdapter` + server `createAdapterRouteHandler`
-- **[User Guide](../../docs/core/USER_GUIDE.md)** - Complete feature reference and usage patterns
-- **[Column Builders Guide](../../docs/core/COLUMN_BUILDERS_GUIDE.md)** - Deep dive into column configuration
-- **[Managers API Reference](../../docs/core/MANAGERS_API_REFERENCE.md)** - State management API documentation
-- **[Types API Reference](../../docs/core/TYPES_API_REFERENCE.md)** - Complete type definitions
-- **[Utilities API Reference](../../docs/core/UTILITIES_API_REFERENCE.md)** - Utility function documentation
-- **[Architecture](../../docs/core/ARCHITECTURE.md)** - Design decisions and system overview
+- **[wiki.md](../../wiki.md)** - Lean 0.6 handbook
+- **[Drizzle adapter](../adapters/drizzle/README.md)** - Database adapter reference
 
 ## Examples
 
 See the [live demo in the marketing site](../../apps/marketing) for a complete working example:
 
-- **Column Definitions**: [apps/marketing/src/lib/columns/user-columns.tsx](../../apps/marketing/src/lib/columns/user-columns.tsx)
+- **Column Definitions**: [apps/marketing/src/lib/demo/support/columns.tsx](../../apps/marketing/src/lib/columns/user-columns.tsx)
 - **Action Builders**: [apps/marketing/src/lib/actions/user-actions.tsx](../../apps/marketing/src/lib/actions/user-actions.tsx)
 - **Integration**: [apps/marketing/src/components/sections/users-table-client.tsx](../../apps/marketing/src/components/sections/users-table-client.tsx)
 
@@ -656,19 +531,11 @@ See the [live demo in the marketing site](../../apps/marketing) for a complete w
 The core package is built with TypeScript and provides full type safety:
 
 ```typescript
-// Type inference from accessors
-const cb = createColumnBuilder<User>();
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [t.text('name')],
+}));
 
-// Accessor types are inferred
-cb.text()
-  .id('name')
-  .accessor((user) => user.name) // TypeScript knows user is User
-  .build();
-
-// Column definitions are fully typed
-const columns: ColumnDefinition<User>[] = [
-  // TypeScript will error if accessor doesn't match User type
-];
+type UserRow = typeof usersTable.$infer.Row;
 ```
 
 ## Contributing
@@ -693,7 +560,7 @@ Contributions are welcome! This is an open-source project, and we appreciate any
 - **Type Safety**: Enhancing TypeScript types
 - **Utilities**: Adding helpful utility functions
 
-See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 
@@ -709,7 +576,7 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 - **GitHub Issues** - Report bugs or request features
 - **GitHub Discussions** - Ask questions and share ideas
-- **Documentation** - Comprehensive guides in the `docs/` directory
+- **Documentation** - See [wiki.md](../../wiki.md) and [MIGRATION.md](../../MIGRATION.md)
 
 ---
 
