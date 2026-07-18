@@ -13,6 +13,7 @@ import type {
   FacetQueryParams,
   FetchDataParams,
   FetchDataResult,
+  InferredColumnSpec,
   TableAdapter,
 } from '../types/adapter';
 import { COLUMN_TYPES, type ColumnType } from '../types/column';
@@ -260,6 +261,17 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       };
       const result = signal ? await send(body, signal) : await sendCacheable(body);
       return result as [number, number];
+    },
+
+    async describeColumns(table?: string): Promise<InferredColumnSpec[]> {
+      // A schema answer is stable — route through the same TTL cache/dedup
+      // as the facet reads (plan 041) so repeated mounts don't refetch.
+      const body = {
+        method: 'describeColumns' as const,
+        ...(table !== undefined ? { table } : {}),
+      };
+      const result = await sendCacheable(body);
+      return result as InferredColumnSpec[];
     },
   };
 }

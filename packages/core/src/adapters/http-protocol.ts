@@ -8,17 +8,19 @@
 
 import type { FacetQueryParams, FetchDataParams } from '../types/adapter';
 
-/** The four read methods of `TableAdapter` the HTTP transport proxies. */
+/** The read methods of `TableAdapter` the HTTP transport proxies. */
 export type AdapterMethod =
   | 'fetchData'
   | 'getFilterOptions'
   | 'getFacetedValues'
-  | 'getMinMaxValues';
+  | 'getMinMaxValues'
+  | 'describeColumns';
 
 /**
  * A single request over the wire. `fetchData` carries a `params` object
  * (minus the non-serializable `AbortSignal`); the three column-scoped facet
- * methods carry a `columnId` plus optional `params`.
+ * methods carry a `columnId` plus optional `params`; `describeColumns`
+ * (plan 054) carries an optional `table` — a plain-JSON read, same envelope.
  */
 export type AdapterRequestBody =
   | {
@@ -31,6 +33,11 @@ export type AdapterRequestBody =
       columnId: string;
       /** {@link FacetQueryParams} without `signal` (handled client-side). */
       params?: Omit<FacetQueryParams, 'signal'>;
+    }
+  | {
+      method: 'describeColumns';
+      /** Table to describe — same resolution as `FetchDataParams.primaryTable`. */
+      table?: string;
     };
 
 /**

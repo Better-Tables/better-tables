@@ -79,6 +79,10 @@ function isValidBody(body: unknown): body is AdapterRequestBody {
   ) {
     return typeof (body as { columnId?: unknown }).columnId === 'string';
   }
+  if (method === 'describeColumns') {
+    const table = (body as { table?: unknown }).table;
+    return table === undefined || typeof table === 'string';
+  }
   return false;
 }
 
@@ -145,6 +149,20 @@ export async function handleAdapterRequest<TData = unknown>(
       }
       case 'getMinMaxValues': {
         const result = await adapter.getMinMaxValues(body.columnId, body.params);
+        return { ok: true, result };
+      }
+      case 'describeColumns': {
+        // Optional capability (plan 054): an adapter without it is a caller
+        // mistake (mounting auto columns over a non-introspectable adapter),
+        // not a server failure — report it as such.
+        if (!adapter.describeColumns) {
+          return {
+            ok: false,
+            error: 'Adapter does not support describeColumns.',
+            kind: 'bad_request',
+          };
+        }
+        const result = await adapter.describeColumns(body.table);
         return { ok: true, result };
       }
     }
