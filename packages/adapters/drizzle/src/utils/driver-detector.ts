@@ -23,6 +23,20 @@ import type { DatabaseDriver } from '../types';
  * 2. Check for driver-specific methods or dialect indicators
  * 3. Check constructor names as fallback
  *
+ * @remarks
+ * **Next.js build-time limitation (plan 051, finding 13b):** During
+ * `next build`'s page-data collection phase, Next imports route modules to
+ * analyze them. If a native binding (e.g. `better-sqlite3`) is constructed
+ * at module scope in that phase, the resulting Drizzle instance often lacks
+ * the dialect/session shape this function expects and detection returns
+ * `null` — even though the identical construction detects fine at real
+ * request time. The supported mitigation is a lazy adapter factory /
+ * memoized async getter so DB construction runs on first request, never
+ * during build (see `apps/marketing/src/lib/demo/support/db.ts` and
+ * `plans/findings/029-dx-findings.md` #13). No safe universal detection
+ * tweak for that phase is available here; callers should pass `driver`
+ * explicitly when auto-detection is impossible.
+ *
  * @param db - The Drizzle database instance
  * @returns The detected driver type or null if unable to detect
  *
@@ -123,7 +137,8 @@ export function detectDriver(db: unknown): DatabaseDriver | null {
     }
   }
 
-  // Unable to detect
+  // Unable to detect — includes the Next.js build-time page-data-collection
+  // shell where native bindings are constructed before dialect/session exist.
   return null;
 }
 

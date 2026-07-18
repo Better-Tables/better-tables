@@ -17,6 +17,10 @@
 - **Depends on**: none
 - **Category**: bug / tests / dx
 - **Planned at**: commit `787a816`, 2026-07-17
+- **Completed**: wave-b branch (`robustness-sweep`), 2026-07-17 — items 4
+  documented-and-deferred (lazy factory sufficient); item 5
+  documented-and-deferred (loud `QueryError` + MIGRATION known gap; tree
+  substitution deferred to computed-fields owner)
 
 ## Why this matters
 
@@ -184,13 +188,13 @@ row noting which of 4/5 were fixed vs documented.
 
 ## Done criteria
 
-- [ ] Marketing singletons memoize the in-flight promise (grep for the promise memo); concurrent-call test passes
-- [ ] `decompressAndDecode` bounds input length + recursion depth; over-limit returns null (tests pass)
-- [ ] Resolver suggests the right prefix for a `distance === 0` column; test passes
-- [ ] detectDriver (item 4) and computed-TREE (item 5) are each either fixed-with-test or documented-and-deferred (state which)
-- [ ] pg/mysql suites SKIP without env DBs (or CLAUDE.md corrected); CI still runs them (env-keyed guard)
-- [ ] Changesets exist; `bun run typecheck` exit 0; all touched suites green
-- [ ] `plans/README.md` updated
+- [x] Marketing singletons memoize the in-flight promise (grep for the promise memo); concurrent-call test passes
+- [x] `decompressAndDecode` bounds input length + recursion depth; over-limit returns null (tests pass)
+- [x] Resolver suggests the right prefix for a `distance === 0` column; test passes
+- [x] detectDriver (item 4) and computed-TREE (item 5) are each either fixed-with-test or documented-and-deferred (state which)
+- [x] pg/mysql suites SKIP without env DBs (or CLAUDE.md corrected); CI still runs them (env-keyed guard)
+- [x] Changesets exist; `bun run typecheck` exit 0; all touched suites green
+- [x] `plans/README.md` updated
 
 ## STOP conditions
 

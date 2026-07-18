@@ -97,7 +97,9 @@ describe('DrizzleAdapter - PostgreSQL [Unit Tests]', () => {
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
+describe.skipIf(!process.env.POSTGRES_TEST_URL)(
+  'DrizzleAdapter - PostgreSQL [Integration Tests]',
+  () => {
   let adapter: ReturnType<typeof createPostgresAdapter>;
   let testDb: ReturnType<typeof createPostgresDatabase>['db'];
   let client: ReturnType<typeof createPostgresDatabase>['client'];
@@ -106,7 +108,7 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
 
   beforeAll(async () => {
     // Drop database if exists and create it once
-    connectionString = process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
+    connectionString = process.env.POSTGRES_TEST_URL!;
     databaseName = await ensurePostgresDatabase(connectionString);
   });
 

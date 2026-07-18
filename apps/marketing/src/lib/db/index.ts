@@ -4,15 +4,17 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { postsRelations, profilesRelations, schema, usersRelations } from './schema';
 import { seedDatabase } from './seed';
 
-// Singleton pattern for in-memory database
-let dbInstance: ReturnType<typeof drizzle> | null = null;
-let sqliteInstance: Database.Database | null = null;
+type DatabaseBundle = {
+  db: ReturnType<typeof drizzle>;
+  sqlite: Database.Database;
+};
 
-export async function getDatabase() {
-  if (dbInstance && sqliteInstance) {
-    return { db: dbInstance, sqlite: sqliteInstance };
-  }
+// Singleton pattern for in-memory database — memoize the in-flight promise
+// synchronously so concurrent cold-start callers share one seed (plan 051).
+let dbInstance: DatabaseBundle | null = null;
+let initPromise: Promise<void> | null = null;
 
+async function initDatabase(): Promise<DatabaseBundle> {
   // Create in-memory SQLite database
   const sqlite = new Database(':memory:');
 
@@ -64,17 +66,32 @@ export async function getDatabase() {
   // Seed the database
   await seedDatabase(db);
 
-  // Store instances
-  dbInstance = db;
-  sqliteInstance = sqlite;
-
   return { db, sqlite };
 }
 
+export async function getDatabase(): Promise<DatabaseBundle> {
+  if (!initPromise) {
+    initPromise = initDatabase()
+      .then((bundle) => {
+        dbInstance = bundle;
+      })
+      .catch((error) => {
+        initPromise = null;
+        throw error;
+      });
+  }
+
+  await initPromise;
+  if (!dbInstance) {
+    throw new Error('Database failed to initialize');
+  }
+  return dbInstance;
+}
+
 export async function resetDatabase() {
-  if (sqliteInstance) {
-    sqliteInstance.close();
+  if (dbInstance?.sqlite) {
+    dbInstance.sqlite.close();
   }
   dbInstance = null;
-  sqliteInstance = null;
+  initPromise = null;
 }

@@ -27,7 +27,7 @@ import { relationsSchema as testRelations, schema as testSchema } from './helper
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
+describe.skipIf(!process.env.MYSQL_TEST_URL)('DrizzleAdapter - MySQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createMySQLAdapter>;
   let testDb: Awaited<ReturnType<typeof createMySQLDatabase>>['db'];
   let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
@@ -36,12 +36,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
   beforeAll(async () => {
     // Drop database if exists, create it, and set up tables with seed data once
-    const envConnectionString = process.env.MYSQL_TEST_URL;
-    if (!envConnectionString) {
-      throw new Error('MYSQL_TEST_URL environment variable is required for MySQL tests');
-    }
-    connectionString = envConnectionString;
-
+    connectionString = process.env.MYSQL_TEST_URL!;
     databaseName = await ensureMySQLDatabase(connectionString);
 
     // Connect and set up tables with seed data

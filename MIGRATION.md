@@ -649,6 +649,17 @@ full design rather than repeating it here:
   `isEmpty`/`isNull`-style operators, whose own condition already means
   null, as redundant. See `plans/027-null-filter-semantics.md`.
 
+## Known gaps
+
+- **Computed-field filters inside filter groups.** Drizzle adapter
+  `fetchData`/`getFacetedValues` can substitute computed-field filters
+  (`filter`/`filterSql`) only on a flat `FilterState[]` (implicit AND).
+  A computed-field leaf inside a `FilterGroupNode` tree is rejected with a
+  `QueryError` naming the column — it is not silently treated as a real
+  schema column. Until tree-walking substitution lands, pass computed-field
+  filters as a flat array or flatten at the call site. (Plan 051 — deferred
+  to the computed-fields owner.)
+
 ---
 
 ## Release runbook (maintainer-facing)

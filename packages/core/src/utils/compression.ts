@@ -69,6 +69,15 @@ export const DECOMPRESSION_KEY_MAP: Record<string, string> = Object.fromEntries(
 const OPAQUE_VALUE_KEYS = new Set(['meta', 'm', 'values', 'v']);
 
 /**
+ * Fail-closed bounds for server-side URL decompression (plan 051, SEC-05).
+ * Chosen generously so bookmarked table state (large filter trees, many
+ * columns) never hits them in normal use.
+ */
+export const MAX_COMPRESSED_ENCODED_LENGTH = 65_536; // 64 KiB after the `c:` prefix
+export const MAX_DECOMPRESSED_JSON_LENGTH = 512_000; // 512 KiB decompressed JSON
+export const MAX_RENAME_KEYS_DEPTH = 64; // nested FilterGroupNode depth
+
+/**
  * Recursively rename object keys using the provided key map.
  *
  * Traverses nested objects and arrays to apply key transformations
@@ -81,19 +90,30 @@ const OPAQUE_VALUE_KEYS = new Set(['meta', 'm', 'values', 'v']);
  * @param keyMap - Mapping of old keys to new keys
  * @returns Object with renamed keys
  */
-export function renameKeys(obj: unknown, keyMap: Record<string, string>): unknown {
+export function renameKeys(
+  obj: unknown,
+  keyMap: Record<string, string>,
+  depth = 0,
+  maxDepth = MAX_RENAME_KEYS_DEPTH
+): unknown {
+  if (depth > maxDepth) {
+    throw new RangeError('renameKeys depth limit exceeded');
+  }
+
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => renameKeys(item, keyMap));
+    return obj.map((item) => renameKeys(item, keyMap, depth + 1, maxDepth));
   }
 
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const newKey = keyMap[key] ?? key;
-    result[newKey] = OPAQUE_VALUE_KEYS.has(key) ? value : renameKeys(value, keyMap);
+    result[newKey] = OPAQUE_VALUE_KEYS.has(key)
+      ? value
+      : renameKeys(value, keyMap, depth + 1, maxDepth);
   }
 
   return result;
@@ -170,9 +190,16 @@ export function decompressAndDecode<T = unknown>(encoded: string, prefix = 'c:')
     }
 
     const compressed = encoded.slice(prefix.length);
+    if (compressed.length > MAX_COMPRESSED_ENCODED_LENGTH) {
+      return null;
+    }
+
     // Decompress with lz-string
     const decompressed = LZString.decompressFromEncodedURIComponent(compressed);
     if (!decompressed) {
+      return null;
+    }
+    if (decompressed.length > MAX_DECOMPRESSED_JSON_LENGTH) {
       return null;
     }
 
