@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
 import {
   clearAllTableStores,
   getOrCreateTableStore,
@@ -11,6 +11,7 @@ import { useTableUrlSync } from '../../src/hooks/use-table-url-sync';
 import { createFakeUrlAdapter, mockColumns, urlFilterForName } from '../helpers/url-sync';
 
 const TABLE_ID = 'url-sync-test-table';
+const URL_SYNC_DEBOUNCE_MS = 150;
 
 beforeEach(() => {
   clearAllTableStores();
@@ -18,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearAllTableStores();
+  jest.useRealTimers();
 });
 
 function createStore() {
@@ -44,6 +46,7 @@ describe('useTableUrlSync', () => {
     }
     const callsBeforeChange = setParamsCalls.length;
 
+    jest.useFakeTimers();
     act(() => {
       store.getState().manager.addFilter({
         columnId: 'name',
@@ -56,8 +59,9 @@ describe('useTableUrlSync', () => {
     unmount();
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
     });
+    jest.useRealTimers();
 
     expect(setParamsCalls.length - callsBeforeChange).toBe(0);
   });
@@ -70,9 +74,12 @@ describe('useTableUrlSync', () => {
     renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
       createStore();
-      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    await waitFor(() => {
+      const store = getTableStore(TABLE_ID);
+      expect(store?.getState().manager.getFilters()).toHaveLength(1);
     });
 
     const store = getTableStore(TABLE_ID);
@@ -80,9 +87,7 @@ describe('useTableUrlSync', () => {
     if (!store) {
       throw new Error('Expected table store');
     }
-    const filters = store.getState().manager.getFilters();
-    expect(filters).toHaveLength(1);
-    expect(filters[0]?.values).toEqual(['late-store']);
+    expect(store.getState().manager.getFilters()[0]?.values).toEqual(['late-store']);
   });
 
   it('does not re-subscribe when config values are unchanged across re-renders', async () => {
@@ -142,7 +147,6 @@ describe('useTableUrlSync', () => {
 
     const { rerender, getByTestId } = render(<TestComponent />);
 
-    // Mount-time hydration: store + chips reflect filters=A.
     await waitFor(() => expect(getByTestId('chips').textContent).toBe('alpha'));
 
     const store = getTableStore(TABLE_ID);
@@ -151,32 +155,68 @@ describe('useTableUrlSync', () => {
       throw new Error('Expected table store');
     }
 
-    // Simulate a soft nav: the URL's filters param changes to B behind the
-    // adapter (as it would when Next.js's useSearchParams() reflects a new
-    // router.push), then the component re-renders (as it would on a real
-    // client-side navigation).
     params.set('filters', filtersB);
     rerender(<TestComponent />);
 
-    // The store AND the filter-bar chips (rendered from useTableFilters, the
-    // same hook `<FilterBar>` uses) must pick up B -- not just re-fetch data
-    // while chips stay stale.
     await waitFor(() => expect(getByTestId('chips').textContent).toBe('bravo'));
     expect(store.getState().manager.getFilters()).toHaveLength(1);
     expect(store.getState().manager.getFilters()[0]?.values).toEqual(['bravo']);
 
-    // No hydrate -> serialize -> hydrate loop: setParams may be called once
-    // more to echo the already-current state back to the URL (harmless -- a
-    // real adapter would write the same value it just read), but must not
-    // keep growing.
+    jest.useFakeTimers();
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
     });
     const callsAfterSettling = setParamsCalls.length;
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
     });
+    jest.useRealTimers();
     expect(setParamsCalls.length).toBe(callsAfterSettling);
+  });
+
+  it('coalesces rapid state changes into a single setParams call with the final state', async () => {
+    createStore();
+    const { adapter, setParamsCalls } = createFakeUrlAdapter();
+    const config: UrlSyncConfig = { filters: true, pagination: true };
+
+    renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    await act(async () => {});
+
+    const store = getTableStore(TABLE_ID);
+    if (!store) throw new Error('Expected table store');
+
+    const callsBeforeBurst = setParamsCalls.length;
+
+    jest.useFakeTimers();
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['first'],
+      });
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['second'],
+      });
+      const pagination = store.getState().manager.getPagination();
+      store.getState().manager.updateState({
+        pagination: { ...pagination, page: 2 },
+      });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
+
+    const burstCalls = setParamsCalls.slice(callsBeforeBurst);
+    expect(burstCalls.length).toBe(1);
+    expect(burstCalls[0]?.page).toBe('2');
   });
 });

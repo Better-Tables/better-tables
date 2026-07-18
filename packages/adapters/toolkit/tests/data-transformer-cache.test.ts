@@ -267,9 +267,7 @@ describe('DataTransformer per-transform caches', () => {
     const { relationshipManager, schemaPort, resolveCalls } = createCountingPorts();
     const transformer = new DataTransformer(schema, relationshipManager, schemaPort);
 
-    const flatData = [
-      { id: 1, email: 'a@example.com', profiles_id: 10, profiles_bio: 'Bio' },
-    ];
+    const flatData = [{ id: 1, email: 'a@example.com', profiles_id: 10, profiles_bio: 'Bio' }];
     const columns = ['email', 'profile.bio'];
 
     transformer.transformToNested(flatData, 'users', columns);

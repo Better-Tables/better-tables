@@ -230,9 +230,8 @@ export function createPathColumnFactory<TRow>(): PathColumnFactory<TRow> {
     },
 
     multiOption<P extends PathsOfType<TRow, readonly string[] | null>>(path: P) {
-      type V = NonNullable<PathValue<TRow, P>> extends readonly (infer E)[]
-        ? Extract<E, string>[]
-        : never;
+      type V =
+        NonNullable<PathValue<TRow, P>> extends readonly (infer E)[] ? Extract<E, string>[] : never;
       const getter = buildPathAccessor(path) as (row: TRow) => V;
       return new MultiOptionColumnBuilder<TRow, V, P>()
         .id(path)

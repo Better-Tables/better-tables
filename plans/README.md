@@ -33,13 +33,16 @@ wave are in "Deferred by decision" at the bottom.
 
 ---
 
-## Current status (2026-07-17, Wave A merged to `main`)
+## Current status (2026-07-17, Wave B on `wave-b-quality-hardening`)
 
 - **All 32 plans from the first audit are DONE and merged** except 008
   (Prisma spike — ON HOLD by maintainer decision). See the done archive.
 - **Wave A (033–036, 040, 046, 047) is DONE and merged to `main`** via
   [PR #83](https://github.com/Better-Tables/better-tables/pull/83)
-  (`b9f9bef`, 2026-07-18). Pre-0.6-publish gates landed. Wave B/C remain TODO.
+  (`b9f9bef`, 2026-07-18). Pre-0.6-publish gates landed.
+- **Wave B (037–039, 041–045, 051, 052) is DONE on branch
+  `wave-b-quality-hardening`** (rebased on `main` @ `ef7c156`); awaiting PR
+  merge after Cubic + CI. Wave C remains TODO.
 - **Second deep audit produced plans 033–052** (written 2026-07-17);
   maintainer decisions folded into the relevant plans — see below.
 - **0.6 remains SHIPPABLE**; Wave A landed the pre-publish obligations
@@ -71,16 +74,16 @@ the breaking window.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [037](037-cli-bundled-ui-source.md) | Bundle `ui/src` into the CLI tarball; `init` copies from disk (kills the mutable-`main` download) | 033 (same file) | TODO |
-| [038](038-operator-column-type-single-source.md) | Single-source the operator + `ColumnType` tables (kill the 4-way drift); option equality canonicalized to `is`/`isNot` | none | TODO |
-| [039](039-documentation-truth.md) | Docs truth: READMEs + lean 0.6 `wiki.md` handbook on the flagship API, migrate+compile drizzle examples, dead-link fixes, toolkit README, runbook erratum, `@deprecated` nudge | none | TODO |
-| [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | TODO |
-| [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | TODO |
-| [043](043-integration-e2e-harness.md) | Cross-package integration test (real drizzle + real UI) + optional Playwright E2E over `/examples` | 033, 042 | TODO |
-| [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | TODO |
-| [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | TODO |
-| [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | TODO |
-| [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | TODO |
+| [037](037-cli-bundled-ui-source.md) | Bundle `ui/src` into the CLI tarball; `init` copies from disk (kills the mutable-`main` download) | 033 (same file) | DONE (wave-b branch) |
+| [038](038-operator-column-type-single-source.md) | Single-source the operator + `ColumnType` tables (kill the 4-way drift); option equality canonicalized to `is`/`isNot` | none | DONE (wave-b branch) |
+| [039](039-documentation-truth.md) | Docs truth: READMEs + lean 0.6 `wiki.md` handbook on the flagship API, migrate+compile drizzle examples, dead-link fixes, toolkit README, runbook erratum, `@deprecated` nudge | none | DONE (wave-b branch) |
+| [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | DONE (wave-b branch) |
+| [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | DONE (wave-b-quality-hardening, 91 tests) |
+| [043](043-integration-e2e-harness.md) | Cross-package integration test (real drizzle + real UI) + optional Playwright E2E over `/examples` | 033, 042 | DONE (wave-b branch; Playwright E2E deferred — not trivially wired) |
+| [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | DONE (wave-b-quality-hardening) |
+| [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | DONE (wave-b branch) |
+| [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | DONE (wave-b branch) |
+| [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | DONE (wave-b branch) |
 
 ### Wave C — direction / fast-follow (post-0.6-publish)
 
@@ -124,8 +127,8 @@ Audit/scope calls:
 - Operator equality spelling = **`is`/`isNot`** (plan 038).
 - Facet queries default to **top-100 by count**, `limit: null` opts out
   (plan 040).
-- Local quality gates = **no git hooks**; clear Biome residue and flip CI lint
-  **blocking** instead (plan 052).
+- Local quality gates = **no git hooks**; Biome residue cleared and CI lint
+  **blocking** (plan 052 — DONE on wave-b branch).
 - Bun pin **aligned to current ≥1.3.11** (plan 052).
 - `wiki.md` → **lean hand-written 0.6 handbook**, old wiki archived out of the
   agent path (plan 039).
@@ -158,15 +161,14 @@ Audit/scope calls:
   fixed by `bunfig.toml` pinning `linker = "hoisted"` + clean reinstall.
   (Plan 052 aligns the CI/`packageManager` pin up to ≥1.3.11.)
 - CI: first real run happens when the git remote is restored. Lint step is
-  `continue-on-error` until Biome residue hits 0 — plan 052 clears the residue
-  and flips it blocking.
+  **blocking** (plan 052 cleared Biome residue to 0 errors).
 - mysql-operations intentionally un-deduped (no RETURNING support —
   documented dialect difference, not drift).
 - `apps/docs/.next` survives on disk as untracked, gitignored cruft from the
-  5319fb1 removal — safe to `rm -rf` (plan 052 handles the `next typegen`
-  poisoning of marketing typecheck).
-- Biome residue at `787a816`: `bunx biome check .` → 44 errors / 78 warnings
-  (core/cli/adapters; ui + marketing clean) — plan 052's target is 0 errors.
+  5319fb1 removal — safe to `rm -rf`. Marketing typecheck prepends
+  `next typegen` (plan 052) so stale `.next/types` cannot poison `tsc`.
+- Biome: `bunx biome check .` → **0 errors** (plan 052); 82 warnings remain
+  (mostly `noConsole` in CLI/examples/tests).
 
 ---
 

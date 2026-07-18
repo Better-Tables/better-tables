@@ -15,25 +15,11 @@ import type {
   FetchDataResult,
   TableAdapter,
 } from '../types/adapter';
-import type { ColumnType } from '../types/column';
+import { COLUMN_TYPES, type ColumnType } from '../types/column';
 import type { FilterOperator, FilterOption } from '../types/filter';
 import type { AdapterRequestBody, AdapterResponseBody } from './http-protocol';
 
-const ALL_COLUMN_TYPES: ColumnType[] = [
-  'text',
-  'number',
-  'date',
-  'boolean',
-  'option',
-  'multiOption',
-  'currency',
-  'percentage',
-  'url',
-  'email',
-  'phone',
-  'json',
-  'custom',
-];
+const ALL_COLUMN_TYPES: ColumnType[] = [...COLUMN_TYPES];
 
 /**
  * Default `meta` for an HTTP adapter. Capabilities actually live on the SERVER
@@ -103,6 +89,9 @@ export interface HttpAdapterConfig {
    * transport meta — the real capabilities live on the server adapter.
    */
   meta?: AdapterMeta;
+
+  /** TTL for facet-read dedup/cache; `0`/`false` disables. @default 2000 */
+  cacheTtlMs?: number | false;
 }
 
 /**
@@ -147,6 +136,11 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     throw new HttpAdapterError('No fetch implementation available; pass `fetch` in the config.');
   }
 
+  const cacheTtlMs =
+    config.cacheTtlMs === false || config.cacheTtlMs === 0 ? 0 : (config.cacheTtlMs ?? 2000);
+  const inFlight = new Map<string, Promise<unknown>>();
+  const resultCache = new Map<string, { result: unknown; expiresAt: number }>();
+
   async function resolveHeaders(): Promise<Record<string, string>> {
     const base = { 'content-type': 'application/json' };
     if (!config.headers) return base;
@@ -154,7 +148,7 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     return { ...base, ...extra };
   }
 
-  async function send(body: AdapterRequestBody, signal?: AbortSignal): Promise<unknown> {
+  async function performFetch(body: AdapterRequestBody, signal?: AbortSignal): Promise<unknown> {
     const response = await doFetch(config.url, {
       method: 'POST',
       headers: await resolveHeaders(),
@@ -178,6 +172,33 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     }
 
     return envelope.result;
+  }
+
+  async function send(body: AdapterRequestBody, signal?: AbortSignal): Promise<unknown> {
+    return performFetch(body, signal);
+  }
+
+  async function sendCacheable(body: AdapterRequestBody): Promise<unknown> {
+    const cacheKey = JSON.stringify(body);
+    if (cacheTtlMs > 0) {
+      const cached = resultCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) return cached.result;
+      let pending = inFlight.get(cacheKey);
+      if (pending) return pending;
+      pending = performFetch(body);
+      inFlight.set(cacheKey, pending);
+      try {
+        const result = await pending;
+        resultCache.set(cacheKey, { result, expiresAt: Date.now() + cacheTtlMs });
+        return result;
+      } catch (error) {
+        resultCache.delete(cacheKey);
+        throw error;
+      } finally {
+        inFlight.delete(cacheKey);
+      }
+    }
+    return performFetch(body);
   }
 
   return {
@@ -205,14 +226,12 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     async getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]> {
       const { signal, ...serializable } = params ?? {};
       const hasParams = Object.keys(serializable).length > 0;
-      const result = await send(
-        {
-          method: 'getFilterOptions',
-          columnId,
-          ...(hasParams ? { params: serializable } : {}),
-        },
-        signal
-      );
+      const body = {
+        method: 'getFilterOptions' as const,
+        columnId,
+        ...(hasParams ? { params: serializable } : {}),
+      };
+      const result = signal ? await send(body, signal) : await sendCacheable(body);
       return result as FilterOption[];
     },
 
@@ -222,29 +241,24 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     ): Promise<Map<string, number>> {
       const { signal, ...serializable } = params ?? {};
       const hasParams = Object.keys(serializable).length > 0;
-      const result = await send(
-        {
-          method: 'getFacetedValues',
-          columnId,
-          ...(hasParams ? { params: serializable } : {}),
-        },
-        signal
-      );
-      // The server sends a `Map` as its `[value, count][]` entries.
+      const body = {
+        method: 'getFacetedValues' as const,
+        columnId,
+        ...(hasParams ? { params: serializable } : {}),
+      };
+      const result = signal ? await send(body, signal) : await sendCacheable(body);
       return new Map(result as [string, number][]);
     },
 
     async getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]> {
       const { signal, ...serializable } = params ?? {};
       const hasParams = Object.keys(serializable).length > 0;
-      const result = await send(
-        {
-          method: 'getMinMaxValues',
-          columnId,
-          ...(hasParams ? { params: serializable } : {}),
-        },
-        signal
-      );
+      const body = {
+        method: 'getMinMaxValues' as const,
+        columnId,
+        ...(hasParams ? { params: serializable } : {}),
+      };
+      const result = signal ? await send(body, signal) : await sendCacheable(body);
       return result as [number, number];
     },
   };

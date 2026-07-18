@@ -1,7 +1,7 @@
-import { Suspense } from 'react';
 import { parseTableSearchParams } from '@better-tables/core';
-import { SourceView } from '@/components/sections/source-view';
+import { Suspense } from 'react';
 import { QueryGroupsWorkspace } from '@/components/sections/query-groups-workspace';
+import { SourceView } from '@/components/sections/source-view';
 import { readSourceFile } from '@/lib/demo/read-source';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { constructMetadata } from '@/lib/utils';
@@ -53,7 +53,9 @@ export default async function QueryGroupsPage({ searchParams }: QueryGroupsPageP
         </p>
       </div>
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}>
+      <Suspense
+        fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}
+      >
         <QueryGroupsWorkspace fetchResult={fetchResult} activePresetId={params.preset ?? null} />
       </Suspense>
 

@@ -39,13 +39,17 @@ Better Tables revolutionizes how you work with relational data:
 The real power comes from how Better Tables handles relationships automatically:
 
 ```tsx
-// You define columns that access related data
-const columns = [
-  cb.text().id('name').accessor(u => u.name).build(),
-  // This automatically creates the JOIN and filters work on it!
-  cb.text().id('profile.location').accessor(u => u.profile?.location).build(),
-  cb.text().id('posts.title').accessor(u => u.posts?.[0]?.title).build(),
-];
+import { betterTables, defineTable } from '@better-tables/core';
+
+export const tables = betterTables({ database: drizzleAdapter(db) });
+
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name'),
+    t.text('profile.location'),
+    t.text('posts.title'),
+  ],
+}));
 
 // The Drizzle adapter automatically:
 // 1. Detects the relationships
@@ -80,35 +84,31 @@ bunx better-tables init
 
 ### Your First Table
 
+Upgrading from 0.5? See [MIGRATION.md](MIGRATION.md) for the flagship `betterTables()` + `defineTable()` API.
+
 ```tsx
 import { BetterTable } from '@/components/better-tables-ui/table/table';
-import { createColumnBuilder } from '@better-tables/core';
+import { betterTables, defineTable } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'editor' | 'viewer';
-  status: 'active' | 'inactive';
-}
+export const tables = betterTables({ database: drizzleAdapter(db) });
 
-const cb = createColumnBuilder<User>();
-
-const columns = [
-  cb.text().id('name').displayName('Name').accessor(u => u.name).build(),
-  cb.text().id('email').displayName('Email').accessor(u => u.email).build(),
-  cb.option().id('role').displayName('Role').accessor(u => u.role)
-    .options([
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name').displayName('Name').filterable().sortable(),
+    t.text('email').displayName('Email').filterable().sortable(),
+    t.option('role').displayName('Role').options([
       { value: 'admin', label: 'Admin' },
       { value: 'editor', label: 'Editor' },
       { value: 'viewer', label: 'Viewer' },
-    ]).build(),
-];
+    ]).filterable().sortable(),
+  ],
+}));
 
 function UserTable() {
   return (
     <BetterTable
-      columns={columns}
+      columns={usersTable.columns}
       data={users}
       features={{
         filtering: true,
@@ -132,12 +132,13 @@ function UserTable() {
 The crown jewel of Better Tables: filter across relationships without writing JOIN queries.
 
 ```tsx
-// Define columns that touch multiple tables
-const columns = [
-  cb.text().id('name').accessor(u => u.name).build(),
-  cb.text().id('profile.location').accessor(u => u.profile?.location).build(),
-  cb.number().id('posts.count').accessor(u => u.posts?.length || 0).build(),
-];
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name'),
+    t.text('profile.location'),
+    t.computed('posts_count', (u) => u.posts?.length ?? 0).displayName('Posts'),
+  ],
+}));
 
 // Filter by location - automatically creates the JOIN!
 // SELECT users.*, profiles.location 
@@ -234,39 +235,31 @@ Every filter, sort, and pagination state syncs to the URL. Users can bookmark an
 Build complex tables with a fluent, type-safe API.
 
 ```tsx
-const columns = [
-  // Text column with search
-  cb.text()
-    .id('name')
-    .displayName('Full Name')
-    .accessor(user => `${user.firstName} ${user.lastName}`)
-    .searchable()
-    .sortable()
-    .build(),
-
-  // Option column with badges
-  cb.option()
-    .id('status')
-    .accessor(u => u.status)
-    .options([
-      { value: 'active', label: 'Active', color: 'green' },
-      { value: 'inactive', label: 'Inactive', color: 'red' },
-    ])
-    .showBadges({ variant: 'default' })
-    .build(),
-
-  // Custom cell renderer
-  cb.text()
-    .id('actions')
-    .accessor(() => null)
-    .cellRenderer(({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuItem onClick={() => editUser(row.id)}>Edit</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => deleteUser(row.id)}>Delete</DropdownMenuItem>
-      </DropdownMenu>
-    ))
-    .build(),
-];
+defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.computed('fullName', (user) => `${user.firstName} ${user.lastName}`)
+      .displayName('Full Name')
+      .searchable()
+      .sortable(),
+    t.option('status')
+      .options([
+        { value: 'active', label: 'Active', color: 'green' },
+        { value: 'inactive', label: 'Inactive', color: 'red' },
+      ])
+      .showBadges({ variant: 'default' }),
+    t.custom()
+      .id('actions')
+      .displayName('Actions')
+      .accessor(() => null)
+      .cellRenderer(({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuItem onClick={() => editUser(row.id)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => deleteUser(row.id)}>Delete</DropdownMenuItem>
+        </DropdownMenu>
+      ))
+      .build(),
+  ],
+}));
 ```
 
 > [📸 **Screenshot: Table showing text search, option filters, and custom action cells**]
@@ -298,6 +291,7 @@ better-tables/
 - **@better-tables/ui** - Production-ready React components with shadcn/ui, copied into your project via the CLI
 - **@better-tables/cli** - `better-tables init` - copies and wires up the UI components
 - **@better-tables/adapters-drizzle** - **Automatic relationship detection and JOIN generation**
+- **@better-tables/adapters-toolkit** - ORM-agnostic adapter primitives (for adapter authors)
 
 ### How Automatic Relationships Work
 
@@ -328,6 +322,7 @@ Each package is independently versioned and can be used standalone or together.
 - **[@better-tables/cli](packages/cli/README.md)** - The `init` command and its options
 - **[@better-tables/adapters-drizzle](packages/adapters/drizzle/README.md)** - Drizzle ORM adapter
   - [Advanced Usage Guide](packages/adapters/drizzle/docs/ADVANCED_USAGE.md)
+- **[@better-tables/adapters-toolkit](packages/adapters/toolkit/README.md)** - Adapter toolkit (ORM-agnostic)
 - **[URL State Sync](packages/ui/docs/URL_SYNC.md)** - Framework-agnostic URL synchronization
 - **[Live Demo](apps/marketing)** - Marketing site with full interactive table demo (`#interactive-demo`)
 
@@ -343,28 +338,23 @@ Filter across relationships without writing SQL JOINs. This is what sets Better 
 
 ```tsx
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
-import { createColumnBuilder } from '@better-tables/core';
+import { betterTables, defineTable } from '@better-tables/core';
 
-// Set up adapter
 const db = drizzle(sqlite, { schema: { users, profiles, posts, usersRelations } });
-const adapter = drizzleAdapter(db);
+const tables = betterTables({ database: drizzleAdapter(db) });
 
-// Define columns that span multiple tables
-const cb = createColumnBuilder<UserWithRelations>();
-const columns = [
-  cb.text().id('name').accessor(u => u.name).build(),
-  cb.text().id('profile.location').accessor(u => u.profile?.location).build(),
-  cb.number().id('posts_count').accessor(u => u.posts?.length || 0).build(),
-  cb.text().id('profile.website').accessor(u => u.profile?.website).build(),
-];
+const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name'),
+    t.text('profile.location'),
+    t.computed('posts_count', (u) => u.posts?.length ?? 0).displayName('Posts'),
+    t.text('profile.website'),
+  ],
+}));
 
-// User filters by "profile.location" - automatic JOIN generated
-// User filters by "posts_count" - automatic COUNT and JOIN
-// All handled by the adapter, zero query writing required
-
-<BetterTable 
-  columns={columns} 
-  adapter={adapter}
+<BetterTable
+  columns={usersTable.columns}
+  adapter={tables.database}
   features={{ filtering: true, sorting: true }}
 />
 ```
@@ -381,19 +371,19 @@ The adapter automatically:
 ### Filtering with Multiple Types
 
 ```tsx
-const columns = [
-  cb.text().id('name').accessor(u => u.name).searchable().build(),
-  cb.number().id('age').accessor(u => u.age).range(18, 100).build(),
-  cb.option().id('role').accessor(u => u.role).options([
-    { value: 'admin', label: 'Admin' },
-    { value: 'editor', label: 'Editor' },
-  ]).build(),
-  cb.date().id('joined').accessor(u => u.joinedAt)
-    .dateRange({ includeNull: false }).build(),
-];
+const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name').searchable(),
+    t.number('age').range(18, 100),
+    t.option('role').options([
+      { value: 'admin', label: 'Admin' },
+      { value: 'editor', label: 'Editor' },
+    ]),
+    t.date('joinedAt').displayName('Joined').dateRange({ includeNull: false }),
+  ],
+}));
 
-// Automatically generates appropriate filter UIs for each type
-<BetterTable columns={columns} data={users} features={{ filtering: true }} />
+<BetterTable columns={usersTable.columns} data={users} features={{ filtering: true }} />
 ```
 
 > [📸 **Screenshot: Filter bar showing text input, number range, select dropdown, and date picker**]
@@ -401,17 +391,14 @@ const columns = [
 ### Custom Cell Rendering
 
 ```tsx
-cb.text()
-  .id('avatar')
+t.text('name')
   .displayName('User')
-  .accessor(u => u.name)
   .cellRenderer(({ value, row }) => (
     <div className="flex items-center gap-2">
       <img src={row.avatarUrl} alt={value} className="w-8 h-8 rounded-full" />
       <span>{value}</span>
     </div>
-  ))
-  .build(),
+  )),
 ```
 
 > [📸 **Screenshot: Table row with custom avatar cell**]
@@ -486,6 +473,7 @@ See the "How to Contribute" steps above, and open an issue first for larger chan
 | `@better-tables/ui` | ✅ Ready | React components and hooks, distributed via the CLI (not on npm) |
 | `@better-tables/cli` | ✅ Ready | `better-tables init` - copies UI components into your project |
 | `@better-tables/adapters-drizzle` | ✅ Ready | Drizzle ORM integration |
+| `@better-tables/adapters-toolkit` | ✅ Ready | ORM-agnostic adapter primitives |
 
 ### Roadmap (not yet started)
 

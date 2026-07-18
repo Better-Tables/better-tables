@@ -202,9 +202,7 @@ export function initCommand(): Command {
         } else {
           console.log(pc.yellow('\nSkipping shadcn component installation.\n'));
           console.log(
-            pc.dim(
-              'Note: Better Tables may not work correctly without all required components.\n'
-            )
+            pc.dim('Note: Better Tables may not work correctly without all required components.\n')
           );
         }
       } else {
@@ -240,9 +238,7 @@ export function initCommand(): Command {
       categories = copyResult.categories;
     } catch (error) {
       console.error(
-        pc.red(
-          `✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`
-        )
+        pc.red(`✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`)
       );
       console.error(pc.dim('  Check your network connection and GitHub access, then try again.'));
       process.exit(1);

@@ -140,25 +140,20 @@ const adapter = drizzleAdapter(db, {
 ### 4. Define Columns with Dot Notation
 
 ```typescript
-import { createColumnBuilder } from '@better-tables/core';
+import { betterTables, defineTable } from '@better-tables/core';
 
-const cb = createColumnBuilder<UserWithRelations>();
+export const tables = betterTables({ database: drizzleAdapter(db) });
 
-const columns = [
-  // Direct columns
-  cb.text().id('name').displayName('Name').accessor(user => user.name).build(),
-  cb.text().id('email').displayName('Email').accessor(user => user.email).build(),
-  
-  // One-to-one relationship
-  cb.text().id('profile.bio').displayName('Bio').accessor(user => user.profile?.bio).build(),
-  cb.text().id('profile.avatar').displayName('Avatar').accessor(user => user.profile?.avatar).build(),
-  
-  // One-to-many relationship (first post)
-  cb.text().id('posts.title').displayName('Latest Post').accessor(user => user.posts?.[0]?.title).build(),
-  
-  // Aggregate columns
-  cb.number().id('posts_count').displayName('Post Count').accessor(user => user.posts?.length || 0).build(),
-];
+export const usersTable = defineTable<typeof tables>()('users', (t) => ({
+  columns: [
+    t.text('name').displayName('Name'),
+    t.text('email').displayName('Email'),
+    t.text('profile.bio').displayName('Bio'),
+    t.text('profile.avatar').displayName('Avatar'),
+    t.text('posts.title').displayName('Latest Post'),
+    t.computed('posts_count', (user) => user.posts?.length ?? 0).displayName('Post Count'),
+  ],
+}));
 ```
 
 ### 5. Use with Better Tables
@@ -1014,9 +1009,9 @@ See the [live demo in the marketing site](../../apps/marketing) for a complete w
 For detailed documentation, see:
 
 - **[Core Package README](../core/README.md)** - Column builders and state management
-- **[Getting Started Guide](../../docs/GETTING_STARTED.md)** - Installation and setup
-- **[Adapters Architecture](../../docs/adapters/ADAPTERS_ARCHITECTURE.md)** - How adapters work
+- **[MIGRATION.md](../../MIGRATION.md)** - 0.6 flagship API upgrade guide
 - **[Advanced Usage](./docs/ADVANCED_USAGE.md)** - Advanced patterns and examples
+- **[Adapter toolkit](../toolkit/README.md)** - ORM-agnostic adapter machinery
 
 ## Contributing
 
@@ -1032,7 +1027,7 @@ Contributions are welcome! This is an open-source project, and we appreciate any
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
-See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 

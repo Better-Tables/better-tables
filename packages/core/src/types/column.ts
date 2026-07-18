@@ -4,31 +4,34 @@ import type { IconComponent, RenderProps } from './common';
 import type { FilterConfig } from './filter';
 
 /**
+ * Runtime list of every {@link ColumnType}. Single source of truth — the type
+ * below is derived from this array so the two can't drift.
+ */
+export const COLUMN_TYPES = [
+  'text',
+  'number',
+  'date',
+  'boolean',
+  'option',
+  'multiOption',
+  'currency',
+  'percentage',
+  'url',
+  'email',
+  'phone',
+  'json',
+  'custom',
+] as const;
+
+/**
  * Column types supported by the table
  */
-export type ColumnType =
-  | 'text'
-  | 'number'
-  | 'date'
-  | 'boolean'
-  | 'option'
-  | 'multiOption'
-  | 'currency'
-  | 'percentage'
-  | 'url'
-  | 'email'
-  | 'phone'
-  | 'json'
-  | 'custom';
+export type ColumnType = (typeof COLUMN_TYPES)[number];
 
 /**
  * Column definition for table columns
  */
-export interface ColumnDefinition<
-  TData = unknown,
-  TValue = unknown,
-  TId extends string = string,
-> {
+export interface ColumnDefinition<TData = unknown, TValue = unknown, TId extends string = string> {
   /** Unique column identifier */
   id: TId;
 

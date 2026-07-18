@@ -450,8 +450,8 @@ export class DrizzlePredicateEmitter
       if (['isAnyOf', 'isNoneOf'].includes(operator)) {
         return undefined;
       }
-      // For equals/notEquals, we need at least one value
-      if (['equals', 'notEquals'].includes(operator)) {
+      // For equality operators (canonical is/isNot + equals/notEquals aliases)
+      if (['is', 'isNot', 'equals', 'notEquals'].includes(operator)) {
         return undefined;
       }
     }
@@ -526,11 +526,13 @@ export class DrizzlePredicateEmitter
         }
         return notInArray(column, validValuesForNone);
       }
+      case 'is':
       case 'equals':
         if (values[0] === undefined) {
           return undefined;
         }
         return eq(column, values[0]);
+      case 'isNot':
       case 'notEquals':
         if (values[0] === undefined) {
           return undefined;

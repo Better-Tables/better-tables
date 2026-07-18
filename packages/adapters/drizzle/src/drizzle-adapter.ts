@@ -52,9 +52,7 @@
 
 import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import type {
-  AdapterFeatures,
   AdapterMeta,
-  ColumnType,
   DataEvent,
   ExportParams,
   ExportResult,
@@ -63,13 +61,15 @@ import type {
   FetchDataResult,
   FilterGroupNode,
   FilterNode,
-  FilterOperator,
   FilterOption,
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
 import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import { AdapterCache } from './adapter-cache';
+import { buildAdapterMeta } from './adapter-meta';
+import { convertToExportFormat, getMimeType } from './export-format';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
@@ -151,14 +151,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   private primaryTableResolver: PrimaryTableResolver<AnyTableType>;
   private queryBuilder: BaseQueryBuilder;
   private dataTransformer: DataTransformer<AnyTableType>;
-  private cache: Map<
-    string,
-    {
-      value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>;
-      timestamp: number;
-      ttl: number;
-    }
-  > = new Map();
+  private cache: AdapterCache<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>>;
   private subscribers: Array<
     (event: DataEvent<InferSelectModelFromFilteredSchema<TSchema>>) => void
   > = [];
@@ -234,6 +227,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     // Filter out relations from schema at runtime - schema may include both tables and relations
     this.schema = filterTablesFromSchema(config.schema) as FilterTablesFromSchema<TSchema>;
     this.options = config.options || {};
+    this.cache = new AdapterCache(this.options);
     if (config.hooks !== undefined) {
       this.hooks = config.hooks;
     }
@@ -298,7 +292,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     });
 
     // Initialize metadata
-    this.meta = this.buildAdapterMeta(config.meta);
+    this.meta = buildAdapterMeta(this.canResolveMutationTable(), config.meta);
   }
 
   /**
@@ -516,6 +510,8 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
             computedFieldFilters.push({ filter, config: computedField });
           }
         }
+      } else {
+        this.rejectComputedFieldFiltersInTree(processedFilters, tableComputedFields);
       }
 
       // Build cache params early (needed for error handling)
@@ -602,10 +598,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         // Note: computedFieldFilters are already in cache key (set above before processing)
         // This ensures different filter values produce different cache keys even when using filterSql
       }
-      const cacheKey = this.getCacheKey(cacheParams);
-      const cached = this.getFromCache(cacheKey);
+      const cacheKey = this.cache.getKey(cacheParams);
+      const cached = this.cache.get(cacheKey);
 
-      if (cached && !this.isCacheExpired(cacheKey)) {
+      if (cached && !this.cache.isExpired(cacheKey)) {
         // Mark as cached and add computed fields
         const resultWithComputed = await this.addComputedFields(
           cached,
@@ -765,7 +761,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       };
 
       // Cache result
-      this.setCache(cacheKey, result);
+      this.cache.set(cacheKey, result);
 
       return result;
     } catch (error) {
@@ -1038,7 +1034,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.executeInsert(mainTableSchema, data);
 
       this.emit({ type: 'insert', data: result });
-      this.invalidateCache();
+      this.cache.invalidate();
 
       return result;
     } catch (error) {
@@ -1073,7 +1069,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.executeUpdate(mainTableSchema, id, data);
 
       this.emit({ type: 'update', data: result });
-      this.invalidateCache();
+      this.cache.invalidate();
 
       return result;
     } catch (error) {
@@ -1104,7 +1100,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.executeDelete(mainTableSchema, id);
 
       this.emit({ type: 'delete', data: result });
-      this.invalidateCache();
+      this.cache.invalidate();
     } catch (error) {
       throw new QueryError(
         `Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -1136,7 +1132,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const results = await this.executeBulkUpdate(mainTableSchema, ids, data);
 
       this.emit({ type: 'update', data: results });
-      this.invalidateCache();
+      this.cache.invalidate();
 
       return results;
     } catch (error) {
@@ -1167,7 +1163,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const results = await this.executeBulkDelete(mainTableSchema, ids);
 
       this.emit({ type: 'delete', data: results });
-      this.invalidateCache();
+      this.cache.invalidate();
     } catch (error) {
       throw new QueryError(
         `Failed to bulk delete records: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -1192,12 +1188,15 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.fetchData(fetchParams);
 
       // Convert to export format
-      const exportData = this.convertToExportFormat(result.data, params.format);
+      const exportData = convertToExportFormat(
+        result.data as Record<string, unknown>[],
+        params.format
+      );
 
       return {
         data: exportData,
         filename: `export.${params.format}`,
-        mimeType: this.getMimeType(params.format),
+        mimeType: getMimeType(params.format),
       };
     } catch (error) {
       throw new QueryError(
@@ -1220,187 +1219,6 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         this.subscribers.splice(index, 1);
       }
     };
-  }
-
-  /**
-   * Build adapter metadata
-   */
-  private buildAdapterMeta(customMeta?: Partial<AdapterMeta>): AdapterMeta {
-    // Mutation actions are only safe to advertise when resolveMutationTable()
-    // can actually resolve a target table (single-table schema, or
-    // options.defaultMutationTable configured) - otherwise callers would hit
-    // a SchemaError at call time.
-    const mutationsResolvable = this.canResolveMutationTable();
-
-    const features: AdapterFeatures = {
-      create: mutationsResolvable,
-      read: true,
-      update: mutationsResolvable,
-      delete: mutationsResolvable,
-      bulkOperations: mutationsResolvable,
-      realTimeUpdates: true,
-      export: true,
-      transactions: true,
-    };
-
-    const supportedColumnTypes: ColumnType[] = [
-      'text',
-      'number',
-      'date',
-      'boolean',
-      'option',
-      'multiOption',
-      'currency',
-      'percentage',
-      'url',
-      'email',
-      'phone',
-      'json',
-      'custom',
-    ];
-
-    const supportedOperators: Record<ColumnType, FilterOperator[]> = {
-      text: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      number: [
-        'equals',
-        'notEquals',
-        'greaterThan',
-        'greaterThanOrEqual',
-        'lessThan',
-        'lessThanOrEqual',
-        'between',
-        'notBetween',
-        'isNull',
-        'isNotNull',
-      ],
-      date: [
-        'is',
-        'isNot',
-        'before',
-        'after',
-        'between',
-        'notBetween',
-        'isToday',
-        'isYesterday',
-        'isThisWeek',
-        'isThisMonth',
-        'isThisYear',
-        'isNull',
-        'isNotNull',
-      ],
-      boolean: ['isTrue', 'isFalse', 'isNull', 'isNotNull'],
-      option: ['equals', 'notEquals', 'isAnyOf', 'isNoneOf', 'isNull', 'isNotNull'],
-      multiOption: [
-        'includes',
-        'excludes',
-        'includesAny',
-        'includesAll',
-        'excludesAny',
-        'excludesAll',
-        'isNull',
-        'isNotNull',
-      ],
-      currency: [
-        'equals',
-        'notEquals',
-        'greaterThan',
-        'greaterThanOrEqual',
-        'lessThan',
-        'lessThanOrEqual',
-        'between',
-        'notBetween',
-        'isNull',
-        'isNotNull',
-      ],
-      percentage: [
-        'equals',
-        'notEquals',
-        'greaterThan',
-        'greaterThanOrEqual',
-        'lessThan',
-        'lessThanOrEqual',
-        'between',
-        'notBetween',
-        'isNull',
-        'isNotNull',
-      ],
-      url: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      email: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      phone: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      json: ['isNull', 'isNotNull'],
-      custom: ['isNull', 'isNotNull'],
-    };
-
-    return {
-      name: customMeta?.name || 'Drizzle Adapter',
-      version: customMeta?.version || '1.0.0',
-      features,
-      supportedColumnTypes,
-      supportedOperators,
-      // Truthful capability flag (design core-contract-v2.md §1.5, plan 017):
-      // the adapter translates FilterNode/FilterGroupNode trees to real
-      // AND/OR SQL (base-query-builder.ts's applyFilters ->
-      // FilterHandler.buildTreeCondition). maxGroupDepth mirrors core's own
-      // default nesting cap (utils/type-guards.ts) and is enforced again on
-      // entry in normalizeIncomingFilters -- defense in depth over core's
-      // URL-boundary normalization, since fetchData is a public API callers
-      // hit directly with unnormalized trees.
-      supportsFilterGroups: true,
-      maxGroupDepth: 3,
-      ...customMeta,
-    };
-  }
-
-  /**
-   * Cache management
-   */
-  private getCacheKey(
-    params: FetchDataParams & {
-      computedFields?: string[];
-      computedFieldFilters?: FilterState[];
-    }
-  ): string {
-    return JSON.stringify(params);
   }
 
   /**
@@ -1447,75 +1265,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     };
   }
 
-  private getFromCache(
-    key: string
-  ): FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>> | undefined {
-    const cached = this.cache.get(key);
-    if (!cached) return undefined;
-
-    const ttl = cached.ttl || this.options?.cache?.ttl || 300000;
-    if (Date.now() - cached.timestamp > ttl) {
-      this.cache.delete(key);
-      return undefined;
-    }
-
-    // LRU: re-insert so this key is most-recently-used.
-    this.cache.delete(key);
-    this.cache.set(key, cached);
-    return cached.value;
-  }
-
-  private setCache(
-    key: string,
-    value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>,
-    ttl?: number
-  ): void {
-    if (this.options?.cache?.enabled === false) {
-      return;
-    }
-
-    const maxSize = this.options?.cache?.maxSize ?? 500;
-    // Non-positive / non-finite capacity means no-cache (clear any residual).
-    if (!Number.isFinite(maxSize) || maxSize <= 0) {
-      this.cache.clear();
-      return;
-    }
-
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    }
-    while (this.cache.size >= maxSize) {
-      const oldest = this.cache.keys().next().value;
-      if (oldest === undefined) break;
-      this.cache.delete(oldest);
-    }
-
-    this.cache.set(key, {
-      value,
-      timestamp: Date.now(),
-      ttl: ttl || this.options?.cache?.ttl || 300000, // 5 minutes default
-    });
-  }
-
-  private isCacheExpired(key: string): boolean {
-    const cached = this.cache.get(key);
-    if (!cached) return true;
-
-    const ttl = cached.ttl || this.options?.cache?.ttl || 300000;
-    if (Date.now() - cached.timestamp > ttl) {
-      this.cache.delete(key);
-      return true;
-    }
-    return false;
-  }
-
-  private invalidateCache(): void {
-    this.cache.clear();
-  }
-
   /** Test/introspection helper — current in-memory cache entry count. */
   getCacheSizeForTests(): number {
-    return this.cache.size;
+    return this.cache.getSizeForTests();
   }
 
   /**
@@ -1530,6 +1282,32 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   /**
    * Utility methods
    */
+
+  /**
+   * Computed-field filter substitution (plan 017) only runs on flat
+   * `FilterState[]` inputs. Filter trees must fail loudly until the
+   * computed-fields owner extends substitution to walk `FilterGroupNode`
+   * trees (plan 051 — documented, not implemented here).
+   */
+  private rejectComputedFieldFiltersInTree(
+    node: FilterGroupNode,
+    tableComputedFields: ComputedFieldConfig[]
+  ): void {
+    for (const child of node.children) {
+      if (isFilterGroupNode(child)) {
+        this.rejectComputedFieldFiltersInTree(child, tableComputedFields);
+        continue;
+      }
+
+      const computedField = tableComputedFields.find((cf) => cf.field === child.columnId);
+      if (computedField?.filter || computedField?.filterSql) {
+        throw new QueryError(
+          `Computed-field filters inside a FilterGroupNode are not supported yet (columnId: "${child.columnId}"). Use a flat FilterState[] (implicit AND) for computed-field filters, or flatten the tree at the call site. See MIGRATION.md "Known gaps".`,
+          { columnId: child.columnId, field: computedField.field }
+        );
+      }
+    }
+  }
 
   /**
    * Depth of a {@link FilterNode}'s group nesting: a leaf is depth 0; a group
@@ -1649,63 +1427,5 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       primaryTable
     );
     return context.joinPaths.size;
-  }
-
-  private convertToExportFormat(
-    data: InferSelectModelFromFilteredSchema<TSchema>[],
-    format: string
-  ): Blob | string {
-    switch (format) {
-      case 'csv':
-        return this.convertToCSV(data);
-      case 'json':
-        return JSON.stringify(data, null, 2);
-      case 'excel':
-        // Would need a library like xlsx for this
-        throw new Error('Excel export not implemented');
-      default:
-        throw new Error(`Unsupported export format: ${format}`);
-    }
-  }
-
-  private convertToCSV(data: InferSelectModelFromFilteredSchema<TSchema>[]): string {
-    if (data.length === 0) return '';
-
-    const firstRecord = data[0];
-    if (!firstRecord || typeof firstRecord !== 'object') return '';
-
-    const headers = Object.keys(firstRecord);
-    const csvRows = [headers.join(',')];
-
-    for (const row of data) {
-      const values = headers.map((header) => {
-        const value = (row as Record<string, unknown>)[header];
-        if (typeof value === 'string') {
-          // Prevent CSV formula injection by prefixing with quote if starts with formula characters
-          const sanitizedValue = value.replace(/"/g, '""');
-          if (/^[=+\-@]/.test(value)) {
-            return `"'${sanitizedValue}"`;
-          }
-          return `"${sanitizedValue}"`;
-        }
-        return value;
-      });
-      csvRows.push(values.join(','));
-    }
-
-    return csvRows.join('\n');
-  }
-
-  private getMimeType(format: string): string {
-    switch (format) {
-      case 'csv':
-        return 'text/csv';
-      case 'json':
-        return 'application/json';
-      case 'excel':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      default:
-        return 'application/octet-stream';
-    }
   }
 }

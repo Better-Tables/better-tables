@@ -58,240 +58,242 @@ function generateTestTexts(count: number): string[] {
   return texts;
 }
 
-describe('DrizzleAdapter - PostgreSQL Large Array Integration Tests', () => {
-  const testConnectionString =
-    process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
-  let testDb: ReturnType<typeof createPostgresDatabase>['db'];
-  let client: ReturnType<typeof createPostgresDatabase>['client'];
-  let adapter: DrizzleAdapter<typeof testSchema, 'postgres'>;
+describe.skipIf(!process.env.POSTGRES_TEST_URL)(
+  'DrizzleAdapter - PostgreSQL Large Array Integration Tests',
+  () => {
+    const testConnectionString = process.env.POSTGRES_TEST_URL!;
+    let testDb: ReturnType<typeof createPostgresDatabase>['db'];
+    let client: ReturnType<typeof createPostgresDatabase>['client'];
+    let adapter: DrizzleAdapter<typeof testSchema, 'postgres'>;
 
-  beforeAll(async () => {
-    // Ensure test database exists
-    await ensurePostgresDatabase(testConnectionString);
+    beforeAll(async () => {
+      // Ensure test database exists
+      await ensurePostgresDatabase(testConnectionString);
 
-    // Create database connection
-    const dbSetup = createPostgresDatabase(testConnectionString);
-    testDb = dbSetup.db;
-    client = dbSetup.client;
+      // Create database connection
+      const dbSetup = createPostgresDatabase(testConnectionString);
+      testDb = dbSetup.db;
+      client = dbSetup.client;
 
-    // Create adapter
-    adapter = new DrizzleAdapter({
-      db: testDb as unknown as DrizzleDatabase<'postgres'>,
-      schema: testSchema,
-      driver: 'postgres',
-    });
+      // Create adapter
+      adapter = new DrizzleAdapter({
+        db: testDb as unknown as DrizzleDatabase<'postgres'>,
+        schema: testSchema,
+        driver: 'postgres',
+      });
 
-    // Create test table
-    await testDb.execute(`
+      // Create test table
+      await testDb.execute(`
       CREATE TABLE IF NOT EXISTS test_users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email TEXT NOT NULL,
         name TEXT
       );
     `);
-  });
+    });
 
-  afterAll(async () => {
-    if (testDb) {
-      await testDb.execute(`DROP TABLE IF EXISTS test_users;`);
-    }
-    if (client) {
-      await closePostgresDatabase(client);
-    }
-    // Optionally drop the test database
-    // await dropPostgresDatabase(testConnectionString);
-  });
-
-  describe('Large Array Filtering with isAnyOf', () => {
-    it('should handle 1,000 values without errors', async () => {
-      // Insert test data using parameterized queries
-      const testIds = generateTestUUIDs(1000);
-      for (const id of testIds.slice(0, 100)) {
-        // Insert a subset for testing using parameterized query
-        await testDb.execute(
-          sql`INSERT INTO test_users (id, email, name) VALUES (${id}::uuid, 'test@example.com', 'Test User') ON CONFLICT DO NOTHING`
-        );
+    afterAll(async () => {
+      if (testDb) {
+        await testDb.execute(`DROP TABLE IF EXISTS test_users;`);
       }
-
-      // Test filter with 1000 values
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
-      // Should not throw "bind message has X parameter formats but 0 parameters" error
-    });
-
-    it('should handle 5,000 values without errors', async () => {
-      const testIds = generateTestUUIDs(5000);
-
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
-    });
-
-    it('should handle 15,000 values without errors (reported error size)', async () => {
-      const testIds = generateTestUUIDs(15000);
-
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
-      // This is the size that was causing the original error
-    });
-
-    it('should handle 50,000 values without errors (stress test)', async () => {
-      const testIds = generateTestUUIDs(50000);
-
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
-    });
-
-    it('should handle text column with large array', async () => {
-      // Insert test data with known emails using parameterized queries
-      const testEmails = generateTestTexts(100);
-      for (let i = 0; i < 100; i++) {
-        await testDb.execute(
-          sql`INSERT INTO test_users (id, email, name) VALUES (gen_random_uuid(), ${testEmails[i]}, 'Test User') ON CONFLICT DO NOTHING`
-        );
+      if (client) {
+        await closePostgresDatabase(client);
       }
-
-      // Test with large array of emails
-      const largeEmailArray = generateTestTexts(15000);
-
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'email',
-            operator: 'isAnyOf',
-            values: largeEmailArray,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
-    });
-  });
-
-  describe('Large Array Filtering with isNoneOf', () => {
-    it('should handle 15,000 values without errors', async () => {
-      const testIds = generateTestUUIDs(15000);
-
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isNoneOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
-    });
-  });
-
-  describe('Boundary Conditions', () => {
-    it('should use inArray for exactly 1000 values', async () => {
-      const testIds = generateTestUUIDs(1000);
-
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
+      // Optionally drop the test database
+      // await dropPostgresDatabase(testConnectionString);
     });
 
-    it('should use large array handler for 1001 values', async () => {
-      const testIds = generateTestUUIDs(1001);
+    describe('Large Array Filtering with isAnyOf', () => {
+      it('should handle 1,000 values without errors', async () => {
+        // Insert test data using parameterized queries
+        const testIds = generateTestUUIDs(1000);
+        for (const id of testIds.slice(0, 100)) {
+          // Insert a subset for testing using parameterized query
+          await testDb.execute(
+            sql`INSERT INTO test_users (id, email, name) VALUES (${id}::uuid, 'test@example.com', 'Test User') ON CONFLICT DO NOTHING`
+          );
+        }
 
-      const result = await adapter.fetchData({
-        columns: ['id', 'email'],
-        filters: [
-          {
-            columnId: 'id',
-            operator: 'isAnyOf',
-            values: testIds,
-            type: 'option',
-          },
-        ],
-        pagination: { page: 1, limit: 10 },
-        primaryTable: 'testUsers',
+        // Test filter with 1000 values
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isAnyOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+        // Should not throw "bind message has X parameter formats but 0 parameters" error
       });
 
-      expect(result).toBeDefined();
-      expect(result.data).toBeDefined();
+      it('should handle 5,000 values without errors', async () => {
+        const testIds = generateTestUUIDs(5000);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isAnyOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+      });
+
+      it('should handle 15,000 values without errors (reported error size)', async () => {
+        const testIds = generateTestUUIDs(15000);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isAnyOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+        // This is the size that was causing the original error
+      });
+
+      it('should handle 50,000 values without errors (stress test)', async () => {
+        const testIds = generateTestUUIDs(50000);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isAnyOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+      });
+
+      it('should handle text column with large array', async () => {
+        // Insert test data with known emails using parameterized queries
+        const testEmails = generateTestTexts(100);
+        for (let i = 0; i < 100; i++) {
+          await testDb.execute(
+            sql`INSERT INTO test_users (id, email, name) VALUES (gen_random_uuid(), ${testEmails[i]}, 'Test User') ON CONFLICT DO NOTHING`
+          );
+        }
+
+        // Test with large array of emails
+        const largeEmailArray = generateTestTexts(15000);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'email',
+              operator: 'isAnyOf',
+              values: largeEmailArray,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+      });
     });
-  });
-});
+
+    describe('Large Array Filtering with isNoneOf', () => {
+      it('should handle 15,000 values without errors', async () => {
+        const testIds = generateTestUUIDs(15000);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isNoneOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+      });
+    });
+
+    describe('Boundary Conditions', () => {
+      it('should use inArray for exactly 1000 values', async () => {
+        const testIds = generateTestUUIDs(1000);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isAnyOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+      });
+
+      it('should use large array handler for 1001 values', async () => {
+        const testIds = generateTestUUIDs(1001);
+
+        const result = await adapter.fetchData({
+          columns: ['id', 'email'],
+          filters: [
+            {
+              columnId: 'id',
+              operator: 'isAnyOf',
+              values: testIds,
+              type: 'option',
+            },
+          ],
+          pagination: { page: 1, limit: 10 },
+          primaryTable: 'testUsers',
+        });
+
+        expect(result).toBeDefined();
+        expect(result.data).toBeDefined();
+      });
+    });
+  }
+);

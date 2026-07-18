@@ -54,9 +54,7 @@ export function OptionFilterInput<TData = unknown>({
   const handleToggleOption = React.useCallback(
     (value: string, checked: boolean) => {
       if (allowsMultiple) {
-        onChange(
-          checked ? [...selectedValues, value] : selectedValues.filter((v) => v !== value)
-        );
+        onChange(checked ? [...selectedValues, value] : selectedValues.filter((v) => v !== value));
         return;
       }
       onChange(checked ? [value] : []);
@@ -119,7 +117,9 @@ export function OptionFilterInput<TData = unknown>({
                   {OptionIcon && <OptionIcon className="size-3.5 text-muted-foreground" />}
                   <span className="flex-1">{option.label}</span>
                   {option.count !== undefined && (
-                    <span className="text-xs text-muted-foreground tabular-nums">{option.count}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {option.count}
+                    </span>
                   )}
                 </Label>
               );
@@ -149,7 +149,9 @@ export function OptionFilterInput<TData = unknown>({
                   {OptionIcon && <OptionIcon className="size-3.5 text-muted-foreground" />}
                   <span className="flex-1">{option.label}</span>
                   {option.count !== undefined && (
-                    <span className="text-xs text-muted-foreground tabular-nums">{option.count}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {option.count}
+                    </span>
                   )}
                 </Label>
               );

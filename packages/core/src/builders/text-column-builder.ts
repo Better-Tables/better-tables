@@ -50,8 +50,7 @@ export class TextColumnBuilder<
    * @returns A `TextColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): TextColumnBuilder<TData, TValue, K> {
-    this.config.id = id as unknown as TId;
-    return this as unknown as TextColumnBuilder<TData, TValue, K>;
+    return super.id(id) as unknown as TextColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -138,11 +137,7 @@ export class TextColumnBuilder<
   textOperators(
     operators: Array<'contains' | 'equals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty'>
   ): this {
-    this.config.filter = {
-      ...this.config.filter,
-      operators,
-    };
-    return this;
+    return this.applyOperators(operators);
   }
 
   /**

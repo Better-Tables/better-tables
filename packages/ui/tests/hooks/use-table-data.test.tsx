@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, jest } from 'bun:test';
 import type { FetchDataParams, FilterState } from '@better-tables/core';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useTableData } from '../../src/hooks/use-table-data';
@@ -151,7 +151,9 @@ describe('useTableData', () => {
 
     await act(async () => {
       inFlight.deferred.resolve(makeFetchResult([{ id: 'late' }]));
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      jest.useFakeTimers();
+      jest.advanceTimersByTime(0);
+      jest.useRealTimers();
     });
 
     expect(onUpdate.count).toBe(0);

@@ -18,6 +18,12 @@ import { ActiveFilters } from './active-filters';
 import { FilterButton } from './filter-button';
 import { FilterDropdown } from './filter-dropdown';
 
+function useLatest<T>(value: T): React.RefObject<T> {
+  const ref = React.useRef(value);
+  ref.current = value;
+  return ref;
+}
+
 export interface FilterBarTheme {
   /** Container styling */
   container?: string;
@@ -181,52 +187,50 @@ export function FilterBar<TData = unknown>({
 
   // Check if we've reached max filters
   const hasReachedMaxFilters = maxFilters !== undefined && filters.length >= maxFilters;
+  const filtersRef = useLatest(filters);
+  const onFiltersChangeRef = useLatest(onFiltersChange);
+  const columnsRef = useLatest(columns);
+  const hasReachedMaxFiltersRef = useLatest(hasReachedMaxFilters);
 
-  const handleAddFilter = React.useCallback(
-    (columnId: string) => {
-      const column = columns.find((col) => col.id === columnId);
-      if (!column || hasReachedMaxFilters) return;
+  const handleAddFilter = React.useCallback((columnId: string) => {
+    const column = columnsRef.current.find((col) => col.id === columnId);
+    if (!column || hasReachedMaxFiltersRef.current) return;
 
-      // Use first custom operator if available, otherwise use default for column type
-      const customOperators = column.filter?.operators;
-      const defaultOperator =
-        (customOperators && customOperators.length > 0
-          ? customOperators[0]
-          : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
+    // Use first custom operator if available, otherwise use default for column type
+    const customOperators = column.filter?.operators;
+    const defaultOperator =
+      (customOperators && customOperators.length > 0
+        ? customOperators[0]
+        : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
 
-      // `column.type`/`defaultOperator` are widened (`ColumnType`/`FilterOperator`)
-      // at this dynamic call site -- there's no single column known at compile
-      // time to narrow `FilterState`'s per-type `operator` field against (plan
-      // 031 Step 1). Runtime behavior is unchanged; `as FilterState` mirrors
-      // the same dynamic-merge cast `handleUpdateFilter` already uses below.
-      const newFilter = {
-        columnId,
-        type: column.type,
-        operator: defaultOperator,
-        values: [],
-      } as FilterState;
+    // `column.type`/`defaultOperator` are widened (`ColumnType`/`FilterOperator`)
+    // at this dynamic call site -- there's no single column known at compile
+    // time to narrow `FilterState`'s per-type `operator` field against (plan
+    // 031 Step 1). Runtime behavior is unchanged; `as FilterState` mirrors
+    // the same dynamic-merge cast `handleUpdateFilter` already uses below.
+    const newFilter = {
+      columnId,
+      type: column.type,
+      operator: defaultOperator,
+      values: [],
+    } as FilterState;
 
-      onFiltersChange([...filters, newFilter]);
-      setIsDropdownOpen(false);
-    },
-    [columns, hasReachedMaxFilters, filters, onFiltersChange]
-  );
+    onFiltersChangeRef.current([...filtersRef.current, newFilter]);
+    setIsDropdownOpen(false);
+  }, []);
 
-  const handleRemoveFilter = React.useCallback(
-    (columnId: string) => {
-      onFiltersChange(filters.filter((f) => f.columnId !== columnId));
-    },
-    [filters, onFiltersChange]
-  );
+  const handleRemoveFilter = React.useCallback((columnId: string) => {
+    onFiltersChangeRef.current(filtersRef.current.filter((f) => f.columnId !== columnId));
+  }, []);
 
   const handleUpdateFilter = React.useCallback(
     (columnId: string, updates: Partial<FilterState>) => {
-      const newFilters = filters.map((f) =>
+      const newFilters = filtersRef.current.map((f) =>
         f.columnId === columnId ? ({ ...f, ...updates } as FilterState) : f
       );
-      onFiltersChange(newFilters);
+      onFiltersChangeRef.current(newFilters);
     },
-    [filters, onFiltersChange]
+    []
   );
 
   const handleClearAll = React.useCallback(() => {
@@ -236,9 +240,9 @@ export function FilterBar<TData = unknown>({
       return;
     }
     // Otherwise, only clear non-protected filters (legacy behavior)
-    const protectedFilters = isFilterProtected ? filters.filter(isFilterProtected) : [];
-    onFiltersChange(protectedFilters);
-  }, [onReset, filters, isFilterProtected, onFiltersChange]);
+    const protectedFilters = isFilterProtected ? filtersRef.current.filter(isFilterProtected) : [];
+    onFiltersChangeRef.current(protectedFilters);
+  }, [onReset, isFilterProtected]);
 
   const hasFilters = React.useMemo(() => filters.length > 0, [filters.length]);
 

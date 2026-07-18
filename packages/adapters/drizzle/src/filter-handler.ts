@@ -39,7 +39,13 @@
  */
 
 import { FilterRouter, FilterRouterError } from '@better-tables/adapters-toolkit';
-import type { ColumnType, FilterGroupNode, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
+import type {
+  ColumnType,
+  FilterGroupNode,
+  FilterNode,
+  FilterOperator,
+  FilterState,
+} from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode, validateOperatorValues } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
 import { and, or, sql } from 'drizzle-orm';
@@ -360,7 +366,10 @@ export class FilterHandler {
             nullOnlyIntent ||
             (filter.values && filter.values.length >= expectedCount);
 
-          if (!hasValidValues || (expectedCount > 0 && filter.values.some((v) => v === undefined))) {
+          if (
+            !hasValidValues ||
+            (expectedCount > 0 && filter.values.some((v) => v === undefined))
+          ) {
             // Skip invalid filters silently - this allows for partial filter states in UI
             return undefined;
           }

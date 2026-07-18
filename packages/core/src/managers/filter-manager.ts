@@ -303,7 +303,9 @@ export class FilterManager<TData = unknown> extends Subscribable<FilterManagerEv
    * is currently flat or a tree.
    */
   private getFlatFilters(): FilterState[] {
-    return Array.isArray(this.filterNode) ? [...this.filterNode] : flattenFilterNode(this.filterNode);
+    return Array.isArray(this.filterNode)
+      ? [...this.filterNode]
+      : flattenFilterNode(this.filterNode);
   }
 
   /**

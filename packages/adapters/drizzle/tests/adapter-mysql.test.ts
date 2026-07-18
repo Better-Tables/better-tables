@@ -27,7 +27,7 @@ import { relationsSchema as testRelations, schema as testSchema } from './helper
  *
  * @skip These tests are skipped by default - database connection required
  */
-describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
+describe.skipIf(!process.env.MYSQL_TEST_URL)('DrizzleAdapter - MySQL [Integration Tests]', () => {
   let adapter: ReturnType<typeof createMySQLAdapter>;
   let testDb: Awaited<ReturnType<typeof createMySQLDatabase>>['db'];
   let connection: Awaited<ReturnType<typeof createMySQLDatabase>>['connection'];
@@ -36,12 +36,7 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
 
   beforeAll(async () => {
     // Drop database if exists, create it, and set up tables with seed data once
-    const envConnectionString = process.env.MYSQL_TEST_URL;
-    if (!envConnectionString) {
-      throw new Error('MYSQL_TEST_URL environment variable is required for MySQL tests');
-    }
-    connectionString = envConnectionString;
-
+    connectionString = process.env.MYSQL_TEST_URL!;
     databaseName = await ensureMySQLDatabase(connectionString);
 
     // Connect and set up tables with seed data
@@ -271,22 +266,19 @@ describe('DrizzleAdapter - MySQL [Integration Tests]', () => {
       expect(result.data.length).toBeGreaterThanOrEqual(2); // At least users with profiles
     });
 
-    it('should filter by text notEquals', async () => {
+    it('should fail-soft for text notEquals (not in core TEXT_OPERATORS, plan 038)', async () => {
+      // Plan 038 derives supportedOperators from core — text no longer
+      // advertises `notEquals`. Unsupported operators are fail-soft.
       const result = await adapter.fetchData({
-        // `notEquals` isn't in core's TEXT_OPERATORS (plan 031 Step 1), but this
-        // adapter's own `supportedOperators.text` intentionally lists it (SQL
-        // `<>` works for any column type) -- `as unknown as FilterState`
-        // preserves that adapter-level behavior/coverage unchanged.
         filters: [
           { columnId: 'name', type: 'text', operator: 'notEquals', values: ['John Doe'] },
         ] as unknown as FilterState[],
       });
-      // Note: notEquals may return all results if not properly implemented
-      // Just verify it returns data and doesn't crash
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
       const names = (result.data as UserWithRelations[]).map((r) => r.name);
       expect(names.length).toBeGreaterThan(0);
+      expect(adapter.meta.supportedOperators.text).not.toContain('notEquals');
     });
 
     it('should filter by text isNull', async () => {

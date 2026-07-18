@@ -49,8 +49,7 @@ export class DateColumnBuilder<
    * @returns A `DateColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): DateColumnBuilder<TData, TValue, K> {
-    this.config.id = id as unknown as TId;
-    return this as unknown as DateColumnBuilder<TData, TValue, K>;
+    return super.id(id) as unknown as DateColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -153,11 +152,7 @@ export class DateColumnBuilder<
       | 'isThisYear'
     >
   ): this {
-    this.config.filter = {
-      ...this.config.filter,
-      operators,
-    };
-    return this;
+    return this.applyOperators(operators);
   }
 
   /**

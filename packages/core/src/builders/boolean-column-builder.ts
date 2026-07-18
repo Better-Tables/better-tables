@@ -49,8 +49,7 @@ export class BooleanColumnBuilder<
    * @returns A `BooleanColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): BooleanColumnBuilder<TData, TValue, K> {
-    this.config.id = id as unknown as TId;
-    return this as unknown as BooleanColumnBuilder<TData, TValue, K>;
+    return super.id(id) as unknown as BooleanColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -89,11 +88,7 @@ export class BooleanColumnBuilder<
    * ```
    */
   booleanOperators(operators: Array<'isTrue' | 'isFalse' | 'isNull' | 'isNotNull'>): this {
-    this.config.filter = {
-      ...this.config.filter,
-      operators,
-    };
-    return this;
+    return this.applyOperators(operators);
   }
 
   /**

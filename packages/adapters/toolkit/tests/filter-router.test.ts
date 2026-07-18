@@ -12,6 +12,7 @@
 
 import { beforeEach, describe, expect, it } from 'bun:test';
 import type { FilterGroupNode, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
+import { COLUMN_TYPES, getOperatorsForType } from '@better-tables/core';
 import {
   computeDatePeriodRange,
   FilterRouter,
@@ -256,6 +257,33 @@ describe('FilterRouter', () => {
       expect(ops).toContain('isNotNull');
       expect(ops).not.toContain('between');
     });
+
+    it('getSupportedOperators(option) includes canonical is/isNot (plan 038)', () => {
+      const ops = router.getSupportedOperators('option');
+      expect(ops).toContain('is');
+      expect(ops).toContain('isNot');
+      expect(ops).toContain('isAnyOf');
+      expect(ops).toContain('isNoneOf');
+      expect(ops).toEqual(getOperatorsForType('option').map((o) => o.key));
+    });
+
+    it('routes option is/isNot to optionOperator, not dateOperator (plan 038)', () => {
+      router.mapOperatorToCondition({ name: 'status' }, 'is', ['open'], false, 'option');
+      expect(emitter.calls.at(-1)?.method).toBe('optionOperator');
+      expect(emitter.calls.at(-1)?.operator).toBe('is');
+
+      router.mapOperatorToCondition({ name: 'status' }, 'isNot', ['closed'], false, 'option');
+      expect(emitter.calls.at(-1)?.method).toBe('optionOperator');
+      expect(emitter.calls.at(-1)?.operator).toBe('isNot');
+    });
+
+    it('getSupportedOperators matches getOperatorsForType for every ColumnType (drift lock)', () => {
+      for (const type of COLUMN_TYPES) {
+        const fromRouter = router.getSupportedOperators(type);
+        const fromCore = getOperatorsForType(type).map((o) => o.key);
+        expect(fromRouter).toEqual(fromCore);
+      }
+    });
   });
 });
 
@@ -314,10 +342,7 @@ describe('FilterRouter.buildNodeCondition (plan 017 group translation)', () => {
     const node: FilterGroupNode = {
       kind: 'group',
       logic: 'or',
-      children: [
-        leaf('a'),
-        { kind: 'group', logic: 'and', children: [leaf('b'), leaf('c')] },
-      ],
+      children: [leaf('a'), { kind: 'group', logic: 'and', children: [leaf('b'), leaf('c')] }],
     };
     const result = router.buildNodeCondition(node, leafCondition);
     expect(result?.kind).toBe('or');

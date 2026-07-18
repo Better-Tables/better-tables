@@ -102,6 +102,7 @@ export interface ColumnFactory<TData = unknown> {
  *     .build(),
  * ];
  * ```
+ * @deprecated Use `defineTable()`/`t.*` — see MIGRATION.md
  */
 export function createColumnBuilder<TData = unknown>(): ColumnFactory<TData> {
   return {
@@ -155,6 +156,7 @@ export function createColumnBuilder<TData = unknown>(): ColumnFactory<TData> {
  * @template TData - The type of row data shared by every column
  * @returns A collector that accepts the tuple of built columns and returns the
  * value-type-erased array ready to hand to `<BetterTable columns={…} />`.
+ * @deprecated Use `defineTable()`/`t.*` — see MIGRATION.md
  */
 export function defineColumns<TData>() {
   return <const TColumns extends readonly unknown[]>(

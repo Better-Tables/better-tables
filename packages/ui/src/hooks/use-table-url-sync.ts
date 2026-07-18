@@ -24,11 +24,11 @@ const HYDRATION_MAX_ATTEMPTS = 5;
  * Debounce utility to batch rapid updates.
  * Returns a cancel function so timers can be cleared on unmount.
  */
-function debounce<T extends (args: Record<string, string | null>) => void>(
+function debounce<T extends (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void>(
   func: T,
   wait: number
 ): {
-  fn: (args: Record<string, string | null>) => void;
+  fn: (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void;
   cancel: () => void;
 } {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -40,11 +40,11 @@ function debounce<T extends (args: Record<string, string | null>) => void>(
     }
   };
 
-  const fn = (args: Record<string, string | null>) => {
+  const fn = (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => {
     cancel();
     timeoutId = setTimeout(() => {
       timeoutId = null;
-      func(args);
+      func(tableState);
     }, wait);
   };
 
@@ -293,12 +293,10 @@ export function useTableUrlSync(
     }
 
     const manager = store.getState().manager;
-    const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce(
-      (urlParams: Record<string, string | null>) => {
-        adapter.setParams(urlParams);
-      },
-      150
-    );
+    const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce((tableState) => {
+      const urlParams = serializeTableStateToUrl(tableState);
+      adapter.setParams(urlParams);
+    }, 150);
 
     const unsubscribe = manager.subscribe((event: TableStateEvent) => {
       if (!hasHydratedFromUrl.current) return;
@@ -331,8 +329,7 @@ export function useTableUrlSync(
           tableState.columnOrder = getColumnOrderModifications(columns, event.state.columnOrder);
         }
 
-        const urlParams = serializeTableStateToUrl(tableState);
-        debouncedUrlUpdate(urlParams);
+        debouncedUrlUpdate(tableState);
       }
     });
 

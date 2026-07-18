@@ -19,6 +19,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { FilterGroupNode, FilterNode, FilterState } from '@better-tables/core';
+import { buildAdapterMeta } from '../src/adapter-meta';
 import {
   closeDatabase,
   createTestAdapter,
@@ -45,6 +46,10 @@ describe('DrizzleAdapter - filter-group translation (plan 017)', () => {
   it('meta advertises supportsFilterGroups: true and maxGroupDepth: 3', () => {
     expect(adapter.meta.supportsFilterGroups).toBe(true);
     expect(adapter.meta.maxGroupDepth).toBe(3);
+  });
+
+  it('adapter.meta matches buildAdapterMeta for this adapter instance', () => {
+    expect(adapter.meta).toEqual(buildAdapterMeta(adapter.meta.features.create));
   });
 
   it('flat regression: a flat FilterState[] still returns the same rows/total as before', async () => {

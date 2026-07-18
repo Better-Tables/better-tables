@@ -1,12 +1,12 @@
 // TODO: Now we are type safe this can be updated to use the types from the schema
 // TODO: remove the any types
-import { createColumnBuilder } from '@better-tables/core';
-import type { RelationshipMap } from '@better-tables/drizzle';
+import { defineTableRow } from '@better-tables/core';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { DrizzleAdapter } from '../src/drizzle-adapter';
+import { drizzleAdapter } from '../src/factory';
+import type { RelationshipMap } from '../src/types';
 
 // Complex schema with many-to-many relationships
 const users = sqliteTable('users', {
@@ -239,255 +239,8 @@ type UserWithComputed = UserWithRelations & {
   project_summary?: string;
 };
 
-// Create a typed column builder
-const cb = createColumnBuilder<UserWithRelations>();
-
-// Advanced column definitions
-const columns = [
-  // Basic user info
-  cb
-    .text()
-    .id('name')
-    .displayName('Name')
-    .accessor((user) => user.name)
-    .build(),
-  cb
-    .text()
-    .id('email')
-    .displayName('Email')
-    .accessor((user) => user.email)
-    .build(),
-  cb
-    .date()
-    .id('createdAt')
-    .displayName('Joined')
-    .accessor((user) => user.createdAt)
-    .build(),
-
-  // Company information
-  cb
-    .text()
-    .id('company.name')
-    .displayName('Company')
-    .nullableAccessor((user) => user.company?.name)
-    .build(),
-  cb
-    .text()
-    .id('company.industry')
-    .displayName('Industry')
-    .nullableAccessor((user) => user.company?.industry)
-    .build(),
-  cb
-    .text()
-    .id('company.size')
-    .displayName('Company Size')
-    .nullableAccessor((user) => user.company?.size)
-    .build(),
-
-  // Department information
-  cb
-    .text()
-    .id('managedDepartments.name')
-    .displayName('Manages Department')
-    .nullableAccessor((user) => user.managedDepartments?.[0]?.name)
-    .build(),
-  cb
-    .number()
-    .id('managedDepartments.budget')
-    .displayName('Dept Budget')
-    .nullableAccessor((user) => user.managedDepartments?.[0]?.budget, 0)
-    .build(),
-
-  // Role information (many-to-many)
-  cb
-    .text()
-    .id('roles.name')
-    .displayName('Primary Role')
-    .nullableAccessor((user) => user.userRoles?.[0]?.role?.name)
-    .build(),
-  cb
-    .text()
-    .id('roles.level')
-    .displayName('Role Level')
-    .nullableAccessor((user) => user.userRoles?.[0]?.role?.level)
-    .build(),
-  cb
-    .number()
-    .id('roles_count')
-    .displayName('Role Count')
-    .accessor((user) => user.userRoles?.length || 0)
-    .build(),
-
-  // Project information (many-to-many)
-  cb
-    .text()
-    .id('userProjects.project.name')
-    .displayName('Current Project')
-    .nullableAccessor((user) => user.userProjects?.[0]?.project?.name)
-    .build(),
-  cb
-    .text()
-    .id('userProjects.role')
-    .displayName('Project Role')
-    .nullableAccessor((user) => user.userProjects?.[0]?.role)
-    .build(),
-  cb
-    .number()
-    .id('userProjects.hoursAllocated')
-    .displayName('Hours Allocated')
-    .nullableAccessor((user) => user.userProjects?.[0]?.hoursAllocated, 0)
-    .build(),
-  cb
-    .number()
-    .id('projects_count')
-    .displayName('Project Count')
-    .accessor((user) => user.userProjects?.length || 0)
-    .build(),
-
-  // Skills information (many-to-many)
-  cb
-    .text()
-    .id('userSkills.skill.name')
-    .displayName('Top Skill')
-    .nullableAccessor((user) => user.userSkills?.[0]?.skill?.name)
-    .build(),
-  cb
-    .text()
-    .id('userSkills.proficiency')
-    .displayName('Skill Level')
-    .nullableAccessor((user) => user.userSkills?.[0]?.proficiency)
-    .build(),
-  cb
-    .number()
-    .id('userSkills.yearsExperience')
-    .displayName('Experience Years')
-    .nullableAccessor((user) => user.userSkills?.[0]?.yearsExperience, 0)
-    .build(),
-  cb
-    .number()
-    .id('skills_count')
-    .displayName('Skills Count')
-    .accessor((user) => user.userSkills?.length || 0)
-    .build(),
-
-  // Complex aggregations
-  cb
-    .number()
-    .id('total_hours')
-    .displayName('Total Hours')
-    .accessor(
-      (user) =>
-        user.userProjects?.reduce(
-          (sum: number, up: UserProject) => sum + (up.hoursAllocated || 0),
-          0
-        ) || 0
-    )
-    .build(),
-
-  cb
-    .number()
-    .id('avg_experience')
-    .displayName('Avg Experience')
-    .accessor((user) => {
-      const skills = user.userSkills || [];
-      return skills.length > 0
-        ? skills.reduce((sum: number, us: UserSkill) => sum + (us.yearsExperience || 0), 0) /
-            skills.length
-        : 0;
-    })
-    .build(),
-
-  cb
-    .number()
-    .id('certified_skills')
-    .displayName('Certified Skills')
-    .accessor((user) => user.userSkills?.filter((us: UserSkill) => us.certified).length || 0)
-    .build(),
-
-  // Status indicators
-  cb
-    .boolean()
-    .id('is_manager')
-    .displayName('Is Manager')
-    .accessor((user) => (user.managedDepartments?.length || 0) > 0)
-    .build(),
-
-  cb
-    .boolean()
-    .id('is_senior')
-    .displayName('Is Senior')
-    .accessor(
-      (user) =>
-        user.userRoles?.some(
-          (ur: UserRole & { role?: Role }) =>
-            ur.role?.level === 'senior' || ur.role?.level === 'lead'
-        ) || false
-    )
-    .build(),
-
-  cb
-    .boolean()
-    .id('has_active_projects')
-    .displayName('Has Active Projects')
-    .accessor(
-      (user) =>
-        user.userProjects?.some(
-          (up: UserProject & { project?: Project }) => up.project?.status === 'active'
-        ) || false
-    )
-    .build(),
-
-  // Custom calculated fields
-  cb
-    .text()
-    .id('skill_summary')
-    .displayName('Skills')
-    .accessor((user) => {
-      const skills = user.userSkills || [];
-      const topSkills =
-        skills
-          .sort((a: UserSkill, b: UserSkill) => (b.yearsExperience || 0) - (a.yearsExperience || 0))
-          .slice(0, 3)
-          .map((us) => `${us.skill?.name} (${us.proficiency})`)
-          .join(', ') || 'No skills';
-      return topSkills || 'No skills';
-    })
-    .build(),
-
-  cb
-    .text()
-    .id('role_summary')
-    .displayName('Roles')
-    .accessor((user) => {
-      const roles = user.userRoles || [];
-      return (
-        roles
-          .map((ur: UserRole & { role?: Role }) => `${ur.role?.name} (${ur.role?.level})`)
-          .join(', ') || 'No roles'
-      );
-    })
-    .build(),
-
-  cb
-    .text()
-    .id('project_summary')
-    .displayName('Projects')
-    .accessor((user) => {
-      const projects = user.userProjects || [];
-      const activeProjects = projects.filter(
-        (up: UserProject & { project?: Project }) => up.project?.status === 'active'
-      );
-      return activeProjects.length > 0
-        ? activeProjects
-            .map((up: UserProject & { project?: Project }) => up.project?.name)
-            .join(', ')
-        : 'No active projects';
-    })
-    .build(),
-];
-
 // Custom relationship mappings for many-to-many
-const customRelationships = {
+const customRelationships: RelationshipMap = {
   // User -> Roles (through userRoles)
   'roles.name': {
     from: 'users',
@@ -543,9 +296,129 @@ const customRelationships = {
   },
 };
 
+function buildUsersTable(_db: ReturnType<typeof drizzle>) {
+  return defineTableRow<UserWithRelations>()('users', (t) => ({
+    columns: [
+      t.text('name').displayName('Name'),
+      t.text('email').displayName('Email'),
+      t.date('createdAt').displayName('Joined'),
+      t.text('company.name').displayName('Company'),
+      t.text('company.industry').displayName('Industry'),
+      t.text('company.size').displayName('Company Size'),
+      t.text('managedDepartments.name').displayName('Manages Department'),
+      t.number('managedDepartments.budget').displayName('Dept Budget'),
+      t
+        .computed('roles.name', (user) => user.userRoles?.[0]?.role?.name)
+        .displayName('Primary Role'),
+      t
+        .computed('roles.level', (user) => user.userRoles?.[0]?.role?.level)
+        .displayName('Role Level'),
+      t.computed('roles_count', (user) => user.userRoles?.length || 0).displayName('Role Count'),
+      t.text('userProjects.project.name').displayName('Current Project'),
+      t.text('userProjects.role').displayName('Project Role'),
+      t.number('userProjects.hoursAllocated').displayName('Hours Allocated'),
+      t
+        .computed('projects_count', (user) => user.userProjects?.length || 0)
+        .displayName('Project Count'),
+      t.text('userSkills.skill.name').displayName('Top Skill'),
+      t.text('userSkills.proficiency').displayName('Skill Level'),
+      t.number('userSkills.yearsExperience').displayName('Experience Years'),
+      t
+        .computed('skills_count', (user) => user.userSkills?.length || 0)
+        .displayName('Skills Count'),
+      t
+        .computed(
+          'total_hours',
+          (user) =>
+            user.userProjects?.reduce(
+              (sum: number, up: UserProject) => sum + (up.hoursAllocated || 0),
+              0
+            ) || 0
+        )
+        .displayName('Total Hours'),
+      t
+        .computed('avg_experience', (user) => {
+          const skills = user.userSkills || [];
+          return skills.length > 0
+            ? skills.reduce((sum: number, us: UserSkill) => sum + (us.yearsExperience || 0), 0) /
+                skills.length
+            : 0;
+        })
+        .displayName('Avg Experience'),
+      t
+        .computed(
+          'certified_skills',
+          (user) => user.userSkills?.filter((us: UserSkill) => us.certified).length || 0
+        )
+        .displayName('Certified Skills'),
+      t
+        .computed('is_manager', (user) => (user.managedDepartments?.length || 0) > 0)
+        .displayName('Is Manager'),
+      t
+        .computed(
+          'is_senior',
+          (user) =>
+            user.userRoles?.some(
+              (ur: UserRole & { role?: Role }) =>
+                ur.role?.level === 'senior' || ur.role?.level === 'lead'
+            ) || false
+        )
+        .displayName('Is Senior'),
+      t
+        .computed(
+          'has_active_projects',
+          (user) =>
+            user.userProjects?.some(
+              (up: UserProject & { project?: Project }) => up.project?.status === 'active'
+            ) || false
+        )
+        .displayName('Has Active Projects'),
+      t
+        .computed('skill_summary', (user) => {
+          const skills = user.userSkills || [];
+          const topSkills =
+            skills
+              .sort(
+                (a: UserSkill, b: UserSkill) => (b.yearsExperience || 0) - (a.yearsExperience || 0)
+              )
+              .slice(0, 3)
+              .map((us) => `${us.skill?.name} (${us.proficiency})`)
+              .join(', ') || 'No skills';
+          return topSkills || 'No skills';
+        })
+        .displayName('Skills'),
+      t
+        .computed('role_summary', (user) => {
+          const roles = user.userRoles || [];
+          return (
+            roles
+              .map((ur: UserRole & { role?: Role }) => `${ur.role?.name} (${ur.role?.level})`)
+              .join(', ') || 'No roles'
+          );
+        })
+        .displayName('Roles'),
+      t
+        .computed('project_summary', (user) => {
+          const projects = user.userProjects || [];
+          const activeProjects = projects.filter(
+            (up: UserProject & { project?: Project }) => up.project?.status === 'active'
+          );
+          return activeProjects.length > 0
+            ? activeProjects
+                .map((up: UserProject & { project?: Project }) => up.project?.name)
+                .join(', ')
+            : 'No active projects';
+        })
+        .displayName('Projects'),
+    ],
+  }));
+}
+let usersTable: ReturnType<typeof buildUsersTable> | undefined;
+let columns: ReturnType<typeof buildUsersTable>['columns'];
+
 async function setupComplexDatabase() {
   const sqlite = new Database(':memory:');
-  const db: any = drizzle(sqlite);
+  const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });
 
   // Create all tables
   await db.run(sql`CREATE TABLE companies (
@@ -718,37 +591,17 @@ async function setupComplexDatabase() {
   return { db, sqlite };
 }
 
-async function createAdvancedAdapter(): Promise<any> {
+async function createAdvancedAdapter(): Promise<{
+  adapter: ReturnType<typeof drizzleAdapter>;
+  sqlite: InstanceType<typeof Database>;
+}> {
   const { db, sqlite } = await setupComplexDatabase();
 
-  const adapter = new DrizzleAdapter({
-    db,
-    schema,
-    mainTable: 'users',
-    driver: 'sqlite',
-    autoDetectRelationships: false, // Use custom mappings
-    relationships: customRelationships as RelationshipMap,
-    options: {
-      cache: {
-        enabled: true,
-        ttl: 600000, // 10 minutes
-        maxSize: 2000,
-      },
-      optimization: {
-        maxJoins: 8, // Allow more joins for complex relationships
-        enableBatching: true,
-        batchSize: 500,
-      },
-      logging: {
-        enabled: true,
-        level: 'debug',
-        logQueries: true,
-      },
-      performance: {
-        trackTiming: true,
-        maxQueryTime: 10000,
-      },
-    },
+  usersTable = buildUsersTable(db);
+  columns = usersTable.columns;
+  const adapter = drizzleAdapter(db, {
+    relationships: customRelationships,
+    options: { defaultPrimaryTable: 'users', defaultMutationTable: 'users' },
   });
 
   return { adapter, sqlite };
@@ -853,11 +706,11 @@ async function runAdvancedExamples() {
     stats.totalProjects += user.projects_count || 0;
   });
   companyStats.forEach((_stats) => {});
-  const _perfResult = await adapter.fetchData({
+  await adapter.fetchData({
     columns: ['name', 'company.name', 'roles.name', 'skill_summary', 'project_summary'],
     sorting: [{ columnId: 'name', direction: 'asc' }],
   });
-  const _exportResult = await adapter.exportData({
+  await adapter.exportData({
     format: 'json',
     columns: [
       'name',
