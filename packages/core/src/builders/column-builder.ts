@@ -13,6 +13,7 @@ import type {
   CellRendererProps,
   ColumnDefinition,
   ColumnType,
+  EditableConfig,
   HeaderRendererProps,
   ValidationRule,
 } from '../types/column';
@@ -302,6 +303,15 @@ export class ColumnBuilder<TData = unknown, TValue = unknown, TId extends string
    */
   validation(rules: ValidationRule<TValue>[]): this {
     this.config.validation = rules;
+    return this;
+  }
+
+  /**
+   * Enable inline editing for this column. `editable()` uses defaults;
+   * pass a config for per-row gating, field mapping, or a custom editor.
+   */
+  editable(config: boolean | EditableConfig<TData, TValue> = true): this {
+    this.config.editable = config;
     return this;
   }
 

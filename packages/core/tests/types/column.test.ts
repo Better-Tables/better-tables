@@ -5,6 +5,8 @@ import type {
   ColumnOrder,
   ColumnType,
   ColumnVisibility,
+  EditableConfig,
+  EditRendererProps,
   HeaderRendererProps,
   ValidationRule,
 } from '../../src/types';
@@ -113,6 +115,49 @@ describe('Column Types', () => {
       }
       const firstRule = assertDefined(column.validation[0], 'expected a validation rule');
       expectTypeOf(firstRule.validate).toBeFunction();
+    });
+
+    it('should support editable config', () => {
+      type Row = { id: string; name: string };
+      const editable: EditableConfig<Row, string> = {
+        when: (row) => row.id !== 'locked',
+        field: 'name',
+        multiline: true,
+        placeholder: 'Name',
+      };
+
+      const column: ColumnDefinition<Row, string> = {
+        id: 'name',
+        displayName: 'Name',
+        accessor: (row) => row.name,
+        type: 'text',
+        editable,
+      };
+
+      expectTypeOf(column.editable).toEqualTypeOf<boolean | EditableConfig<Row, string> | undefined>();
+      expect(column.editable).toEqual(editable);
+    });
+  });
+
+  describe('EditRendererProps', () => {
+    it('should expose commit and cancel', () => {
+      type Row = { id: string; name: string };
+      const props: EditRendererProps<Row, string> = {
+        value: 'Ada',
+        row: { id: '1', name: 'Ada' },
+        column: {
+          id: 'name',
+          displayName: 'Name',
+          accessor: (row) => row.name,
+          type: 'text',
+        },
+        commit: (_value) => undefined,
+        cancel: () => undefined,
+      };
+
+      expectTypeOf(props.commit).toEqualTypeOf<(value: string) => void>();
+      expectTypeOf(props.cancel).toEqualTypeOf<() => void>();
+      expectTypeOf(props.value).toEqualTypeOf<string>();
     });
   });
 

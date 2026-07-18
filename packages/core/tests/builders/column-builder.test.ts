@@ -98,6 +98,99 @@ describe('Column Builder System', () => {
       expect(column.align).toBe('center');
       expect(column.nullable).toBe(true);
     });
+
+    it('editable() defaults to true on the built definition', () => {
+      const column = new ColumnBuilder<TestUser, string>('text')
+        .id('name')
+        .displayName('Name')
+        .accessor((user) => user.name)
+        .editable()
+        .build();
+
+      expect(column.editable).toBe(true);
+    });
+
+    it('editable(false) disables editing', () => {
+      const column = new ColumnBuilder<TestUser, string>('text')
+        .id('name')
+        .displayName('Name')
+        .accessor((user) => user.name)
+        .editable(false)
+        .build();
+
+      expect(column.editable).toBe(false);
+    });
+
+    it('editable({ when, field }) carries through the config', () => {
+      const when = (row: TestUser) => row.isActive;
+      const column = new ColumnBuilder<TestUser, string>('text')
+        .id('displayName')
+        .displayName('Display Name')
+        .accessor((user) => user.name)
+        .editable({ when, field: 'name', multiline: true, placeholder: 'Enter name' })
+        .build();
+
+      expect(column.editable).toEqual({
+        when,
+        field: 'name',
+        multiline: true,
+        placeholder: 'Enter name',
+      });
+    });
+
+    it('editable is absent when not called', () => {
+      const column = new ColumnBuilder<TestUser, string>('text')
+        .id('name')
+        .displayName('Name')
+        .accessor((user) => user.name)
+        .build();
+
+      expect(column.editable).toBeUndefined();
+    });
+
+    it('editable() chains from specialized type builders', () => {
+      const textCol = new TextColumnBuilder<TestUser>()
+        .id('name')
+        .displayName('Name')
+        .accessor((u) => u.name)
+        .editable()
+        .build();
+      const numberCol = new NumberColumnBuilder<TestUser>()
+        .id('age')
+        .displayName('Age')
+        .accessor((u) => u.age)
+        .editable({ field: 'age' })
+        .build();
+      const boolCol = new BooleanColumnBuilder<TestUser>()
+        .id('isActive')
+        .displayName('Active')
+        .accessor((u) => u.isActive)
+        .editable()
+        .build();
+      const dateCol = new DateColumnBuilder<TestUser>()
+        .id('createdAt')
+        .displayName('Created')
+        .accessor((u) => u.createdAt)
+        .editable()
+        .build();
+      const optionCol = new OptionColumnBuilder<TestUser>()
+        .id('status')
+        .displayName('Status')
+        .accessor((u) => u.status)
+        .options([
+          { label: 'Active', value: 'active' },
+          { label: 'Inactive', value: 'inactive' },
+          { label: 'Pending', value: 'pending' },
+        ])
+        .editable()
+        .build();
+
+      expect(textCol.editable).toBe(true);
+      expect(numberCol.editable).toEqual({ field: 'age' });
+      expect(boolCol.editable).toBe(true);
+      expect(dateCol.editable).toBe(true);
+      expect(optionCol.editable).toBe(true);
+    });
   });
 
   describe('TextColumnBuilder', () => {
