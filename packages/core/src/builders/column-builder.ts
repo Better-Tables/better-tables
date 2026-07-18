@@ -17,7 +17,7 @@ import type {
   ValidationRule,
 } from '../types/column';
 import type { IconComponent } from '../types/common';
-import type { FilterConfig } from '../types/filter';
+import type { FilterConfig, FilterOperator } from '../types/filter';
 
 /**
  * Base column builder class with fluent API.
@@ -124,6 +124,14 @@ export class ColumnBuilder<TData = unknown, TValue = unknown, TId extends string
    * builder's value type is inferred from (and rebound to) the accessor's return
    * type, so subsequent chained methods (e.g. `cellRenderer`, `filterable`) see
    * the narrowed type rather than the original `TValue`.
+   *
+   * **Accessor constraint policy:** the base uses `V extends TValue` — the
+   * accessor's return type must be assignable to the builder's current value
+   * type. Value-family builders (text/number/date/boolean) override with a
+   * primitive-family bound (`V extends string`, etc.) when `TValue` is still the
+   * column default. Option and multi-option builders keep `V extends TValue`
+   * because `.options()` narrows `TValue` to a literal union and the accessor
+   * must stay consistent with declared option values.
    *
    * @param accessor - Function that extracts the column value from row data
    * @returns A builder rebound to the accessor's return type, for method chaining
@@ -411,5 +419,16 @@ export class ColumnBuilder<TData = unknown, TValue = unknown, TId extends string
    */
   protected getConfig(): Partial<ColumnDefinition<TData, TValue, TId>> {
     return { ...this.config };
+  }
+
+  /**
+   * Apply a typed operator list to the column's filter config.
+   *
+   * Shared implementation for per-type `*Operators()` setters on specialized
+   * builders; public methods keep their own operator-union parameter types.
+   */
+  protected applyOperators(operators: readonly string[]): this {
+    this.config.filter = { ...this.config.filter, operators: [...operators] as FilterOperator[] };
+    return this;
   }
 }

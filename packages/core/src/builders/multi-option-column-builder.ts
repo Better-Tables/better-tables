@@ -52,8 +52,7 @@ export class MultiOptionColumnBuilder<
    * @returns A `MultiOptionColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): MultiOptionColumnBuilder<TData, TValue, K> {
-    this.config.id = id as unknown as TId;
-    return this as unknown as MultiOptionColumnBuilder<TData, TValue, K>;
+    return super.id(id) as unknown as MultiOptionColumnBuilder<TData, TValue, K>;;
   }
 
   /**
@@ -72,8 +71,7 @@ export class MultiOptionColumnBuilder<
   override accessor<V extends TValue>(
     accessor: (data: TData) => V
   ): MultiOptionColumnBuilder<TData, V, TId> {
-    this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as MultiOptionColumnBuilder<TData, V, TId>;
+    return super.accessor(accessor) as unknown as MultiOptionColumnBuilder<TData, V, TId>;;
   }
 
   /**
@@ -186,11 +184,7 @@ export class MultiOptionColumnBuilder<
       'includes' | 'excludes' | 'includesAny' | 'includesAll' | 'excludesAny' | 'excludesAll'
     >
   ): this {
-    this.config.filter = {
-      ...this.config.filter,
-      operators,
-    };
-    return this;
+    return this.applyOperators(operators);
   }
 
   /**

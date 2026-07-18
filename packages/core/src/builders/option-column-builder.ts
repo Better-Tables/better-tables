@@ -60,8 +60,7 @@ export class OptionColumnBuilder<
    * @returns An `OptionColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): OptionColumnBuilder<TData, TValue, K> {
-    this.config.id = id as unknown as TId;
-    return this as unknown as OptionColumnBuilder<TData, TValue, K>;
+    return super.id(id) as unknown as OptionColumnBuilder<TData, TValue, K>;;
   }
 
   /**
@@ -80,8 +79,7 @@ export class OptionColumnBuilder<
   override accessor<V extends TValue>(
     accessor: (data: TData) => V
   ): OptionColumnBuilder<TData, V, TId> {
-    this.config.accessor = accessor as unknown as (data: TData) => TValue;
-    return this as unknown as OptionColumnBuilder<TData, V, TId>;
+    return super.accessor(accessor) as unknown as OptionColumnBuilder<TData, V, TId>;;
   }
 
   /**
@@ -176,11 +174,7 @@ export class OptionColumnBuilder<
    * ```
    */
   optionOperators(operators: Array<'is' | 'isNot' | 'isAnyOf' | 'isNoneOf'>): this {
-    this.config.filter = {
-      ...this.config.filter,
-      operators,
-    };
-    return this;
+    return this.applyOperators(operators);
   }
 
   /**
