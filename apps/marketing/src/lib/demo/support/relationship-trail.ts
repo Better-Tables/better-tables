@@ -41,8 +41,6 @@ export function buildRelationshipTrail(filters: FilterState[]): RelationshipTrai
       const field = meta?.field ?? filter.columnId.split('.')[1] ?? filter.columnId;
 
       return {
-        // Stable per-filter key: prefers a real `filter.id` when present,
-        // else falls back to `columnId#index` (plan 031, finding 2).
         id: filterKey(filter, index),
         entity,
         field,
@@ -61,13 +59,9 @@ export interface SupportScenarioPreset {
   sorting?: SortingState;
 }
 
-// `buildFilter(ticketsTable, path, [type,] operator, values)` authors each
-// leaf against the table's REAL row paths and per-type operators (plan 031):
-// a wrong path, a wrong operator for the column family (e.g. `equals` on an
-// option column -- finding 8), or a wrong value type is a COMPILE error here.
-// Option columns need the explicit `'option'` type (a string-shaped path
-// can't be inferred as option); text/boolean leaves infer from the path.
-// The `{ kind: 'group', logic }` wrapper is the real group shape (finding 1).
+// `buildFilter(table, path, …)` is typed against the table definition —
+// wrong paths/operators fail at compile time. Wrap leaves in `{ kind: 'group' }`
+// for AND/OR trees; a bare array is implicit AND.
 export const supportScenarioPresets: SupportScenarioPreset[] = [
   {
     id: 'enterprise-escalations',
@@ -117,13 +111,7 @@ export const supportScenarioPresets: SupportScenarioPreset[] = [
   },
 ];
 
-/**
- * The dedicated null-only-filter preset for the query-groups example
- * (027 showcase): "tickets with no assignee" via `includeNull: true,
- * values: []` (Option A semantics) rather than an `isNull`/`isEmpty`
- * operator (redundant per `FilterManager.validateFilter`, which rejects
- * `includeNull` combined with an operator that already means null).
- */
+/** Null-only filter: `includeNull: true` with empty values means "is empty". */
 export const noAssigneeFilterPreset: SupportScenarioPreset = {
   id: 'no-assignee',
   label: 'No assignee (null-only filter)',
@@ -131,8 +119,7 @@ export const noAssigneeFilterPreset: SupportScenarioPreset = {
   filters: [buildFilter(ticketsTable, 'assignee.name', 'equals', [], { includeNull: true })],
 };
 
-/** Every preset the `query-groups` example showcases: AND groups, an OR
- * group, a flat (implicit-AND) list, and the null-only filter (027). */
+/** Query-groups presets: AND groups, an OR group, a flat list, and null-only. */
 export const queryGroupPresets: SupportScenarioPreset[] = [
   ...supportScenarioPresets,
   noAssigneeFilterPreset,

@@ -6,20 +6,11 @@ import {
 } from '@/lib/demo/support/tickets-adapter-guard';
 
 /**
- * Client-callable table adapter for the tickets demo.
+ * HTTP adapter endpoint for the facets example.
  *
- * `httpAdapter({ url: '/api/tables/tickets' })` (see `facets-sidebar.tsx`)
- * proxies `fetchData`/`getFacetedValues`/`getMinMaxValues` here.
- * `createAdapterRouteHandler` dispatches to the real Drizzle adapter.
- *
- * IMPORTANT: a bare `createAdapterRouteHandler(adapter)` exposes every table
- * in the server adapter's schema. This route:
- * 1. Pins `primaryTable: 'tickets'` for `fetchData` via `constrainRequest`
- * 2. Allowlists every referenced `columnId` (facet target, filters, sort,
- *    columns) to the tickets demo surface — facet methods resolve their
- *    table from `columnId`, so without (2) a client could still read
- *    `customers`/`assignees`/`bulkTickets` via e.g. `company`.
- * Copy this pattern — do not mount a multi-table adapter without constraining.
+ * `httpAdapter({ url: '/api/tables/tickets' })` proxies fetch/facet calls here.
+ * Always constrain a multi-table adapter: pin `primaryTable` and allowlist
+ * column ids so clients cannot reach unrelated tables.
  */
 export const POST = createAdapterRouteHandler(
   () => getSupportTables().then((tables) => tables.database),

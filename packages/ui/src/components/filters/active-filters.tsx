@@ -291,7 +291,13 @@ function FilterBadge<TData = unknown>({
             >
               <FilterValueDisplay filter={filter} column={column} />
             </DialogTrigger>
-            <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-xs">
+            <DialogContent
+              className={
+                column.type === 'date'
+                  ? 'max-w-[min(100vw-2rem,52rem)] max-h-[90vh] overflow-y-auto backdrop-blur-xs'
+                  : 'max-w-sm max-h-[90vh] overflow-y-auto backdrop-blur-xs'
+              }
+            >
               <DialogHeader>
                 <DialogTitle>Edit Filter Value</DialogTitle>
               </DialogHeader>
@@ -323,7 +329,12 @@ function FilterBadge<TData = unknown>({
             >
               <FilterValueDisplay filter={filter} column={column} />
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-3" align="start">
+            <PopoverContent
+              className={
+                column.type === 'date' ? 'w-auto max-w-[min(100vw-2rem,52rem)] p-3' : 'w-80 p-3'
+              }
+              align="start"
+            >
               <FilterValueInput
                 filter={filter}
                 column={column}

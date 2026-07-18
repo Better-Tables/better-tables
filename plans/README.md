@@ -97,6 +97,8 @@ the breaking window.
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
 | [053](053-editable-cells.md) | **`.editable()` inline cell editing** — builder API, per-type in-cell editors (text/number/option/boolean/date), adapter+callback save, optimistic rollback, gating matrix, integration proof, dogfood example | 047, 042 (done) | DONE on `editable-cells` |
+| [054](054-schema-driven-auto-columns.md) | **Auto columns from the schema** — `describeColumns` adapter capability (wire-proxied), `t.auto()` + no-factory `define` with explicit-wins merge, enum→option inference with humanized labels, facet-fallback dropdown options | 053 merged | TODO — magic-DX pillar 1 |
+| [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop in the save resolution, opt-in double-sided HTTP write proxy for split deployments, dogfood rewired to the direct path (custom route deleted) | 053 merged (hard), 054 (soft — proxy allow-list) | TODO — magic-DX pillar 2 |
 | [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
 | [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
 | [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049 | TODO (reconciled 2026-07-18 — export seams moved by 044; line refs refreshed) |
@@ -174,6 +176,36 @@ Audit/scope calls:
 - Direction features to build this wave: **plugin hooks** (049) + **export UI**
   (050). In-memory adapter and saved views were **not selected** — see
   "Deferred by decision".
+
+Magic-DX decisions (collected 2026-07-18 after 053 shipped; folded into plans 054/055):
+
+- **The monolith is the PRIMARY story** (Next.js, TanStack Start): tables
+  work directly with the mounted adapter/instance; `httpAdapter` is ONLY for
+  genuinely separated frontend/backend deployments and docs/examples present
+  it that way. The editable marketing example uses the direct path.
+- **Cell-edit saves cross the client boundary via a generated action**:
+  `tables.cellEditAction(def)` — serializable in/out, exported through a
+  `'use server'` one-liner (Next) or `createServerFn` (TanStack Start). This
+  partially UN-defers the 2026-07-17 "HTTP adapter is the bridge" decision —
+  scoped to the cell-edit action only, not a full server-actions data bridge.
+- **HTTP writes: opt-in on BOTH sides** (`writes: true` on handler + client),
+  schema-derived allow-list via `describeColumns` (fail closed without it),
+  server-side type coercion, authorize dev-warning. Deliberately reverses
+  053's "writes are never proxied" boundary under double opt-in.
+- **`.editable()` stays per-column** — table-level enable-all was REJECTED
+  (auto-inferred columns are read-only until explicitly overridden).
+- **Auto columns in both forms**: no-factory `define('users')` + `t.auto()`
+  spread (explicit wins by id), resolved lazily at mount via the new
+  `describeColumns` adapter capability.
+- **Option dropdowns: enum → facets** — schema enums populate options with
+  humanized labels; option columns without enum metadata lazily fetch
+  `getFilterOptions`; declared options always win.
+- **Enrichment ≠ `t.auto()`** (clarified 2026-07-18): explicitly declared
+  columns self-infer missing config (`t.option('status')` gets its enum
+  choices with no `.options()` and no `t.auto()`); `t.auto()` exists ONLY to
+  include the rest of the table's columns, and auto-inclusion never becomes
+  the default (declared subsets are deliberate — schemas contain columns
+  that must not silently render).
 
 `.editable()` decisions (collected 2026-07-18, folded into plan 053):
 

@@ -7,11 +7,10 @@ import type {
   SortingState,
 } from '@better-tables/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, EyeOff, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, EyeOff, X } from 'lucide-react';
 import * as React from 'react';
 import {
   ContextMenu,
-  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -115,37 +114,31 @@ export function TableHeaderContextMenu<TData = unknown>({
           React.isValidElement(children) ? children : <div className="contents">{children}</div>
         }
       />
-      <ContextMenuContent className="w-56">
+      <ContextMenuContent className="w-max min-w-36">
         {/* Sorting controls */}
         {isSortable && contextMenuConfig.showSortToggle && (
           <>
-            <ContextMenuCheckboxItem
-              checked={currentSort?.direction === 'asc'}
-              onCheckedChange={(checked) => {
-                if (checked) onSetSortAsc();
-              }}
-              className="flex items-center gap-2 pl-8"
-            >
-              <ArrowUp size={10} className="ml-[-2px] shrink-0" strokeWidth={2} />
+            <ContextMenuItem onClick={onSetSortAsc}>
+              <ArrowUp />
               Sort Ascending
-            </ContextMenuCheckboxItem>
+              {currentSort?.direction === 'asc' ? (
+                <Check className="ml-auto size-3.5 text-muted-foreground" />
+              ) : null}
+            </ContextMenuItem>
 
-            <ContextMenuCheckboxItem
-              checked={currentSort?.direction === 'desc'}
-              onCheckedChange={(checked) => {
-                if (checked) onSetSortDesc();
-              }}
-              className="flex items-center gap-2 pl-8"
-            >
-              <ArrowDown size={10} className="ml-[-2px] shrink-0" strokeWidth={2} />
+            <ContextMenuItem onClick={onSetSortDesc}>
+              <ArrowDown />
               Sort Descending
-            </ContextMenuCheckboxItem>
+              {currentSort?.direction === 'desc' ? (
+                <Check className="ml-auto size-3.5 text-muted-foreground" />
+              ) : null}
+            </ContextMenuItem>
 
             {currentSort && (
               <>
                 <ContextMenuSeparator />
-                <ContextMenuItem onClick={onClearSort} className="flex items-center gap-2">
-                  <X className="h-4 w-4" />
+                <ContextMenuItem onClick={onClearSort}>
+                  <X />
                   Clear This Sort
                 </ContextMenuItem>
               </>
@@ -158,9 +151,8 @@ export function TableHeaderContextMenu<TData = unknown>({
                   onClick={() => {
                     onSortReorder([]);
                   }}
-                  className="flex items-center gap-2"
                 >
-                  <X className="h-4 w-4" />
+                  <X />
                   Clear All Sorting
                 </ContextMenuItem>
               </>
@@ -197,8 +189,8 @@ export function TableHeaderContextMenu<TData = unknown>({
         {isHideable && contextMenuConfig.showColumnVisibility && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem onClick={onToggleVisibility} className="flex items-center gap-2">
-              <EyeOff className="h-4 w-4" />
+            <ContextMenuItem onClick={onToggleVisibility}>
+              <EyeOff />
               {isVisible ? 'Hide Column' : 'Show Column'}
             </ContextMenuItem>
           </>

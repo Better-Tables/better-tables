@@ -10,15 +10,13 @@ import {
   getDatePresetConfig,
   getFilterValueAsDate,
 } from '@better-tables/core';
-import { CalendarIcon, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
-import { useFilterValidation, useKeyboardNavigation } from '../../../hooks';
-import { cn } from '../../../lib/utils';
+import { useFilterValidation } from '../../../hooks';
 import { Button } from '../../ui/button';
 import { Calendar } from '../../ui/calendar';
 import { Label } from '../../ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 import { Separator } from '../../ui/separator';
 
 export interface DateFilterInputProps<TData = unknown> {
@@ -33,7 +31,7 @@ export interface DateFilterInputProps<TData = unknown> {
 }
 
 /**
- * Date filter input component
+ * Date filter input — calendar + quick-select embedded inline (no nested popover).
  *
  * Pattern: Controlled component with local UI state
  * - Data state comes from parent (filter.values as dates)
@@ -86,6 +84,15 @@ export function DateFilterInput<TData = unknown>({
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  // Timestamps of the last values we pushed to the parent. Used so sync-from-parent
+  // does not overwrite local state while the parent (URL / store) is still catching up.
+  const lastEmittedRef = React.useRef<number[] | null>(null);
+
+  const emitValues = React.useCallback((values: Date[]) => {
+    lastEmittedRef.current = values.map((d) => d.getTime());
+    onChangeRef.current(values);
+  }, []);
+
   // UI-only state: selected dates in calendar
   const [singleDate, setSingleDate] = React.useState<Date | undefined>(() => {
     return getFilterValueAsDate(filter, 0) || undefined;
@@ -100,10 +107,6 @@ export function DateFilterInput<TData = unknown>({
       }
     }
     return undefined;
-  });
-  // Auto-open popover when there's no date value
-  const [isOpen, setIsOpen] = React.useState(() => {
-    return needsNoValues ? false : needsDateRange ? !dateRange?.from : !singleDate;
   });
 
   // Convert dates when operator changes AND immediately sync to parent
@@ -120,7 +123,7 @@ export function DateFilterInput<TData = unknown>({
         if (dateToUse) {
           setDateRange({ from: dateToUse, to: dateToUse });
           // Immediately send both dates to parent to avoid validation error
-          onChangeRef.current([dateToUse, dateToUse]);
+          emitValues([dateToUse, dateToUse]);
         }
       }
       // Convert from range to single: use the from date (or first filter value)
@@ -129,21 +132,13 @@ export function DateFilterInput<TData = unknown>({
         if (dateToUse) {
           setSingleDate(dateToUse);
           // Immediately send the single date to parent
-          onChangeRef.current([dateToUse]);
+          emitValues([dateToUse]);
         }
       }
 
       prevNeedsDateRangeRef.current = needsDateRange;
     }
-  }, [needsDateRange, singleDate, dateRange, filter]);
-
-  // Keyboard navigation
-  const keyboardNavigation = useKeyboardNavigation({
-    onEscape: () => {
-      setSingleDate(undefined);
-      setDateRange(undefined);
-    },
-  });
+  }, [needsDateRange, singleDate, dateRange, filter, emitValues]);
 
   // Prepare values for validation
   const validationValues = React.useMemo(() => {
@@ -178,23 +173,20 @@ export function DateFilterInput<TData = unknown>({
   // Sync TO parent when dates change
   React.useEffect(() => {
     if (needsNoValues) {
+      lastEmittedRef.current = [];
       onChangeRef.current([]);
     } else if (needsDateRange) {
       // For date range, only send values when BOTH dates are selected
       if (dateRange?.from && dateRange?.to) {
-        onChangeRef.current([dateRange.from, dateRange.to]);
-        // Close popover when both dates are selected
-        setIsOpen(false);
+        emitValues([dateRange.from, dateRange.to]);
       }
     } else {
       // Single date
       if (singleDate) {
-        onChangeRef.current([singleDate]);
-        // Close popover when date is selected
-        setIsOpen(false);
+        emitValues([singleDate]);
       }
     }
-  }, [singleDate, dateRange, needsDateRange, needsNoValues]);
+  }, [singleDate, dateRange, needsDateRange, needsNoValues, emitValues]);
 
   // Sync FROM parent when filter values change
   // Get external values and compare timestamps to detect actual changes
@@ -202,13 +194,46 @@ export function DateFilterInput<TData = unknown>({
   const externalTo = getFilterValueAsDate(filter, 1);
 
   React.useEffect(() => {
+    const externalTimes = [externalFrom, externalTo]
+      .filter((d): d is Date => d != null)
+      .map((d) => d.getTime());
+    const lastEmitted = lastEmittedRef.current;
+
+    // Parent caught up to our last emit — clear the pending marker
+    if (
+      lastEmitted &&
+      lastEmitted.length === externalTimes.length &&
+      lastEmitted.every((t, i) => t === externalTimes[i])
+    ) {
+      lastEmittedRef.current = null;
+    }
+
     if (needsDateRange && filter.values.length >= 2) {
       const from = externalFrom;
       const to = externalTo;
 
-      // Only update if dates actually changed (compare timestamps)
       if (from && to) {
         setDateRange((prev) => {
+          // In-progress range pick: DayPicker sets `{ from, to: undefined }` after
+          // the first click. Parent still holds the previous complete pair — do not
+          // clobber the partial local selection or the second click can never land.
+          if (prev?.from && !prev.to) {
+            return prev;
+          }
+
+          // We just emitted a complete range; parent props are still stale. Keep local.
+          if (
+            lastEmitted &&
+            lastEmitted.length === 2 &&
+            prev?.from &&
+            prev?.to &&
+            prev.from.getTime() === lastEmitted[0] &&
+            prev.to.getTime() === lastEmitted[1] &&
+            (from.getTime() !== lastEmitted[0] || to.getTime() !== lastEmitted[1])
+          ) {
+            return prev;
+          }
+
           const needsUpdate =
             !prev?.from ||
             !prev?.to ||
@@ -221,8 +246,17 @@ export function DateFilterInput<TData = unknown>({
     } else if (!needsDateRange) {
       const date = externalFrom;
 
-      // Only update if date actually changed
       setSingleDate((prev) => {
+        if (
+          lastEmitted &&
+          lastEmitted.length === 1 &&
+          prev &&
+          prev.getTime() === lastEmitted[0] &&
+          (!date || date.getTime() !== lastEmitted[0])
+        ) {
+          return prev;
+        }
+
         const needsUpdate =
           (!prev && date) || (prev && !date) || (prev && date && prev.getTime() !== date.getTime());
 
@@ -249,7 +283,7 @@ export function DateFilterInput<TData = unknown>({
   const PresetButtons = React.useMemo(
     () => (
       <div className="flex flex-col gap-1 p-2">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="mb-2 flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <Label className="text-xs font-medium text-muted-foreground">Quick Select</Label>
         </div>
@@ -260,8 +294,9 @@ export function DateFilterInput<TData = unknown>({
               variant="ghost"
               size="sm"
               onClick={() => handlePresetSelect(preset)}
-              className="justify-start text-xs h-8 px-2 py-1"
+              className="h-8 justify-start px-2 py-1 text-xs"
               title={preset.description}
+              disabled={disabled}
             >
               {preset.label}
             </Button>
@@ -269,7 +304,7 @@ export function DateFilterInput<TData = unknown>({
         </div>
       </div>
     ),
-    [presets, handlePresetSelect]
+    [presets, handlePresetSelect, disabled]
   );
 
   if (needsNoValues) {
@@ -280,99 +315,51 @@ export function DateFilterInput<TData = unknown>({
     );
   }
 
-  if (needsDateRange) {
-    return (
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold tracking-tight">Date Range</Label>
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="outline"
-                className={cn(
-                  'w-full justify-start text-left font-normal',
-                  !dateRange && 'text-muted-foreground',
-                  !validation.isValid && validationValues.length > 0 && 'border-destructive'
-                )}
-                disabled={disabled}
-                onKeyDown={keyboardNavigation.onKeyDown}
-                {...keyboardNavigation.ariaAttributes}
-              />
-            }
-          >
-            {dateRange?.from ? (
-              <span className="truncate">
-                {formatDateRange(dateRange.from, dateRange.to, dateFormat)}
-              </span>
-            ) : (
-              <span className="truncate">
-                Pick a date range{dateFormat.showTime ? ' and time' : ''}
-              </span>
-            )}
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <div className="flex">
-              {PresetButtons}
-              <Separator orientation="vertical" className="h-auto" />
-              <Calendar
-                autoFocus
-                mode="range"
-                numberOfMonths={2}
-                disabled={disabled}
-                {...(dateRange?.from !== undefined && { defaultMonth: dateRange.from })}
-                {...(dateRange !== undefined && { selected: dateRange })}
-                {...(!disabled && { onSelect: setDateRange })}
-              />
-            </div>
-          </PopoverContent>
-        </Popover>
-        {!validation.isValid && validation.error && validationValues.length > 0 && (
-          <p className="text-sm text-destructive">{validation.error}</p>
-        )}
-      </div>
-    );
-  }
+  const selectedSummary = needsDateRange
+    ? dateRange?.from
+      ? formatDateRange(dateRange.from, dateRange.to, dateFormat)
+      : null
+    : singleDate
+      ? formatDateWithConfig(singleDate, dateFormat)
+      : null;
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-semibold tracking-tight">Date</Label>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger
-          render={
-            <Button
-              variant="outline"
-              className={cn(
-                'w-full justify-start text-left font-normal',
-                !singleDate && 'text-muted-foreground',
-                !validation.isValid && validationValues.length > 0 && 'border-destructive'
-              )}
-              disabled={disabled}
-              onKeyDown={keyboardNavigation.onKeyDown}
-              {...keyboardNavigation.ariaAttributes}
-            />
-          }
-        >
-          <CalendarIcon data-icon="inline-start" />
-          {singleDate ? (
-            <span>{formatDateWithConfig(singleDate, dateFormat)}</span>
-          ) : (
-            <span>Pick a date{dateFormat.showTime ? ' and time' : ''}</span>
-          )}
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex">
-            {PresetButtons}
-            <Separator orientation="vertical" className="h-auto" />
-            <Calendar
-              mode="single"
-              autoFocus
-              disabled={disabled}
-              {...(singleDate !== undefined && { selected: singleDate })}
-              {...(!disabled && { onSelect: setSingleDate })}
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
+      <div className="flex items-baseline justify-between gap-2 px-0.5">
+        <Label className="text-sm font-semibold tracking-tight">
+          {needsDateRange ? 'Date Range' : 'Date'}
+        </Label>
+        {selectedSummary ? (
+          <span className="truncate text-xs text-muted-foreground">{selectedSummary}</span>
+        ) : null}
+      </div>
+
+      <div className="flex min-w-0 rounded-md border">
+        <div className="shrink-0">{PresetButtons}</div>
+        <Separator orientation="vertical" className="h-auto" />
+        {needsDateRange ? (
+          <Calendar
+            autoFocus
+            mode="range"
+            numberOfMonths={2}
+            resetOnSelect
+            disabled={disabled}
+            className="min-w-0"
+            {...(dateRange?.from !== undefined && { defaultMonth: dateRange.from })}
+            {...(dateRange !== undefined && { selected: dateRange })}
+            {...(!disabled && { onSelect: setDateRange })}
+          />
+        ) : (
+          <Calendar
+            mode="single"
+            autoFocus
+            disabled={disabled}
+            {...(singleDate !== undefined && { selected: singleDate })}
+            {...(!disabled && { onSelect: setSingleDate })}
+          />
+        )}
+      </div>
+
       {!validation.isValid && validation.error && validationValues.length > 0 && (
         <p className="text-sm text-destructive">{validation.error}</p>
       )}

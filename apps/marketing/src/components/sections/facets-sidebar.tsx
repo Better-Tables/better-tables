@@ -26,18 +26,13 @@ interface FacetsSidebarProps {
 }
 
 /**
- * Filter-aware facet sidebar. The whole data path is now shipped primitives:
- * `httpAdapter` (a browser-safe adapter proxying to `/api/tables/tickets`,
- * whose entire server is a one-line `createAdapterRouteHandler`) + `useFacets`
- * (owns the batching, race-guard, and `Map`→`FacetOption[]` conversion this
- * file used to hand-roll). Only the bespoke presentation below is app code.
- * `filterHasValue`/`toggleFacetValue` replace the discriminated-union casts
- * the hand-built version needed (findings 1, 7, 17).
+ * Facet sidebar: `httpAdapter` talks to `/api/tables/tickets`, and `useFacets`
+ * loads counts/ranges for the active filters. Toggle a value to update the URL.
  */
 export function FacetsSidebar({ activeFilters }: FacetsSidebarProps) {
   const urlAdapter = useNextjsUrlAdapter();
 
-  // Browser-safe adapter -> the server-only Drizzle adapter, over HTTP.
+  // Browser proxy to the server Drizzle adapter.
   const adapter = useMemo(() => httpAdapter({ url: '/api/tables/tickets' }), []);
 
   const { facets, ranges, loading } = useFacets({

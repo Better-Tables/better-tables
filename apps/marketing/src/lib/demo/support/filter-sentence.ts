@@ -35,10 +35,7 @@ function describeLeaf(filter: FilterState): string {
     return `${filter.columnId} is ${filter.operator === 'isTrue' ? 'true' : 'false'}`;
   }
 
-  // Null-only filter (027 showcase): `includeNull: true, values: []` reads
-  // as "is empty" on its own -- prefixing the operator word ("equals is
-  // empty") is redundant, since the operator's normal meaning doesn't apply
-  // when there are no values to compare against.
+  // Null-only filter (`includeNull: true`, no values) reads as "is empty".
   if (filter.includeNull && filter.values.length === 0) {
     return `${filter.columnId} is empty`;
   }
@@ -49,48 +46,33 @@ function describeLeaf(filter: FilterState): string {
 }
 
 /**
- * Render a `FilterNode` (a leaf `FilterState` or a recursive `FilterGroupNode`
- * -- the query-groups example's whole point) as a readable, plain-English
- * sentence: `"a AND b"`, `"a OR (b AND c)"`, etc. Nested groups whose logic
- * differs from their parent's are parenthesized for clarity; a nested group
- * with the SAME logic as its parent is flattened into the parent's list
- * (mirrors how `a AND b AND c` reads more naturally than `a AND (b AND c)`).
+ * Render a filter leaf or AND/OR group as a plain-English sentence
+ * (`"a AND b"`, `"a OR (b AND c)"`). Nested groups with different logic are
+ * parenthesized; same-logic nesting is flattened.
  */
-export function describeFilterNode(node: FilterNode, parentLogic?: 'and' | 'or'): string {
+export function describeFilterNode(node: FilterNode): string {
   if (!isFilterGroupNode(node)) {
     return describeLeaf(node);
   }
 
   const parts = node.children.map((child) => {
     if (isFilterGroupNode(child) && child.logic !== node.logic) {
-      return `(${describeFilterNode(child, node.logic)})`;
+      return `(${describeFilterNode(child)})`;
     }
-    return describeFilterNode(child, node.logic);
+    return describeFilterNode(child);
   });
 
-  const joined = parts.join(node.logic === 'and' ? ' AND ' : ' OR ');
-
-  // Only wrap the TOP-level call in parens when it will be nested inside a
-  // different-logic parent (the recursive branch above already handles
-  // that); a bare top-level call returns unwrapped.
-  if (parentLogic && parentLogic !== node.logic) {
-    return joined;
-  }
-  return joined;
+  return parts.join(node.logic === 'and' ? ' AND ' : ' OR ');
 }
 
-/** Count every leaf `FilterState` in a `FilterNode` tree (for a quick "N conditions" label). */
+/** Count leaf filters in a group tree (for "N conditions" labels). */
 export function countLeaves(node: FilterNode): number {
   if (!isFilterGroupNode(node)) return 1;
   return node.children.reduce((sum, child) => sum + countLeaves(child), 0);
 }
 
 /**
- * `FetchDataParams.filters` (and this app's `SupportScenarioPreset.filters`)
- * is `FilterState[] | FilterGroupNode` -- a bare array means implicit AND,
- * not a single `FilterNode`. These wrap a flat array as a synthetic
- * `{ kind: 'group', logic: 'and' }` before delegating, so callers can pass
- * either shape without checking first.
+ * Describe either a flat filter list (implicit AND) or an explicit group node.
  */
 export function describeFilters(filters: FilterState[] | FilterGroupNode): string {
   if (Array.isArray(filters)) {

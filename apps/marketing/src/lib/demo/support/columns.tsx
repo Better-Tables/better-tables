@@ -1,10 +1,7 @@
 import { defineTable } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
-// `import type` only -- the RSC-safe pattern MIGRATION.md documents.
-// `defineTable` has no DB-driver dependency, so importing just the instance's
-// TYPE (`SupportTables`, exported by `./db` alongside its lazy runtime getter)
-// keeps `better-sqlite3` out of any client bundle that imports THIS file.
-// Verified via `bun run build --filter=@better-tables/site`.
+// Type-only import keeps the SQLite driver out of any client bundle that
+// pulls in this table definition.
 import type { SupportTables } from './db';
 
 const statusColors: Record<string, string> = {
@@ -22,12 +19,11 @@ const priorityColors: Record<string, string> = {
 };
 
 /**
- * The flagship 018 entry point: `defineTable<SupportTables>()(...)`
- * derives `'tickets'` and every column path (including dot-notation
- * relation paths like `'customer.plan'`) from the REAL schema `supportTables`
- * carries via `$types` -- a typo'd path or table name is a compile error
- * here, not a runtime throw (see plans/findings/029-dx-findings.md #4 for
- * why the WIP didn't start here).
+ * Table definition for the support-tickets examples.
+ *
+ * `defineTable<SupportTables>()` types the table name and every column path
+ * (including relation paths like `customer.plan`) from your schema — typos
+ * are compile errors.
  */
 export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
   columns: [
@@ -83,8 +79,7 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .filterable()
       .editable(),
 
-    // Direct numeric column -- the `facets` example's `getMinMaxValues`
-    // showcase needs one.
+    // Numeric column used by the facets example's min/max range.
     t
       .number('reopenCount')
       .displayName('Reopens')
@@ -147,11 +142,7 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       ])
       .filterable(),
 
-    // 028 showcase: an explicit, non-UTC `timeZone` on `.dateTime()` -- per
-    // MIGRATION.md §11, `.dateTime()`/`.format()`/`.timeOnly()` default to
-    // `'UTC'` when `timeZone` is omitted (a behavior change from 0.5's
-    // silently-ignored `timeZone`), so this column deliberately sets one to
-    // demonstrate the real conversion rather than relying on the default.
+    // `.dateTime()` defaults to UTC; set `timeZone` when you want a local zone.
     t
       .date('createdAt')
       .displayName('Opened')
@@ -162,16 +153,9 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
   ],
 }));
 
-/**
- * The ticket row type, derived straight from the SCHEMA -- there is no
- * hand-shaped duplicate to keep in sync. `$infer.Row` now carries the forward
- * relations (`customer`, `assignee`) as a clean intersection and omits inverse
- * back-references, so it IS the shape a fetch actually returns (plan 030,
- * finding 12).
- */
+/** Row type inferred from the table definition — includes related `customer` / `assignee`. */
 export type TicketRow = typeof ticketsTable.$infer.Row;
 
-/** Typed against `TicketRow` by construction -- no cast (finding 12). */
 export const ticketColumns = ticketsTable.columns;
 
 export const defaultVisibleTicketColumns = [
@@ -187,11 +171,8 @@ export const defaultVisibleTicketColumns = [
 ];
 
 /**
- * Every column id the table can render, not just the default-visible subset:
- * column visibility toggling is client-side (no refetch), so a
- * hidden-but-toggleable column still needs its data in the initial fetch.
- * (Relations touched by filters/sorting auto-embed on their own -- finding 10
- * -- but toggling reaches columns no filter mentions.)
+ * All column ids (not only the default-visible subset). Column visibility is
+ * client-side, so hidden-but-toggleable columns still need data in the fetch.
  */
 export const allTicketColumnIds = ticketColumns.map((column) => column.id);
 

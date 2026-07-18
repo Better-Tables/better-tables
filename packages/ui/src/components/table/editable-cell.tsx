@@ -71,7 +71,7 @@ function TextEditor<TValue>({
         value={draft}
         placeholder={placeholder}
         aria-label="Edit cell"
-        className="min-h-16 text-sm"
+        className="min-h-16 w-full text-sm"
         onChange={(e) => {
           committedRef.current = false;
           setDraft(e.target.value);
@@ -100,7 +100,7 @@ function TextEditor<TValue>({
       value={draft}
       placeholder={placeholder}
       aria-label="Edit cell"
-      className="h-7"
+      className="h-7 w-full"
       onChange={(e) => {
         committedRef.current = false;
         setDraft(e.target.value);
@@ -177,7 +177,7 @@ function NumberEditor<TValue>({
       value={draft}
       placeholder={placeholder}
       aria-label="Edit cell"
-      className="h-7"
+      className="h-7 w-full"
       onChange={(e) => {
         committedRef.current = false;
         setDraft(e.target.value);
@@ -469,7 +469,7 @@ export function EditableCell<TData = unknown, TValue = unknown>({
         data-editing="true"
         data-saving={saving ? 'true' : undefined}
         className={cn(
-          'relative min-w-0',
+          'relative w-full min-w-0',
           saving && 'opacity-70',
           displayError && 'ring-2 ring-destructive/40 rounded-md'
         )}
@@ -509,7 +509,7 @@ export function EditableCell<TData = unknown, TValue = unknown>({
       aria-label={`Edit ${column.displayName}`}
       title={displayError ?? `Double-click or press Enter to edit ${column.displayName}`}
       className={cn(
-        'group/editable relative -mx-1 min-h-7 min-w-0 rounded-sm px-1 outline-none',
+        'group/editable relative inline-flex max-w-full items-center gap-1.5 -mx-1 min-w-0 rounded-sm px-1 outline-none',
         'hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30',
         saving && 'opacity-70',
         displayError && 'ring-2 ring-destructive/40'
@@ -521,17 +521,14 @@ export function EditableCell<TData = unknown, TValue = unknown>({
         }
       }}
       onClick={(e) => {
-        // Keep single-click for row activation; only stop when we own the gesture.
         if (e.detail > 1) e.stopPropagation();
       }}
     >
-      <span className="inline-flex max-w-full items-center gap-1.5">
-        <span className="min-w-0 truncate">{children}</span>
-        <Pencil
-          aria-hidden
-          className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/editable:opacity-70 group-focus-visible/editable:opacity-70"
-        />
-      </span>
+      <span className="min-w-0 shrink-0">{children}</span>
+      <Pencil
+        aria-hidden
+        className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/editable:opacity-70 group-focus-visible/editable:opacity-70"
+      />
     </div>
   );
 

@@ -70,4 +70,41 @@ describe('DateFilterInput (plan 042 step 1)', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect((onChange.mock.calls[0] as unknown[] | undefined)?.[0]).toEqual([]);
   });
+
+  it('keeps an in-progress between selection when parent still has a complete range', async () => {
+    const onChange = mock((values: unknown[]) => values);
+    const column = makeDateColumn();
+    // Seed a complete range in July so calendar day buttons are in view
+    const seededFrom = new Date(2026, 6, 1);
+    const seededTo = new Date(2026, 6, 10);
+    const filter = baseFilter({
+      columnId: 'createdAt',
+      type: 'date',
+      operator: 'between',
+      values: [seededFrom, seededTo],
+    });
+
+    const { rerender, container } = render(
+      <DateFilterInput filter={filter} column={column} onChange={onChange} />
+    );
+
+    // resetOnSelect starts a new range (`to` cleared). Parent props stay on the
+    // old complete pair — sync-from-parent must not reset the partial pick.
+    fireEvent.click(screen.getByRole('button', { name: /July 15th, 2026/i }));
+    expect(container.querySelector('.text-xs.text-muted-foreground')?.textContent).toMatch(
+      /July 15th/
+    );
+    rerender(<DateFilterInput filter={filter} column={column} onChange={onChange} />);
+    expect(container.querySelector('.text-xs.text-muted-foreground')?.textContent).toMatch(
+      /July 15th/
+    );
+    fireEvent.click(screen.getByRole('button', { name: /July 20th, 2026/i }));
+
+    await waitFor(() => {
+      const lastCall = onChange.mock.calls.at(-1)?.[0] as Date[] | undefined;
+      expect(lastCall?.length).toBe(2);
+      expect(lastCall?.[0]?.getDate()).toBe(15);
+      expect(lastCall?.[1]?.getDate()).toBe(20);
+    });
+  });
 });

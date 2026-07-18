@@ -1,6 +1,6 @@
 /**
  * Persist an inline cell edit for the tickets demo.
- * httpAdapter has no write proxy — this is the save path (plan 053).
+ * Cell-edit save path for the support-ticket demos.
  */
 export async function persistTicketCellEdit(ctx: {
   rowId: string;

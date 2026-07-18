@@ -63,6 +63,12 @@ export function QueryGroupsTableClient({
         pagination: true,
         rowSelection: false,
         columnReordering: false,
+        headerContextMenu: {
+          enabled: true,
+          showSortToggle: true,
+          allowSortReorder: true,
+          showColumnVisibility: true,
+        },
       }}
       sorting={{ enabled: true, multiSort: true, maxSortColumns: 2 }}
       emptyMessage="No tickets match this scenario."

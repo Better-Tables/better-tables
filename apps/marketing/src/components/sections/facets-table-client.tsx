@@ -40,9 +40,7 @@ export function FacetsTableClient({
 
   return (
     <BetterTable
-      // Explicit `id` (not the table prop's `tableName` default): three
-      // separate pages render this same table definition and each needs its
-      // own store/URL-sync identity.
+      // Unique id so this page's store/URL state stays separate from other demos.
       id={TABLE_ID}
       name="Tickets"
       table={ticketsTable}
@@ -60,6 +58,12 @@ export function FacetsTableClient({
         pagination: true,
         rowSelection: false,
         columnReordering: false,
+        headerContextMenu: {
+          enabled: true,
+          showSortToggle: true,
+          allowSortReorder: false,
+          showColumnVisibility: true,
+        },
       }}
       sorting={{ enabled: true, multiSort: false }}
       emptyMessage="No tickets match the active facets."

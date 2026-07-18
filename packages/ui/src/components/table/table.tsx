@@ -901,15 +901,29 @@ export function BetterTable<TData = unknown>({
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;
 
-  // Screen reader announcement for sort changes
-  const sortAnnouncement = React.useMemo(() => {
-    if (sortingState.length === 0) return '';
-    return sortingState
-      .map((sort) => {
-        const column = columnsWithDefaults.find((c) => c.id === sort.columnId);
-        return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
-      })
-      .join(', ');
+  // Live-region text must stay empty during SSR/hydration: the module-level
+  // table store can already hold client URL-synced sorting while the server
+  // store is empty (or vice versa). Announcing only after mount keeps the
+  // DOM structure stable and matches aria-live's "announce changes" role.
+  const [sortAnnouncement, setSortAnnouncement] = React.useState('');
+  const sortAnnouncementMountedRef = useRef(false);
+  useEffect(() => {
+    const next =
+      sortingState.length === 0
+        ? ''
+        : sortingState
+            .map((sort) => {
+              const column = columnsWithDefaults.find((c) => c.id === sort.columnId);
+              return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
+            })
+            .join(', ');
+    // Skip the first effect run so loading a pre-sorted URL doesn't announce
+    // static initial state — only later user-driven sort changes speak.
+    if (!sortAnnouncementMountedRef.current) {
+      sortAnnouncementMountedRef.current = true;
+      return;
+    }
+    setSortAnnouncement(next);
   }, [sortingState, columnsWithDefaults]);
 
   // Filter columns by visibility and apply column order (must be before any early returns)
@@ -1057,12 +1071,10 @@ export function BetterTable<TData = unknown>({
 
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props} {...(name !== undefined && { name })}>
-      {/* Screen reader announcement for sort changes */}
-      {sortAnnouncement && (
-        <div aria-live="polite" aria-atomic="true" className="sr-only">
-          {sortAnnouncement}
-        </div>
-      )}
+      {/* Always mounted so SSR/client DOM structure matches */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {sortAnnouncement}
+      </div>
 
       <div className="flex items-center gap-2">
         {/* Actions Toolbar - render independently of filtering */}

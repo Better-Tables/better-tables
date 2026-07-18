@@ -67,12 +67,7 @@ function pick<T>(rng: () => number, items: readonly T[]): T {
   return item;
 }
 
-/**
- * Generate `count` deterministic synthetic big-board rows. `description` is
- * deliberately variable-length (one to four repeated sentences) so the
- * `big-board` example's expandable-row-height showcase has real content to
- * expand into, not a fixed-height placeholder.
- */
+/** Deterministic synthetic big-board rows with variable-length descriptions. */
 export function generateBulkTickets(count: number): BulkTicket[] {
   const rng = mulberry32(20260713);
   const baseTime = new Date('2026-01-01T00:00:00Z').getTime();

@@ -14,6 +14,15 @@
 - **Depends on**: 049 (the plugin seam — `csvExport()` rides `beforeFetch`/plugin methods)
 - **Category**: direction
 - **Planned at**: commit `787a816`, 2026-07-17
+- **Reconciled 2026-07-18 at `7b58ed8`**: finding still valid, line refs
+  updated for plan 044's decomposition — `exportData` is now at
+  `drizzle-adapter.ts:1178` with the unbounded fetch
+  (`limit: Number.MAX_SAFE_INTEGER`) at `:1185`, and the CSV/format
+  conversion was EXTRACTED to `packages/adapters/drizzle/src/export-format.ts`
+  (`convertToExportFormat`, imported at `:1191`) — Step 1's cap change and
+  the formula-escaping check now target those locations. "Current state"
+  refs to `:1163`/`:1170` and in-class `convertToExportFormat` are stale;
+  everything else holds.
 - **Maintainer decision (2026-07-17)**: build the EXPORT half now (import is a
   separately-scoped, much larger design — explicitly deferred). Ship an
   `ExportButton`/`useTableExport` in `@better-tables/ui` plus a `csvExport()`

@@ -43,9 +43,8 @@ export default function ExamplesIndexPage() {
           Four ways to see Better Tables working
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          Every example runs against the same deterministic, in-memory SQLite support-ticket
-          dataset, using the flagship <code>betterTables()</code> + <code>defineTable()</code> API.
-          Each page has a collapsible source panel showing the real implementation.
+          Every example runs against the same in-memory SQLite support-ticket dataset. Open any page
+          to see relationship filters, query groups, virtualization, or facets in action.
         </p>
       </div>
 
