@@ -70,7 +70,29 @@ export const ticketColumns = ticketsTable.columns;
 
 **Escape hatches:** `t.computed(id, accessor)`; `t.custom()` for the full fluent builder. Legacy column factories are deprecated — see MIGRATION.md.
 
-Reference: `apps/marketing/src/lib/demo/support/columns.tsx`, `packages/core/src/builders/path-builders.ts`.
+### Auto columns (schema-driven)
+
+The adapter already knows every column's name/type/nullability/enum values (`adapter.describeColumns`, implemented by the Drizzle adapter and proxied by `httpAdapter`). Two forms consume it:
+
+```typescript
+// Fully inferred: zero column boilerplate.
+export const usersTable = tables.define('users'); // or defineTable<typeof tables>()('users')
+
+// Inferred base + explicit overrides — explicit wins by id:
+export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+  columns: [...t.auto(), t.text('subject').editable()],
+}));
+```
+
+Resolution is **lazy, at mount**: `<BetterTable table={def} adapter={adapter} />` calls core's `resolveTableColumns(def, adapter)` before creating the table store (the curried `defineTable` form stays runtime-adapter-free/RSC-safe). Precedence rules:
+
+- **Explicit wins by id**; order is explicit first, then inferred in stable schema order.
+- **Enrichment is independent of `t.auto()`**: an explicit `t.option('status')` with no `.options()` gets its choices from the schema enum through the same resolver. Declared config always wins; enrichment only fills gaps. A declared type contradicting the schema type logs a dev warn.
+- **`t.auto()`'s only job is column-SET inclusion** ("and the rest of the table's columns"). Auto-inclusion is never the default — declaring a subset is deliberate (schemas contain columns that must not silently render).
+- **Inferred columns are read-only** (`sortable`/`filterable`/`hideable`, never `editable`) until explicitly overridden: `[...t.auto(), t.text('subject').editable()]`.
+- Fully-declared tables skip resolution entirely (no async hop); an adapter without `describeColumns` degrades to the declared list with a dev warn. Own-table columns only — relations stay explicit.
+
+Reference: `apps/marketing/src/lib/demo/support/columns.tsx`, `packages/core/src/builders/path-builders.ts`, `packages/core/src/factory.ts` (`resolveTableColumns`).
 
 ---
 
@@ -146,6 +168,8 @@ Field mapping for adapter saves: `editable.field` if set; else the column id whe
 Optimistic updates: the new value shows immediately; on save failure the cell rolls back and `onCellEditError` fires. Validation rules on the column run before any save.
 
 **V1 editors**: text (+ email/url/phone), number (+ currency/percentage), option, boolean, date. `multiOption`/`json` stay read-only; `custom` needs `editable.editRenderer`. Edits are last-write-wins (no version checks).
+
+**Option choices auto-populate** (plan 054): the option editor (and the option filter input) resolve choices as declared `.options()` → schema enum values (enriched in by `resolveTableColumns`) → a lazy `adapter.getFilterOptions(columnId)` facet fetch on first open (cached per adapter+column). "No options" appears only when a fetch returns empty or fails.
 
 ```tsx
 <BetterTable

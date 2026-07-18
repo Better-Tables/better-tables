@@ -28,9 +28,20 @@ const priorityColors: Record<string, string> = {
  * carries via `$types` -- a typo'd path or table name is a compile error
  * here, not a runtime throw (see plans/findings/029-dx-findings.md #4 for
  * why the WIP didn't start here).
+ *
+ * Since plan 054 this is also the `[...t.auto(), overrides]` showcase: the
+ * spread pulls in every REMAINING own-table column from the adapter schema
+ * at mount (`channel` -- whose dropdown options come straight from the DB
+ * enum, no `.options()` anywhere -- plus `id`/`customerId`/`assigneeId`/
+ * `reopenCount`), while the explicit entries below keep their richer config
+ * (`.editable()`, cell renderers, relation paths -- relations stay explicit
+ * by design) and always win by id. Inferred columns are read-only until
+ * explicitly overridden.
  */
 export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
   columns: [
+    ...t.auto(),
+
     t.text('subject').searchable().filterable().sortable().editable(),
 
     t
@@ -66,15 +77,11 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
         </span>
       )),
 
-    t
-      .option('channel')
-      .options([
-        { value: 'email', label: 'Email' },
-        { value: 'chat', label: 'Chat' },
-        { value: 'phone', label: 'Phone' },
-      ])
-      .filterable()
-      .sortable(),
+    // `channel` is deliberately NOT declared: `t.auto()` infers it as an
+    // option column with Email/Chat/Phone choices read from the DB enum --
+    // the plan-054 "enum becomes a dropdown by itself" showcase. Same for
+    // `reopenCount` (inferred number; the facets example's `getMinMaxValues`
+    // showcase keeps working against the inferred column id).
 
     t
       .boolean('slaBreached')
@@ -82,14 +89,6 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .activeInactive({ activeText: 'Breached', inactiveText: 'On track', showBadges: true })
       .filterable()
       .editable(),
-
-    // Direct numeric column -- the `facets` example's `getMinMaxValues`
-    // showcase needs one.
-    t
-      .number('reopenCount')
-      .displayName('Reopens')
-      .filterable()
-      .sortable(),
 
     t
       .text('customer.company')
@@ -171,8 +170,23 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
  */
 export type TicketRow = typeof ticketsTable.$infer.Row;
 
-/** Typed against `TicketRow` by construction -- no cast (finding 12). */
+/** Typed against `TicketRow` by construction -- no cast (finding 12).
+ * NOTE: with `t.auto()` in play this is the EXPLICIT list only -- the
+ * inferred columns materialize at mount via `resolveTableColumns` (BetterTable
+ * does this itself when given an adapter). */
 export const ticketColumns = ticketsTable.columns;
+
+/**
+ * The own-table columns `t.auto()` adds at mount, in schema order. Static
+ * (not introspected) because two SERVER-side consumers need the full column
+ * surface where resolving through an adapter would be circular or async:
+ * the fetch column list and the API route's column-id allowlist
+ * (tickets-adapter-guard). The RENDERED auto set still comes from
+ * `describeColumns` at mount -- if this list drifts from the schema, the
+ * symptom is an empty (fetch) or facet-blocked (guard) column, not a wrong
+ * render.
+ */
+export const inferredTicketColumnIds = ['id', 'channel', 'customerId', 'assigneeId', 'reopenCount'];
 
 export const defaultVisibleTicketColumns = [
   'subject',
@@ -191,9 +205,13 @@ export const defaultVisibleTicketColumns = [
  * column visibility toggling is client-side (no refetch), so a
  * hidden-but-toggleable column still needs its data in the initial fetch.
  * (Relations touched by filters/sorting auto-embed on their own -- finding 10
- * -- but toggling reaches columns no filter mentions.)
+ * -- but toggling reaches columns no filter mentions.) Includes the
+ * `t.auto()`-inferred own-table columns for the same reason.
  */
-export const allTicketColumnIds = ticketColumns.map((column) => column.id);
+export const allTicketColumnIds = [
+  ...ticketColumns.map((column) => column.id),
+  ...inferredTicketColumnIds,
+];
 
 export const relationshipColumnIds = new Set([
   'customer.company',

@@ -1,8 +1,9 @@
 'use client';
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import { httpAdapter } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   defaultVisibleTicketColumns,
   type TicketRow,
@@ -44,11 +45,18 @@ export function TicketsTableClient({
 
   const onCellEdit = useCallback(persistTicketCellEdit, []);
 
+  // Auto columns (plan 054): `ticketsTable` spreads `t.auto()`, so BetterTable
+  // resolves the inferred columns at mount through this adapter's
+  // `describeColumns` (same endpoint the facets sidebar reads). The SAVE path
+  // is unchanged -- `onCellEdit` above wins over the adapter (plan 055 next).
+  const adapter = useMemo(() => httpAdapter<TicketRow>({ url: '/api/tables/tickets' }), []);
+
   return (
     <BetterTable
       id={TABLE_ID}
       name="Tickets"
       table={ticketsTable}
+      adapter={adapter}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}
