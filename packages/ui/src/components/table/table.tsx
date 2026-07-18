@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CellEditAction,
   type ColumnDefinition,
   type ColumnVisibility,
   destroyTableStore,
@@ -9,9 +10,11 @@ import {
   getOrCreateTableStore,
   getTableStore,
   type PaginationState,
+  resolveTableColumns,
   type SortingState,
   type TableConfig,
   type TableDefinition,
+  tableNeedsColumnResolution,
   type UrlSyncAdapter,
   type UrlSyncConfig,
 } from '@better-tables/core';
@@ -19,10 +22,10 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { TableAdapterProvider } from '../../hooks/use-column-options';
 import {
   type CellEditErrorHandler,
   type CellEditHandler,
-  isRowEditable,
   useEditableCells,
 } from '../../hooks/use-editable-cells';
 import {
@@ -239,6 +242,13 @@ export interface BetterTableProps<TData = unknown>
   onCellEditError?: CellEditErrorHandler<TData>;
 
   /**
+   * Serializable cell-save function (plan 055) — typically the app's
+   * `'use server'` wrapper around `tables.cellEditAction(def)`. Save
+   * resolution order: `onCellEdit` → `saveAction` → direct adapter.
+   */
+  saveAction?: CellEditAction;
+
+  /**
    * Table-level master switch for inline editing. Default `true`. Set `false`
    * to render every cell read-only without changing column defs.
    */
@@ -267,6 +277,8 @@ interface TableRowComponentProps<TData> {
   onToggleSelection: (rowId: string, selected: boolean) => void;
   /** Column ids that can edit when a save path exists (stable Set), or null when none. */
   editableColumnIds: ReadonlySet<string> | null;
+  /** Row-level gate: `editable.when` + related-row-id presence (plan 055). */
+  isRowCellEditable: (column: ColumnDefinition<TData, unknown>, row: TData) => boolean;
   rowOverlay: Readonly<Record<string, unknown>>;
   rowErrors: Readonly<Record<string, string>>;
   rowSavingColumns: ReadonlySet<string>;
@@ -294,6 +306,7 @@ function TableRowComponent<TData>({
   onActivate,
   onToggleSelection,
   editableColumnIds,
+  isRowCellEditable,
   rowOverlay,
   rowErrors,
   rowSavingColumns,
@@ -332,7 +345,8 @@ function TableRowComponent<TData>({
         const value =
           column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
         const cellEditable =
-          editableColumnIds?.has(column.id) === true && isRowEditable(column, row);
+          editableColumnIds?.has(column.id) === true &&
+          isRowCellEditable(column as ColumnDefinition<TData, unknown>, row);
         const isEditing = editingColumnId === column.id;
 
         const display = column.cellRenderer
@@ -433,7 +447,115 @@ function TableRowComponent<TData>({
  */
 const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
 
-export function BetterTable<TData = unknown>({
+/**
+ * Lazily resolve a `table` definition's columns against the adapter (plan
+ * 054): auto columns (`t.auto()` / no-factory `define`) and enrichable gaps
+ * (an option column without options) resolve through core's ONE
+ * `resolveTableColumns` helper. Returns `null` while a needed resolution is
+ * in flight; when `enabled` is false this hook is inert (no state churn, no
+ * async hop) so fully-declared tables pay nothing.
+ */
+function useResolvedTableColumns<TData>(
+  enabled: boolean,
+  table: TableDefinition<string, TData> | undefined,
+  adapter: BetterTableProps<TData>['adapter']
+): ColumnDefinition<TData, unknown>[] | null {
+  const [resolved, setResolved] = React.useState<ColumnDefinition<TData, unknown>[] | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !table) return undefined;
+    let cancelled = false;
+    // Reset when the definition/adapter changes (no-op on first run: React
+    // bails out of a null -> null state update).
+    setResolved(null);
+    void resolveTableColumns(table, adapter).then((columns) => {
+      if (!cancelled) setResolved(columns);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, table, adapter]);
+
+  return enabled ? resolved : null;
+}
+
+/** Column count for the columns-resolving skeleton (real columns unknown yet). */
+const AUTO_COLUMNS_SKELETON_KEYS = ['first', 'second', 'third'] as const;
+
+/** Skeleton shown while auto columns resolve — mirrors the loading state. */
+function AutoColumnsLoading({ className }: { className?: string | undefined }) {
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: Fine for live regions
+    <div
+      className={cn('space-y-4', className)}
+      role="status"
+      aria-live="polite"
+      aria-label="Loading table columns"
+    >
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {AUTO_COLUMNS_SKELETON_KEYS.map((key) => (
+                <TableHead key={key}>
+                  <Skeleton className="h-4 w-[100px]" />
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...Array(5)].map((_, rowIdx) => {
+              const rowKey = `auto-columns-skeleton-${rowIdx}`;
+              return (
+                <TableRow key={rowKey}>
+                  {AUTO_COLUMNS_SKELETON_KEYS.map((key) => (
+                    <TableCell key={`${rowKey}-${key}`}>
+                      <Skeleton className="h-4 w-[100px]" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The mount seam for auto columns (plan 054): when the `table` definition
+ * needs resolution (`t.auto()` / no-factory `define`, or an explicit option
+ * column with no options to enrich), resolve columns against the adapter
+ * BEFORE mounting the real table — the store is created once, with the
+ * final column list. Fully-declared tables (or an explicit `columns` prop,
+ * which wins over `table` — existing semantics) skip the async hop entirely
+ * and render exactly as before.
+ */
+export function BetterTable<TData = unknown>(props: BetterTableProps<TData>) {
+  const { columns: columnsProp, table, adapter } = props;
+  const needsResolution = !columnsProp && !!table && tableNeedsColumnResolution(table);
+  const resolvedColumns = useResolvedTableColumns(needsResolution, table, adapter);
+
+  if (needsResolution && resolvedColumns === null) {
+    return <AutoColumnsLoading className={props.className} />;
+  }
+
+  // The adapter context powers the facet fallback for option dropdowns
+  // (plan 054 Step 5) — leaf inputs (option editor, option filter input)
+  // lazily fetch choices for option columns that declare none.
+  return (
+    <TableAdapterProvider adapter={adapter}>
+      {needsResolution && resolvedColumns !== null ? (
+        <BetterTableInner {...props} columns={resolvedColumns} />
+      ) : (
+        <BetterTableInner {...props} />
+      )}
+    </TableAdapterProvider>
+  );
+}
+
+function BetterTableInner<TData = unknown>({
   // Core table config (minus adapter)
   id: idProp,
   name: nameProp,
@@ -481,9 +603,10 @@ export function BetterTable<TData = unknown>({
   // Filter protection
   isFilterProtected,
 
-  // Inline editing (plan 053)
+  // Inline editing (plan 053; saveAction — plan 055)
   onCellEdit,
   onCellEditError,
+  saveAction,
   editing = true,
   ...props
 }: BetterTableProps<TData>) {
@@ -860,6 +983,7 @@ export function BetterTable<TData = unknown>({
     ...(table?.tableName != null ? { tableName: table.tableName } : {}),
     ...(onCellEdit != null ? { onCellEdit } : {}),
     ...(onCellEditError != null ? { onCellEditError } : {}),
+    ...(saveAction != null ? { saveAction } : {}),
   });
 
   const editableColumnIds = useMemo(() => {
@@ -1300,6 +1424,7 @@ export function BetterTable<TData = unknown>({
                   onActivate={handleRowActivate}
                   onToggleSelection={handleRowSelection}
                   editableColumnIds={editableColumnIds}
+                  isRowCellEditable={editableCells.isRowCellEditable}
                   rowOverlay={editableCells.getRowOverlay(rowId)}
                   rowErrors={editableCells.getRowErrors(rowId)}
                   rowSavingColumns={editableCells.getRowSavingColumns(rowId)}

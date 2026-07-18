@@ -10,9 +10,12 @@
 
 import type {
   AdapterMeta,
+  CellWriteTarget,
   FacetQueryParams,
   FetchDataParams,
   FetchDataResult,
+  InferredColumnSpec,
+  MutationOptions,
   TableAdapter,
 } from '../types/adapter';
 import { COLUMN_TYPES, type ColumnType } from '../types/column';
@@ -92,6 +95,20 @@ export interface HttpAdapterConfig {
 
   /** TTL for facet-read dedup/cache; `0`/`false` disables. @default 2000 */
   cacheTtlMs?: number | false;
+
+  /**
+   * Opt in to proxied cell-edit WRITES (plan 055). The server side must opt
+   * in too (`writes` on `createAdapterRouteHandler`) — this is a deliberate
+   * double opt-in. When true, the adapter implements `updateRecord` (single
+   * field per call — cell edits are singular) over the `cellEdit` wire
+   * method and advertises `features.update`. Absent/false keeps the
+   * read-only shape byte-identical to pre-055.
+   *
+   * Only for genuinely separated frontend/backend deployments — monoliths
+   * should use `tables.cellEditAction` through their framework's server
+   * boundary instead.
+   */
+  writes?: boolean;
 }
 
 /**
@@ -201,8 +218,15 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     return performFetch(body);
   }
 
+  // Default meta advertises the real capability surface: update flips on
+  // with the write opt-in (plan 055). A caller-supplied `meta` always wins.
+  const meta = config.meta ?? defaultHttpAdapterMeta();
+  if (!config.meta && config.writes) {
+    meta.features.update = true;
+  }
+
   return {
-    meta: config.meta ?? defaultHttpAdapterMeta(),
+    meta,
 
     async fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>> {
       // `signal` drives THIS fetch's cancellation; it's not sent over the wire.
@@ -261,5 +285,64 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       const result = signal ? await send(body, signal) : await sendCacheable(body);
       return result as [number, number];
     },
+
+    async describeColumns(table?: string): Promise<InferredColumnSpec[]> {
+      // A schema answer is stable — route through the same TTL cache/dedup
+      // as the facet reads (plan 041) so repeated mounts don't refetch.
+      const body = {
+        method: 'describeColumns' as const,
+        ...(table !== undefined ? { table } : {}),
+      };
+      const result = await sendCacheable(body);
+      return result as InferredColumnSpec[];
+    },
+
+    async resolveCellWriteTarget(
+      columnId: string,
+      table?: string
+    ): Promise<CellWriteTarget | null> {
+      // A READ (schema/relationship introspection, plan 055) — independent
+      // of the write opt-in, cached like describeColumns.
+      const body = {
+        method: 'resolveCellWriteTarget' as const,
+        columnId,
+        ...(table !== undefined ? { table } : {}),
+      };
+      const result = await sendCacheable(body);
+      return result as CellWriteTarget | null;
+    },
+
+    // Proxied writes are DOUBLE opt-in (plan 055): without `writes: true`
+    // here the adapter's shape stays byte-identical to the read-only pre-055
+    // surface (no updateRecord, meta advertises update: false).
+    ...(config.writes
+      ? {
+          async updateRecord(
+            id: string,
+            data: Partial<TData>,
+            options?: MutationOptions
+          ): Promise<TData> {
+            const keys = Object.keys(data as Record<string, unknown>);
+            const field = keys[0];
+            if (keys.length !== 1 || !field) {
+              throw new HttpAdapterError(
+                'httpAdapter cell edits are singular — pass exactly one field per updateRecord call.'
+              );
+            }
+            const raw = (data as Record<string, unknown>)[field];
+            const value = raw instanceof Date ? raw.toISOString() : raw;
+            const body = {
+              method: 'cellEdit' as const,
+              id,
+              field,
+              value,
+              ...(options?.table !== undefined ? { table: options.table } : {}),
+            };
+            // Writes are never cached/deduped.
+            const result = await send(body);
+            return result as TData;
+          },
+        }
+      : {}),
   };
 }

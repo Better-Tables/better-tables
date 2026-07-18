@@ -3,6 +3,7 @@
 import type { ColumnDefinition, EditableConfig, EditRendererProps } from '@better-tables/core';
 import { Pencil } from 'lucide-react';
 import * as React from 'react';
+import { useColumnOptions } from '../../hooks/use-column-options';
 import { normalizeEditableConfig, V1_EDITABLE_TYPES } from '../../hooks/use-editable-cells';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -269,6 +270,41 @@ function OptionEditor<TValue>({
   );
 }
 
+/**
+ * Option editor with the facet fallback (plan 054): declared/enriched
+ * options render immediately; a column without options lazily fetches
+ * `adapter.getFilterOptions(columnId)` on first open (this component mounts
+ * when editing begins). "No options" remains only for an empty/failed fetch.
+ */
+function OptionEditorWithFallback<TData, TValue>({
+  column,
+  value,
+  onCommit,
+  onCancel,
+}: {
+  column: ColumnDefinition<TData, TValue>;
+  value: TValue;
+  onCommit: (value: TValue) => void;
+  onCancel: () => void;
+}) {
+  const { options, loading } = useColumnOptions(column as ColumnDefinition<TData, unknown>);
+
+  if (loading) {
+    return <span className="text-muted-foreground text-xs">Loading options…</span>;
+  }
+  if (options.length === 0) {
+    return <span className="text-muted-foreground text-xs">No options</span>;
+  }
+  return (
+    <OptionEditor
+      value={value}
+      options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+      onCommit={onCommit}
+      onCancel={onCancel}
+    />
+  );
+}
+
 function BooleanEditor<TValue>({
   value,
   onCommit,
@@ -401,20 +437,15 @@ function CellEditor<TData, TValue>({
           onInvalid={onInvalid}
         />
       );
-    case 'option': {
-      const options = column.filter?.options ?? [];
-      if (options.length === 0) {
-        return <span className="text-muted-foreground text-xs">No options</span>;
-      }
+    case 'option':
       return (
-        <OptionEditor
+        <OptionEditorWithFallback
+          column={column}
           value={value}
-          options={options.map((o) => ({ value: String(o.value), label: o.label }))}
           onCommit={onCommit}
           onCancel={onCancel}
         />
       );
-    }
     case 'boolean':
       return <BooleanEditor value={value} onCommit={onCommit} />;
     case 'date':

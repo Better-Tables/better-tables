@@ -134,6 +134,7 @@ const UI_SOURCE_FILES = {
   },
   hooks: [
     'index.ts',
+    'use-column-options.tsx',
     'use-debounce.ts',
     'use-editable-cells.ts',
     'use-filter-validation.ts',

@@ -7,8 +7,19 @@
  * files, edge functions, etc.
  */
 
+import { coerceCellValue } from '../lib/cell-edit-core';
 import type { FetchDataResult, TableAdapter } from '../types/adapter';
 import type { AdapterRequestBody, AdapterResponseBody } from './http-protocol';
+
+/**
+ * Opt-in write configuration (plan 055). Absent/false = writes disabled
+ * (the pre-055 read-only behavior). `true` allows a `cellEdit` on any
+ * column the adapter's schema says is writable; the `{ columns }` object
+ * form narrows the allow-list to the app's ACTUAL editable columns —
+ * RECOMMENDED, because the handler has no TableDefinition and
+ * schema-writable alone is broader than app-editable.
+ */
+export type AdapterWritesOption = boolean | { columns: string[] };
 
 /**
  * Context forwarded to lazy adapter factories when serving over HTTP.
@@ -31,6 +42,8 @@ export type AdapterSource<TData = unknown> =
 export interface HandleAdapterRequestOptions {
   /** Server-side error sink for `server_error` responses. */
   onError?: (error: unknown) => void;
+  /** Opt-in write gate for `cellEdit` (plan 055) — see {@link AdapterWritesOption}. */
+  writes?: AdapterWritesOption;
 }
 
 /**
@@ -53,6 +66,13 @@ export interface AdapterRouteHandlerOptions {
   constrainRequest?: (body: AdapterRequestBody, request: Request) => AdapterRequestBody;
   /** Server-side error sink for `server_error` responses. */
   onError?: (error: unknown) => void;
+  /**
+   * Opt-in write gate for `cellEdit` (plan 055) — see
+   * {@link AdapterWritesOption}. Enabling writes without an `authorize`
+   * callback logs a dev warn at handler creation: every browser can reach
+   * this endpoint, and row-level authorization is the APP's concern.
+   */
+  writes?: AdapterWritesOption;
 }
 
 async function resolveAdapter<TData>(
@@ -78,6 +98,28 @@ function isValidBody(body: unknown): body is AdapterRequestBody {
     method === 'getMinMaxValues'
   ) {
     return typeof (body as { columnId?: unknown }).columnId === 'string';
+  }
+  if (method === 'describeColumns') {
+    const table = (body as { table?: unknown }).table;
+    return table === undefined || typeof table === 'string';
+  }
+  if (method === 'resolveCellWriteTarget') {
+    const table = (body as { table?: unknown }).table;
+    return (
+      typeof (body as { columnId?: unknown }).columnId === 'string' &&
+      (table === undefined || typeof table === 'string')
+    );
+  }
+  if (method === 'cellEdit') {
+    const candidate = body as { id?: unknown; field?: unknown; table?: unknown };
+    return (
+      typeof candidate.id === 'string' &&
+      candidate.id.length > 0 &&
+      typeof candidate.field === 'string' &&
+      candidate.field.length > 0 &&
+      'value' in (body as object) &&
+      (candidate.table === undefined || typeof candidate.table === 'string')
+    );
   }
   return false;
 }
@@ -147,6 +189,94 @@ export async function handleAdapterRequest<TData = unknown>(
         const result = await adapter.getMinMaxValues(body.columnId, body.params);
         return { ok: true, result };
       }
+      case 'describeColumns': {
+        // Optional capability (plan 054): an adapter without it is a caller
+        // mistake (mounting auto columns over a non-introspectable adapter),
+        // not a server failure — report it as such.
+        if (!adapter.describeColumns) {
+          return {
+            ok: false,
+            error: 'Adapter does not support describeColumns.',
+            kind: 'bad_request',
+          };
+        }
+        const result = await adapter.describeColumns(body.table);
+        return { ok: true, result };
+      }
+      case 'resolveCellWriteTarget': {
+        // A READ (pure introspection, plan 055) — independent of the write
+        // opt-in; the UI needs it to gate relationship-path columns.
+        if (!adapter.resolveCellWriteTarget) {
+          return {
+            ok: false,
+            error: 'Adapter does not support resolveCellWriteTarget.',
+            kind: 'bad_request',
+          };
+        }
+        const result = await adapter.resolveCellWriteTarget(body.columnId, body.table);
+        return { ok: true, result };
+      }
+      case 'cellEdit': {
+        // The ONE proxied write (plan 055) — double opt-in, fail closed.
+        const writes = options?.writes;
+        if (!writes) {
+          return {
+            ok: false,
+            error: 'Writes are not enabled on this endpoint.',
+            kind: 'forbidden',
+          };
+        }
+        if (typeof writes === 'object' && !writes.columns.includes(body.field)) {
+          return {
+            ok: false,
+            error: `Column "${body.field}" is not on the write allow-list.`,
+            kind: 'bad_request',
+          };
+        }
+        // FAIL CLOSED: without schema introspection the server cannot
+        // validate the target or the value — never trust the client.
+        if (!adapter.resolveCellWriteTarget || !adapter.describeColumns) {
+          return {
+            ok: false,
+            error: 'Adapter cannot validate writes (schema introspection unavailable).',
+            kind: 'bad_request',
+          };
+        }
+        const target = await adapter.resolveCellWriteTarget(body.field, body.table);
+        if (!target || !target.writable || !target.single) {
+          return {
+            ok: false,
+            error: `Column "${body.field}" is not writable.`,
+            kind: 'bad_request',
+          };
+        }
+        const specs = await adapter.describeColumns(target.table);
+        const spec = specs.find((candidate) => candidate.field === target.field);
+        if (!spec || !spec.writable) {
+          return {
+            ok: false,
+            error: `Column "${body.field}" is not writable.`,
+            kind: 'bad_request',
+          };
+        }
+        const coerced = coerceCellValue(spec.columnType, body.value, spec.options);
+        if (!coerced.ok) {
+          return { ok: false, error: coerced.error, kind: 'bad_request' };
+        }
+        if (!adapter.updateRecord) {
+          return {
+            ok: false,
+            error: 'Adapter does not support updateRecord.',
+            kind: 'bad_request',
+          };
+        }
+        const result = await adapter.updateRecord(
+          body.id,
+          { [target.field]: coerced.value } as Partial<TData>,
+          { table: target.table }
+        );
+        return { ok: true, result };
+      }
     }
   } catch (error) {
     if (options?.onError) {
@@ -191,6 +321,20 @@ export function createAdapterRouteHandler<TData = unknown>(
   source: AdapterSource<TData>,
   routeOptions?: AdapterRouteHandlerOptions
 ): (request: Request) => Promise<Response> {
+  // Writes without authorization means ANY browser can write through this
+  // endpoint — warn once, at creation (plan 055).
+  if (
+    routeOptions?.writes &&
+    !routeOptions.authorize &&
+    (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production')
+  ) {
+    console.warn(
+      '[better-tables] createAdapterRouteHandler: writes are enabled without an `authorize` ' +
+        'callback — every client of this endpoint can write. Add authorize (and consider ' +
+        'writes: { columns } narrowing).'
+    );
+  }
+
   return async (request: Request): Promise<Response> => {
     let body: unknown;
     try {
@@ -258,11 +402,20 @@ export function createAdapterRouteHandler<TData = unknown>(
     const envelope = await handleAdapterRequest(
       source,
       constrained,
-      routeOptions?.onError ? { onError: routeOptions.onError } : undefined,
+      {
+        ...(routeOptions?.onError ? { onError: routeOptions.onError } : {}),
+        ...(routeOptions?.writes !== undefined ? { writes: routeOptions.writes } : {}),
+      },
       { request }
     );
 
-    const status = envelope.ok ? 200 : envelope.kind === 'server_error' ? 500 : 400;
+    const status = envelope.ok
+      ? 200
+      : envelope.kind === 'server_error'
+        ? 500
+        : envelope.kind === 'forbidden'
+          ? 403
+          : 400;
     return new Response(JSON.stringify(envelope), {
       status,
       headers: { 'content-type': 'application/json' },
