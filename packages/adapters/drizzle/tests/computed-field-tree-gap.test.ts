@@ -9,7 +9,6 @@ import { sql } from 'drizzle-orm';
 import { pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
 import type { DrizzleAdapterConfig, PostgresDatabaseType } from '../src/types';
-import { QueryError } from '../src/types';
 
 const usersTable = pgTable('users', {
   id: uuid('id').primaryKey(),
