@@ -1,7 +1,7 @@
 // TODO: Now we are type safe this can be updated to use the types from the schema
 // TODO: remove the any types
 
-import { betterTables, defineTable } from '@better-tables/core';
+import { defineTableRow } from '@better-tables/core';
 import { drizzleAdapter } from '../src/factory';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
@@ -110,11 +110,8 @@ type UserWithRelations = User & {
 };
 
 // Flagship table definition
-function buildUsersTable(db: ReturnType<typeof drizzle>) {
-  const tables = betterTables({
-    database: drizzleAdapter(db, { options: { defaultPrimaryTable: 'users' } }),
-  });
-  return defineTable<typeof tables>()('users', (t) => ({
+function buildUsersTable(_db: ReturnType<typeof drizzle>) {
+  return defineTableRow<UserWithRelations>()('users', (t) => ({
     columns: [
       t.text('name').displayName('Name'),
       t.text('email').displayName('Email'),

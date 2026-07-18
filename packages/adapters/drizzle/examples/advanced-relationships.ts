@@ -1,8 +1,8 @@
 // TODO: Now we are type safe this can be updated to use the types from the schema
 // TODO: remove the any types
-import { betterTables, defineTable } from '@better-tables/core';
+import { defineTableRow } from '@better-tables/core';
 import { drizzleAdapter } from '../src/factory';
-import type { RelationshipMap } from '@better-tables/drizzle';
+import type { RelationshipMap } from '../src/types';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -241,7 +241,7 @@ type UserWithComputed = UserWithRelations & {
 };
 
 // Custom relationship mappings for many-to-many
-const customRelationships = {
+const customRelationships: RelationshipMap = {
   // User -> Roles (through userRoles)
   'roles.name': {
     from: 'users',
@@ -298,9 +298,8 @@ const customRelationships = {
 };
 
 
-function buildUsersTable(db: ReturnType<typeof drizzle>) {
-  const tables = betterTables({ database: drizzleAdapter(db, { relationships: customRelationships, options: { defaultPrimaryTable: 'users', defaultMutationTable: 'users' } }) });
-  return defineTable<typeof tables>()('users', (t) => ({
+function buildUsersTable(_db: ReturnType<typeof drizzle>) {
+  return defineTableRow<UserWithRelations>()('users', (t) => ({
     columns: [
       t.text('name').displayName('Name'),
       t.text('email').displayName('Email'),
@@ -327,41 +326,60 @@ function buildUsersTable(db: ReturnType<typeof drizzle>) {
           0
         ) || 0).displayName('Total Hours'),
       t.computed('avg_experience', (user) => {
-      const skills = user.userSkills || [];
-      return skills.length > 0
-        ? skills.reduce((sum: number, us: UserSkill) => sum + (us.yearsExperience || 0), 0) /
-            skills.length
-        : 0;
-    }).displayName('Avg Experience'),
-      t.computed('certified_skills', (user) => user.userSkills?.filter((us: UserSkill) => us.certified).displayName('Certified Skills'),
-      t.computed('is_manager', (user) => (user.managedDepartments?.length || 0) > 0).displayName('Is Manager'),
+        const skills = user.userSkills || [];
+        return skills.length > 0
+          ? skills.reduce((sum: number, us: UserSkill) => sum + (us.yearsExperience || 0), 0) /
+              skills.length
+          : 0;
+      }).displayName('Avg Experience'),
+      t.computed('certified_skills', (user) =>
+        user.userSkills?.filter((us: UserSkill) => us.certified).length || 0
+      ).displayName('Certified Skills'),
+      t.computed('is_manager', (user) => (user.managedDepartments?.length || 0) > 0).displayName(
+        'Is Manager'
+      ),
       t.computed('is_senior', (user) =>
         user.userRoles?.some(
           (ur: UserRole & { role?: Role }) =>
             ur.role?.level === 'senior' || ur.role?.level === 'lead'
-        ) || false).displayName('Is Senior'),
+        ) || false
+      ).displayName('Is Senior'),
       t.computed('has_active_projects', (user) =>
         user.userProjects?.some(
           (up: UserProject & { project?: Project }) => up.project?.status === 'active'
-        ) || false).displayName('Has Active Projects'),
+        ) || false
+      ).displayName('Has Active Projects'),
       t.computed('skill_summary', (user) => {
-      const skills = user.userSkills || [];
-      const topSkills =
-        skills
-          .sort((a: UserSkill, b: UserSkill) => (b.yearsExperience || 0) - (a.yearsExperience || 0)).displayName('Skills'),
+        const skills = user.userSkills || [];
+        const topSkills =
+          skills
+            .sort(
+              (a: UserSkill, b: UserSkill) => (b.yearsExperience || 0) - (a.yearsExperience || 0)
+            )
+            .slice(0, 3)
+            .map((us) => `${us.skill?.name} (${us.proficiency})`)
+            .join(', ') || 'No skills';
+        return topSkills || 'No skills';
+      }).displayName('Skills'),
       t.computed('role_summary', (user) => {
-      const roles = user.userRoles || [];
-      return (
-        roles
-          .map((ur: UserRole & { role?: Role }) => `${ur.role?.name} (${ur.role?.level})`).displayName('Roles'),
+        const roles = user.userRoles || [];
+        return (
+          roles
+            .map((ur: UserRole & { role?: Role }) => `${ur.role?.name} (${ur.role?.level})`)
+            .join(', ') || 'No roles'
+        );
+      }).displayName('Roles'),
       t.computed('project_summary', (user) => {
-      const projects = user.userProjects || [];
-      const activeProjects = projects.filter(
-        (up: UserProject & { project?: Project }) => up.project?.status === 'active'
-      );
-      return activeProjects.length > 0
-        ? activeProjects
-            .map((up: UserProject & { project?: Project }) => up.project?.name).displayName('Projects'),
+        const projects = user.userProjects || [];
+        const activeProjects = projects.filter(
+          (up: UserProject & { project?: Project }) => up.project?.status === 'active'
+        );
+        return activeProjects.length > 0
+          ? activeProjects
+              .map((up: UserProject & { project?: Project }) => up.project?.name)
+              .join(', ')
+          : 'No active projects';
+      }).displayName('Projects'),
     ],
   }));
 }
