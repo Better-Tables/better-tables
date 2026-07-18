@@ -254,7 +254,12 @@ async function setupDatabase() {
 }
 
 // Create adapter
-async function createAdapter() {
+async function createAdapter(): Promise<{
+  adapter: ReturnType<typeof drizzleAdapter>;
+  sqlite: InstanceType<typeof Database>;
+  usersTable: ReturnType<typeof buildUsersTable>;
+  columns: ReturnType<typeof buildUsersTable>['columns'];
+}> {
   const { db, sqlite } = await setupDatabase();
 
   usersTable = buildUsersTable(db);

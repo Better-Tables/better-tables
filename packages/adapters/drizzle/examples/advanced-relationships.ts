@@ -591,7 +591,10 @@ async function setupComplexDatabase() {
   return { db, sqlite };
 }
 
-async function createAdvancedAdapter() {
+async function createAdvancedAdapter(): Promise<{
+  adapter: ReturnType<typeof drizzleAdapter>;
+  sqlite: InstanceType<typeof Database>;
+}> {
   const { db, sqlite } = await setupComplexDatabase();
 
   usersTable = buildUsersTable(db);
