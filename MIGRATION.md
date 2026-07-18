@@ -665,7 +665,7 @@ is a condensed checklist, not a replacement.
    `changeset version`.
 2. **Publish as one train.** All accumulated changesets in `.changeset/`
    publish together: `bun run changeset:version`, review the resulting
-   version bumps and changelog entries, then `bun run changeset:release` (or
+   version bumps and changelog entries, then `bun run release` (or
    the repo's equivalent `release` script). Do not partially publish.
 3. **Restore the git remote before publishing.** The repository currently has
    no git remote configured — that's deliberate during local plan-driven
