@@ -171,6 +171,8 @@ export async function handleAdapterRequest<TData = unknown>(
  *
  * Status mapping: success → 200; `kind: 'bad_request'` (and authorize false)
  * → 400/403; `kind: 'server_error'` → 500. The response is `application/json`.
+ * Throws from `authorize` / `constrainRequest` are caught the same way as
+ * adapter failures (500 + `server_error` envelope + optional `onError`).
  *
  * @example
  * ```ts
@@ -209,27 +211,49 @@ export function createAdapterRouteHandler<TData = unknown>(
       });
     }
 
-    if (routeOptions?.authorize) {
-      const authResult = await routeOptions.authorize(request, body);
-      if (authResult instanceof Response) {
-        return authResult;
+    let constrained: AdapterRequestBody = body;
+    try {
+      if (routeOptions?.authorize) {
+        const authResult = await routeOptions.authorize(request, body);
+        if (authResult instanceof Response) {
+          return authResult;
+        }
+        if (authResult === false) {
+          const envelope: AdapterResponseBody = {
+            ok: false,
+            error: 'Unauthorized.',
+            kind: 'bad_request',
+          };
+          return new Response(JSON.stringify(envelope), {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
       }
-      if (authResult === false) {
-        const envelope: AdapterResponseBody = {
-          ok: false,
-          error: 'Unauthorized.',
-          kind: 'bad_request',
-        };
-        return new Response(JSON.stringify(envelope), {
-          status: 403,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-    }
 
-    const constrained = routeOptions?.constrainRequest
-      ? routeOptions.constrainRequest(body, request)
-      : body;
+      if (routeOptions?.constrainRequest) {
+        constrained = routeOptions.constrainRequest(body, request);
+      }
+    } catch (error) {
+      // Match handleAdapterRequest: never leak authorize/constrain failures
+      // outside the JSON envelope + onError sink.
+      if (routeOptions?.onError) {
+        try {
+          routeOptions.onError(error);
+        } catch {
+          // A throwing logger must not mask the response.
+        }
+      }
+      const envelope: AdapterResponseBody = {
+        ok: false,
+        error: 'Adapter request failed.',
+        kind: 'server_error',
+      };
+      return new Response(JSON.stringify(envelope), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
 
     const envelope = await handleAdapterRequest(
       source,

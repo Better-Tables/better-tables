@@ -389,6 +389,78 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     expect(sent.primaryTable).toBe('tickets');
   });
 
+  it('authorize throws map to 500 server_error and invoke onError', async () => {
+    const seen: unknown[] = [];
+    let built = 0;
+    const handler = createAdapterRouteHandler(
+      () => {
+        built += 1;
+        return makeServerAdapter().adapter;
+      },
+      {
+        authorize: () => {
+          throw new Error('auth boom');
+        },
+        onError: (error) => {
+          seen.push(error);
+        },
+      }
+    );
+
+    const response = await handler(
+      new Request('http://x/api/tables', {
+        method: 'POST',
+        body: JSON.stringify({ method: 'fetchData', params: {} }),
+      })
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Adapter request failed.',
+      kind: 'server_error',
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBeInstanceOf(Error);
+    expect((seen[0] as Error).message).toBe('auth boom');
+    expect(built).toBe(0);
+  });
+
+  it('constrainRequest throws map to 500 server_error and invoke onError', async () => {
+    const seen: unknown[] = [];
+    let built = 0;
+    const handler = createAdapterRouteHandler(
+      () => {
+        built += 1;
+        return makeServerAdapter().adapter;
+      },
+      {
+        constrainRequest: () => {
+          throw new Error('constrain boom');
+        },
+        onError: (error) => {
+          seen.push(error);
+        },
+      }
+    );
+
+    const response = await handler(
+      new Request('http://x/api/tables', {
+        method: 'POST',
+        body: JSON.stringify({ method: 'fetchData', params: {} }),
+      })
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Adapter request failed.',
+      kind: 'server_error',
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBeInstanceOf(Error);
+    expect((seen[0] as Error).message).toBe('constrain boom');
+    expect(built).toBe(0);
+  });
+
   it('maps adapter throws to 500 server_error and malformed body to 400', async () => {
     const failing: TableAdapter = {
       meta: TEST_META,
