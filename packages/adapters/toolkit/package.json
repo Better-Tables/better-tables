@@ -28,7 +28,7 @@
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "lint": "biome check .",
-    "lint:fix": "biome check --apply .",
+    "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf .cache dist .turbo node_modules"

@@ -10,6 +10,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
     "clean": "git clean -xdf .cache .next .turbo node_modules"
   },
   "dependencies": {

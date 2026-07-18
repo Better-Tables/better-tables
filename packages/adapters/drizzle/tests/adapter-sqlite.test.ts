@@ -316,14 +316,7 @@ describe('DrizzleAdapter - SQLite Integration', () => {
     });
   });
 
-  // TODO: Enable strict validation for invalid filter operators
-  //
-  // Skipped because URL-synced filters may contain invalid/partial states that
-  // filter-handler.ts intentionally allows (see handleCrossTableFilters:672-710).
-  // Consider adding a validation mode: strict for API calls, lenient for URL state.
-  //
-  // Related: packages/adapters/drizzle/src/filter-handler.ts:672-710 (commit 3f04f60)
-  describe.skip('Error Handling', () => {
+  describe('Error Handling', () => {
     it('should handle invalid column IDs', async () => {
       await expect(
         adapter.fetchData({
@@ -332,36 +325,36 @@ describe('DrizzleAdapter - SQLite Integration', () => {
       ).rejects.toThrow();
     });
 
-    it('should handle invalid filter operators gracefully', async () => {
-      // Adapter should throw an error for invalid operators
-      await expect(
-        adapter.fetchData({
-          filters: [
-            {
-              columnId: 'name',
-              type: 'text',
-              operator: 'invalidOperator' as FilterOperator,
-              values: ['test'],
-            },
-          ] as unknown as FilterState[],
-        })
-      ).rejects.toThrow();
+    it('should fail-soft for unsupported filter operators', async () => {
+      // Unsupported operators are skipped so partial URL/UI filter state can
+      // still fetch (see filter-handler: skip invalid filters silently).
+      const result = await adapter.fetchData({
+        filters: [
+          {
+            columnId: 'name',
+            type: 'text',
+            operator: 'invalidOperator' as FilterOperator,
+            values: ['test'],
+          },
+        ] as unknown as FilterState[],
+      });
+      expect(result.data.length).toBeGreaterThan(0);
     });
 
-    it('should throw error for invalid filter values', async () => {
-      // Test invalid values (e.g. undefined for contains)
-      await expect(
-        adapter.fetchData({
-          filters: [
-            {
-              columnId: 'name',
-              type: 'text',
-              operator: 'contains',
-              values: [undefined], // Invalid value
-            } as unknown as FilterState,
-          ],
-        })
-      ).rejects.toThrow();
+    it('should fail-soft for empty/missing filter values', async () => {
+      // ADAPTER-07: present-but-wrong-type values throw; empty/missing values
+      // intentionally emit undefined (fail-soft for partial UI input).
+      const result = await adapter.fetchData({
+        filters: [
+          {
+            columnId: 'name',
+            type: 'text',
+            operator: 'contains',
+            values: [undefined],
+          } as unknown as FilterState,
+        ],
+      });
+      expect(result.data.length).toBeGreaterThan(0);
     });
   });
 
