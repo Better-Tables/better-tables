@@ -75,6 +75,7 @@ import {
   normalizeFilterNode,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import { convertToExportFormat, getMimeType } from './export-format';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
@@ -1197,12 +1198,15 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.fetchData(fetchParams);
 
       // Convert to export format
-      const exportData = this.convertToExportFormat(result.data, params.format);
+      const exportData = convertToExportFormat(
+        result.data as Record<string, unknown>[],
+        params.format
+      );
 
       return {
         data: exportData,
         filename: `export.${params.format}`,
-        mimeType: this.getMimeType(params.format),
+        mimeType: getMimeType(params.format),
       };
     } catch (error) {
       throw new QueryError(
@@ -1537,61 +1541,4 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     return context.joinPaths.size;
   }
 
-  private convertToExportFormat(
-    data: InferSelectModelFromFilteredSchema<TSchema>[],
-    format: string
-  ): Blob | string {
-    switch (format) {
-      case 'csv':
-        return this.convertToCSV(data);
-      case 'json':
-        return JSON.stringify(data, null, 2);
-      case 'excel':
-        // Would need a library like xlsx for this
-        throw new Error('Excel export not implemented');
-      default:
-        throw new Error(`Unsupported export format: ${format}`);
-    }
-  }
-
-  private convertToCSV(data: InferSelectModelFromFilteredSchema<TSchema>[]): string {
-    if (data.length === 0) return '';
-
-    const firstRecord = data[0];
-    if (!firstRecord || typeof firstRecord !== 'object') return '';
-
-    const headers = Object.keys(firstRecord);
-    const csvRows = [headers.join(',')];
-
-    for (const row of data) {
-      const values = headers.map((header) => {
-        const value = (row as Record<string, unknown>)[header];
-        if (typeof value === 'string') {
-          // Prevent CSV formula injection by prefixing with quote if starts with formula characters
-          const sanitizedValue = value.replace(/"/g, '""');
-          if (/^[=+\-@]/.test(value)) {
-            return `"'${sanitizedValue}"`;
-          }
-          return `"${sanitizedValue}"`;
-        }
-        return value;
-      });
-      csvRows.push(values.join(','));
-    }
-
-    return csvRows.join('\n');
-  }
-
-  private getMimeType(format: string): string {
-    switch (format) {
-      case 'csv':
-        return 'text/csv';
-      case 'json':
-        return 'application/json';
-      case 'excel':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      default:
-        return 'application/octet-stream';
-    }
-  }
 }
