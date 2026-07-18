@@ -430,8 +430,7 @@ function buildInferredColumn(spec: InferredColumnSpec): ColumnDefinition<unknown
   return {
     id: field,
     displayName: spec.label,
-    accessor: (row: unknown) =>
-      row == null ? undefined : (row as Record<string, unknown>)[field],
+    accessor: (row: unknown) => (row == null ? undefined : (row as Record<string, unknown>)[field]),
     type: spec.columnType,
     sortable: true,
     filterable: true,

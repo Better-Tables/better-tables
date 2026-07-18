@@ -136,10 +136,7 @@ describe('tableNeedsColumnResolution', () => {
     expect(tableNeedsColumnResolution(gap)).toBe(true);
 
     const declared = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [
-        t.text('subject'),
-        t.option('status').options([{ value: 'open', label: 'Open' }]),
-      ],
+      columns: [t.text('subject'), t.option('status').options([{ value: 'open', label: 'Open' }])],
     }));
     expect(tableNeedsColumnResolution(declared)).toBe(false);
   });

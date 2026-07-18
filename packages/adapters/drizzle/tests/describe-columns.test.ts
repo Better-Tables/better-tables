@@ -11,24 +11,17 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type { InferredColumnSpec } from '@better-tables/core';
 import {
   boolean as pgBoolean,
+  pgEnum,
   integer as pgInteger,
   jsonb as pgJsonb,
-  pgEnum,
   pgTable,
   text as pgText,
   timestamp as pgTimestamp,
 } from 'drizzle-orm/pg-core';
 import { blob, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { AnyColumnType, AnyTableType } from '../src/types';
-import {
-  describeTableColumns,
-  isTimestampDrizzleColumn,
-} from '../src/utils/drizzle-schema-utils';
-import {
-  closeDatabase,
-  createTestAdapter,
-  createTestDatabase,
-} from './helpers/test-fixtures';
+import { describeTableColumns, isTimestampDrizzleColumn } from '../src/utils/drizzle-schema-utils';
+import { closeDatabase, createTestAdapter, createTestDatabase } from './helpers/test-fixtures';
 
 // ---------------------------------------------------------------------------
 // Fixtures: one table with enum + timestamp + array (pg), one sqlite table
