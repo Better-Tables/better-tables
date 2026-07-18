@@ -1,6 +1,6 @@
 'use server';
 
-import type { CellEditActionInput } from '@better-tables/core';
+import type { CellEditActionInput, CellEditActionResult } from '@better-tables/core';
 import { ticketsTable } from './columns';
 import { getSupportTables } from './db';
 
@@ -21,7 +21,14 @@ import { getSupportTables } from './db';
  * Row-level authorization stays the app's concern — a real app would check
  * the caller's session here before delegating.
  */
-export async function saveTicketCell(input: CellEditActionInput) {
-  const tables = await getSupportTables();
-  return tables.cellEditAction(ticketsTable)(input);
+export async function saveTicketCell(input: CellEditActionInput): Promise<CellEditActionResult> {
+  try {
+    const tables = await getSupportTables();
+    return await tables.cellEditAction(ticketsTable)(input);
+  } catch (error) {
+    // `getSupportTables()` throws if the lazy in-memory DB failed to
+    // initialize — surface that as a normal save failure instead of an
+    // unhandled server-action rejection.
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }

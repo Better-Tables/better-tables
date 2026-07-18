@@ -12,7 +12,7 @@ import {
   resolveEditableField,
   runValidationRules,
 } from '@better-tables/core';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ONE implementation (plan 055 Step 1): the editable helpers moved to core's
 // cell-edit-core module (shared with `cellEditAction` and the HTTP write
@@ -79,8 +79,27 @@ export type CellEditState = {
   error: string | null;
 };
 
+/**
+ * Cell keys must round-trip an arbitrary `(rowId, columnId)` pair without
+ * ambiguity, even when either id contains a `:` -- a naive `${rowId}:${columnId}`
+ * join lets `rowId="a:b", columnId="c"` collide with `rowId="a", columnId="b:c"`
+ * (both produce `"a:b:c"`). Length-prefixing the row id removes the ambiguity:
+ * the prefix encodes both the row id's exact length and its exact bytes, so no
+ * OTHER row id can ever produce the same prefix string.
+ */
 function cellKey(rowId: string, columnId: string): string {
-  return `${rowId}:${columnId}`;
+  return `${rowId.length}:${rowId}:${columnId}`;
+}
+
+/** The unambiguous prefix every cell key for `rowId` starts with. */
+function cellKeyRowPrefix(rowId: string): string {
+  return `${rowId.length}:${rowId}:`;
+}
+
+/** Extracts `columnId` from a cell key IF it belongs to `rowId`, else `null`. */
+function columnIdForRowKey(key: string, rowId: string): string | null {
+  const prefix = cellKeyRowPrefix(rowId);
+  return key.startsWith(prefix) ? key.slice(prefix.length) : null;
 }
 
 /**
@@ -253,6 +272,13 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
   const [resolvedTargets, setResolvedTargets] = useState(
     () => new Map<string, CellWriteTarget | null>()
   );
+  /**
+   * Column ids a render has asked to resolve but whose adapter I/O hasn't
+   * been kicked off yet -- flushed by the `useEffect` below so the actual
+   * `adapter.resolveCellWriteTarget` call never happens synchronously
+   * during render (bug fix: render path must stay pure).
+   */
+  const [pendingResolutionIds, setPendingResolutionIds] = useState(() => new Set<string>());
 
   const warnedColumnsRef = useRef(new Set<string>());
   const pendingEditsRef = useRef(pendingEdits);
@@ -276,6 +302,40 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
   const hasOnCellEdit = Boolean(onCellEdit);
   const hasSaveAction = Boolean(saveAction);
 
+  /**
+   * Bumped whenever `adapter`/`tableName` change (below), and captured by
+   * each in-flight resolution request. A resolution whose generation is
+   * stale by the time it settles belongs to a superseded adapter/table and
+   * must never write into `resolvedTargets` (bug fix: stale relationship
+   * targets on adapter/table switch).
+   */
+  const targetGenerationRef = useRef(0);
+  const adapterIdentityRef = useRef<{
+    adapter: TableAdapter<TData> | null | undefined;
+    tableName: string | undefined;
+  } | null>(null);
+
+  // Render-time reset (React "adjusting state during render" pattern, same
+  // one `useResolvedTableColumns` in table.tsx uses): when `adapter` or
+  // `tableName` change identity, clear resolved + in-flight relationship
+  // write targets SYNCHRONOUSLY so no render in between this one and the
+  // next can read a target resolved against the PREVIOUS adapter/table.
+  if (
+    adapterIdentityRef.current === null ||
+    adapterIdentityRef.current.adapter !== adapter ||
+    adapterIdentityRef.current.tableName !== tableName
+  ) {
+    adapterIdentityRef.current = { adapter, tableName };
+    targetGenerationRef.current += 1;
+    resolvingTargetsRef.current.clear();
+    if (resolvedTargets.size > 0) {
+      setResolvedTargets(new Map());
+    }
+    if (pendingResolutionIds.size > 0) {
+      setPendingResolutionIds(new Set());
+    }
+  }
+
   const warnOnce = useCallback((columnId: string, message: string) => {
     if (process.env.NODE_ENV === 'production') return;
     if (warnedColumnsRef.current.has(columnId)) return;
@@ -285,8 +345,9 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
 
   /**
    * Lazily resolve a dot column's write target through the adapter
-   * capability, once per column (plan 055). The kick-off is a guarded
-   * fire-and-forget: state lands asynchronously, never during render.
+   * capability, once per column (plan 055). Called ONLY from the
+   * `useEffect` below -- never during render -- so the adapter I/O itself
+   * is a proper post-commit effect.
    */
   const requestTargetResolution = useCallback((columnId: string) => {
     if (resolvedTargetsRef.current.has(columnId)) return;
@@ -294,21 +355,43 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
     const currentAdapter = adapterRef.current;
     const resolve = currentAdapter?.resolveCellWriteTarget;
     if (typeof resolve !== 'function') return;
+    const generation = targetGenerationRef.current;
     resolvingTargetsRef.current.add(columnId);
     resolve
       .call(currentAdapter, columnId, tableNameRef.current)
       .then(
         (target) => {
+          // Superseded by an adapter/table switch mid-flight -- discard.
+          if (targetGenerationRef.current !== generation) return;
           setResolvedTargets((prev) => new Map(prev).set(columnId, target));
         },
         () => {
+          if (targetGenerationRef.current !== generation) return;
           setResolvedTargets((prev) => new Map(prev).set(columnId, null));
         }
       )
       .finally(() => {
         resolvingTargetsRef.current.delete(columnId);
+        setPendingResolutionIds((prev) => {
+          if (!prev.has(columnId)) return prev;
+          const next = new Set(prev);
+          next.delete(columnId);
+          return next;
+        });
       });
   }, []);
+
+  // Flushes `pendingResolutionIds` after every commit (bug fix: adapter I/O
+  // during render). `getWriteTargetState` only ever QUEUES a column id
+  // during render -- this effect performs the actual adapter call, always
+  // post-render. `requestTargetResolution` itself is idempotent per column
+  // id (guarded by `resolvedTargetsRef`/`resolvingTargetsRef`), so running
+  // this on every render is safe/cheap once a column settles.
+  useEffect(() => {
+    for (const columnId of pendingResolutionIds) {
+      requestTargetResolution(columnId);
+    }
+  }, [pendingResolutionIds, requestTargetResolution]);
 
   /** Write-target state for a column: only dot ids (without a field override) need one. */
   const getWriteTargetState = useCallback(
@@ -321,10 +404,20 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
       if (resolvedTargets.has(column.id)) {
         return resolvedTargets.get(column.id) ?? null;
       }
-      requestTargetResolution(column.id);
+      // Render must stay pure: queue the request (adjusting-state-during-
+      // render pattern, guarded so it only fires once per column id) and
+      // let the effect above perform the actual adapter I/O post-commit.
+      if (!pendingResolutionIds.has(column.id)) {
+        setPendingResolutionIds((prev) => {
+          if (prev.has(column.id)) return prev;
+          const next = new Set(prev);
+          next.add(column.id);
+          return next;
+        });
+      }
       return 'pending';
     },
-    [requestTargetResolution, resolvedTargets]
+    [resolvedTargets, pendingResolutionIds]
   );
 
   const getColumnEditability = useCallback(
@@ -374,8 +467,8 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
     (rowId: string): Readonly<Record<string, unknown>> => {
       let overlay: Record<string, unknown> | null = null;
       for (const [key, value] of pendingEdits) {
-        if (!key.startsWith(`${rowId}:`)) continue;
-        const columnId = key.slice(rowId.length + 1);
+        const columnId = columnIdForRowKey(key, rowId);
+        if (columnId === null) continue;
         overlay ??= {};
         overlay[columnId] = value;
       }
@@ -388,8 +481,8 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
     (rowId: string): Readonly<Record<string, string>> => {
       let errors: Record<string, string> | null = null;
       for (const [key, message] of cellErrors) {
-        if (!key.startsWith(`${rowId}:`)) continue;
-        const columnId = key.slice(rowId.length + 1);
+        const columnId = columnIdForRowKey(key, rowId);
+        if (columnId === null) continue;
         errors ??= {};
         errors[columnId] = message;
       }
@@ -402,8 +495,8 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
     (rowId: string): ReadonlySet<string> => {
       let saving: Set<string> | null = null;
       for (const key of savingCells) {
-        if (!key.startsWith(`${rowId}:`)) continue;
-        const columnId = key.slice(rowId.length + 1);
+        const columnId = columnIdForRowKey(key, rowId);
+        if (columnId === null) continue;
         saving ??= new Set();
         saving.add(columnId);
       }
@@ -422,6 +515,21 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
       };
     },
     [activeEditKey, cellErrors, savingCells]
+  );
+
+  /**
+   * The column id being edited in `rowId`, or `null`. Table components
+   * (table.tsx / virtualized-table.tsx) should use this instead of parsing
+   * `activeEditKey` themselves with `startsWith`/`slice` -- the key's
+   * internal encoding (length-prefixed, see `cellKey`) is a hook-private
+   * detail.
+   */
+  const getEditingColumnId = useCallback(
+    (rowId: string): string | null => {
+      if (activeEditKey === null) return null;
+      return columnIdForRowKey(activeEditKey, rowId);
+    },
+    [activeEditKey]
   );
 
   const beginEdit = useCallback((rowId: string, columnId: string) => {
@@ -592,10 +700,24 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
             throw new Error('No save path available for cell edit');
           }
           const writeTable = target ? target.table : tableNameRef.current;
+          // `columnId` lets a wire adapter (httpAdapter) send the COLUMN id
+          // on the wire instead of `writeField` (the storage field, which
+          // for a relationship-path column is the RELATED table's field,
+          // e.g. `'company'` for column id `'customer.company'`) — the
+          // server's allow-list and `resolveCellWriteTarget` are keyed by
+          // column id (bug fix). Own-table columns don't need it: their
+          // storage field already equals their column id.
+          const updateOptions =
+            writeTable != null || target
+              ? {
+                  ...(writeTable != null ? { table: writeTable } : {}),
+                  ...(target ? { columnId: column.id } : {}),
+                }
+              : undefined;
           const updated = await currentAdapter.updateRecord(
             targetRowId,
             { [writeField]: value } as Partial<TData>,
-            writeTable != null ? { table: writeTable } : undefined
+            updateOptions
           );
           confirmFromRecord(updated);
         }
@@ -660,6 +782,7 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
     getRowErrors,
     getRowSavingColumns,
     getCellState,
+    getEditingColumnId,
     beginEdit,
     cancelEdit,
     commitEdit,

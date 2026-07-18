@@ -596,10 +596,18 @@ export function mapColumnInfoToColumnType(info: ColumnInfo): ColumnType {
 /**
  * Memoize schema-derived {@link InferredColumnSpec} lists by table object
  * identity (same WeakMap pattern as {@link getTableColumns} / plan 040's
- * caches). Callers receive a shallow copy so mutations cannot corrupt the
- * cache.
+ * caches). Callers receive a deep clone (top-level array AND each spec's
+ * `options` array) so mutation of either cannot corrupt the cache.
  */
 const describeColumnsCache = new WeakMap<object, readonly InferredColumnSpec[]>();
+
+/** Deep-enough clone for {@link InferredColumnSpec}: own fields plus the `options` array/entries. */
+function cloneInferredColumnSpec(spec: InferredColumnSpec): InferredColumnSpec {
+  return {
+    ...spec,
+    ...(spec.options ? { options: spec.options.map((option) => ({ ...option })) } : {}),
+  };
+}
 
 /**
  * Describe every column of a Drizzle table schema as an
@@ -611,30 +619,36 @@ const describeColumnsCache = new WeakMap<object, readonly InferredColumnSpec[]>(
  *   invalid/malformed schemas (never throws).
  */
 export function describeTableColumns(tableSchema: AnyTableType): InferredColumnSpec[] {
-  const cached = describeColumnsCache.get(tableSchema as object);
-  if (cached) {
-    return cached.slice();
-  }
+  try {
+    if (!tableSchema || typeof tableSchema !== 'object') {
+      return [];
+    }
 
-  const specs = getTableColumns(tableSchema).map((info): InferredColumnSpec => {
-    const columnType = mapColumnInfoToColumnType(info);
-    const enumValues = info.isArray ? null : getEnumValues(info.column);
-    return {
-      field: info.name,
-      columnType,
-      label: humanize(info.name),
-      ...(enumValues
-        ? { options: enumValues.map((value) => ({ value, label: humanize(value) })) }
-        : {}),
-      nullable: info.isNullable,
-      primaryKey: info.isPrimaryKey,
-      foreignKey: info.isForeignKey,
-      writable: !info.isPrimaryKey,
-    };
-  });
+    const cached = describeColumnsCache.get(tableSchema as object);
+    if (cached) {
+      return cached.map(cloneInferredColumnSpec);
+    }
 
-  if (tableSchema && typeof tableSchema === 'object') {
+    const specs = getTableColumns(tableSchema).map((info): InferredColumnSpec => {
+      const columnType = mapColumnInfoToColumnType(info);
+      const enumValues = info.isArray ? null : getEnumValues(info.column);
+      return {
+        field: info.name,
+        columnType,
+        label: humanize(info.name),
+        ...(enumValues
+          ? { options: enumValues.map((value) => ({ value, label: humanize(value) })) }
+          : {}),
+        nullable: info.isNullable,
+        primaryKey: info.isPrimaryKey,
+        foreignKey: info.isForeignKey,
+        writable: !info.isPrimaryKey,
+      };
+    });
+
     describeColumnsCache.set(tableSchema as object, specs);
+    return specs.map(cloneInferredColumnSpec);
+  } catch {
+    return [];
   }
-  return specs.slice();
 }

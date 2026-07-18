@@ -102,24 +102,33 @@ export type CellValueCoercion = { ok: true; value: unknown } | { ok: false; erro
 
 /**
  * Coerce a wire-safe value for a column TYPE (plan 055 Step 1):
+ * - `null` is only accepted when `nullable` is `true` — the column-builder
+ *   default is `false` (bug fix: this used to admit `null` unconditionally,
+ *   regardless of the column's declared nullability).
  * - `date`: `Date` (in-process) / ISO string / epoch number → `Date`;
- *   invalid dates rejected; `null` allowed (nullable columns).
- * - `number`/`currency`/`percentage`: finite number or `null`.
+ *   invalid dates rejected.
+ * - `number`/`currency`/`percentage`: finite number.
  * - `boolean`: requires a boolean.
  * - `option`: when `options` are declared/inferred the value must be one of
- *   them; otherwise a string (or `null`).
- * - text family (`text`/`email`/`url`/`phone`): string or `null`.
- * - `custom`: wire-safe primitive passthrough (`string|number|boolean|null`).
+ *   them; otherwise a string.
+ * - text family (`text`/`email`/`url`/`phone`): string.
+ * - `custom`: wire-safe primitive passthrough (`string|number|boolean`).
  * - anything else (`multiOption`/`json`/unknown): rejected — no v1 editor.
+ *
+ * @param nullable - Whether `null` is an admissible value for this column.
+ *   Defaults to `false`, matching `ColumnBuilder`'s default.
  */
 export function coerceCellValue(
   type: ColumnType,
   value: unknown,
-  options?: ReadonlyArray<Pick<FilterOption, 'value'>>
+  options?: ReadonlyArray<Pick<FilterOption, 'value'>>,
+  nullable = false
 ): CellValueCoercion {
+  if (value === null) {
+    return nullable ? { ok: true, value: null } : { ok: false, error: 'This field is required.' };
+  }
   switch (type) {
     case 'date': {
-      if (value === null) return { ok: true, value: null };
       if (value instanceof Date) {
         return Number.isNaN(value.getTime())
           ? { ok: false, error: 'Invalid date value.' }
@@ -136,7 +145,6 @@ export function coerceCellValue(
     case 'number':
     case 'currency':
     case 'percentage': {
-      if (value === null) return { ok: true, value: null };
       if (typeof value === 'number' && Number.isFinite(value)) return { ok: true, value };
       return { ok: false, error: 'Expected a finite number.' };
     }
@@ -151,23 +159,18 @@ export function coerceCellValue(
           ? { ok: true, value }
           : { ok: false, error: 'Value is not one of the column options.' };
       }
-      if (value === null || typeof value === 'string') return { ok: true, value };
+      if (typeof value === 'string') return { ok: true, value };
       return { ok: false, error: 'Expected a string option value.' };
     }
     case 'text':
     case 'email':
     case 'url':
     case 'phone': {
-      if (value === null || typeof value === 'string') return { ok: true, value };
+      if (typeof value === 'string') return { ok: true, value };
       return { ok: false, error: 'Expected a string.' };
     }
     case 'custom': {
-      if (
-        value === null ||
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean'
-      ) {
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         return { ok: true, value };
       }
       return { ok: false, error: 'Expected a primitive value.' };
@@ -263,6 +266,34 @@ export async function buildCellEditPolicy<TName extends string, TRow>(
       // Own-table write (flat id, or explicit field override — including on
       // dotted ids, where `editable.field` means "write THIS own-table
       // field", the plan-053 semantic).
+      //
+      // Consult the adapter's schema writability for THIS field when the
+      // capability is available (bug fix: this path used to hardcode
+      // `writable: true`, admitting primary keys and other
+      // schema-unwritable own-table fields — `resolveCellWriteTarget`
+      // already reports real writability for flat ids, see the Drizzle
+      // adapter). No capability (or the adapter doesn't recognize the
+      // field) keeps the previous permissive default so callback-only /
+      // adapter-less setups are unaffected.
+      let writable = true;
+      if (typeof resolveTarget === 'function') {
+        try {
+          const resolved = await resolveTarget.call(adapter, ownField, def.tableName);
+          if (resolved && resolved.table === def.tableName && resolved.relatedIdPath === null) {
+            writable = resolved.writable;
+          }
+        } catch {
+          // Introspection failure — fall back to the permissive default
+          // rather than blocking own-table saves on an adapter quirk.
+        }
+      }
+      if (!writable) {
+        devWarn(
+          `[better-tables] cellEditPolicy('${def.tableName}'): column '${column.id}' targets a ` +
+            `schema-unwritable field ('${ownField}') — not admitted.`
+        );
+        continue;
+      }
       entries.set(column.id, {
         column,
         target: {
@@ -340,7 +371,12 @@ export async function buildCellEditPolicy<TName extends string, TRow>(
         return { ok: false, error: `Column "${input.field}" is not editable.` };
       }
 
-      const coerced = coerceCellValue(entry.column.type, input.value, entry.column.filter?.options);
+      const coerced = coerceCellValue(
+        entry.column.type,
+        input.value,
+        entry.column.filter?.options,
+        entry.column.nullable ?? false
+      );
       if (!coerced.ok) {
         return { ok: false, error: coerced.error };
       }

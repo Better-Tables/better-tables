@@ -266,6 +266,18 @@ export interface CellWriteTarget {
 export interface MutationOptions {
   /** Explicit mutation target — JS schema key of the table to write. */
   table?: string;
+  /**
+   * The originating COLUMN id for a single-cell edit (plan 055 bug fix),
+   * e.g. `'customer.company'` for a relationship-path column whose
+   * `data` key is the RELATED table's storage field (`'company'`). Direct
+   * DB adapters (Drizzle, etc.) ignore this — they key `data` by storage
+   * field already. Wire adapters (`httpAdapter`) MUST prefer it over the
+   * `data` key when present: allow-lists and `resolveCellWriteTarget` are
+   * keyed by column id, not storage field, so sending the storage field on
+   * the wire lets it collide with an unrelated column/table that happens
+   * to share the same field name.
+   */
+  columnId?: string;
 }
 
 /**

@@ -253,6 +253,27 @@ describe('cellEdit over the wire — server side', () => {
     expect(updates).toHaveLength(0);
   });
 
+  it('null on a non-nullable column is a 400 bad_request, never a 500 (P2)', async () => {
+    const { adapter, updates } = makeWritableServer();
+    // `subject` (own table) and `customer.company` (related table) are both
+    // declared `nullable: false` in their specs — null must be rejected by
+    // type-driven coercion instead of reaching `updateRecord` and throwing.
+    const own = await handleAdapterRequest(
+      adapter,
+      { method: 'cellEdit', id: '1', field: 'subject', value: null },
+      { writes: true }
+    );
+    expect(own).toEqual({ ok: false, error: 'This field is required.', kind: 'bad_request' });
+
+    const related = await handleAdapterRequest(
+      adapter,
+      { method: 'cellEdit', id: '9', field: 'customer.company', value: null },
+      { writes: true }
+    );
+    expect(related).toEqual({ ok: false, error: 'This field is required.', kind: 'bad_request' });
+    expect(updates).toHaveLength(0);
+  });
+
   it('{ columns } narrowing rejects fields outside the allow-list', async () => {
     const { adapter, updates } = makeWritableServer();
     const narrowed = { writes: { columns: ['subject'] } };
@@ -332,6 +353,112 @@ describe('cellEdit over the wire — server side', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('{ columns } narrowing does not let a shared column id redirect to another table via `table` (P1)', async () => {
+    // Two tables both expose an own, writable column literally named
+    // 'subject' — 'tickets' is the DEFAULT (table omitted resolves to it);
+    // 'notes' is a different table the app never intended to expose via
+    // this endpoint's `writes: { columns: ['subject'] }` (scoped for
+    // 'tickets' only, per the doc example).
+    const NOTES_SPECS: InferredColumnSpec[] = [
+      {
+        field: 'subject',
+        columnType: 'text',
+        label: 'Subject',
+        nullable: false,
+        primaryKey: false,
+        foreignKey: false,
+        writable: true,
+      },
+    ];
+    const updates: Array<{ id: string; data: Record<string, unknown>; options?: MutationOptions }> =
+      [];
+    const adapter: TableAdapter<Record<string, unknown>> = {
+      meta: {
+        name: 'shared-field-server',
+        version: 'test',
+        features: {
+          create: false,
+          read: true,
+          update: true,
+          delete: false,
+          bulkOperations: false,
+          realTimeUpdates: false,
+          export: false,
+          transactions: false,
+        },
+        supportedColumnTypes: ['text'],
+        supportedOperators: {} as never,
+      },
+      fetchData: async () => ({
+        data: [],
+        total: 0,
+        pagination: { page: 1, limit: 10, totalPages: 0, hasNext: false, hasPrev: false },
+      }),
+      getFilterOptions: async () => [],
+      getFacetedValues: async () => new Map(),
+      getMinMaxValues: async () => [0, 0],
+      describeColumns: async (table?: string) => (table === 'notes' ? NOTES_SPECS : TICKET_SPECS),
+      resolveCellWriteTarget: async (columnId: string, table?: string) => {
+        const primary = table ?? 'tickets';
+        if (primary === 'notes') {
+          return columnId === 'subject'
+            ? {
+                table: 'notes',
+                field: 'subject',
+                relatedIdPath: null,
+                single: true,
+                writable: true,
+              }
+            : null;
+        }
+        const spec = TICKET_SPECS.find((candidate) => candidate.field === columnId);
+        return spec ? ownTarget(spec.field, spec.writable) : null;
+      },
+      updateRecord: async (id, data, options) => {
+        updates.push({
+          id,
+          data: data as Record<string, unknown>,
+          ...(options ? { options } : {}),
+        });
+        return { id, ...data };
+      },
+    };
+
+    const narrowed = { writes: { columns: ['subject'] } };
+
+    // Legit: table omitted (defaults to 'tickets') — allowed.
+    const legitDefault = await handleAdapterRequest(
+      adapter,
+      { method: 'cellEdit', id: '1', field: 'subject', value: 'a' },
+      narrowed
+    );
+    expect(legitDefault.ok).toBe(true);
+
+    // Legit: table EXPLICITLY 'tickets' — same as the default, still allowed.
+    const legitExplicit = await handleAdapterRequest(
+      adapter,
+      { method: 'cellEdit', id: '1', field: 'subject', table: 'tickets', value: 'b' },
+      narrowed
+    );
+    expect(legitExplicit.ok).toBe(true);
+    expect(updates).toHaveLength(2);
+    expect(updates.every((u) => u.options?.table === 'tickets')).toBe(true);
+
+    // Attack: same allow-listed column id, `table` redirected to 'notes' —
+    // rejected, even though 'notes.subject' is independently writable.
+    const attack = await handleAdapterRequest(
+      adapter,
+      { method: 'cellEdit', id: '1', field: 'subject', table: 'notes', value: 'x' },
+      narrowed
+    );
+    expect(attack).toEqual({
+      ok: false,
+      error: 'Column "subject" is not on the write allow-list.',
+      kind: 'bad_request',
+    });
+    expect(updates).toHaveLength(2); // no write from the attack
   });
 
   it('malformed cellEdit bodies are rejected', async () => {
@@ -420,6 +547,50 @@ describe('httpAdapter writes opt-in — client side', () => {
     // server-side via coercion.
     expect(updates[0]?.data.createdAt).toBeInstanceOf(Date);
     expect(updates[0]?.options).toEqual({ table: 'tickets' });
+  });
+
+  it('with writes: updateRecord sends the COLUMN id on the wire via options.columnId (P1 fix)', async () => {
+    const { adapter, updates } = makeWritableServer();
+    const handler = createAdapterRouteHandler(adapter, { writes: true, authorize: () => true });
+    const client = httpAdapter<Record<string, unknown>>({
+      url: '/api/tables',
+      writes: true,
+      fetch: loopbackFetch(handler),
+    });
+
+    // Mirrors the editable-cells save path for a relationship-path column:
+    // `data` is keyed by the RELATED table's storage field ('company'), but
+    // `options.columnId` carries the COLUMN id ('customer.company') the
+    // allow-list / `resolveCellWriteTarget` expect on the wire.
+    const updated = await client.updateRecord?.(
+      '9',
+      { company: 'Globex' },
+      { table: 'customers', columnId: 'customer.company' }
+    );
+    expect(updated).toBeDefined();
+    expect(updates).toEqual([
+      { id: '9', data: { company: 'Globex' }, options: { table: 'customers' } },
+    ]);
+  });
+
+  it('with writes: updateRecord falls back to the data key when columnId is absent (own-table columns)', async () => {
+    const { adapter, updates } = makeWritableServer();
+    const handler = createAdapterRouteHandler(adapter, { writes: true, authorize: () => true });
+    const client = httpAdapter<Record<string, unknown>>({
+      url: '/api/tables',
+      writes: true,
+      fetch: loopbackFetch(handler),
+    });
+
+    const updated = await client.updateRecord?.(
+      '5',
+      { subject: 'New subject' },
+      { table: 'tickets' }
+    );
+    expect(updated).toBeDefined();
+    expect(updates).toEqual([
+      { id: '5', data: { subject: 'New subject' }, options: { table: 'tickets' } },
+    ]);
   });
 
   it('with writes: a multi-field data record is rejected client-side (cell edits are singular)', async () => {

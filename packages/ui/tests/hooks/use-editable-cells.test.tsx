@@ -12,6 +12,15 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * Mirrors the hook's internal (length-prefixed) cell key encoding so tests
+ * don't hardcode the format -- see `cellKey` in `use-editable-cells.ts` for
+ * why a naive `${rowId}:${columnId}` join is ambiguous.
+ */
+function key(rowId: string, columnId: string): string {
+  return `${rowId.length}:${rowId}:${columnId}`;
+}
+
 interface Row {
   id: string;
   name: string;
@@ -163,7 +172,7 @@ describe('useEditableCells (plan 053 step 2)', () => {
     });
 
     expect(result.current.getDisplayValue('1', 'name', 'Alice')).toBe('Alicia');
-    expect(result.current.savingCells.has('1:name')).toBe(true);
+    expect(result.current.savingCells.has(key('1', 'name'))).toBe(true);
 
     await act(async () => {
       resolveUpdate({ id: '1', name: 'Alicia', age: 30 });
@@ -171,7 +180,7 @@ describe('useEditableCells (plan 053 step 2)', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.savingCells.has('1:name')).toBe(false);
+      expect(result.current.savingCells.has(key('1', 'name'))).toBe(false);
     });
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord.mock.calls[0]?.[0]).toBe('1');
@@ -201,9 +210,9 @@ describe('useEditableCells (plan 053 step 2)', () => {
     });
 
     expect(result.current.getDisplayValue('1', 'name', 'Alice')).toBe('Alice');
-    expect(result.current.cellErrors.get('1:name')).toBe('boom');
+    expect(result.current.cellErrors.get(key('1', 'name'))).toBe('boom');
     expect(onCellEditError).toHaveBeenCalledTimes(1);
-    expect(result.current.savingCells.has('1:name')).toBe(false);
+    expect(result.current.savingCells.has(key('1', 'name'))).toBe(false);
   });
 
   it('validation failure never calls the adapter', async () => {
@@ -235,8 +244,8 @@ describe('useEditableCells (plan 053 step 2)', () => {
     });
 
     expect(updateRecord).not.toHaveBeenCalled();
-    expect(result.current.cellErrors.get('1:name')).toBe('too short');
-    expect(result.current.activeEditKey).toBe('1:name');
+    expect(result.current.cellErrors.get(key('1', 'name'))).toBe('too short');
+    expect(result.current.activeEditKey).toBe(key('1', 'name'));
   });
 
   it('callback path wins over adapter path when both are present', async () => {
@@ -267,14 +276,36 @@ describe('useEditableCells (plan 053 step 2)', () => {
     const original = console.warn;
     console.warn = warn;
 
-    const column = makeColumn({ id: 'name', type: 'text', editable: true });
-    const { result } = renderHook(() => useEditableCells<Row>({ editing: true }));
+    try {
+      const column = makeColumn({ id: 'name', type: 'text', editable: true });
+      const { result } = renderHook(() => useEditableCells<Row>({ editing: true }));
 
-    expect(result.current.isColumnPotentiallyEditable(column)).toBe(false);
-    expect(result.current.isColumnPotentiallyEditable(column)).toBe(false);
-    expect(warn).toHaveBeenCalledTimes(1);
+      expect(result.current.isColumnPotentiallyEditable(column)).toBe(false);
+      expect(result.current.isColumnPotentiallyEditable(column)).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      // try/finally (not a bare reassignment after the assertions): an
+      // assertion failure above must not leave `console.warn` mocked for
+      // every test that runs afterward in this file.
+      console.warn = original;
+    }
+  });
 
-    console.warn = original;
+  it('does not collide cell keys when a row/column id contains ":" (bug fix)', () => {
+    // A naive `${rowId}:${columnId}` join makes rowId="a:b", columnId="c"
+    // collide with rowId="a", columnId="b:c" (both produce "a:b:c").
+    const { result } = renderHook(() => useEditableCells<Row>({ onCellEdit: async () => {} }));
+
+    act(() => {
+      result.current.beginEdit('a:b', 'c');
+    });
+
+    expect(result.current.getEditingColumnId('a:b')).toBe('c');
+    // The OTHER (rowId, columnId) pair that would collide under naive
+    // joining must stay untouched.
+    expect(result.current.getEditingColumnId('a')).toBeNull();
+    expect(result.current.getCellState('a:b', 'c').editing).toBe(true);
+    expect(result.current.getCellState('a', 'b:c').editing).toBe(false);
   });
 
   it('passes tableName into adapter updateRecord options', async () => {

@@ -21,6 +21,14 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * Mirrors the hook's internal (length-prefixed) cell key encoding so tests
+ * don't hardcode the format -- see `cellKey` in `use-editable-cells.ts`.
+ */
+function key(rowId: string, columnId: string): string {
+  return `${rowId.length}:${rowId}:${columnId}`;
+}
+
 interface Row {
   id: string;
   name: string;
@@ -160,9 +168,9 @@ describe('saveAction save path', () => {
     });
 
     expect(result.current.getDisplayValue('1', 'name', 'Alice')).toBe('Alice');
-    expect(result.current.cellErrors.get('1:name')).toBe('Column "name" is not editable.');
+    expect(result.current.cellErrors.get(key('1', 'name'))).toBe('Column "name" is not editable.');
     expect(onCellEditError).toHaveBeenCalledTimes(1);
-    expect(result.current.savingCells.has('1:name')).toBe(false);
+    expect(result.current.savingCells.has(key('1', 'name'))).toBe(false);
   });
 
   it('onCellEdit wins over saveAction (precedence)', async () => {
@@ -335,6 +343,13 @@ describe('relationship-path (dot) column gating', () => {
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord.mock.calls[0]?.[0]).toBe('9');
     expect(updateRecord.mock.calls[0]?.[1]).toEqual({ company: 'Globex' } as never);
-    expect(updateRecord.mock.calls[0]?.[2]).toEqual({ table: 'customers' } as never);
+    // `columnId` carries the COLUMN id ('customer.company') alongside the
+    // RELATED table (bug fix): a wire adapter needs it to send the column
+    // id — not the storage field `data` is keyed by — over the wire, since
+    // allow-lists and `resolveCellWriteTarget` are keyed by column id.
+    expect(updateRecord.mock.calls[0]?.[2]).toEqual({
+      table: 'customers',
+      columnId: 'customer.company',
+    } as never);
   });
 });

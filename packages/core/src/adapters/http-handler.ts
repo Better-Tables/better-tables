@@ -226,13 +226,6 @@ export async function handleAdapterRequest<TData = unknown>(
             kind: 'forbidden',
           };
         }
-        if (typeof writes === 'object' && !writes.columns.includes(body.field)) {
-          return {
-            ok: false,
-            error: `Column "${body.field}" is not on the write allow-list.`,
-            kind: 'bad_request',
-          };
-        }
         // FAIL CLOSED: without schema introspection the server cannot
         // validate the target or the value — never trust the client.
         if (!adapter.resolveCellWriteTarget || !adapter.describeColumns) {
@@ -242,6 +235,8 @@ export async function handleAdapterRequest<TData = unknown>(
             kind: 'bad_request',
           };
         }
+        // `body.field` is the COLUMN id — re-resolved server-side against
+        // `body.table` so the client can never redirect a write (plan 055).
         const target = await adapter.resolveCellWriteTarget(body.field, body.table);
         if (!target || !target.writable || !target.single) {
           return {
@@ -249,6 +244,47 @@ export async function handleAdapterRequest<TData = unknown>(
             error: `Column "${body.field}" is not writable.`,
             kind: 'bad_request',
           };
+        }
+        if (typeof writes === 'object') {
+          if (!writes.columns.includes(body.field)) {
+            return {
+              ok: false,
+              error: `Column "${body.field}" is not on the write allow-list.`,
+              kind: 'bad_request',
+            };
+          }
+          // Cross-table bypass guard (P1): `{ columns }` allow-list entries
+          // are bare column ids, meaningful only relative to ONE canonical
+          // table — but `body.table` is client-supplied. Without this
+          // check, a client could keep an allow-listed column id (e.g.
+          // `'subject'`) and swap `body.table` to redirect the write to a
+          // DIFFERENT table that happens to expose a writable column
+          // sharing that same id/name, bypassing the app's intended scope.
+          // Re-resolve the SAME column id against the endpoint's own
+          // default table (ignoring the client-supplied `body.table`) and
+          // require it lands on the identical (table, field) — fail closed
+          // on any mismatch, ambiguity, or introspection failure. Apps that
+          // genuinely serve several primary tables from one endpoint must
+          // pin `table` via `constrainRequest` (same guidance as reads).
+          if (body.table !== undefined) {
+            let canonical: Awaited<ReturnType<typeof adapter.resolveCellWriteTarget>> = null;
+            try {
+              canonical = await adapter.resolveCellWriteTarget(body.field);
+            } catch {
+              canonical = null;
+            }
+            if (
+              !canonical ||
+              canonical.table !== target.table ||
+              canonical.field !== target.field
+            ) {
+              return {
+                ok: false,
+                error: `Column "${body.field}" is not on the write allow-list.`,
+                kind: 'bad_request',
+              };
+            }
+          }
         }
         const specs = await adapter.describeColumns(target.table);
         const spec = specs.find((candidate) => candidate.field === target.field);
@@ -259,7 +295,7 @@ export async function handleAdapterRequest<TData = unknown>(
             kind: 'bad_request',
           };
         }
-        const coerced = coerceCellValue(spec.columnType, body.value, spec.options);
+        const coerced = coerceCellValue(spec.columnType, body.value, spec.options, spec.nullable);
         if (!coerced.ok) {
           return { ok: false, error: coerced.error, kind: 'bad_request' };
         }

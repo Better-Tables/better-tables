@@ -118,7 +118,11 @@ export function TableHeaderContextMenu<TData = unknown>({
         {/* Sorting controls */}
         {isSortable && contextMenuConfig.showSortToggle && (
           <>
-            <ContextMenuItem onClick={onSetSortAsc}>
+            <ContextMenuItem
+              role="menuitemcheckbox"
+              aria-checked={currentSort?.direction === 'asc'}
+              onClick={onSetSortAsc}
+            >
               <ArrowUp />
               Sort Ascending
               {currentSort?.direction === 'asc' ? (
@@ -126,7 +130,11 @@ export function TableHeaderContextMenu<TData = unknown>({
               ) : null}
             </ContextMenuItem>
 
-            <ContextMenuItem onClick={onSetSortDesc}>
+            <ContextMenuItem
+              role="menuitemcheckbox"
+              aria-checked={currentSort?.direction === 'desc'}
+              onClick={onSetSortDesc}
+            >
               <ArrowDown />
               Sort Descending
               {currentSort?.direction === 'desc' ? (

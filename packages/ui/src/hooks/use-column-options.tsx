@@ -6,7 +6,7 @@ import * as React from 'react';
 /**
  * Facet-fallback options for option dropdowns (plan 054 Step 5).
  *
- * Precedence: declared options (including enum options enriched in by
+ * Precedence: declared options (including enum options enriched by
  * `resolveTableColumns`) always win and never trigger a fetch. An
  * option-typed column with NO options lazily fetches
  * `adapter.getFilterOptions(columnId)` when the consuming dropdown first
@@ -37,28 +37,41 @@ export function TableAdapterProvider({
   );
 }
 
-/** Fetch-once cache per (adapter, columnId) — reopen never refetches. */
-const optionsCache = new WeakMap<object, Map<string, Promise<FilterOption[]>>>();
+/**
+ * Fetch-once cache per (adapter, columnId) — reopen never refetches.
+ *
+ * Alongside the in-flight `promise`, each entry tracks its settled `value`
+ * once resolved so a later (re)mount can read the result synchronously
+ * instead of waiting a tick for a `.then()` callback (see `useColumnOptions`).
+ */
+interface OptionsCacheEntry {
+  promise: Promise<FilterOption[]>;
+  value?: FilterOption[];
+}
 
-function fetchOptionsOnce(
-  adapter: ColumnOptionsAdapter,
-  columnId: string
-): Promise<FilterOption[]> {
+const optionsCache = new WeakMap<object, Map<string, OptionsCacheEntry>>();
+
+function getOptionsEntry(adapter: ColumnOptionsAdapter, columnId: string): OptionsCacheEntry {
   let perColumn = optionsCache.get(adapter);
   if (!perColumn) {
     perColumn = new Map();
     optionsCache.set(adapter, perColumn);
   }
-  let pending = perColumn.get(columnId);
-  if (!pending) {
+  let entry = perColumn.get(columnId);
+  if (!entry) {
     // Failures resolve to [] — the dropdown shows its "No options" fallback
     // instead of crashing, and the result is cached like a success (schema
     // facets are stable; a transient failure shouldn't hammer the endpoint
     // on every reopen).
-    pending = adapter.getFilterOptions(columnId).catch(() => []);
-    perColumn.set(columnId, pending);
+    const promise = adapter.getFilterOptions(columnId).catch(() => []);
+    const newEntry: OptionsCacheEntry = { promise };
+    entry = newEntry;
+    perColumn.set(columnId, newEntry);
+    promise.then((options) => {
+      newEntry.value = options;
+    });
   }
-  return pending;
+  return entry;
 }
 
 const EMPTY_OPTIONS: FilterOption[] = [];
@@ -85,12 +98,37 @@ export function useColumnOptions<TData>(
     !hasDeclared &&
     (column.type === 'option' || column.type === 'multiOption') &&
     typeof adapter?.getFilterOptions === 'function';
+
+  // Tracks which (adapter, columnId) `fetched` currently belongs to, so a
+  // column/adapter switch is detected — and `fetched` reset — before this
+  // render commits, instead of one effect-cycle later (Bug A: stale options
+  // leaking across columns).
+  const keyRef = React.useRef<{ adapter: ColumnOptionsAdapter; columnId: string } | null>(null);
   const [fetched, setFetched] = React.useState<FilterOption[] | null>(null);
+
+  const keyChanged =
+    canFetch &&
+    !!adapter &&
+    (keyRef.current === null ||
+      keyRef.current.adapter !== adapter ||
+      keyRef.current.columnId !== column.id);
+
+  if (keyChanged && adapter) {
+    keyRef.current = { adapter, columnId: column.id };
+    // Adjusting state during render (React-supported pattern): read the
+    // cache synchronously so an already-settled value is available on the
+    // very first render for this column — no "Loading options…" flash on
+    // remount (Bug B) — while an unsettled entry correctly starts `null`.
+    const entry = getOptionsEntry(adapter, column.id);
+    setFetched(entry.value ?? null);
+  }
 
   React.useEffect(() => {
     if (!canFetch || !adapter) return undefined;
+    const entry = getOptionsEntry(adapter, column.id);
+    if (entry.value !== undefined) return undefined;
     let cancelled = false;
-    fetchOptionsOnce(adapter, column.id).then((options) => {
+    entry.promise.then((options) => {
       if (!cancelled) setFetched(options);
     });
     return () => {

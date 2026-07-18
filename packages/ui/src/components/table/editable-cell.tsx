@@ -146,21 +146,23 @@ function NumberEditor<TValue>({
   const [draft, setDraft] = React.useState(initial);
   const committedRef = React.useRef(false);
 
-  const commit = React.useCallback(() => {
-    if (committedRef.current) return;
+  /** Returns whether the draft committed (or was already committed); false on a parse error. */
+  const commit = React.useCallback((): boolean => {
+    if (committedRef.current) return true;
     const trimmed = draft.trim();
     if (trimmed === '') {
       committedRef.current = true;
       onCommit(null as TValue);
-      return;
+      return true;
     }
     const parsed = Number(trimmed);
-    if (Number.isNaN(parsed)) {
+    if (!Number.isFinite(parsed)) {
       onInvalid('Enter a valid number');
-      return;
+      return false;
     }
     committedRef.current = true;
     onCommit(parsed as TValue);
+    return true;
   }, [draft, onCommit, onInvalid]);
 
   const cancel = React.useCallback(() => {
@@ -183,7 +185,14 @@ function NumberEditor<TValue>({
         committedRef.current = false;
         setDraft(e.target.value);
       }}
-      onBlur={commit}
+      onBlur={(e) => {
+        const committed = commit();
+        // Invalid input: refocus so the user can fix it instead of silently
+        // losing focus (and the editor) on an unresolved parse error.
+        if (!committed) {
+          e.target.focus();
+        }
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -293,7 +302,28 @@ function OptionEditorWithFallback<TData, TValue>({
     return <span className="text-muted-foreground text-xs">Loading options…</span>;
   }
   if (options.length === 0) {
-    return <span className="text-muted-foreground text-xs">No options</span>;
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>No options</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          autoFocus
+          onClick={onCancel}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              onCancel();
+            }
+          }}
+        >
+          Cancel
+        </Button>
+      </div>
+    );
   }
   return (
     <OptionEditor
@@ -308,9 +338,11 @@ function OptionEditorWithFallback<TData, TValue>({
 function BooleanEditor<TValue>({
   value,
   onCommit,
+  onCancel,
 }: {
   value: TValue;
   onCommit: (value: TValue) => void;
+  onCancel: () => void;
 }) {
   const checked = Boolean(value);
   return (
@@ -320,6 +352,13 @@ function BooleanEditor<TValue>({
       aria-label="Edit cell"
       onCheckedChange={(next) => {
         onCommit(next as TValue);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
       }}
     />
   );
@@ -447,7 +486,7 @@ function CellEditor<TData, TValue>({
         />
       );
     case 'boolean':
-      return <BooleanEditor value={value} onCommit={onCommit} />;
+      return <BooleanEditor value={value} onCommit={onCommit} onCancel={onCancel} />;
     case 'date':
       return <DateEditor value={value} onCommit={onCommit} onCancel={onCancel} />;
     default:
@@ -552,7 +591,13 @@ export function EditableCell<TData = unknown, TValue = unknown>({
         }
       }}
       onClick={(e) => {
-        if (e.detail > 1) e.stopPropagation();
+        // Always stop propagation, even on the FIRST click of a double-click
+        // sequence -- the row's own `onClick` (which can navigate) fires on
+        // that first click too, before `onDoubleClick` ever gets a chance to
+        // open the editor. Gating this on `e.detail > 1` (native browsers
+        // report `detail: 1` for that first click, `2` for the second) let
+        // the first click reach the row handler and steal the interaction.
+        e.stopPropagation();
       }}
     >
       <span className="min-w-0 shrink-0">{children}</span>

@@ -16,7 +16,7 @@ import {
   useEditableCells,
 } from '../../hooks/use-editable-cells';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
-import { cn } from '../../lib/utils';
+import { cn, defaultGetRowId } from '../../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { EditableCell } from './editable-cell';
 
@@ -311,15 +311,6 @@ const MemoizedVirtualizedRow = memo(
  * primitive only when you need rendering `<BetterTable>` doesn't do -- a
  * non-table layout via `renderRow`, or per-row dynamic height measurement.
  */
-function defaultGetRowId<T>(item: T, index: number): string {
-  if (typeof item === 'object' && item !== null) {
-    const obj = item as Record<string, unknown>;
-    if ('id' in obj && obj.id != null) return String(obj.id);
-    if ('_id' in obj && obj._id != null) return String(obj._id);
-  }
-  return `row-${index}`;
-}
-
 export function VirtualizedTable<T = unknown>({
   data,
   columns,
@@ -534,10 +525,7 @@ export function VirtualizedTable<T = unknown>({
                   }
 
                   const rowId = getRowId(item, virtualRow.index);
-                  const editingColumnId =
-                    editableCells.activeEditKey?.startsWith(`${rowId}:`) === true
-                      ? editableCells.activeEditKey.slice(rowId.length + 1)
-                      : null;
+                  const editingColumnId = editableCells.getEditingColumnId(rowId);
 
                   return (
                     <MemoizedVirtualizedRow

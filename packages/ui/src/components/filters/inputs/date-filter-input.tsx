@@ -87,8 +87,14 @@ export function DateFilterInput<TData = unknown>({
   // Timestamps of the last values we pushed to the parent. Used so sync-from-parent
   // does not overwrite local state while the parent (URL / store) is still catching up.
   const lastEmittedRef = React.useRef<number[] | null>(null);
+  // Snapshot of what the parent's value looked like right before we emitted. Lets
+  // sync-from-parent tell "parent hasn't caught up yet" (still equals this snapshot)
+  // apart from "parent moved to a genuinely different value" (matches neither this
+  // snapshot nor what we emitted) — the latter must be accepted, not swallowed forever.
+  const preEmitBaselineRef = React.useRef<number[] | null>(null);
 
-  const emitValues = React.useCallback((values: Date[]) => {
+  const emitValues = React.useCallback((values: Date[], baseline: Date[] = []) => {
+    preEmitBaselineRef.current = baseline.map((d) => d.getTime());
     lastEmittedRef.current = values.map((d) => d.getTime());
     onChangeRef.current(values);
   }, []);
@@ -123,7 +129,8 @@ export function DateFilterInput<TData = unknown>({
         if (dateToUse) {
           setDateRange({ from: dateToUse, to: dateToUse });
           // Immediately send both dates to parent to avoid validation error
-          emitValues([dateToUse, dateToUse]);
+          const priorFrom = getFilterValueAsDate(filter, 0);
+          emitValues([dateToUse, dateToUse], priorFrom ? [priorFrom] : []);
         }
       }
       // Convert from range to single: use the from date (or first filter value)
@@ -132,7 +139,12 @@ export function DateFilterInput<TData = unknown>({
         if (dateToUse) {
           setSingleDate(dateToUse);
           // Immediately send the single date to parent
-          emitValues([dateToUse]);
+          const priorFrom = getFilterValueAsDate(filter, 0);
+          const priorTo = getFilterValueAsDate(filter, 1);
+          emitValues(
+            [dateToUse],
+            [priorFrom, priorTo].filter((d): d is Date => d != null)
+          );
         }
       }
 
@@ -174,18 +186,29 @@ export function DateFilterInput<TData = unknown>({
   React.useEffect(() => {
     if (needsNoValues) {
       lastEmittedRef.current = [];
+      preEmitBaselineRef.current = [];
       onChangeRef.current([]);
     } else if (needsDateRange) {
       // For date range, only send values when BOTH dates are selected
       if (dateRange?.from && dateRange?.to) {
-        emitValues([dateRange.from, dateRange.to]);
+        const priorFrom = getFilterValueAsDate(filter, 0);
+        const priorTo = getFilterValueAsDate(filter, 1);
+        emitValues(
+          [dateRange.from, dateRange.to],
+          [priorFrom, priorTo].filter((d): d is Date => d != null)
+        );
       }
     } else {
       // Single date
       if (singleDate) {
-        emitValues([singleDate]);
+        const priorFrom = getFilterValueAsDate(filter, 0);
+        emitValues([singleDate], priorFrom ? [priorFrom] : []);
       }
     }
+    // `filter` intentionally omitted: this effect must only fire on local
+    // (singleDate/dateRange) changes, not whenever the parent's value moves —
+    // it reads `filter` solely to snapshot the pre-emit baseline for the
+    // sync-from-parent effect below.
   }, [singleDate, dateRange, needsDateRange, needsNoValues, emitValues]);
 
   // Sync FROM parent when filter values change
@@ -198,15 +221,26 @@ export function DateFilterInput<TData = unknown>({
       .filter((d): d is Date => d != null)
       .map((d) => d.getTime());
     const lastEmitted = lastEmittedRef.current;
+    const baseline = preEmitBaselineRef.current;
 
-    // Parent caught up to our last emit — clear the pending marker
+    // Parent caught up to our last emit — clear the pending markers.
     if (
       lastEmitted &&
       lastEmitted.length === externalTimes.length &&
       lastEmitted.every((t, i) => t === externalTimes[i])
     ) {
       lastEmittedRef.current = null;
+      preEmitBaselineRef.current = null;
     }
+
+    // True only while the parent is still echoing the stale snapshot from right
+    // before we emitted. A parent value that matches neither that snapshot nor
+    // what we emitted is a genuine external change and must be accepted below,
+    // not suppressed indefinitely.
+    const parentStillOnPreEmitSnapshot =
+      baseline != null &&
+      baseline.length === externalTimes.length &&
+      baseline.every((t, i) => t === externalTimes[i]);
 
     if (needsDateRange && filter.values.length >= 2) {
       const from = externalFrom;
@@ -221,16 +255,18 @@ export function DateFilterInput<TData = unknown>({
             return prev;
           }
 
-          // We just emitted a complete range; parent props are still stale. Keep local.
-          if (
+          // We just emitted a complete range and the parent is still stale — keep
+          // local until it catches up (or a different external value arrives).
+          const weAreWaitingOnOurEmit =
             lastEmitted &&
             lastEmitted.length === 2 &&
             prev?.from &&
             prev?.to &&
             prev.from.getTime() === lastEmitted[0] &&
             prev.to.getTime() === lastEmitted[1] &&
-            (from.getTime() !== lastEmitted[0] || to.getTime() !== lastEmitted[1])
-          ) {
+            (from.getTime() !== lastEmitted[0] || to.getTime() !== lastEmitted[1]);
+
+          if (weAreWaitingOnOurEmit && parentStillOnPreEmitSnapshot) {
             return prev;
           }
 
@@ -247,13 +283,14 @@ export function DateFilterInput<TData = unknown>({
       const date = externalFrom;
 
       setSingleDate((prev) => {
-        if (
+        const weAreWaitingOnOurEmit =
           lastEmitted &&
           lastEmitted.length === 1 &&
           prev &&
           prev.getTime() === lastEmitted[0] &&
-          (!date || date.getTime() !== lastEmitted[0])
-        ) {
+          (!date || date.getTime() !== lastEmitted[0]);
+
+        if (weAreWaitingOnOurEmit && parentStillOnPreEmitSnapshot) {
           return prev;
         }
 

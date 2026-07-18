@@ -11,6 +11,27 @@ import { clearAllTableStores, defineTableRow, getTableStore } from '@better-tabl
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { BetterTable } from '../../src/components/table/table';
 
+const PRIORITY_SPECS: InferredColumnSpec[] = [
+  {
+    field: 'id',
+    columnType: 'number',
+    label: 'Id',
+    nullable: false,
+    primaryKey: true,
+    foreignKey: false,
+    writable: false,
+  },
+  {
+    field: 'priority',
+    columnType: 'text',
+    label: 'Priority',
+    nullable: false,
+    primaryKey: false,
+    foreignKey: false,
+    writable: true,
+  },
+];
+
 interface TicketRow {
   id: number;
   subject: string;
@@ -201,5 +222,44 @@ describe('BetterTable auto columns (plan 054)', () => {
 
     expect(screen.getByText('Prop Subject')).toBeTruthy();
     expect(describeCalls).toEqual([]);
+  });
+
+  it("switching adapters (same table id) never leaves the store with the previous adapter's stale schema (P1 bug fix)", async () => {
+    const ticketsTable = defineTableRow<TicketRow>()('tickets');
+    const { adapter: adapterA } = makeAdapter(TICKET_SPECS);
+    const { adapter: adapterB } = makeAdapter(PRIORITY_SPECS);
+
+    const { rerender } = render(
+      <BetterTable table={ticketsTable} data={ROWS} adapter={adapterA} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Subject')).toBeTruthy();
+    });
+    expect(
+      getTableStore('tickets')
+        ?.getState()
+        .columns.map((c) => c.id)
+    ).toEqual(['id', 'subject', 'status']);
+
+    rerender(<BetterTable table={ticketsTable} data={ROWS} adapter={adapterB} />);
+
+    // Re-resolving against the NEW adapter -- must never render a mix of
+    // the old and new schemas while that's in flight.
+    await waitFor(() => {
+      expect(screen.getByText('Priority')).toBeTruthy();
+    });
+    expect(screen.queryByText('Subject')).toBeNull();
+    expect(screen.queryByText('Status')).toBeNull();
+
+    // The store itself (not just this render's JSX) must reflect the NEW
+    // adapter's schema -- `getOrCreateTableStore` can't update columns
+    // after creation, so a stale store here would persist for the table's
+    // whole lifetime.
+    expect(
+      getTableStore('tickets')
+        ?.getState()
+        .columns.map((c) => c.id)
+    ).toEqual(['id', 'priority']);
   });
 });

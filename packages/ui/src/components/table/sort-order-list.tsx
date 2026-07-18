@@ -116,7 +116,7 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
       </span>
 
       {/* Column name */}
-      <span className="min-w-0 flex-1">{columnName}</span>
+      <span className="min-w-0 flex-1 truncate">{columnName}</span>
 
       {/* Direction icon */}
       {sort.direction === 'asc' ? (

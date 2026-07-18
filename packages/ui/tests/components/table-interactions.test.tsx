@@ -277,6 +277,33 @@ describe('BetterTable inline editing (plan 053 step 4)', () => {
     expect(screen.queryByRole('button', { name: /edit name/i })).toBeNull();
   });
 
+  it('a single click on an editable cell does not activate the row (bug fix)', () => {
+    // Regression: `onClick` fires on the FIRST click of a double-click
+    // sequence too (browsers report `detail: 1` there, `2` on the second
+    // click) -- gating `stopPropagation` on `e.detail > 1` let that first
+    // click reach the row's `onClick` before the editor ever opened.
+    const adapter = makeUpdateAdapter(async () => ({ id: '1', name: 'Alice' }));
+    const onRowClick = mock(() => {});
+
+    render(
+      <BetterTable
+        id={`${TABLE_ID}-row-click`}
+        columns={editableColumns}
+        data={editableRows}
+        adapter={adapter}
+        onRowClick={onRowClick}
+        virtualized={false}
+        features={{ sorting: false, pagination: false, filtering: false }}
+      />
+    );
+
+    const editButton = screen.getAllByRole('button', { name: /edit name/i })[0];
+    if (!editButton) throw new Error('Expected an editable cell button');
+    fireEvent.click(editButton, { detail: 1 });
+
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
   it('non-editable columns are unaffected', () => {
     const adapter = makeUpdateAdapter(async () => ({ id: '1', name: 'Alice' }));
 

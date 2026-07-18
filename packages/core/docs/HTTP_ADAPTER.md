@@ -81,6 +81,16 @@ Rules the handler enforces:
   any schema-writable column; the handler has no `TableDefinition`, so
   schema-writable is broader than what your app actually marks
   `.editable()`. Pass the explicit column list.
+- **`{ columns }` entries are pinned to your default table.** A bare column
+  id (e.g. `'subject'`) only means one thing: the field on whichever table
+  `resolveCellWriteTarget` resolves to when `table` is OMITTED. A request
+  that supplies a different `table` for that same column id is rejected —
+  even if that other table independently has a writable column sharing the
+  same name — so a client can never redirect an allow-listed column id to a
+  table you didn't intend to expose. If your endpoint genuinely serves
+  several primary tables, pin `table` yourself via `constrainRequest` (the
+  same pattern the `primaryTable` warning above recommends for reads) —
+  don't rely on client-supplied `table` for `cellEdit` either.
 - **`authorize` runs before the write.** Enabling writes without
   `authorize` logs a dev warning at handler creation — row-level
   authorization is the app's concern.

@@ -38,7 +38,7 @@ import {
 } from '../../hooks/use-table-store';
 import { useTableUrlSync } from '../../hooks/use-table-url-sync';
 import { useVirtualization } from '../../hooks/use-virtualization';
-import { cn } from '../../lib/utils';
+import { cn, defaultGetRowId } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
@@ -451,23 +451,55 @@ const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
  * Lazily resolve a `table` definition's columns against the adapter (plan
  * 054): auto columns (`t.auto()` / no-factory `define`) and enrichable gaps
  * (an option column without options) resolve through core's ONE
- * `resolveTableColumns` helper. Returns `null` while a needed resolution is
- * in flight; when `enabled` is false this hook is inert (no state churn, no
- * async hop) so fully-declared tables pay nothing.
+ * `resolveTableColumns` helper. Returns `columns: null` while a needed
+ * resolution is in flight; when `enabled` is false this hook is inert (no
+ * state churn, no async hop) so fully-declared tables pay nothing.
+ *
+ * `generation` increments every time `table`/`adapter` change identity
+ * (bug fix: auto-column stale schema in store, P1) -- `BetterTable` keys
+ * `BetterTableInner` on it so a table/adapter switch always remounts Inner
+ * (destroying and recreating its `TableStateManager` store) rather than
+ * risk `getOrCreateTableStore` baking in a stale columns/columnVisibility
+ * shape from before the switch (the store has no way to update columns
+ * after creation).
  */
 function useResolvedTableColumns<TData>(
   enabled: boolean,
   table: TableDefinition<string, TData> | undefined,
   adapter: BetterTableProps<TData>['adapter']
-): ColumnDefinition<TData, unknown>[] | null {
+): { columns: ColumnDefinition<TData, unknown>[] | null; generation: number } {
   const [resolved, setResolved] = React.useState<ColumnDefinition<TData, unknown>[] | null>(null);
+  const generationRef = useRef(0);
+  const inputsRef = useRef<{
+    table: TableDefinition<string, TData> | undefined;
+    adapter: BetterTableProps<TData>['adapter'];
+  } | null>(null);
+
+  // Render-time reset (React "adjusting state during render" pattern): a
+  // plain `useEffect`-only reset (the previous approach) still lets THIS
+  // render commit once with `resolved` holding the PREVIOUS table/adapter's
+  // columns, and `BetterTable` mount `BetterTableInner` (and therefore
+  // `getOrCreateTableStore`) with them before the effect has a chance to
+  // clear it. Clearing synchronously here closes that window: by the time
+  // this render's return value is used, `resolved` is already `null` for a
+  // new table/adapter identity.
+  if (enabled) {
+    const inputsChanged =
+      inputsRef.current === null ||
+      inputsRef.current.table !== table ||
+      inputsRef.current.adapter !== adapter;
+    if (inputsChanged) {
+      inputsRef.current = { table, adapter };
+      generationRef.current += 1;
+      if (resolved !== null) setResolved(null);
+    }
+  } else {
+    inputsRef.current = null;
+  }
 
   useEffect(() => {
     if (!enabled || !table) return undefined;
     let cancelled = false;
-    // Reset when the definition/adapter changes (no-op on first run: React
-    // bails out of a null -> null state update).
-    setResolved(null);
     void resolveTableColumns(table, adapter).then((columns) => {
       if (!cancelled) setResolved(columns);
     });
@@ -476,7 +508,7 @@ function useResolvedTableColumns<TData>(
     };
   }, [enabled, table, adapter]);
 
-  return enabled ? resolved : null;
+  return { columns: enabled ? resolved : null, generation: generationRef.current };
 }
 
 /** Column count for the columns-resolving skeleton (real columns unknown yet). */
@@ -535,11 +567,22 @@ function AutoColumnsLoading({ className }: { className?: string | undefined }) {
 export function BetterTable<TData = unknown>(props: BetterTableProps<TData>) {
   const { columns: columnsProp, table, adapter } = props;
   const needsResolution = !columnsProp && !!table && tableNeedsColumnResolution(table);
-  const resolvedColumns = useResolvedTableColumns(needsResolution, table, adapter);
+  const { columns: resolvedColumns, generation } = useResolvedTableColumns(
+    needsResolution,
+    table,
+    adapter
+  );
 
   if (needsResolution && resolvedColumns === null) {
     return <AutoColumnsLoading className={props.className} />;
   }
+
+  // Keyed on the resolution's generation (bug fix: auto-column stale schema
+  // in store, P1) so a table/adapter switch always remounts `Inner` --
+  // destroying its `TableStateManager` store instead of reusing one that
+  // may have been created with a previous switch's (or this same id's
+  // pre-switch) columns baked in.
+  const innerKey = needsResolution ? `resolved-${generation}` : undefined;
 
   // The adapter context powers the facet fallback for option dropdowns
   // (plan 054 Step 5) — leaf inputs (option editor, option filter input)
@@ -547,7 +590,7 @@ export function BetterTable<TData = unknown>(props: BetterTableProps<TData>) {
   return (
     <TableAdapterProvider adapter={adapter}>
       {needsResolution && resolvedColumns !== null ? (
-        <BetterTableInner {...props} columns={resolvedColumns} />
+        <BetterTableInner key={innerKey} {...props} columns={resolvedColumns} />
       ) : (
         <BetterTableInner {...props} />
       )}
@@ -901,28 +944,10 @@ function BetterTableInner<TData = unknown>({
     previousFiltersRef.current = filters;
   }, [autoShowFilteredColumns, filters, defaultVisibleColumns, setColumnVisibility, store]);
 
-  // Get row ID function from rowConfig or use default
+  // Get row ID function from rowConfig or use the shared default (also used
+  // by `<VirtualizedTable>` -- see `lib/utils.ts` for why this is ONE helper).
   const getRowId = useMemo(() => {
-    return (
-      rowConfig?.getId ||
-      ((row: TData, _index: number) => {
-        // Try to find an id field using common patterns
-        if (typeof row === 'object' && row !== null) {
-          const obj = row as Record<string, unknown>;
-          if ('id' in obj && obj.id != null) {
-            return String(obj.id);
-          }
-          if ('_id' in obj && obj._id != null) {
-            return String(obj._id);
-          }
-          if ('uuid' in obj && obj.uuid != null) {
-            return String(obj.uuid);
-          }
-        }
-        // Fallback to index only if no ID field found
-        return `row-${_index}`;
-      })
-    );
+    return rowConfig?.getId || defaultGetRowId;
   }, [rowConfig?.getId]);
 
   // Handle filter changes - just update store
@@ -1406,10 +1431,7 @@ function BetterTableInner<TData = unknown>({
             {virtualBodyRows.map(({ row, index }) => {
               const rowId = getRowId(row, index);
               const isSelected = selectedRows.has(rowId);
-              const editingColumnId =
-                editableCells.activeEditKey?.startsWith(`${rowId}:`) === true
-                  ? editableCells.activeEditKey.slice(rowId.length + 1)
-                  : null;
+              const editingColumnId = editableCells.getEditingColumnId(rowId);
 
               return (
                 <MemoizedTableRow

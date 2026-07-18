@@ -178,7 +178,7 @@ Optimistic updates: the new value shows immediately; on save failure (including 
 
 **V1 editors**: text (+ email/url/phone), number (+ currency/percentage), option, boolean, date. `multiOption`/`json` stay read-only; `custom` needs `editable.editRenderer`. Edits are last-write-wins (no version checks).
 
-**Option choices auto-populate** (plan 054): the option editor (and the option filter input) resolve choices as declared `.options()` → schema enum values (enriched in by `resolveTableColumns`) → a lazy `adapter.getFilterOptions(columnId)` facet fetch on first open (cached per adapter+column). "No options" appears only when a fetch returns empty or fails.
+**Option choices auto-populate** (plan 054): the option editor (and the option filter input) resolve choices as declared `.options()` → schema enum values (enriched by `resolveTableColumns`) → a lazy `adapter.getFilterOptions(columnId)` facet fetch on first open (cached per adapter+column). "No options" appears only when a fetch returns empty or fails.
 
 ```tsx
 <BetterTable

@@ -133,10 +133,21 @@ describe('describeTableColumns (plan 054)', () => {
   it('falls back to text (with a dev warn) for unmapped data types instead of throwing', () => {
     const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const specs = describeTableColumns(sqliteTickets as unknown as AnyTableType);
+      // A fresh table object, not the shared `sqliteTickets` fixture: describeTableColumns
+      // memoizes per table identity, and `sqliteTickets` was already described (and cached)
+      // by the previous test — reusing it here would hit the cache, skip the fallback
+      // mapping code path entirely, and never call console.warn.
+      const freshSqliteTickets = sqliteTable('tickets_fallback', {
+        id: integer('id').primaryKey(),
+        attachment: blob('attachment'),
+      });
+
+      const specs = describeTableColumns(freshSqliteTickets as unknown as AnyTableType);
       const byField = bySpecField(specs);
       // blob() has dataType 'buffer' — no mapping, total fallback to text.
       expect(byField.attachment?.columnType).toBe('text');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toMatch(/attachment/);
     } finally {
       warnSpy.mockRestore();
     }
@@ -148,6 +159,19 @@ describe('describeTableColumns (plan 054)', () => {
     const second = describeTableColumns(pgTickets as unknown as AnyTableType);
     expect(second).toHaveLength(8);
     expect(second).not.toBe(first);
+  });
+
+  it('deep-clones each spec (mutating a nested options array cannot poison the cache)', () => {
+    const first = bySpecField(describeTableColumns(pgTickets as unknown as AnyTableType));
+    first.status?.options?.push({ value: 'bogus', label: 'Bogus' });
+
+    const second = bySpecField(describeTableColumns(pgTickets as unknown as AnyTableType));
+    expect(second.status?.options).toEqual([
+      { value: 'open', label: 'Open' },
+      { value: 'in_progress', label: 'In Progress' },
+      { value: 'closed', label: 'Closed' },
+    ]);
+    expect(second.status?.options).not.toBe(first.status?.options);
   });
 });
 

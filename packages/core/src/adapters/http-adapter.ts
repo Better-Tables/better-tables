@@ -331,10 +331,17 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
             }
             const raw = (data as Record<string, unknown>)[field];
             const value = raw instanceof Date ? raw.toISOString() : raw;
+            // Bug fix: `field` here is the STORAGE field (the `data` key —
+            // the related table's field for a relationship-path column).
+            // Allow-lists and `resolveCellWriteTarget` are keyed by COLUMN
+            // id, so prefer `options.columnId` (set by the editable-cells
+            // save path) on the wire when present; falls back to `field`
+            // for own-table columns, where storage field === column id.
+            const wireField = options?.columnId ?? field;
             const body = {
               method: 'cellEdit' as const,
               id,
-              field,
+              field: wireField,
               value,
               ...(options?.table !== undefined ? { table: options.table } : {}),
             };

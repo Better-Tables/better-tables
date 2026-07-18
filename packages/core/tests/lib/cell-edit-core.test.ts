@@ -70,8 +70,13 @@ describe('buildCellEditPolicy — admission', () => {
     const policy = await buildCellEditPolicy(def, adapter);
 
     expect([...policy.entries.keys()].sort()).toEqual(['customer.company', 'subject']);
-    // Own-table columns resolved locally — the adapter saw only the dot column.
-    expect(calls).toEqual([['customer.company', 'tickets']]);
+    // Own-table columns are ALSO checked against the adapter's schema
+    // writability (bug fix — see the PK-rejection test below), so the
+    // adapter sees both the own field and the dot column.
+    expect(calls).toEqual([
+      ['subject', 'tickets'],
+      ['customer.company', 'tickets'],
+    ]);
     expect(policy.entries.get('subject')?.target).toEqual({
       table: 'tickets',
       field: 'subject',
@@ -122,6 +127,44 @@ describe('buildCellEditPolicy — admission', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('rejects an own-table field the adapter schema reports as unwritable (e.g. a PK)', async () => {
+    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
+      columns: [t.number('id').editable(), t.text('subject').editable()],
+    }));
+    const { adapter } = makeTargetStub({
+      id: { table: 'tickets', field: 'id', relatedIdPath: null, single: true, writable: false },
+      subject: {
+        table: 'tickets',
+        field: 'subject',
+        relatedIdPath: null,
+        single: true,
+        writable: true,
+      },
+    });
+
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const policy = await buildCellEditPolicy(def, adapter);
+      expect([...policy.entries.keys()]).toEqual(['subject']);
+      expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('schema-unwritable'))).toBe(
+        true
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('an own-table field stays admitted when the adapter has no opinion on it (permissive default)', async () => {
+    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
+      columns: [t.text('subject').editable()],
+    }));
+    // The stub knows nothing about 'subject' — resolves to null.
+    const { adapter } = makeTargetStub({});
+    const policy = await buildCellEditPolicy(def, adapter);
+    expect([...policy.entries.keys()]).toEqual(['subject']);
+    expect(policy.entries.get('subject')?.target.writable).toBe(true);
   });
 
   it('a dot column without the capability is not admitted (callback-only, dev warn)', async () => {
@@ -201,15 +244,27 @@ describe('policy.check — coercion, validation, rejection', () => {
     expect(policy.check({ id: '1', field: 'createdAt', value: true }).ok).toBe(false);
   });
 
-  it('number: finite ok, non-finite/NaN/string rejected', async () => {
+  it('number: finite ok, non-finite/NaN/string rejected; null rejected (non-nullable, default)', async () => {
     const policy = await makeTicketsPolicy();
     expect(policy.check({ id: '1', field: 'reopenCount', value: 3 }).ok).toBe(true);
-    expect(policy.check({ id: '1', field: 'reopenCount', value: null }).ok).toBe(true);
+    // `reopenCount` doesn't declare `.nullable()` — nullable defaults to
+    // false, so null must be REJECTED (bug fix: this used to admit null
+    // unconditionally, regardless of the column's declared nullability).
+    expect(policy.check({ id: '1', field: 'reopenCount', value: null }).ok).toBe(false);
     expect(policy.check({ id: '1', field: 'reopenCount', value: Number.NaN }).ok).toBe(false);
     expect(
       policy.check({ id: '1', field: 'reopenCount', value: Number.POSITIVE_INFINITY }).ok
     ).toBe(false);
     expect(policy.check({ id: '1', field: 'reopenCount', value: '3' }).ok).toBe(false);
+  });
+
+  it('null is accepted for a column that explicitly declares .nullable()', async () => {
+    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
+      columns: [t.number('reopenCount').nullable().editable()],
+    }));
+    const policy = await buildCellEditPolicy(def, null);
+    expect(policy.check({ id: '1', field: 'reopenCount', value: null }).ok).toBe(true);
+    expect(policy.check({ id: '1', field: 'reopenCount', value: 3 }).ok).toBe(true);
   });
 
   it('boolean: requires a boolean', async () => {
@@ -227,7 +282,7 @@ describe('policy.check — coercion, validation, rejection', () => {
     if (!bad.ok) expect(bad.error).toContain('not one of the column options');
   });
 
-  it('text: string/null ok, non-string rejected; ValidationRules run after coercion', async () => {
+  it('text: string ok, non-string rejected; ValidationRules run after coercion', async () => {
     const policy = await makeTicketsPolicy();
     expect(policy.check({ id: '1', field: 'subject', value: 'Hello' }).ok).toBe(true);
     expect(policy.check({ id: '1', field: 'subject', value: 42 }).ok).toBe(false);
@@ -262,6 +317,32 @@ describe('coerceCellValue (field-agnostic export) + resolveEditableField', () =>
   it('rejects types without a v1 editor', () => {
     expect(coerceCellValue('multiOption', ['a']).ok).toBe(false);
     expect(coerceCellValue('json', {}).ok).toBe(false);
+  });
+
+  it('null is rejected by default (nullable defaults to false) across every v1-editable type', () => {
+    for (const type of [
+      'text',
+      'email',
+      'url',
+      'phone',
+      'number',
+      'currency',
+      'percentage',
+      'option',
+      'boolean',
+      'date',
+      'custom',
+    ] as const) {
+      const result = coerceCellValue(type, null);
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('null is accepted when nullable is explicitly true', () => {
+    expect(coerceCellValue('text', null, undefined, true)).toEqual({ ok: true, value: null });
+    expect(coerceCellValue('number', null, undefined, true)).toEqual({ ok: true, value: null });
+    expect(coerceCellValue('date', null, undefined, true)).toEqual({ ok: true, value: null });
+    expect(coerceCellValue('boolean', null, undefined, true)).toEqual({ ok: true, value: null });
   });
 
   it('accepts an in-process Date for date columns', () => {
