@@ -1,12 +1,19 @@
 'use client';
 
-import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
+import type { ColumnDefinition, ScrollInfo, TableAdapter } from '@better-tables/core';
 import { getColumnStyle, getFormatterForType } from '@better-tables/core';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  type CellEditErrorHandler,
+  type CellEditHandler,
+  isRowEditable,
+  useEditableCells,
+} from '../../hooks/use-editable-cells';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
 import { cn } from '../../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { EditableCell } from './editable-cell';
 
 /**
  * Props for the VirtualizedTable component
@@ -24,7 +31,11 @@ export interface VirtualizedTableProps<T = unknown> {
   /** Custom row renderer */
   renderRow?: (item: T, index: number, style: React.CSSProperties) => React.ReactNode;
 
-  /** Custom cell renderer */
+  /**
+   * Custom cell renderer. When provided, built-in inline editing is skipped
+   * for that cell path (v1 — opt out; use `<BetterTable virtualized />` for
+   * full editable support).
+   */
   renderCell?: (
     value: unknown,
     column: ColumnDefinition<T>,
@@ -58,6 +69,15 @@ export interface VirtualizedTableProps<T = unknown> {
   onScroll?: (scrollInfo: ScrollInfo) => void;
   onViewportChange?: (startIndex: number, endIndex: number) => void;
 
+  /** Adapter for the default cell-edit save path (plan 053). */
+  adapter?: TableAdapter<T>;
+  tableName?: string;
+  onCellEdit?: CellEditHandler<T>;
+  onCellEditError?: CellEditErrorHandler<T>;
+  /** Table-level master switch for inline editing. Default true. */
+  editing?: boolean;
+  getRowId?: (item: T, index: number) => string;
+
   /** Accessibility props */
   'aria-label'?: string;
   'aria-describedby'?: string;
@@ -69,6 +89,7 @@ export interface VirtualizedTableProps<T = unknown> {
 interface VirtualizedRowProps<T> {
   item: T;
   index: number;
+  rowId: string;
   columns: ColumnDefinition<T>[];
   style: React.CSSProperties;
   renderCell?: (
@@ -82,16 +103,39 @@ interface VirtualizedRowProps<T> {
    * single top-level callback can serve every row (see `onMeasure` in
    * `VirtualizedTable`). */
   onMeasure: (rowIndex: number, height: number) => void;
+  editableColumnIds: ReadonlySet<string> | null;
+  rowOverlay: Readonly<Record<string, unknown>>;
+  rowErrors: Readonly<Record<string, string>>;
+  rowSavingColumns: ReadonlySet<string>;
+  editingColumnId: string | null;
+  onBeginCellEdit: (rowId: string, columnId: string) => void;
+  onCancelCellEdit: (rowId: string, columnId: string) => void;
+  onCommitCellEdit: (args: {
+    row: T;
+    rowId: string;
+    column: ColumnDefinition<T, unknown>;
+    value: unknown;
+    previousValue: unknown;
+  }) => void;
 }
 
 function VirtualizedRow<T>({
   item,
   index,
+  rowId,
   columns,
   style,
   renderCell,
   onRowClick,
   onMeasure,
+  editableColumnIds,
+  rowOverlay,
+  rowErrors,
+  rowSavingColumns,
+  editingColumnId,
+  onBeginCellEdit,
+  onCancelCellEdit,
+  onCommitCellEdit,
 }: VirtualizedRowProps<T>) {
   const rowRef = useRef<HTMLTableRowElement>(null);
 
@@ -129,8 +173,16 @@ function VirtualizedRow<T>({
       data-row-index={index}
     >
       {columns.map((column) => {
-        const value = item[column.id as keyof T];
+        const accessorValue = column.accessor ? column.accessor(item) : item[column.id as keyof T];
+        const value =
+          column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
         const colStyle = getColumnStyle(column.meta);
+        const cellEditable =
+          !renderCell && editableColumnIds?.has(column.id) === true && isRowEditable(column, item);
+        const display = renderCell
+          ? renderCell(value, column, item, index)
+          : getFormatterForType(column.type, value, column.meta);
+
         return (
           <TableCell
             key={column.id}
@@ -141,9 +193,32 @@ function VirtualizedRow<T>({
               maxWidth: colStyle.maxWidth,
             }}
           >
-            {renderCell
-              ? renderCell(value, column, item, index)
-              : getFormatterForType(column.type, value, column.meta)}
+            {cellEditable ? (
+              <EditableCell
+                row={item}
+                rowId={rowId}
+                column={column}
+                value={value}
+                editing={editingColumnId === column.id}
+                saving={rowSavingColumns.has(column.id)}
+                error={rowErrors[column.id] ?? null}
+                onBeginEdit={() => onBeginCellEdit(rowId, column.id)}
+                onCancel={() => onCancelCellEdit(rowId, column.id)}
+                onCommit={(next) =>
+                  onCommitCellEdit({
+                    row: item,
+                    rowId,
+                    column,
+                    value: next,
+                    previousValue: accessorValue,
+                  })
+                }
+              >
+                {display}
+              </EditableCell>
+            ) : (
+              display
+            )}
           </TableCell>
         );
       })}
@@ -166,10 +241,19 @@ function areVirtualizedRowPropsEqual<T>(
   return (
     prev.item === next.item &&
     prev.index === next.index &&
+    prev.rowId === next.rowId &&
     prev.columns === next.columns &&
     prev.renderCell === next.renderCell &&
     prev.onRowClick === next.onRowClick &&
     prev.onMeasure === next.onMeasure &&
+    prev.editableColumnIds === next.editableColumnIds &&
+    prev.rowOverlay === next.rowOverlay &&
+    prev.rowErrors === next.rowErrors &&
+    prev.rowSavingColumns === next.rowSavingColumns &&
+    prev.editingColumnId === next.editingColumnId &&
+    prev.onBeginCellEdit === next.onBeginCellEdit &&
+    prev.onCancelCellEdit === next.onCancelCellEdit &&
+    prev.onCommitCellEdit === next.onCommitCellEdit &&
     prev.style.top === next.style.top &&
     prev.style.left === next.style.left &&
     prev.style.right === next.style.right &&
@@ -214,6 +298,15 @@ const MemoizedVirtualizedRow = memo(
  * primitive only when you need rendering `<BetterTable>` doesn't do -- a
  * non-table layout via `renderRow`, or per-row dynamic height measurement.
  */
+function defaultGetRowId<T>(item: T, index: number): string {
+  if (typeof item === 'object' && item !== null) {
+    const obj = item as Record<string, unknown>;
+    if ('id' in obj && obj.id != null) return String(obj.id);
+    if ('_id' in obj && obj._id != null) return String(obj._id);
+  }
+  return `row-${index}`;
+}
+
 export function VirtualizedTable<T = unknown>({
   data,
   columns,
@@ -230,9 +323,45 @@ export function VirtualizedTable<T = unknown>({
   onRowClick,
   onScroll,
   onViewportChange,
+  adapter,
+  tableName,
+  onCellEdit,
+  onCellEditError,
+  editing = true,
+  getRowId = defaultGetRowId,
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedBy,
 }: VirtualizedTableProps<T>) {
+  const editableCells = useEditableCells<T>({
+    editing,
+    ...(adapter != null ? { adapter } : {}),
+    ...(tableName != null ? { tableName } : {}),
+    ...(onCellEdit != null ? { onCellEdit } : {}),
+    ...(onCellEditError != null ? { onCellEditError } : {}),
+  });
+
+  const editableColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const column of columns) {
+      if (editableCells.isColumnPotentiallyEditable(column)) {
+        ids.add(column.id);
+      }
+    }
+    return ids.size > 0 ? ids : null;
+  }, [columns, editableCells.isColumnPotentiallyEditable]);
+
+  const handleCommitCellEdit = useCallback(
+    (args: {
+      row: T;
+      rowId: string;
+      column: ColumnDefinition<T, unknown>;
+      value: unknown;
+      previousValue: unknown;
+    }) => {
+      void editableCells.commitEdit(args);
+    },
+    [editableCells.commitEdit]
+  );
   // Virtualization configuration
   const virtualizationConfig: UseVirtualizationConfig = useMemo(
     () => ({
@@ -387,16 +516,31 @@ export function VirtualizedTable<T = unknown>({
                   );
                 }
 
+                const rowId = getRowId(item, virtualRow.index);
+                const editingColumnId =
+                  editableCells.activeEditKey?.startsWith(`${rowId}:`) === true
+                    ? editableCells.activeEditKey.slice(rowId.length + 1)
+                    : null;
+
                 return (
                   <MemoizedVirtualizedRow
                     key={virtualRow.index}
                     item={item}
                     index={virtualRow.index}
+                    rowId={rowId}
                     columns={columns}
                     style={rowStyle}
                     {...(renderCell !== undefined && { renderCell })}
                     {...(onRowClick !== undefined && { onRowClick })}
                     onMeasure={onMeasure}
+                    editableColumnIds={editableColumnIds}
+                    rowOverlay={editableCells.getRowOverlay(rowId)}
+                    rowErrors={editableCells.getRowErrors(rowId)}
+                    rowSavingColumns={editableCells.getRowSavingColumns(rowId)}
+                    editingColumnId={editingColumnId}
+                    onBeginCellEdit={editableCells.beginEdit}
+                    onCancelCellEdit={editableCells.cancelEdit}
+                    onCommitCellEdit={handleCommitCellEdit}
                   />
                 );
               })}

@@ -20,6 +20,12 @@ import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
+  type CellEditErrorHandler,
+  type CellEditHandler,
+  isRowEditable,
+  useEditableCells,
+} from '../../hooks/use-editable-cells';
+import {
   useTableColumnOrder,
   useTableColumnVisibility,
   useTableFilters,
@@ -36,6 +42,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { ActionsToolbar } from './actions-toolbar';
+import { EditableCell } from './editable-cell';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { TableHeaderContextMenu } from './table-header-context-menu';
@@ -221,6 +228,21 @@ export interface BetterTableProps<TData = unknown>
    * Protected filters will be shown with a lock icon and cannot be removed.
    */
   isFilterProtected?: (filter: FilterState) => boolean;
+
+  /**
+   * Persist a cell edit. When provided, wins over the adapter `updateRecord`
+   * path (required for `httpAdapter` and custom writes). See plan 053.
+   */
+  onCellEdit?: CellEditHandler<TData>;
+
+  /** Called when a cell save fails after optimistic update + rollback. */
+  onCellEditError?: CellEditErrorHandler<TData>;
+
+  /**
+   * Table-level master switch for inline editing. Default `true`. Set `false`
+   * to render every cell read-only without changing column defs.
+   */
+  editing?: boolean;
 }
 
 /** Ref-latch a frequently-changing callback/value prop so a `useEffect` (or
@@ -243,6 +265,22 @@ interface TableRowComponentProps<TData> {
   clickable: boolean;
   onActivate: (row: TData) => void;
   onToggleSelection: (rowId: string, selected: boolean) => void;
+  /** Column ids that can edit when a save path exists (stable Set), or null when none. */
+  editableColumnIds: ReadonlySet<string> | null;
+  rowOverlay: Readonly<Record<string, unknown>>;
+  rowErrors: Readonly<Record<string, string>>;
+  rowSavingColumns: ReadonlySet<string>;
+  /** Column id currently being edited in this row, or null. */
+  editingColumnId: string | null;
+  onBeginCellEdit: (rowId: string, columnId: string) => void;
+  onCancelCellEdit: (rowId: string, columnId: string) => void;
+  onCommitCellEdit: (args: {
+    row: TData;
+    rowId: string;
+    column: ColumnDefinition<TData, unknown>;
+    value: unknown;
+    previousValue: unknown;
+  }) => void;
 }
 
 function TableRowComponent<TData>({
@@ -255,6 +293,14 @@ function TableRowComponent<TData>({
   clickable,
   onActivate,
   onToggleSelection,
+  editableColumnIds,
+  rowOverlay,
+  rowErrors,
+  rowSavingColumns,
+  editingColumnId,
+  onBeginCellEdit,
+  onCancelCellEdit,
+  onCommitCellEdit,
 }: TableRowComponentProps<TData>) {
   return (
     <TableRow
@@ -282,7 +328,52 @@ function TableRowComponent<TData>({
         </TableCell>
       )}
       {visibleColumns.map((column) => {
-        const value = column.accessor(row);
+        const accessorValue = column.accessor(row);
+        const value =
+          column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
+        const cellEditable =
+          editableColumnIds?.has(column.id) === true && isRowEditable(column, row);
+        const isEditing = editingColumnId === column.id;
+
+        const display = column.cellRenderer
+          ? column.cellRenderer({
+              value,
+              row,
+              column,
+              rowIndex: index,
+            })
+          : (() => {
+              const formatted = getFormatterForType(column.type, value, column.meta);
+              const truncateConfig = column.meta?.truncate as
+                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                | undefined;
+
+              // Show tooltip for truncated text if showTooltip is enabled
+              if (truncateConfig?.showTooltip && value != null) {
+                const originalValue = String(value);
+                const maxLen = truncateConfig.maxLength || 50;
+                const isTruncated = originalValue.length > maxLen;
+
+                if (isTruncated) {
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<span className="cursor-help truncate max-w-full inline-block" />}
+                      >
+                        {formatted}
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
+                          {originalValue}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+              }
+
+              return <span>{formatted}</span>;
+            })();
 
         return (
           <TableCell
@@ -298,47 +389,32 @@ function TableRowComponent<TData>({
               column.align === 'right' && 'text-right'
             )}
           >
-            {column.cellRenderer
-              ? column.cellRenderer({
-                  value,
-                  row,
-                  column,
-                  rowIndex: index,
-                })
-              : (() => {
-                  const formatted = getFormatterForType(column.type, value, column.meta);
-                  const truncateConfig = column.meta?.truncate as
-                    | { maxLength?: number; suffix?: string; showTooltip?: boolean }
-                    | undefined;
-
-                  // Show tooltip for truncated text if showTooltip is enabled
-                  if (truncateConfig?.showTooltip && value != null) {
-                    const originalValue = String(value);
-                    const maxLen = truncateConfig.maxLength || 50;
-                    const isTruncated = originalValue.length > maxLen;
-
-                    if (isTruncated) {
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <span className="cursor-help truncate max-w-full inline-block" />
-                            }
-                          >
-                            {formatted}
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            <div className="wrap-break-word whitespace-pre-wrap text-pretty">
-                              {originalValue}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    }
-                  }
-
-                  return <span>{formatted}</span>;
-                })()}
+            {cellEditable ? (
+              <EditableCell
+                row={row}
+                rowId={rowId}
+                column={column}
+                value={value}
+                editing={isEditing}
+                saving={rowSavingColumns.has(column.id)}
+                error={rowErrors[column.id] ?? null}
+                onBeginEdit={() => onBeginCellEdit(rowId, column.id)}
+                onCancel={() => onCancelCellEdit(rowId, column.id)}
+                onCommit={(next) =>
+                  void onCommitCellEdit({
+                    row,
+                    rowId,
+                    column,
+                    value: next,
+                    previousValue: accessorValue,
+                  })
+                }
+              >
+                {display}
+              </EditableCell>
+            ) : (
+              display
+            )}
           </TableCell>
         );
       })}
@@ -370,6 +446,7 @@ export function BetterTable<TData = unknown>({
 
   // Data props (handled by parent)
   data,
+  adapter,
   virtualized = false,
   loading = false,
   error = null,
@@ -403,6 +480,11 @@ export function BetterTable<TData = unknown>({
 
   // Filter protection
   isFilterProtected,
+
+  // Inline editing (plan 053)
+  onCellEdit,
+  onCellEditError,
+  editing = true,
   ...props
 }: BetterTableProps<TData>) {
   // `table` (a defineTable() result) is sugar for columns={table.columns},
@@ -771,6 +853,39 @@ export function BetterTable<TData = unknown>({
     [onRowClickRef, rowConfigOnClickRef]
   );
   const rowsClickable = Boolean(onRowClick || rowConfig?.onClick);
+
+  const editableCells = useEditableCells<TData>({
+    editing,
+    ...(adapter != null ? { adapter } : {}),
+    ...(table?.tableName != null ? { tableName: table.tableName } : {}),
+    ...(onCellEdit != null ? { onCellEdit } : {}),
+    ...(onCellEditError != null ? { onCellEditError } : {}),
+  });
+
+  const editableColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const column of columnsWithDefaults) {
+      if (editableCells.isColumnPotentiallyEditable(column)) {
+        ids.add(column.id);
+      }
+    }
+    return ids.size > 0 ? ids : null;
+  }, [columnsWithDefaults, editableCells.isColumnPotentiallyEditable]);
+
+  const handleBeginCellEdit = editableCells.beginEdit;
+  const handleCancelCellEdit = editableCells.cancelEdit;
+  const handleCommitCellEdit = useCallback(
+    (args: {
+      row: TData;
+      rowId: string;
+      column: ColumnDefinition<TData, unknown>;
+      value: unknown;
+      previousValue: unknown;
+    }) => {
+      void editableCells.commitEdit(args);
+    },
+    [editableCells.commitEdit]
+  );
 
   // Clear filters handler
   const handleClearFilters = useCallback(() => {
@@ -1155,6 +1270,10 @@ export function BetterTable<TData = unknown>({
             {virtualBodyRows.map(({ row, index }) => {
               const rowId = getRowId(row, index);
               const isSelected = selectedRows.has(rowId);
+              const editingColumnId =
+                editableCells.activeEditKey?.startsWith(`${rowId}:`) === true
+                  ? editableCells.activeEditKey.slice(rowId.length + 1)
+                  : null;
 
               return (
                 <MemoizedTableRow
@@ -1168,6 +1287,14 @@ export function BetterTable<TData = unknown>({
                   clickable={rowsClickable}
                   onActivate={handleRowActivate}
                   onToggleSelection={handleRowSelection}
+                  editableColumnIds={editableColumnIds}
+                  rowOverlay={editableCells.getRowOverlay(rowId)}
+                  rowErrors={editableCells.getRowErrors(rowId)}
+                  rowSavingColumns={editableCells.getRowSavingColumns(rowId)}
+                  editingColumnId={editingColumnId}
+                  onBeginCellEdit={handleBeginCellEdit}
+                  onCancelCellEdit={handleCancelCellEdit}
+                  onCommitCellEdit={handleCommitCellEdit}
                 />
               );
             })}
