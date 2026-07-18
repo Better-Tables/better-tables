@@ -237,8 +237,7 @@ export interface PathColumnBuilder<TData, TValue> {
   cellRenderer(renderer: (value: TValue, row: TData) => unknown): PathColumnBuilder<TData, TValue>;
 }
 
-export interface NumberPathColumnBuilder<TData>
-  extends PathColumnBuilder<TData, number | null> {
+export interface NumberPathColumnBuilder<TData> extends PathColumnBuilder<TData, number | null> {
   range(min: number, max: number): NumberPathColumnBuilder<TData>;
 }
 
@@ -399,17 +398,18 @@ export interface TableDefinitionV1<TName extends string, TRow> {
  * must be supplied explicitly while `TName` is inferred from the call
  * (design doc Step 1 decision 3).
  */
-export interface DefineTableV1Curried<TInstance> {
-  <TName extends TableNamesOf<TInstance>>(
-    tableName: TName,
-    factory: (
-      t: PathColumnFactory<RowOf<TInstance, TName>>
-    ) => TableDefResultV1<RowOf<TInstance, TName>>
-  ): TableDefinitionV1<TName, RowOf<TInstance, TName>>;
-}
+export type DefineTableV1Curried<TInstance> = <TName extends TableNamesOf<TInstance>>(
+  tableName: TName,
+  factory: (
+    t: PathColumnFactory<RowOf<TInstance, TName>>
+  ) => TableDefResultV1<RowOf<TInstance, TName>>
+) => TableDefinitionV1<TName, RowOf<TInstance, TName>>;
 
 export function defineTableV1<TInstance>(): DefineTableV1Curried<TInstance> {
-  return ((tableName: string, factory: (t: PathColumnFactory<unknown>) => TableDefResultV1<unknown>) => {
+  return ((
+    tableName: string,
+    factory: (t: PathColumnFactory<unknown>) => TableDefResultV1<unknown>
+  ) => {
     const result = factory(createMockPathColumnFactory());
     return {
       tableName,
@@ -425,12 +425,10 @@ export function defineTableV1<TInstance>(): DefineTableV1Curried<TInstance> {
  * unconstrained `string` (there's no schema catalog to check it against),
  * but columns remain fully path-typed against `TRow`.
  */
-export interface DefineTableRowV1Curried<TRow> {
-  (
-    tableName: string,
-    factory: (t: PathColumnFactory<TRow>) => TableDefResultV1<TRow>
-  ): TableDefinitionV1<string, TRow>;
-}
+export type DefineTableRowV1Curried<TRow> = (
+  tableName: string,
+  factory: (t: PathColumnFactory<TRow>) => TableDefResultV1<TRow>
+) => TableDefinitionV1<string, TRow>;
 
 export function defineTableRowV1<TRow>(): DefineTableRowV1Curried<TRow> {
   return (tableName: string, factory: (t: PathColumnFactory<TRow>) => TableDefResultV1<TRow>) => {

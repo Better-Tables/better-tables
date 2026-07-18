@@ -180,7 +180,9 @@ function FacetedFilterSidebarComponent<TData = unknown>({
                     >
                       <Checkbox checked={active} tabIndex={-1} className="pointer-events-none" />
                       <span className="flex-1 truncate">{option.value}</span>
-                      <span className="font-mono text-xs text-muted-foreground">{option.count}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {option.count}
+                      </span>
                     </button>
                   );
                 })}

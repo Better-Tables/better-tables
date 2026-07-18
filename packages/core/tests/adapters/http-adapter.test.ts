@@ -351,7 +351,10 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
   });
 
   it('authorize may return a custom Response verbatim', async () => {
-    const custom = new Response('login', { status: 401, headers: { 'www-authenticate': 'Bearer' } });
+    const custom = new Response('login', {
+      status: 401,
+      headers: { 'www-authenticate': 'Bearer' },
+    });
     const handler = createAdapterRouteHandler(makeServerAdapter().adapter, {
       authorize: () => custom,
     });

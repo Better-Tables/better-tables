@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { betterTables, defineTable } from '../../src/factory';
-import { buildPathAccessor, createPathColumnFactory } from '../../src/builders/path-builders';
 import { createColumnBuilder } from '../../src/builders/column-factory';
+import { buildPathAccessor, createPathColumnFactory } from '../../src/builders/path-builders';
+import { betterTables, defineTable } from '../../src/factory';
 import { humanize, lastPathSegment } from '../../src/lib/format-utils';
 import type { SchemaAwareAdapter } from '../../src/types/paths';
 
@@ -190,9 +190,9 @@ describe('path builders (plan 018)', () => {
       }));
 
       expect(viaMethod.tableName).toBe(viaCurried.tableName);
-      expect(
-        viaMethod.columns.map(({ accessor, ...rest }) => rest)
-      ).toEqual(viaCurried.columns.map(({ accessor, ...rest }) => rest));
+      expect(viaMethod.columns.map(({ accessor, ...rest }) => rest)).toEqual(
+        viaCurried.columns.map(({ accessor, ...rest }) => rest)
+      );
 
       const row: User = { name: 'Ada', age: 30, posts: [] };
       expect(viaMethod.columns.map((c) => c.accessor(row))).toEqual(

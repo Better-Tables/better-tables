@@ -14,8 +14,8 @@ export {
   type AdapterRouteHandlerOptions,
   type AdapterSource,
   type AdapterSourceContext,
-  type HandleAdapterRequestOptions,
   createAdapterRouteHandler,
+  type HandleAdapterRequestOptions,
   handleAdapterRequest,
 } from './http-handler';
 export type { AdapterMethod, AdapterRequestBody, AdapterResponseBody } from './http-protocol';

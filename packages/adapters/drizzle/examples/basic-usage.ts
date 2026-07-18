@@ -4,6 +4,7 @@
 import { createColumnBuilder } from '@better-tables/core';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
@@ -246,10 +247,10 @@ const columns = [
 ];
 
 // Example usage
-async function setupDatabase(): Promise<any> {
+async function setupDatabase(): Promise<{ db: BetterSQLite3Database; sqlite: Database }> {
   // Create in-memory SQLite database
   const sqlite = new Database(':memory:');
-  const db: any = drizzle(sqlite);
+  const db = drizzle(sqlite);
 
   // Create tables
   await db.run(sql`CREATE TABLE users (

@@ -17,12 +17,12 @@
  * wrong-unit semantics that shipped before.
  */
 
+import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { FilterState } from '@better-tables/core';
-import { Database } from 'bun:sqlite';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { drizzleAdapter } from '../src/factory';
 
 const events = sqliteTable('events', {

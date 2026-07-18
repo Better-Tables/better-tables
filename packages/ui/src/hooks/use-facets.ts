@@ -178,10 +178,7 @@ export function useFacets<TData = unknown>({
         return;
       }
       // Aborted requests are superseded — don't surface them as errors.
-      if (
-        (err instanceof Error && err.name === 'AbortError') ||
-        controller.signal.aborted
-      ) {
+      if ((err instanceof Error && err.name === 'AbortError') || controller.signal.aborted) {
         return;
       }
 

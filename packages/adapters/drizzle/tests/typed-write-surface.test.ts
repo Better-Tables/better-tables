@@ -3,12 +3,12 @@
  * multi-table schema does not rely on defaultMutationTable.
  */
 
+import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { betterTables, defineTableRow } from '@better-tables/core';
-import { Database } from 'bun:sqlite';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { drizzleAdapter } from '../src/factory';
 
 const tickets = sqliteTable('tickets', {
@@ -75,7 +75,9 @@ describe('Plan 047 — typed write surface on multi-table drizzle', () => {
       options: { defaultMutationTable: 'customers' },
     });
     await adapter.createRecord({ name: 'Acme' } as Partial<CustomerRow>);
-    const customerRows = sqlite.query('SELECT name FROM customers').all() as Array<{ name: string }>;
+    const customerRows = sqlite.query('SELECT name FROM customers').all() as Array<{
+      name: string;
+    }>;
     expect(customerRows).toEqual([{ name: 'Acme' }]);
   });
 });

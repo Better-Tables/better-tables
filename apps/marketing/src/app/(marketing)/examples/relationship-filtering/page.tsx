@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
 import { parseTableSearchParams } from '@better-tables/core';
+import { Suspense } from 'react';
 import { SourceView } from '@/components/sections/source-view';
 import { SupportDemoWorkspace } from '@/components/sections/support-demo-workspace';
 import { readSourceFile } from '@/lib/demo/read-source';
@@ -58,7 +58,9 @@ export default async function RelationshipFilteringPage({
         </p>
       </div>
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}>
+      <Suspense
+        fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}
+      >
         <SupportDemoWorkspace fetchResult={fetchResult} />
       </Suspense>
 

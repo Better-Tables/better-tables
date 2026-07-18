@@ -4,6 +4,7 @@ import { createColumnBuilder } from '@better-tables/core';
 import type { RelationshipMap } from '@better-tables/drizzle';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
@@ -543,9 +544,9 @@ const customRelationships = {
   },
 };
 
-async function setupComplexDatabase() {
+async function setupComplexDatabase(): Promise<{ db: BetterSQLite3Database; sqlite: Database }> {
   const sqlite = new Database(':memory:');
-  const db: any = drizzle(sqlite);
+  const db = drizzle(sqlite);
 
   // Create all tables
   await db.run(sql`CREATE TABLE companies (
@@ -718,7 +719,7 @@ async function setupComplexDatabase() {
   return { db, sqlite };
 }
 
-async function createAdvancedAdapter(): Promise<any> {
+async function createAdvancedAdapter(): Promise<DrizzleAdapter<User>> {
   const { db, sqlite } = await setupComplexDatabase();
 
   const adapter = new DrizzleAdapter({
