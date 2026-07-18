@@ -2,11 +2,13 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { useCallback } from 'react';
 import {
   defaultVisibleTicketColumns,
   type TicketRow,
   ticketsTable,
 } from '@/lib/demo/support/columns';
+import { persistTicketCellEdit } from '@/lib/demo/support/ticket-cell-edit';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'support-tickets-table';
@@ -40,6 +42,8 @@ export function TicketsTableClient({
     urlAdapter
   );
 
+  const onCellEdit = useCallback(persistTicketCellEdit, []);
+
   return (
     <BetterTable
       id={TABLE_ID}
@@ -52,6 +56,7 @@ export function TicketsTableClient({
       initialFilters={initialFilters}
       defaultVisibleColumns={defaultVisibleTicketColumns}
       autoShowFilteredColumns
+      onCellEdit={onCellEdit}
       features={{
         filtering: true,
         sorting: true,

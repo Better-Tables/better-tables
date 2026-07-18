@@ -127,6 +127,17 @@ function UserTable() {
 
 ## 💎 Key Features
 
+### Inline cell editing
+
+Mark a column `.editable()` and the table mounts a type-aware in-cell editor (text, number, option, boolean, date). Saves go through the adapter's `updateRecord` when `features.update` is on, or through an `onCellEdit` callback (required for `httpAdapter`). Optimistic UI with rollback on failure; column `validation` rules run before any write.
+
+```tsx
+t.text('subject').editable()
+t.option('status').options([...]).editable()
+
+<BetterTable table={ticketsTable} data={rows} adapter={adapter} />
+```
+
 ### Automatic Relationship Filtering
 
 The crown jewel of Better Tables: filter across relationships without writing JOIN queries.

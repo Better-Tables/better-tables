@@ -134,7 +134,9 @@ describe('Column Types', () => {
         editable,
       };
 
-      expectTypeOf(column.editable).toEqualTypeOf<boolean | EditableConfig<Row, string> | undefined>();
+      expectTypeOf(column.editable).toEqualTypeOf<
+        boolean | EditableConfig<Row, string> | undefined
+      >();
       expect(column.editable).toEqual(editable);
     });
   });

@@ -31,7 +31,7 @@ const priorityColors: Record<string, string> = {
  */
 export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
   columns: [
-    t.text('subject').searchable().filterable().sortable(),
+    t.text('subject').searchable().filterable().sortable().editable(),
 
     t
       .option('status')
@@ -43,6 +43,7 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       ])
       .filterable()
       .sortable()
+      .editable()
       .cellRenderer(({ value }) => (
         <Badge variant="outline" className={statusColors[value] ?? ''}>
           {value}
@@ -79,7 +80,8 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .boolean('slaBreached')
       .displayName('SLA breached')
       .activeInactive({ activeText: 'Breached', inactiveText: 'On track', showBadges: true })
-      .filterable(),
+      .filterable()
+      .editable(),
 
     // Direct numeric column -- the `facets` example's `getMinMaxValues`
     // showcase needs one.
@@ -155,7 +157,8 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .displayName('Opened')
       .dateTime({ timeZone: 'America/New_York' })
       .filterable()
-      .sortable(),
+      .sortable()
+      .editable(),
   ],
 }));
 

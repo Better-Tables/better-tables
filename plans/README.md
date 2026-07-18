@@ -46,6 +46,12 @@ wave are in "Deferred by decision" at the bottom.
   and required CI was green before merge. Wave C remains TODO.
 - **Second deep audit produced plans 033–052** (written 2026-07-17);
   maintainer decisions folded into the relevant plans — see below.
+- **Reconcile audit 2026-07-18 (at `7b58ed8`): all 17 merged plans VERIFIED
+  against their done criteria at HEAD** — see "Reconcile audit" below. Wave C
+  TODO plans drift-checked and refreshed; findings still valid.
+- **Plan [053](053-editable-cells.md) written (2026-07-18)** — `.editable()`
+  inline cell editing, the maintainer's chosen next feature; scoping
+  decisions collected and folded in. It heads Wave C.
 - **0.6 remains SHIPPABLE**; Wave A landed the pre-publish obligations
   (033 infra truth, 035 HTTP wire hardening, 040 facet top-100, 047 writes).
 
@@ -86,14 +92,42 @@ the breaking window.
 | [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | DONE (merged to main, PR #85) |
 | [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | DONE (merged to main, PR #85) |
 
-### Wave C — direction / fast-follow (post-0.6-publish)
+### Wave C — features / fast-follow (post-0.6-publish)
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO |
-| [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO |
-| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049 | TODO |
+| [053](053-editable-cells.md) | **`.editable()` inline cell editing** — builder API, per-type in-cell editors (text/number/option/boolean/date), adapter+callback save, optimistic rollback, gating matrix, integration proof, dogfood example | 047, 042 (done) | DONE on `editable-cells` |
+| [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
+| [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
+| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049 | TODO (reconciled 2026-07-18 — export seams moved by 044; line refs refreshed) |
 | 008 | Prisma adapter spike (read path) | 007 (done) + lift of the PRISMA HOLD | **ON HOLD** (maintainer) |
+
+### Reconcile audit (2026-07-18, at `7b58ed8`)
+
+Both merged waves were re-verified against their done criteria at HEAD by two
+independent auditors (every cheap criterion re-run; key implementations and
+~25 new tests spot-read for substance). **All 17 plans hold — no criteria
+failures, no silent deviations.** Full gates at HEAD: typecheck 10/10 ·
+core 1216/0 · toolkit 114/0 · ui 94/0 · cli 140/0 · drizzle 620/0 (+185
+env-DB skips via 051's guards) · marketing 17/0 · `bun audit` clean
+(closes 052's last skipped criterion) · `bunx biome check .` 0 errors.
+Notes for the record (all acceptable, none require action):
+
+- 034: its two "no `filters = []`" greps match only a JSDoc `@example` for a
+  reference implementation — the real hook uses frozen `EMPTY_FILTERS`/
+  `EMPTY_PARAMS`; the criterion was imprecise, the fix is correct.
+- 036: the emitter interface lives in `filter-router.ts` (not `types.ts` as
+  the plan's criterion assumed); `prefersDateSemantics` was correctly added
+  there and to the drizzle emitter.
+- 040's cache now lives in `adapter-cache.ts` (relocated by 044) with the
+  eviction semantics intact.
+- 043: Playwright E2E deferred per the plan's own escape hatch (recorded).
+- 044: `drizzle-adapter.ts` shrank ~223 lines (criterion estimated ~350) —
+  all structural deliverables present; cosmetic gap only.
+- 045: id/accessor overrides remain as thin typed declarations (bodies
+  delegated) — public signatures preserved as required.
+- 051 items 4 (detectDriver) + 5 (computed-TREE) documented-and-deferred per
+  their INVESTIGATE escape hatches; MIGRATION "Known gaps" records item 5.
 
 ### Dependency & ordering notes
 
@@ -106,6 +140,10 @@ the breaking window.
 - **033 before 037/042/052** — 033 fixes the turbo test-cache (so new tests
   run) and touches `packages/cli/package.json` (037) + `test.yml` (052).
 - **049 before 050** — `csvExport()` rides the plugin seam 049 builds.
+- **053 is independent of 048/049/050** — it builds on the merged 047 write
+  surface and 042 test harness; it can run first (it's the maintainer's
+  chosen next feature). Its `commitEdit` seam is designed to accept 049's
+  future `beforeSave`/`afterSave` hooks without rework.
 - Within Wave A, 034/035/036/040/046/047 touch largely disjoint files and can
   run in parallel worktrees; 033 first is safest (test-cache correctness).
 
@@ -136,6 +174,18 @@ Audit/scope calls:
 - Direction features to build this wave: **plugin hooks** (049) + **export UI**
   (050). In-memory adapter and saved views were **not selected** — see
   "Deferred by decision".
+
+`.editable()` decisions (collected 2026-07-18, folded into plan 053):
+
+- **Save path = adapter + callback**: default through the 047 write surface,
+  gated on `features.update` + resolvable field/rowId; `onCellEdit` callback
+  overrides/enables (the httpAdapter path — writes stay un-proxied).
+- **Optimistic updates with rollback** on save failure.
+- **Trigger UX**: double-click or Enter opens; Enter/blur commits; Escape
+  cancels; option/boolean commit on selection/toggle.
+- **V1 types**: text (+email/url/phone), number (+currency/percentage),
+  option, boolean, date. `multiOption`/`json` read-only in v1; `custom` via
+  `editRenderer`.
 - Per-component `@better-tables/ui` subpath exports — **rejected** (see
   Deferred by decision).
 

@@ -2,11 +2,13 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { useCallback } from 'react';
 import {
   defaultVisibleTicketColumns,
   type TicketRow,
   ticketsTable,
 } from '@/lib/demo/support/columns';
+import { persistTicketCellEdit } from '@/lib/demo/support/ticket-cell-edit';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'query-groups-table';
@@ -40,6 +42,8 @@ export function QueryGroupsTableClient({
     urlAdapter
   );
 
+  const onCellEdit = useCallback(persistTicketCellEdit, []);
+
   return (
     <BetterTable
       id={TABLE_ID}
@@ -52,6 +56,7 @@ export function QueryGroupsTableClient({
       initialFilters={initialFilters}
       defaultVisibleColumns={defaultVisibleTicketColumns}
       autoShowFilteredColumns
+      onCellEdit={onCellEdit}
       features={{
         filtering: true,
         sorting: true,

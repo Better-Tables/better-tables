@@ -120,6 +120,44 @@ const result = await tables.fetchData(ticketsTable, {
 
 ---
 
+## Inline editing
+
+Enable per-column with `.editable()` on the builder. Double-click (or Enter on a focused cell) opens a type-appropriate editor; Enter/blur commits; Escape cancels. Option/boolean/date editors commit on selection/toggle/day pick.
+
+```typescript
+t.text('subject').editable()
+t.option('status').options([...]).editable()
+t.boolean('slaBreached').editable({ when: (row) => row.status !== 'resolved' })
+t.number('reopenCount').editable({ field: 'reopenCount' }) // field override when id ≠ storage key
+```
+
+**Save resolution** (first match wins):
+
+| Condition | Result |
+|---|---|
+| `editing={false}` on `<BetterTable>` | read-only |
+| column has no `editable` / `when(row)` false | read-only |
+| `onCellEdit` provided | callback save (required for `httpAdapter`) |
+| adapter `features.update` + `updateRecord` + resolvable field + row id | adapter save |
+| otherwise | read-only (+ one dev `console.warn` per column) |
+
+Field mapping for adapter saves: `editable.field` if set; else the column id when it has no dot; dotted relationship ids are callback-only in v1.
+
+Optimistic updates: the new value shows immediately; on save failure the cell rolls back and `onCellEditError` fires. Validation rules on the column run before any save.
+
+**V1 editors**: text (+ email/url/phone), number (+ currency/percentage), option, boolean, date. `multiOption`/`json` stay read-only; `custom` needs `editable.editRenderer`. Edits are last-write-wins (no version checks).
+
+```tsx
+<BetterTable
+  table={ticketsTable}
+  data={rows}
+  adapter={adapter}           // drizzle: uses updateRecord when features.update
+  // onCellEdit={...}         // httpAdapter / custom persistence
+/>
+```
+
+---
+
 ## URL State Management
 
 Sync table state to query parameters via a framework-agnostic adapter. Filters use compressed wire format (`c:` prefix); see `serializeFiltersToURL` / `deserializeFiltersFromURL` in core.
