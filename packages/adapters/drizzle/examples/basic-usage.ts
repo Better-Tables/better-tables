@@ -226,21 +226,21 @@ async function createAdapter() {
 
   usersTable = buildUsersTable(db);
   columns = usersTable.columns;
-  const adapter = drizzleAdapter(db, { options: { defaultPrimaryTable: 'users', cache: { enabled: true, ttl: 300000, maxSize: 1000 }, logging: { enabled: true, level: 'info', logQueries: false }, performance: { trackTiming: true, maxQueryTime: 5000 } } });
+  const adapter = drizzleAdapter(db, { options: { defaultPrimaryTable: 'users', defaultMutationTable: 'users', cache: { enabled: true, ttl: 300000, maxSize: 1000 }, logging: { enabled: true, level: 'info', logQueries: false }, performance: { trackTiming: true, maxQueryTime: 5000 } } });
   return { adapter, sqlite, usersTable, columns };
 }
 
 // Example queries
 async function runExamples() {
   const { adapter, sqlite } = await createAdapter();
-  const _basicResult = await adapter.fetchData({});
-  const _paginatedResult = await adapter.fetchData({
+  await adapter.fetchData({});
+  await adapter.fetchData({
     pagination: { page: 1, limit: 2 },
   });
-  const _sortedResult = await adapter.fetchData({
+  await adapter.fetchData({
     sorting: [{ columnId: 'age', direction: 'desc' }],
   });
-  const _filteredResult = await adapter.fetchData({
+  await adapter.fetchData({
     filters: [
       {
         columnId: 'has_profile',
@@ -250,7 +250,7 @@ async function runExamples() {
       },
     ],
   });
-  const _crossTableResult = await adapter.fetchData({
+  await adapter.fetchData({
     filters: [
       {
         columnId: 'profile.bio',
@@ -260,7 +260,7 @@ async function runExamples() {
       },
     ],
   });
-  const _complexResult = await adapter.fetchData({
+  await adapter.fetchData({
     filters: [
       {
         columnId: 'is_active',
@@ -277,30 +277,14 @@ async function runExamples() {
     ],
     sorting: [{ columnId: 'engagement_score', direction: 'desc' }],
   });
-  const _ageOptions = await adapter.getFilterOptions('age');
-  const _facets = await adapter.getFacetedValues('posts_count');
-  const [_minViews, _maxViews] = await adapter.getMinMaxValues('total_views');
+  await adapter.getFilterOptions('age');
+  await adapter.getFacetedValues('posts_count');
+  await adapter.getMinMaxValues('total_views');
 
-  // Create
-  const newUser = await adapter.createRecord({
-    name: 'David Lee',
-    email: 'david@example.com',
-    age: 33,
-    createdAt: new Date(),
-  } as Partial<User>);
+  // Typed writes omitted — drizzleAdapter() mutation typing requires a fully
+  // inferred schema catalog; see MIGRATION.md §7 and the Drizzle README.
 
-  // Update
-  const _updatedUser = await adapter.updateRecord(newUser.id.toString(), {
-    age: 34,
-  } as Partial<User>);
-
-  // Delete
-  await adapter.deleteRecord(newUser.id.toString());
-  const _exportResult = await adapter.exportData({
-    format: 'json',
-    columns: ['name', 'email', 'posts_count', 'total_views'],
-  });
-  const _perfResult = await adapter.fetchData({
+  await adapter.fetchData({
     columns: ['name', 'profile.bio', 'posts.title', 'posts_count', 'total_views'],
     sorting: [{ columnId: 'total_views', direction: 'desc' }],
   });

@@ -670,11 +670,11 @@ async function runAdvancedExamples() {
     stats.totalProjects += user.projects_count || 0;
   });
   companyStats.forEach((_stats) => {});
-  const _perfResult = await adapter.fetchData({
+  await adapter.fetchData({
     columns: ['name', 'company.name', 'roles.name', 'skill_summary', 'project_summary'],
     sorting: [{ columnId: 'name', direction: 'asc' }],
   });
-  const _exportResult = await adapter.exportData({
+  await adapter.exportData({
     format: 'json',
     columns: [
       'name',
