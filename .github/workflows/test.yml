@@ -117,7 +117,6 @@ jobs:
 
       - name: Lint (check only)
         run: bunx biome check .
-        continue-on-error: true   # TODO: make blocking once biome residue is cleared (see plans/013 report — 71 errors remain)
 
   test-core:
     name: Test Core Package
