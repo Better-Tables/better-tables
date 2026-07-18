@@ -217,6 +217,28 @@ export interface FacetQueryParams {
 }
 
 /**
+ * Schema-derived column description — the raw material for auto columns
+ * (plan 054). Returned by {@link TableAdapter.describeColumns}; consumed by
+ * `resolveTableColumns` (core) to enrich explicit column definitions and to
+ * build inferred ones for `t.auto()` / no-factory `define`.
+ */
+export interface InferredColumnSpec {
+  /** Storage field name (own-table). Doubles as the auto column id. */
+  field: string;
+  /** Mapped Better Tables column type. */
+  columnType: ColumnType;
+  /** Humanized display label. */
+  label: string;
+  /** Declared enum choices, when the schema knows them. */
+  options?: Array<{ value: string; label: string }>;
+  nullable: boolean;
+  primaryKey: boolean;
+  foreignKey: boolean;
+  /** False for PKs and anything the adapter cannot write back. */
+  writable: boolean;
+}
+
+/**
  * Optional per-call options for adapter write methods. The instance surface
  * (`tables.createRecord(table, data)`) injects `{ table: table.tableName }`
  * so multi-table schemas don't rely on `defaultMutationTable`.
@@ -375,6 +397,20 @@ export interface TableAdapter<TData = unknown> {
    * ```
    */
   getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]>;
+
+  /**
+   * Optional: describe a table's columns from the underlying schema —
+   * powers auto column inference (`t.auto()` / no-factory `define`).
+   * `table` follows the same resolution as {@link FetchDataParams.primaryTable}.
+   *
+   * @param table - Explicit table to describe. When omitted, the adapter
+   *   resolves it exactly like a read with no `columns`/`primaryTable`
+   *   (single-table schemas stay zero-config; multi-table schemas need the
+   *   argument or a configured default).
+   * @returns Promise resolving to one {@link InferredColumnSpec} per
+   *   own-table column, in stable schema order.
+   */
+  describeColumns?(table?: string): Promise<InferredColumnSpec[]>;
 
   /**
    * Create a new record (optional operation).
