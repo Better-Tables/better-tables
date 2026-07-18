@@ -8,6 +8,7 @@ import {
   defineTableRow,
   type FilterState,
   formatDateWithConfig,
+  getTableStore,
 } from '@better-tables/core';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
@@ -224,6 +225,56 @@ describe('Drizzle + BetterTable integration (plan 043)', () => {
     } as never);
     const alice = refetch.data.find((r) => r.id === 1);
     expect(alice?.name).toBe('Alicia Updated');
+  });
+
+  it('renders a fully inferred auto-columns table against real bun:sqlite (plan 054)', async () => {
+    // Fresh no-factory definition per test — resolveTableColumns memoizes
+    // per (def, adapter) pair.
+    const autoUsersTable = defineTableRow<UserRow>()('users');
+    // Stable identity — a fresh [] every render would retrigger useTableData.
+    const noFilters: FilterState[] = [];
+
+    function AutoHarness() {
+      const { data, loading } = useTableData<UserRow>({
+        adapter: adapter as never,
+        filters: noFilters,
+        pagination: PAGINATION,
+      });
+      return (
+        <BetterTable
+          id="auto-users"
+          table={autoUsersTable}
+          data={data}
+          adapter={adapter as never}
+          loading={loading}
+        />
+      );
+    }
+
+    render(<AutoHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+    });
+
+    // Inferred, humanized headers from real Drizzle schema introspection.
+    expect(screen.getByText('Id')).toBeTruthy();
+    expect(screen.getByText('Name')).toBeTruthy();
+    expect(screen.getByText('Status')).toBeTruthy();
+    expect(screen.getByText('Created At')).toBeTruthy();
+
+    // The enum column carried its choices through describeColumns.
+    const store = getTableStore('auto-users');
+    const statusColumn = store?.getState().columns.find((column) => column.id === 'status');
+    expect(statusColumn?.type).toBe('option');
+    expect(statusColumn?.filter?.options).toEqual([
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+    ]);
+
+    // Inferred columns are read-only — no editable affordance without an
+    // explicit override.
+    expect(screen.queryByRole('button', { name: /edit name/i })).toBeNull();
   });
 
   it('rolls back the display when updateRecord fails (plan 053)', async () => {

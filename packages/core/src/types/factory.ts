@@ -245,6 +245,17 @@ export interface TableDefInfer<TName extends string, TRow> {
 export interface TableDefinition<TName extends string, TRow> {
   readonly tableName: TName;
   readonly columns: ColumnDefinition<TRow, unknown>[];
+  /**
+   * Internal marker (plan 054): column-SET inference was requested — either
+   * the no-factory `define('users')` form, or a `...t.auto()` spread in the
+   * factory's `columns`. Resolved lazily at mount by `resolveTableColumns`
+   * against `adapter.describeColumns`; never resolved at definition time
+   * (the curried `defineTable` form is deliberately runtime-adapter-free).
+   *
+   * Auto-inclusion is opt-in by design: declaring a subset of columns is
+   * deliberate (schemas contain columns that must not silently render).
+   */
+  readonly autoColumns?: boolean;
   readonly $infer: TableDefInfer<TName, TRow>;
 }
 
@@ -253,23 +264,39 @@ export interface TableDefinition<TName extends string, TRow> {
  * Curried because TS has no partial type-argument inference -- `TInstance`
  * must be supplied explicitly while `TName` is inferred from the call
  * (design doc Step 1 decision 3).
+ *
+ * The factory is optional (plan 054): `defineTable<T>()('users')` with NO
+ * factory produces a fully inferred table (`columns: []` +
+ * `autoColumns: true`), resolved lazily at mount via
+ * `adapter.describeColumns`.
  */
-export type DefineTableCurried<TInstance> = <TName extends TableNamesOf<TInstance>>(
-  tableName: TName,
-  factory: (
-    t: PathColumnFactory<RowOf<TInstance, TName>>
-  ) => TableDefResult<RowOf<TInstance, TName>>
-) => TableDefinition<TName, RowOf<TInstance, TName>>;
+export interface DefineTableCurried<TInstance> {
+  /** No-factory form: every column inferred from the adapter schema at mount. */
+  <TName extends TableNamesOf<TInstance>>(
+    tableName: TName
+  ): TableDefinition<TName, RowOf<TInstance, TName>>;
+  <TName extends TableNamesOf<TInstance>>(
+    tableName: TName,
+    factory: (
+      t: PathColumnFactory<RowOf<TInstance, TName>>
+    ) => TableDefResult<RowOf<TInstance, TName>>
+  ): TableDefinition<TName, RowOf<TInstance, TName>>;
+}
 
 /**
  * Tier-2 escape hatch for adapters without `$types` (REST, memory): an
  * explicit row generic replaces schema-derived inference. Table name is an
  * unconstrained `string` (there's no schema catalog to check it against),
- * but columns remain fully path-typed against `TRow`.
+ * but columns remain fully path-typed against `TRow`. The factory is
+ * optional, same as {@link DefineTableCurried} (plan 054).
  */
-export type DefineTableRowCurried<TRow> = (
-  tableName: string,
-  factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
-) => TableDefinition<string, TRow>;
+export interface DefineTableRowCurried<TRow> {
+  /** No-factory form: every column inferred from the adapter schema at mount. */
+  (tableName: string): TableDefinition<string, TRow>;
+  (
+    tableName: string,
+    factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
+  ): TableDefinition<string, TRow>;
+}
 
 export type { AdapterTableTypes, AdapterTypes, SchemaAwareAdapter, SchemaOf } from './paths';

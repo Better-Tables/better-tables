@@ -38,9 +38,13 @@
 
 import type { ColumnBuilder } from './builders/column-builder';
 import { validateColumns } from './builders/column-factory';
-import { createPathColumnFactory, type PathColumnFactory } from './builders/path-builders';
-import type { FacetQueryParams, TableAdapter } from './types/adapter';
-import type { ColumnDefinition } from './types/column';
+import {
+  createPathColumnFactory,
+  isAutoColumnsSentinel,
+  type PathColumnFactory,
+} from './builders/path-builders';
+import type { FacetQueryParams, InferredColumnSpec, TableAdapter } from './types/adapter';
+import type { ColumnDefinition, ColumnType } from './types/column';
 import type {
   BetterTablesConfig,
   BetterTablesInstance,
@@ -85,7 +89,7 @@ export function betterTables<TAdapter extends object>(
   // `defineTableRow()` curried functions below -- see their doc comments.
   instance.define = ((
     tableName: string,
-    factory: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>
+    factory?: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>
   ) => defineTableImpl(tableName, factory)) as unknown as DefineTableCurried<
     BetterTablesInstance<TAdapter>
   >;
@@ -207,8 +211,20 @@ function asTableAdapter(database: unknown): TableAdapter<unknown> {
 function buildTableColumns<TRow>(
   tableName: string,
   entries: ReadonlyArray<TableColumnEntry<TRow>>
-): ColumnDefinition<TRow, unknown>[] {
-  const built = entries.map((entry) => {
+): { columns: ColumnDefinition<TRow, unknown>[]; autoColumns: boolean } {
+  // Strip `t.auto()` sentinels first (plan 054): they mark column-SET
+  // inference on the definition and never become real columns, so they must
+  // not reach validation (a sentinel isn't a valid column) nor render.
+  let autoColumns = false;
+  const concrete = entries.filter((entry) => {
+    if (isAutoColumnsSentinel(entry)) {
+      autoColumns = true;
+      return false;
+    }
+    return true;
+  });
+
+  const built = concrete.map((entry) => {
     const maybeBuilder = entry as unknown as ColumnBuilder<TRow, unknown>;
     return typeof maybeBuilder.build === 'function'
       ? maybeBuilder.build()
@@ -224,21 +240,39 @@ function buildTableColumns<TRow>(
 
   // Single audited erasure to the table boundary's value-type-erased shape --
   // see the doc comment above.
-  return built as unknown as ColumnDefinition<TRow, unknown>[];
+  return { columns: built as unknown as ColumnDefinition<TRow, unknown>[], autoColumns };
 }
 
-/** Shared implementation behind `defineTable<TInstance>()(...)`, `defineTableRow<TRow>()(...)`, and `tables.define(...)`. */
+/**
+ * Shared implementation behind `defineTable<TInstance>()(...)`,
+ * `defineTableRow<TRow>()(...)`, and `tables.define(...)`.
+ *
+ * `factory` is optional (plan 054): the no-factory form produces a fully
+ * inferred table — `columns: []` + `autoColumns: true`, resolved lazily at
+ * mount by {@link resolveTableColumns}.
+ */
 function defineTableImpl<TRow>(
   tableName: string,
-  factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
+  factory?: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>
 ): TableDefinition<string, TRow> {
+  if (!factory) {
+    return {
+      tableName,
+      columns: [],
+      autoColumns: true,
+      // Type-only phantom -- $infer is never read at runtime, see TableDefInfer.
+      $infer: undefined as unknown as TableDefinition<string, TRow>['$infer'],
+    };
+  }
+
   const t = createPathColumnFactory<TRow>();
   const result = factory(t);
-  const columns = buildTableColumns<TRow>(tableName, result.columns);
+  const { columns, autoColumns } = buildTableColumns<TRow>(tableName, result.columns);
 
   return {
     tableName,
     columns,
+    ...(autoColumns ? { autoColumns: true } : {}),
     // Type-only phantom -- $infer is never read at runtime, see TableDefInfer.
     $infer: undefined as unknown as TableDefinition<string, TRow>['$infer'],
   };
@@ -266,7 +300,7 @@ function defineTableImpl<TRow>(
 export function defineTable<TInstance>(): DefineTableCurried<TInstance> {
   return ((
     tableName: string,
-    factory: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>
+    factory?: (t: PathColumnFactory<unknown>) => TableDefResult<unknown>
   ) => defineTableImpl(tableName, factory)) as unknown as DefineTableCurried<TInstance>;
 }
 
@@ -277,8 +311,231 @@ export function defineTable<TInstance>(): DefineTableCurried<TInstance> {
  * columns remain fully path-typed against `TRow`.
  */
 export function defineTableRow<TRow>(): DefineTableRowCurried<TRow> {
-  return ((tableName: string, factory: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>) =>
+  return ((tableName: string, factory?: (t: PathColumnFactory<TRow>) => TableDefResult<TRow>) =>
     defineTableImpl<TRow>(tableName, factory)) as unknown as DefineTableRowCurried<TRow>;
+}
+
+// ============================================================================
+// Lazy column resolution (plan 054)
+// ============================================================================
+
+/** Dev-mode warn — advisory diagnostics only, silenced in production builds. */
+function devWarn(message: string): void {
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') return;
+  console.warn(message);
+}
+
+/**
+ * Coarse type families for the declared-vs-schema mismatch warn: a declared
+ * type is compatible with the schema-inferred one when they share a family
+ * or the declaration is a common storage refinement (e.g. `multiOption`
+ * over a JSON/text column holding an encoded array, `text` over an enum).
+ */
+const COLUMN_TYPE_FAMILIES: Record<ColumnType, string> = {
+  text: 'string',
+  email: 'string',
+  url: 'string',
+  phone: 'string',
+  option: 'string',
+  number: 'number',
+  currency: 'number',
+  percentage: 'number',
+  date: 'date',
+  boolean: 'boolean',
+  multiOption: 'array',
+  json: 'json',
+  custom: 'any',
+};
+
+function declaredTypeMatchesSpec(declared: ColumnType, inferred: ColumnType): boolean {
+  const declaredFamily = COLUMN_TYPE_FAMILIES[declared];
+  const inferredFamily = COLUMN_TYPE_FAMILIES[inferred];
+  if (declaredFamily === 'any' || inferredFamily === 'any') return true;
+  if (declaredFamily === inferredFamily) return true;
+  // String/JSON storage commonly backs richer declared types.
+  if (inferredFamily === 'string' && (declaredFamily === 'array' || declaredFamily === 'json')) {
+    return true;
+  }
+  if (inferredFamily === 'json' && (declaredFamily === 'array' || declaredFamily === 'string')) {
+    return true;
+  }
+  return false;
+}
+
+/** An option/multiOption column with no declared (or enriched) choices. */
+function columnHasEnrichableGap(column: ColumnDefinition<unknown, unknown>): boolean {
+  if (column.type !== 'option' && column.type !== 'multiOption') return false;
+  const options = column.filter?.options;
+  return !options || options.length === 0;
+}
+
+/**
+ * Whether mounting `def` needs a `resolveTableColumns` pass: the definition
+ * requested column-set inference (`autoColumns`), or an explicit column has
+ * a gap enrichment can fill (an option column without options). Fully
+ * declared tables return `false` — they must not pay a resolution
+ * round-trip (plan 054).
+ */
+export function tableNeedsColumnResolution<TName extends string, TRow>(
+  def: TableDefinition<TName, TRow>
+): boolean {
+  if (def.autoColumns) return true;
+  return def.columns.some((column) =>
+    columnHasEnrichableGap(column as ColumnDefinition<unknown, unknown>)
+  );
+}
+
+/** The one member of `TableAdapter` the resolver needs — structural, so any adapter (or none) fits. */
+type DescribeColumnsSource = Pick<TableAdapter<unknown>, 'describeColumns'>;
+
+/** Stable placeholder cache key for "no adapter" so those calls memoize too. */
+const MISSING_ADAPTER_KEY: object = Object.freeze({});
+
+/** Memoized resolutions per (definition, adapter) pair — see {@link resolveTableColumns}. */
+const resolvedColumnsCache = new WeakMap<
+  object,
+  WeakMap<object, Promise<ColumnDefinition<unknown, unknown>[]>>
+>();
+
+function enrichExplicitColumn(
+  tableName: string,
+  column: ColumnDefinition<unknown, unknown>,
+  spec: InferredColumnSpec | undefined
+): ColumnDefinition<unknown, unknown> {
+  if (!spec) return column;
+
+  if (!declaredTypeMatchesSpec(column.type, spec.columnType)) {
+    devWarn(
+      `[better-tables] resolveTableColumns('${tableName}'): column '${column.id}' is declared ` +
+        `'${column.type}' but the schema says '${spec.columnType}' — the declaration wins, but ` +
+        `check the column definition.`
+    );
+  }
+
+  // Fill gaps only — declared values always win. Today the only enrichable
+  // gap is option choices (plan 054); schema enum values back an
+  // option/multiOption column that declared none.
+  if (columnHasEnrichableGap(column) && spec.options && spec.options.length > 0) {
+    return {
+      ...column,
+      filter: { ...column.filter, options: spec.options },
+    };
+  }
+
+  return column;
+}
+
+function buildInferredColumn(spec: InferredColumnSpec): ColumnDefinition<unknown, unknown> {
+  const field = spec.field;
+  return {
+    id: field,
+    displayName: spec.label,
+    accessor: (row: unknown) =>
+      row == null ? undefined : (row as Record<string, unknown>)[field],
+    type: spec.columnType,
+    sortable: true,
+    filterable: true,
+    hideable: true,
+    // NOT editable: inferred columns are read-only until explicitly
+    // overridden (`[...t.auto(), t.text('subject').editable()]`).
+    ...(spec.options && spec.options.length > 0 ? { filter: { options: spec.options } } : {}),
+  };
+}
+
+async function resolveTableColumnsUncached(
+  def: TableDefinition<string, unknown>,
+  adapter: DescribeColumnsSource | null | undefined
+): Promise<ColumnDefinition<unknown, unknown>[]> {
+  const describe = adapter?.describeColumns;
+  if (typeof describe !== 'function') {
+    // Enrichment silently no-ops (columns behave exactly as declared);
+    // requested column-set inference degrades to the explicit list with a
+    // dev warn — nothing to infer from.
+    if (def.autoColumns) {
+      devWarn(
+        `[better-tables] resolveTableColumns('${def.tableName}'): the adapter does not ` +
+          `implement describeColumns — auto columns resolve to the explicitly declared list.`
+      );
+    }
+    return def.columns;
+  }
+
+  let specs: InferredColumnSpec[];
+  try {
+    specs = await describe.call(adapter, def.tableName);
+  } catch (error) {
+    devWarn(
+      `[better-tables] resolveTableColumns('${def.tableName}'): describeColumns failed ` +
+        `(${error instanceof Error ? error.message : String(error)}) — falling back to the ` +
+        `declared columns.`
+    );
+    return def.columns;
+  }
+
+  const specByField = new Map(specs.map((spec) => [spec.field, spec]));
+
+  // 1. Enrichment — ALWAYS runs, `t.auto()` NOT required: fill config the
+  //    user didn't declare on explicit columns. Declared values always win.
+  const explicit = def.columns.map((column) =>
+    enrichExplicitColumn(def.tableName, column, specByField.get(column.id))
+  );
+
+  if (!def.autoColumns) return explicit;
+
+  // 2. Column-set inference — ONLY when requested: build real definitions
+  //    for the remaining spec fields. Explicit wins by id; order is explicit
+  //    first, then inferred in stable schema order.
+  const declaredIds = new Set(def.columns.map((column) => column.id));
+  const inferred = specs
+    .filter((spec) => !declaredIds.has(spec.field))
+    .map((spec) => buildInferredColumn(spec));
+
+  return [...explicit, ...inferred];
+}
+
+/**
+ * Resolve a table definition's columns against an adapter (plan 054) — the
+ * ONE lazy resolver behind both auto-column halves:
+ *
+ * 1. **Enrichment** (always): explicit columns matching a schema field get
+ *    config the user didn't declare filled in — today, enum options on an
+ *    `option`/`multiOption` column with no `.options()`. Declared values
+ *    always win; a declared-vs-schema type contradiction is a dev warn.
+ * 2. **Column-set inference** (only when the definition carries the
+ *    `autoColumns` marker — `t.auto()` or the no-factory `define`): the
+ *    remaining schema fields become real, read-only column definitions,
+ *    appended after the explicit ones in stable schema order.
+ *
+ * Runs lazily at mount, never at definition time — the curried `defineTable`
+ * form is deliberately runtime-adapter-free (RSC-safe). Memoized per
+ * (definition, adapter) pair; an adapter without `describeColumns` resolves
+ * to the declared columns unchanged (dev warn only when inference was
+ * requested).
+ */
+export function resolveTableColumns<TName extends string, TRow>(
+  def: TableDefinition<TName, TRow>,
+  adapter: DescribeColumnsSource | null | undefined
+): Promise<ColumnDefinition<TRow, unknown>[]> {
+  const defKey = def as object;
+  const adapterKey = (adapter ?? MISSING_ADAPTER_KEY) as object;
+
+  let perAdapter = resolvedColumnsCache.get(defKey);
+  if (!perAdapter) {
+    perAdapter = new WeakMap();
+    resolvedColumnsCache.set(defKey, perAdapter);
+  }
+
+  const cached = perAdapter.get(adapterKey);
+  if (cached) {
+    return cached as Promise<ColumnDefinition<TRow, unknown>[]>;
+  }
+
+  const pending = resolveTableColumnsUncached(
+    def as unknown as TableDefinition<string, unknown>,
+    adapter
+  );
+  perAdapter.set(adapterKey, pending);
+  return pending as Promise<ColumnDefinition<TRow, unknown>[]>;
 }
 
 export type { TableNamesOf, RowOf };

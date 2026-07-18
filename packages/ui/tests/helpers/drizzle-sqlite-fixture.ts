@@ -13,7 +13,9 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey(),
   name: text('name').notNull(),
-  status: text('status').notNull(),
+  // Enum-typed text: same TEXT storage, but the schema knows the choices —
+  // exercised by describeColumns/auto-columns inference (plan 054).
+  status: text('status', { enum: ['active', 'inactive'] }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
