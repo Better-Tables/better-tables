@@ -1,4 +1,5 @@
 // React hooks
+export * from './use-column-options';
 export * from './use-debounce';
 export * from './use-editable-cells';
 export * from './use-facets';

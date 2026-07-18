@@ -167,10 +167,7 @@ describe('BetterTable auto columns (plan 054)', () => {
 
   it('never calls describeColumns for a fully-declared definition (no async hop)', () => {
     const ticketsTable = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [
-        t.text('subject'),
-        t.option('status').options([{ value: 'open', label: 'Open' }]),
-      ],
+      columns: [t.text('subject'), t.option('status').options([{ value: 'open', label: 'Open' }])],
     }));
     const { adapter, describeCalls } = makeAdapter();
 

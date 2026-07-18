@@ -21,6 +21,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { TableAdapterProvider } from '../../hooks/use-column-options';
 import {
   type CellEditErrorHandler,
   type CellEditHandler,
@@ -525,13 +526,22 @@ export function BetterTable<TData = unknown>(props: BetterTableProps<TData>) {
   const needsResolution = !columnsProp && !!table && tableNeedsColumnResolution(table);
   const resolvedColumns = useResolvedTableColumns(needsResolution, table, adapter);
 
-  if (needsResolution) {
-    if (resolvedColumns === null) {
-      return <AutoColumnsLoading className={props.className} />;
-    }
-    return <BetterTableInner {...props} columns={resolvedColumns} />;
+  if (needsResolution && resolvedColumns === null) {
+    return <AutoColumnsLoading className={props.className} />;
   }
-  return <BetterTableInner {...props} />;
+
+  // The adapter context powers the facet fallback for option dropdowns
+  // (plan 054 Step 5) — leaf inputs (option editor, option filter input)
+  // lazily fetch choices for option columns that declare none.
+  return (
+    <TableAdapterProvider adapter={adapter}>
+      {needsResolution && resolvedColumns !== null ? (
+        <BetterTableInner {...props} columns={resolvedColumns} />
+      ) : (
+        <BetterTableInner {...props} />
+      )}
+    </TableAdapterProvider>
+  );
 }
 
 function BetterTableInner<TData = unknown>({
