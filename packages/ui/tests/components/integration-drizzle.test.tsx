@@ -277,6 +277,87 @@ describe('Drizzle + BetterTable integration (plan 043)', () => {
     expect(screen.queryByRole('button', { name: /edit name/i })).toBeNull();
   });
 
+  it('edits a RELATED-table field from the primary grid; one-to-many stays read-only (plan 055)', async () => {
+    interface JoinedRow {
+      id: number;
+      name: string;
+      team: { id: number; name: string } | null;
+      notes: Array<{ id: number; body: string }>;
+    }
+
+    const joinedTable = defineTableRow<JoinedRow>()('users', (t) => ({
+      columns: [
+        t.text('name').displayName('Name'),
+        // Single-valued relationship — joined editing via the adapter path.
+        t
+          .text('team.name')
+          .displayName('Team')
+          .editable(),
+        // One-to-many relationship — must stay read-only despite .editable().
+        t
+          .text('notes.body')
+          .displayName('Notes')
+          .editable(),
+      ],
+    }));
+
+    const fetched = await adapter.fetchData({
+      primaryTable: 'users',
+      columns: ['id', 'name', 'team.name', 'notes.body'],
+      pagination: { page: 1, limit: 10 },
+    } as never);
+
+    render(
+      <BetterTable
+        id="joined-users"
+        table={joinedTable}
+        data={fetched.data as never}
+        adapter={adapter as never}
+      />
+    );
+
+    expect(screen.getByText('Alice')).toBeTruthy();
+
+    // The edit affordance appears once the write target lazily resolves.
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /edit team/i }).length).toBeGreaterThan(0);
+    });
+
+    // One-to-many column: NO edit affordance, ever.
+    expect(screen.queryByRole('button', { name: /edit notes/i })).toBeNull();
+
+    // Alice + Bob are on team 1 ('Platform'); Carol has no team — her row's
+    // team cell is read-only (2 affordances, not 3).
+    expect(screen.getAllByRole('button', { name: /edit team/i })).toHaveLength(2);
+
+    const teamCell = screen.getAllByRole('button', { name: /edit team/i })[0];
+    if (!teamCell) throw new Error('expected editable team cell');
+    fireEvent.doubleClick(teamCell);
+    const input = screen.getByRole('textbox', { name: /edit cell/i });
+    fireEvent.change(input, { target: { value: 'Platform Renamed' } });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Platform Renamed')).toBeTruthy();
+    });
+
+    // The RELATED table row changed…
+    const refetch = await adapter.fetchData({
+      primaryTable: 'users',
+      columns: ['id', 'name', 'team.name'],
+      pagination: { page: 1, limit: 10 },
+    } as never);
+    const rows = refetch.data as unknown as JoinedRow[];
+    expect(rows.find((r) => r.id === 1)?.team?.name).toBe('Platform Renamed');
+    // …every row sharing that team sees it…
+    expect(rows.find((r) => r.id === 2)?.team?.name).toBe('Platform Renamed');
+    // …and the PRIMARY row did NOT change.
+    expect(rows.find((r) => r.id === 1)?.name).toBe('Alice');
+    expect(rows.find((r) => r.id === 3)?.team ?? null).toBeNull();
+  });
+
   it('rolls back the display when updateRecord fails (plan 053)', async () => {
     const originalUpdate = adapter.updateRecord?.bind(adapter);
     adapter.updateRecord = mock(async () => {

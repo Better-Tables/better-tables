@@ -95,7 +95,12 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .displayName('Customer')
       .searchable({ includeNull: true })
       .filterable()
-      .sortable(),
+      .sortable()
+      // JOINED editing (plan 055): this edits the RELATED customer row —
+      // the write target resolves through `resolveCellWriteTarget` and the
+      // save lands in `customers.company` (every ticket of that customer
+      // reflects it). Unassigned relations render read-only per row.
+      .editable(),
 
     t
       .option('customer.plan')

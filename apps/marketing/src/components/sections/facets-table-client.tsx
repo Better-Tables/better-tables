@@ -3,13 +3,13 @@
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { httpAdapter } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
+import { saveTicketCell } from '@/lib/demo/support/actions';
 import {
   defaultVisibleTicketColumns,
   type TicketRow,
   ticketsTable,
 } from '@/lib/demo/support/columns';
-import { persistTicketCellEdit } from '@/lib/demo/support/ticket-cell-edit';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'facets-table';
@@ -37,12 +37,12 @@ export function FacetsTableClient({
     urlAdapter
   );
 
-  const onCellEdit = useCallback(persistTicketCellEdit, []);
-
   // Auto columns (plan 054): `ticketsTable` spreads `t.auto()`, so BetterTable
   // resolves the inferred columns at mount through this adapter's
-  // `describeColumns` (same endpoint the facets sidebar reads). The SAVE path
-  // is unchanged -- `onCellEdit` above wins over the adapter (plan 055 next).
+  // `describeColumns` (same endpoint the facets sidebar reads); the joined
+  // `customer.company` column also resolves its write target through it.
+  // SAVES go through the DIRECT server-action path (`saveAction` below) --
+  // this endpoint proxies reads only.
   const adapter = useMemo(() => httpAdapter<TicketRow>({ url: '/api/tables/tickets' }), []);
 
   return (
@@ -61,7 +61,7 @@ export function FacetsTableClient({
       initialFilters={initialFilters}
       defaultVisibleColumns={defaultVisibleTicketColumns}
       autoShowFilteredColumns
-      onCellEdit={onCellEdit}
+      saveAction={saveTicketCell}
       features={{
         filtering: true,
         sorting: true,
