@@ -514,7 +514,7 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     expect(typeof value).toBe('string');
     expect(value).toBe(when.toISOString());
   });
-}
+
   it('dedups in-flight and caches getFacetedValues within cacheTtlMs', async () => {
     let fetchCount = 0;
     const { adapter: server } = makeServerAdapter();

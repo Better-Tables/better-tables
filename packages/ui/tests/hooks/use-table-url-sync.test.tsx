@@ -11,6 +11,7 @@ import { useTableUrlSync } from '../../src/hooks/use-table-url-sync';
 import { createFakeUrlAdapter, mockColumns, urlFilterForName } from '../helpers/url-sync';
 
 const TABLE_ID = 'url-sync-test-table';
+const URL_SYNC_DEBOUNCE_MS = 150;
 
 beforeEach(() => {
   clearAllTableStores();
@@ -26,14 +27,6 @@ function createStore() {
     columns: mockColumns,
     config: { pagination: { defaultPageSize: 10 } },
   });
-}
-
-async function advanceFakeTimers(ms: number) {
-  jest.useFakeTimers();
-  await act(async () => {
-    jest.advanceTimersByTime(ms);
-  });
-  jest.useRealTimers();
 }
 
 describe('useTableUrlSync', () => {
@@ -53,6 +46,7 @@ describe('useTableUrlSync', () => {
     }
     const callsBeforeChange = setParamsCalls.length;
 
+    jest.useFakeTimers();
     act(() => {
       store.getState().manager.addFilter({
         columnId: 'name',
@@ -64,7 +58,10 @@ describe('useTableUrlSync', () => {
 
     unmount();
 
-    await advanceFakeTimers(200);
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
 
     expect(setParamsCalls.length - callsBeforeChange).toBe(0);
   });
@@ -76,22 +73,21 @@ describe('useTableUrlSync', () => {
 
     renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
 
-    jest.useFakeTimers();
     await act(async () => {
-      jest.advanceTimersByTime(50);
       createStore();
-      jest.advanceTimersByTime(300);
     });
-    jest.useRealTimers();
+
+    await waitFor(() => {
+      const store = getTableStore(TABLE_ID);
+      expect(store?.getState().manager.getFilters()).toHaveLength(1);
+    });
 
     const store = getTableStore(TABLE_ID);
     expect(store).toBeDefined();
     if (!store) {
       throw new Error('Expected table store');
     }
-    const filters = store.getState().manager.getFilters();
-    expect(filters).toHaveLength(1);
-    expect(filters[0]?.values).toEqual(['late-store']);
+    expect(store.getState().manager.getFilters()[0]?.values).toEqual(['late-store']);
   });
 
   it('does not re-subscribe when config values are unchanged across re-renders', async () => {
@@ -166,10 +162,16 @@ describe('useTableUrlSync', () => {
     expect(store.getState().manager.getFilters()).toHaveLength(1);
     expect(store.getState().manager.getFilters()[0]?.values).toEqual(['bravo']);
 
-    await advanceFakeTimers(250);
+    jest.useFakeTimers();
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
     const callsAfterSettling = setParamsCalls.length;
 
-    await advanceFakeTimers(250);
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
     expect(setParamsCalls.length).toBe(callsAfterSettling);
   });
 
@@ -183,10 +185,12 @@ describe('useTableUrlSync', () => {
     await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
 
     const store = getTableStore(TABLE_ID);
-    expect(store).toBeDefined();
-    if (!store) {
-      throw new Error('Expected table store');
-    }
+    if (!store) throw new Error('Expected table store');
+
+    // Prime hydration so the subscribe handler is active.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     const callsBeforeBurst = setParamsCalls.length;
 
@@ -209,7 +213,9 @@ describe('useTableUrlSync', () => {
       });
     });
 
-    await advanceFakeTimers(200);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
 
     const burstCalls = setParamsCalls.slice(callsBeforeBurst);
     expect(burstCalls.length).toBe(1);
