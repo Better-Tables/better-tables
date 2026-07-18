@@ -1009,9 +1009,9 @@ See the [live demo in the marketing site](../../apps/marketing) for a complete w
 For detailed documentation, see:
 
 - **[Core Package README](../core/README.md)** - Column builders and state management
-- **[Getting Started Guide](../../docs/GETTING_STARTED.md)** - Installation and setup
-- **[Adapters Architecture](../../docs/adapters/ADAPTERS_ARCHITECTURE.md)** - How adapters work
+- **[MIGRATION.md](../../MIGRATION.md)** - 0.6 flagship API upgrade guide
 - **[Advanced Usage](./docs/ADVANCED_USAGE.md)** - Advanced patterns and examples
+- **[Adapter toolkit](../toolkit/README.md)** - ORM-agnostic adapter machinery
 
 ## Contributing
 
@@ -1027,7 +1027,7 @@ Contributions are welcome! This is an open-source project, and we appreciate any
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
-See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 
