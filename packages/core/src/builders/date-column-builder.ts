@@ -49,7 +49,7 @@ export class DateColumnBuilder<
    * @returns A `DateColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): DateColumnBuilder<TData, TValue, K> {
-    return super.id(id) as unknown as DateColumnBuilder<TData, TValue, K>;;
+    return super.id(id) as unknown as DateColumnBuilder<TData, TValue, K>;
   }
 
   /**

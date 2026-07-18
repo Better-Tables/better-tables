@@ -49,7 +49,7 @@ export class BooleanColumnBuilder<
    * @returns A `BooleanColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): BooleanColumnBuilder<TData, TValue, K> {
-    return super.id(id) as unknown as BooleanColumnBuilder<TData, TValue, K>;;
+    return super.id(id) as unknown as BooleanColumnBuilder<TData, TValue, K>;
   }
 
   /**

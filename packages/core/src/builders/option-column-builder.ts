@@ -60,7 +60,7 @@ export class OptionColumnBuilder<
    * @returns An `OptionColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): OptionColumnBuilder<TData, TValue, K> {
-    return super.id(id) as unknown as OptionColumnBuilder<TData, TValue, K>;;
+    return super.id(id) as unknown as OptionColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -79,7 +79,7 @@ export class OptionColumnBuilder<
   override accessor<V extends TValue>(
     accessor: (data: TData) => V
   ): OptionColumnBuilder<TData, V, TId> {
-    return super.accessor(accessor) as unknown as OptionColumnBuilder<TData, V, TId>;;
+    return super.accessor(accessor) as unknown as OptionColumnBuilder<TData, V, TId>;
   }
 
   /**

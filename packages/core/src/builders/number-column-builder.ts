@@ -49,7 +49,7 @@ export class NumberColumnBuilder<
    * @returns A `NumberColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): NumberColumnBuilder<TData, TValue, K> {
-    return super.id(id) as unknown as NumberColumnBuilder<TData, TValue, K>;;
+    return super.id(id) as unknown as NumberColumnBuilder<TData, TValue, K>;
   }
 
   /**

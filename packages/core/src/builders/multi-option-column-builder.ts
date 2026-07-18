@@ -52,7 +52,7 @@ export class MultiOptionColumnBuilder<
    * @returns A `MultiOptionColumnBuilder` rebound to the id literal
    */
   override id<const K extends string>(id: K): MultiOptionColumnBuilder<TData, TValue, K> {
-    return super.id(id) as unknown as MultiOptionColumnBuilder<TData, TValue, K>;;
+    return super.id(id) as unknown as MultiOptionColumnBuilder<TData, TValue, K>;
   }
 
   /**
@@ -71,7 +71,7 @@ export class MultiOptionColumnBuilder<
   override accessor<V extends TValue>(
     accessor: (data: TData) => V
   ): MultiOptionColumnBuilder<TData, V, TId> {
-    return super.accessor(accessor) as unknown as MultiOptionColumnBuilder<TData, V, TId>;;
+    return super.accessor(accessor) as unknown as MultiOptionColumnBuilder<TData, V, TId>;
   }
 
   /**
