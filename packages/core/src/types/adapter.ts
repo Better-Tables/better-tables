@@ -197,6 +197,29 @@ export interface FacetQueryParams {
    * responsibility, not the caller's.
    */
   filters?: FilterState[] | FilterGroupNode;
+
+  /**
+   * Transport-level cancellation for this read. Never serialized by wire
+   * adapters; in-process adapters may ignore it.
+   */
+  signal?: AbortSignal;
+
+  /**
+   * Cap distinct facet values returned, ordered by count descending.
+   * Default: `100`. Pass `null` to disable the cap (return all values).
+   * A positive number overrides the default.
+   */
+  limit?: number | null;
+}
+
+/**
+ * Optional per-call options for adapter write methods. The instance surface
+ * (`tables.createRecord(table, data)`) injects `{ table: table.tableName }`
+ * so multi-table schemas don't rely on `defaultMutationTable`.
+ */
+export interface MutationOptions {
+  /** Explicit mutation target — JS schema key of the table to write. */
+  table?: string;
 }
 
 /**
@@ -352,47 +375,35 @@ export interface TableAdapter<TData = unknown> {
   /**
    * Create a new record (optional operation).
    *
-   * @param data - Partial data for the new record
-   * @returns Promise resolving to the created record
+   * Prefer the instance surface `tables.createRecord(table, data)` which
+   * injects `{ table: table.tableName }` via {@link MutationOptions}. Direct
+   * adapter callers without `options.table` keep using
+   * `defaultMutationTable` / single-table inference.
    *
-   * @example
-   * ```typescript
-   * const newUser = await adapter.createRecord({
-   *   name: 'John Doe',
-   *   email: 'john@example.com'
-   * });
-   * ```
+   * @param data - Partial data for the new record
+   * @param options - Optional `{ table }` mutation target
+   * @returns Promise resolving to the created record
    */
-  createRecord?(data: Partial<TData>): Promise<TData>;
+  createRecord?(data: Partial<TData>, options?: MutationOptions): Promise<TData>;
 
   /**
    * Update an existing record (optional operation).
    *
    * @param id - Record identifier
    * @param data - Partial data to update
+   * @param options - Optional `{ table }` mutation target
    * @returns Promise resolving to the updated record
-   *
-   * @example
-   * ```typescript
-   * const updatedUser = await adapter.updateRecord('1', {
-   *   name: 'John Smith'
-   * });
-   * ```
    */
-  updateRecord?(id: string, data: Partial<TData>): Promise<TData>;
+  updateRecord?(id: string, data: Partial<TData>, options?: MutationOptions): Promise<TData>;
 
   /**
    * Delete a record (optional operation).
    *
    * @param id - Record identifier
+   * @param options - Optional `{ table }` mutation target
    * @returns Promise resolving when deletion is complete
-   *
-   * @example
-   * ```typescript
-   * await adapter.deleteRecord('1');
-   * ```
    */
-  deleteRecord?(id: string): Promise<void>;
+  deleteRecord?(id: string, options?: MutationOptions): Promise<void>;
 
   /**
    * Bulk update multiple records (optional operation).

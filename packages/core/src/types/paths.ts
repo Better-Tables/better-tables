@@ -45,10 +45,11 @@ export type Prev = [never, 0, 1, 2, 3];
  *
  * Depth cap rationale: relation types can be mutually recursive
  * (user -> posts -> author -> posts -> ...); an uncapped recursive
- * conditional type would not terminate. Default depth is 3 (Open question
- * (c), decided: keep 3, expose `D` as a per-call override) -- see the perf
- * fixture (`tests/types/table-def-perf-fixture.ts`) for the budget this cap
- * is tuned against.
+ * conditional type would not terminate. Default depth is **3** (maintainer
+ * decision 2026-07-17 / plan 046): ~10x/2.5x headroom on the perf fixture.
+ * Pass `Paths<Row, 2>` (or another `D`) per call to lower the cap; re-measure
+ * `tests/types/table-def-perf-fixture.ts` before ever changing the global
+ * default.
  */
 export type Paths<T, D extends number = 3> = [D] extends [never]
   ? never

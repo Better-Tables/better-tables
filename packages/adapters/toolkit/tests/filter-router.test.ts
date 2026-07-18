@@ -37,6 +37,9 @@ class StubEmitter implements PredicateEmitter<StubColumn, StubPredicate> {
   /** When true, leaf methods return undefined (simulates empty/invalid values). */
   emitNothing = false;
 
+  /** Optional probe — assigned in individual tests that exercise the fallback. */
+  prefersDateSemantics?: (column: StubColumn) => boolean;
+
   private leaf(method: string, operator: string, values?: unknown[]): StubPredicate | undefined {
     this.calls.push(values === undefined ? { method, operator } : { method, operator, values });
     if (this.emitNothing) {
@@ -146,6 +149,29 @@ describe('FilterRouter', () => {
         expect(result?.kind).toBe(method);
       });
     }
+
+    it("routes date-typed 'between' to dateOperator", () => {
+      router.mapOperatorToCondition(column, 'between', ['2026-01-01', '2026-01-31'], false, 'date');
+      expect(emitter.calls[0]?.method).toBe('dateOperator');
+    });
+
+    it("routes untyped 'between' to dateOperator when prefersDateSemantics is true", () => {
+      emitter.prefersDateSemantics = () => true;
+      router.mapOperatorToCondition(column, 'between', ['2026-01-01', '2026-01-31']);
+      expect(emitter.calls[0]?.method).toBe('dateOperator');
+    });
+
+    it("routes untyped 'between' to numberOperator when prefersDateSemantics is false", () => {
+      emitter.prefersDateSemantics = () => false;
+      router.mapOperatorToCondition(column, 'between', [1, 5]);
+      expect(emitter.calls[0]?.method).toBe('numberOperator');
+    });
+
+    it("routes untyped 'between' to numberOperator when prefersDateSemantics is absent", () => {
+      // StubEmitter has no prefersDateSemantics by default.
+      router.mapOperatorToCondition(column, 'between', [1, 5]);
+      expect(emitter.calls[0]?.method).toBe('numberOperator');
+    });
 
     it("passes columnType through to the emitter's dateOperator", () => {
       const result = router.mapOperatorToCondition(column, 'is', ['2026-01-01'], false, 'date');

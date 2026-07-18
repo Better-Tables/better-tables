@@ -71,6 +71,16 @@ export interface PredicateEmitter<TColumn, TPredicate> {
   multiOptionOperator(column: TColumn, operator: string, values: unknown[]): TPredicate | undefined;
   universalOperator(column: TColumn, operator: string): TPredicate | undefined;
 
+  /**
+   * Optional: report whether `column` stores date/timestamp semantics even
+   * when the filter's `columnType` doesn't say `date` (e.g. a Drizzle
+   * `integer(..., { mode: 'timestamp' })` column receiving an untyped
+   * programmatic filter). Used by the router to give `between`/`notBetween`
+   * the same timestamp fallback the single-value date operators get inside
+   * `dateOperator` itself. Absent ⇒ no fallback (columnType decides alone).
+   */
+  prefersDateSemantics?(column: TColumn): boolean;
+
   /** IS NULL leaf predicate — used by the router when `includeNull` is set. */
   isNullCondition(column: TColumn): TPredicate;
 
@@ -270,11 +280,16 @@ export class FilterRouter<TColumn, TPredicate> {
       condition = this.emitter.numberOperator(column, operator, values);
     } else if (this.isTextOperator(operator)) {
       condition = this.emitter.textOperator(column, operator, values);
-    } else if (columnType === 'date' && (operator === 'between' || operator === 'notBetween')) {
+    } else if (
+      (operator === 'between' || operator === 'notBetween') &&
+      (columnType === 'date' || this.emitter.prefersDateSemantics?.(column) === true)
+    ) {
       // `between`/`notBetween` are shared between number and date columns. On a
       // date column they need the date handler's day-range semantics — the
       // numeric handler would treat the ISO/Date values as raw numbers and
-      // silently drop the filter (matching every row).
+      // silently drop the filter (matching every row). The prefersDateSemantics
+      // probe mirrors dateOperator's own shouldUseDateComparison timestamp
+      // fallback for untyped/mis-typed filters on timestamp storage.
       condition = this.emitter.dateOperator(column, operator, values, columnType);
     } else if (this.isNumberOperator(operator)) {
       condition = this.emitter.numberOperator(column, operator, values);

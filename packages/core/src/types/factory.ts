@@ -141,6 +141,30 @@ export interface BetterTablesInstance<TAdapter extends object = SchemaAwareAdapt
     columnId: TableDefInfer<TName, TRow>['ColumnId'],
     params?: FacetQueryParams
   ): Promise<FilterOption[]>;
+
+  /**
+   * Table-scoped write: injects the mutation target from `table.tableName`
+   * (plan 047). Prefer this over `database.createRecord(data)` on multi-table
+   * schemas — the heuristic `defaultMutationTable` is only a fallback for
+   * direct adapter callers.
+   */
+  createRecord<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    data: Partial<TRow>
+  ): Promise<TRow>;
+
+  /** Table-scoped update — see {@link BetterTablesInstance.createRecord}. */
+  updateRecord<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    id: string,
+    data: Partial<TRow>
+  ): Promise<TRow>;
+
+  /** Table-scoped delete — see {@link BetterTablesInstance.createRecord}. */
+  deleteRecord<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>,
+    id: string
+  ): Promise<void>;
 }
 
 /**

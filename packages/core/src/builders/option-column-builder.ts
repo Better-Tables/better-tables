@@ -7,6 +7,7 @@
  * @module builders/option-column-builder
  */
 
+import { humanize } from '../lib/format-utils';
 import type { FilterConfig, FilterOption } from '../types/filter';
 import { ColumnBuilder } from './column-builder';
 
@@ -114,7 +115,7 @@ export class OptionColumnBuilder<
    * ```
    */
   options<const V extends TValue>(
-    options: ReadonlyArray<FilterOption<V>>,
+    options: ReadonlyArray<V | FilterOption<V>>,
     config: {
       /** Whether to include null values (default: false) */
       includeNull?: boolean;
@@ -128,9 +129,17 @@ export class OptionColumnBuilder<
   ): OptionColumnBuilder<TData, V, TId> {
     const { includeNull = false, validation, searchable = true, placeholder } = config;
 
+    // Bare string values get a runtime humanized label; explicit labels win.
+    const normalized: FilterOption<V>[] = options.map((option) => {
+      if (typeof option === 'string') {
+        return { value: option, label: humanize(option) };
+      }
+      return option;
+    });
+
     const filterConfig: FilterConfig<V> = {
       operators: ['is', 'isNot', 'isAnyOf', 'isNoneOf'],
-      options: [...options],
+      options: normalized,
       includeNull,
       ...(validation !== undefined && { validation }),
     };
@@ -141,7 +150,7 @@ export class OptionColumnBuilder<
       options: {
         searchable,
         placeholder,
-        values: options,
+        values: normalized,
       },
     };
     return this as unknown as OptionColumnBuilder<TData, V, TId>;

@@ -134,6 +134,41 @@ export function betterTables<TAdapter extends object>(
     return asTableAdapter(config.database).getFilterOptions(columnId, params);
   }) as unknown as BetterTablesInstance<TAdapter>['getFilterOptions'];
 
+  // Table-scoped writes (plan 047): inject `{ table: table.tableName }` so
+  // multi-table schemas don't rely on defaultMutationTable at the instance
+  // level. The low-level adapter keeps a single-table form + optional
+  // MutationOptions.table seam (option A).
+  instance.createRecord = (async (
+    table: TableDefinition<string, unknown>,
+    data: Partial<unknown>
+  ) => {
+    const adapter = asTableAdapter(config.database);
+    if (!adapter.createRecord) {
+      throw new Error('Adapter does not support createRecord');
+    }
+    return adapter.createRecord(data, { table: table.tableName });
+  }) as unknown as BetterTablesInstance<TAdapter>['createRecord'];
+
+  instance.updateRecord = (async (
+    table: TableDefinition<string, unknown>,
+    id: string,
+    data: Partial<unknown>
+  ) => {
+    const adapter = asTableAdapter(config.database);
+    if (!adapter.updateRecord) {
+      throw new Error('Adapter does not support updateRecord');
+    }
+    return adapter.updateRecord(id, data, { table: table.tableName });
+  }) as unknown as BetterTablesInstance<TAdapter>['updateRecord'];
+
+  instance.deleteRecord = (async (table: TableDefinition<string, unknown>, id: string) => {
+    const adapter = asTableAdapter(config.database);
+    if (!adapter.deleteRecord) {
+      throw new Error('Adapter does not support deleteRecord');
+    }
+    return adapter.deleteRecord(id, { table: table.tableName });
+  }) as unknown as BetterTablesInstance<TAdapter>['deleteRecord'];
+
   return instance;
 }
 

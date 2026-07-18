@@ -82,6 +82,14 @@ describe('table-def-v1 prototype (plan 011), retargeted to production types (pla
       const tooDeep: Paths<User> = 'posts.author.posts.title';
       expect(typeof tooDeep).toBe('string');
     });
+
+    it('Paths<Row, 2> override: depth-2 resolves, depth-3 does not', () => {
+      const depth2: Paths<User, 2> = 'posts.title';
+      expect(depth2).toBe('posts.title');
+      // @ts-expect-error - depth-3 path is outside Paths<User, 2>
+      const depth3: Paths<User, 2> = 'posts.author.posts';
+      expect(typeof depth3).toBe('string');
+    });
   });
 
   describe('PathsOfType<T, V> -- paths filtered by resolved value type', () => {

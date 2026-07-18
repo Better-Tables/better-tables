@@ -323,12 +323,19 @@ export function getFormatterForType(
       return formatUrl(typeof value === 'string' ? value : null);
     case 'phone':
       return formatPhone(typeof value === 'string' ? value : null);
-    case 'date':
+    case 'date': {
+      const dateConfig = meta?.dateFormat as Record<string, unknown> | undefined;
       if (value instanceof Date || (value && typeof value === 'object' && 'getTime' in value)) {
-        const dateConfig = meta?.dateFormat as Record<string, unknown> | undefined;
         return formatDateWithConfig(value as Date, dateConfig || {});
       }
+      if (typeof value === 'string' || typeof value === 'number') {
+        const coerced = new Date(value);
+        if (!Number.isNaN(coerced.getTime())) {
+          return formatDateWithConfig(coerced, dateConfig || {});
+        }
+      }
       return String(value || '');
+    }
     case 'json':
       return formatJson(value, { pretty: false });
     default: {

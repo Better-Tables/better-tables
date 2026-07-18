@@ -635,6 +635,7 @@ const restoredFilters = deserializeFiltersFromURL(urlParams);
 
 For detailed documentation, see:
 
+- **[HTTP Adapter](./docs/HTTP_ADAPTER.md)** - Browser `httpAdapter` + server `createAdapterRouteHandler`
 - **[User Guide](../../docs/core/USER_GUIDE.md)** - Complete feature reference and usage patterns
 - **[Column Builders Guide](../../docs/core/COLUMN_BUILDERS_GUIDE.md)** - Deep dive into column configuration
 - **[Managers API Reference](../../docs/core/MANAGERS_API_REFERENCE.md)** - State management API documentation

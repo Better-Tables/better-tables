@@ -11,7 +11,10 @@ export {
   httpAdapter,
 } from './http-adapter';
 export {
+  type AdapterRouteHandlerOptions,
   type AdapterSource,
+  type AdapterSourceContext,
+  type HandleAdapterRequestOptions,
   createAdapterRouteHandler,
   handleAdapterRequest,
 } from './http-handler';

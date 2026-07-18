@@ -108,6 +108,7 @@ export function useFacets<TData = unknown>({
   const [error, setError] = useState<Error | null>(null);
 
   const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // columnIds/rangeColumnIds are near-always inline array literals at the
   // call site (e.g. columnIds={['status', 'priority']}), which is a fresh
@@ -135,14 +136,19 @@ export function useFacets<TData = unknown>({
     }
 
     const requestId = ++requestIdRef.current;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setLoading(true);
     setError(null);
 
-    // `exactOptionalPropertyTypes` forbids `{ filters: undefined }` for an
-    // optional `filters?:` property -- only include the key when it has a
-    // real value.
-    const facetParams = stableFilters !== undefined ? { filters: stableFilters } : {};
+    // `exactOptionalPropertyTypes` forbids `{ filters: undefined }` /
+    // `{ signal: undefined }` — only include keys when they have real values.
+    const facetParams = {
+      ...(stableFilters !== undefined ? { filters: stableFilters } : {}),
+      signal: controller.signal,
+    };
 
     try {
       const [facetResults, rangeResults] = await Promise.all([
@@ -171,6 +177,13 @@ export function useFacets<TData = unknown>({
       if (requestId !== requestIdRef.current) {
         return;
       }
+      // Aborted requests are superseded — don't surface them as errors.
+      if (
+        (err instanceof Error && err.name === 'AbortError') ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
 
       setError(err instanceof Error ? err : new Error('Failed to fetch facets'));
     } finally {
@@ -190,6 +203,9 @@ export function useFacets<TData = unknown>({
 
   useEffect(() => {
     void fetchFacets();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [fetchFacets]);
 
   return {

@@ -866,17 +866,9 @@ per-table shell.)
 
 **(a) Package placement: path types in `@better-tables/core` vs. a new
 `@better-tables/typekit`.**
-**Recommendation:** keep in `core`, under `src/types/` (promoted out of
-`experimental/` once approved), NOT a new package. The path types have no
-runtime code and zero dependencies beyond TypeScript itself — the
-"separate package" argument (usually: independent versioning, smaller
-install footprint, reuse outside this library) doesn't apply here, since
-anyone using path types is, by definition, using `@better-tables/core`'s
-`defineTable`. A new package adds a publish/version-sync burden (two
-packages that must always ship compatible versions together) for no
-isolation benefit. Revisit only if a genuinely external consumer (e.g. a
-future codegen CLI that needs `Paths<T>` without pulling in the rest of
-`core`) materializes.
+**RESOLVED (maintainer, 2026-07-17 / plan 046):** path types live in
+`@better-tables/core` under `src/types/paths.ts` (already promoted; not a
+new package).
 
 **(b) Ship the instance API in 0.6 with contract v2, or after.**
 **DECIDED (maintainer, 2026-07-12): together, in 0.6, as one coordinated
@@ -892,24 +884,15 @@ across releases means one of the two ships in a visibly half-finished
 state.
 
 **(c) Default depth cap 3 vs. 2.**
-**Recommendation:** keep 3 as the global default. The Step 5 perf numbers
-show ~10x headroom on the instantiation budget and ~2.5x on check time at a
-30-table, ~15-relation synthetic schema — there's no performance case for
-2 today. Expose `D` as a per-call override (`Paths<Row, 2>`) for any future
-schema that turns out to need it, and re-measure against the perf fixture
-(scaled up if needed) before ever lowering the global default.
+**RESOLVED (maintainer, 2026-07-17 / plan 046):** keep depth **3** as the
+global default; per-call override via `Paths<Row, 2>` (documented on the
+type). Re-measure the perf fixture before ever changing the global default.
 
 **(d) `t.option` auto-label: `Capitalize` vs. a humanize runtime helper.**
-**Recommendation:** a runtime humanize helper, not `Capitalize<S>`.
-`Capitalize<'multi_word_value'>` only uppercases the first character,
-producing `'Multi_word_value'` — wrong for the common snake_case/kebab-case
-enum-value convention (Postgres enum values are frequently
-`snake_case` by SQL naming convention). A small runtime `humanize(value:
-string): string` (split on `_`/`-`, capitalize each word, join with a
-space) gives correct default labels (`'multi_word_value'` ->
-`'Multi Word Value'`) at the cost of needing a real (tiny) runtime
-function instead of a pure type-level default. `.options([...])` remains
-available to override any default that's still wrong for a given enum.
+**RESOLVED (maintainer, 2026-07-17 / plan 046):** runtime `humanize()` helper
+(existing `packages/core/src/lib/format-utils.ts`); bare
+`.options(['multi_word_value'])` defaults to `'Multi Word Value'`; explicit
+`{value,label}` still overrides.
 
 **(e) Data-bridge shape for RSC: route handler vs. server actions vs.
 both.**

@@ -10,9 +10,11 @@ on:
       - 'packages/adapters/**'
       - 'packages/ui/**'
       - 'packages/cli/**'
+      - 'apps/marketing/**'
       - 'package.json'
       - 'bun.lock'
       - 'turbo.json'
+      - 'bunfig.toml'
       - 'tsconfig.json'
       - 'biome.json'
       - '.github/workflows/test.yml'
@@ -25,15 +27,17 @@ on:
       - 'packages/adapters/**'
       - 'packages/ui/**'
       - 'packages/cli/**'
+      - 'apps/marketing/**'
       - 'package.json'
       - 'bun.lock'
       - 'turbo.json'
+      - 'bunfig.toml'
       - 'tsconfig.json'
       - 'biome.json'
       - '.github/workflows/test.yml'
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 jobs:
   static-checks:
@@ -43,11 +47,14 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.1'
+          bun-version: '1.3.11'
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
+      - name: Test marketing data layer
+        run: bun test
+        working-directory: apps/marketing
       - name: Lint (check only)
         run: bunx biome check .
         continue-on-error: true   # TODO: make blocking once biome residue is cleared (see plans/013 report — 71 errors remain)
@@ -68,7 +75,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.1'
+          bun-version: '1.3.11'
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -121,7 +128,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.1'
+          bun-version: '1.3.11'
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -174,7 +181,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.1'
+          bun-version: '1.3.11'
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -243,7 +250,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.1'
+          bun-version: '1.3.11'
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -260,17 +267,16 @@ jobs:
           echo "Workspace packages:"
           bun pm ls 2>/dev/null | head -20 || echo "Package list command not available"
 
-      - name: Build Core Package (dependency)
+      - name: Build Core + Toolkit (dependencies)
         run: |
-          echo "Building @better-tables/core package as dependency..."
+          echo "Building adapter test dependencies..."
           cd ../../..
-          echo "Building core package..."
-          cd packages/core
-          bun run build
+          bun run build --filter=@better-tables/core --filter=@better-tables/adapters-toolkit
           echo ""
-          echo "Verifying core package was built..."
-          ls -la dist/ || echo "Warning: dist directory not found"
-          echo "✓ Core package built successfully"
+          echo "Verifying builds..."
+          ls -la packages/core/dist/ || echo "Warning: core dist not found"
+          ls -la packages/adapters/toolkit/dist/ || echo "Warning: toolkit dist not found"
+          echo "✓ Core and toolkit built successfully"
 
       - name: Run Adapter Tests
         env:

@@ -904,7 +904,8 @@ export interface DrizzleAdapterOptions {
   cache?: {
     enabled: boolean;
     ttl: number;
-    maxSize: number;
+    /** Max cached entries (LRU eviction). Default 500. */
+    maxSize?: number;
   };
 
   /** Query optimization settings */
