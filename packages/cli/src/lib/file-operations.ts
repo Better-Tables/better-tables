@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ResolvedPaths, ShadcnConfig } from './config';
 import { getAliasPrefix } from './config';
 import type { ConflictResolution } from './prompts';
@@ -24,34 +25,68 @@ export interface CopyResult {
   error?: string;
 }
 
-/**
- * GitHub repository configuration
- */
-const GITHUB_REPO = 'Better-Tables/better-tables';
-const GITHUB_BRANCH = 'main'; // Could be made configurable or use package version
-const GITHUB_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}`;
-const GITHUB_UI_BASE_URL = `${GITHUB_BASE_URL}/packages/ui/src`;
+let cachedUiSourceRoot: string | null = null;
+
+function findCliPackageRoot(startDir: string): string {
+  let dir = startDir;
+  while (true) {
+    const pkgPath = join(dir, 'package.json');
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { name?: string };
+      if (pkg.name === '@better-tables/cli') {
+        return dir;
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      throw new Error('Could not find @better-tables/cli package root');
+    }
+    dir = parent;
+  }
+}
 
 /**
- * Download a file from GitHub
+ * The bundled UI source root. In the published package this is
+ * `<pkg>/ui-src` (created by scripts/bundle-ui-src.ts at build time);
+ * in the monorepo (running the CLI from source, ui-src not yet built)
+ * it falls back to the workspace's `packages/ui/src`.
+ *
+ * @internal Exported for tests only.
  */
-async function downloadFromGitHub(filePath: string): Promise<string> {
-  const url = `${GITHUB_UI_BASE_URL}/${filePath}`;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(`File not found: ${filePath}`);
-      }
-      throw new Error(`Failed to download ${filePath}: ${response.status} ${response.statusText}`);
-    }
-    return await response.text();
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to download ${filePath} from GitHub: ${error.message}`);
-    }
-    throw error;
+export function resolveUiSourceRoot(): string {
+  if (cachedUiSourceRoot) {
+    return cachedUiSourceRoot;
   }
+
+  const startDir = dirname(fileURLToPath(import.meta.url));
+  const pkgRoot = findCliPackageRoot(startDir);
+  const bundled = join(pkgRoot, 'ui-src');
+  if (existsSync(bundled)) {
+    cachedUiSourceRoot = bundled;
+    return bundled;
+  }
+  const workspace = join(pkgRoot, '..', 'ui', 'src');
+  if (existsSync(workspace)) {
+    cachedUiSourceRoot = workspace;
+    return workspace;
+  }
+  throw new Error(
+    'Bundled UI source not found. This @better-tables/cli install is corrupted — reinstall it.'
+  );
+}
+
+/** @internal Exported for tests only. */
+export function resetUiSourceRootCacheForTests(): void {
+  cachedUiSourceRoot = null;
+}
+
+/** @internal Exported for tests only. */
+export async function readUiSourceFile(filePath: string): Promise<string> {
+  const fullPath = join(resolveUiSourceRoot(), filePath);
+  if (!existsSync(fullPath)) {
+    throw new Error(`File not found in bundled UI source: ${filePath}`);
+  }
+  return readFileSync(fullPath, 'utf-8');
 }
 
 /**
@@ -130,7 +165,7 @@ export function generateFileMappings(
   // Table components
   for (const file of UI_SOURCE_FILES.components.table) {
     mappings.push({
-      sourcePath: `components/table/${file}`, // GitHub path, not filesystem path
+      sourcePath: `components/table/${file}`,
       destPath: join(componentsBasePath, 'table', file),
       category: 'table',
     });
@@ -138,7 +173,7 @@ export function generateFileMappings(
   // Filter components (including subdirectories like inputs/)
   for (const file of UI_SOURCE_FILES.components.filters) {
     mappings.push({
-      sourcePath: `components/filters/${file}`, // GitHub path
+      sourcePath: `components/filters/${file}`,
       destPath: join(componentsBasePath, 'filters', file),
       category: 'filters',
     });
@@ -146,7 +181,7 @@ export function generateFileMappings(
   // Hooks
   for (const file of UI_SOURCE_FILES.hooks) {
     mappings.push({
-      sourcePath: `hooks/${file}`, // GitHub path
+      sourcePath: `hooks/${file}`,
       destPath: join(resolvedPaths.hooks, file),
       category: 'hooks',
     });
@@ -154,7 +189,7 @@ export function generateFileMappings(
   // Lib files
   for (const file of UI_SOURCE_FILES.lib) {
     mappings.push({
-      sourcePath: `lib/${file}`, // GitHub path
+      sourcePath: `lib/${file}`,
       destPath: join(resolvedPaths.lib, file),
       category: 'lib',
     });
@@ -162,7 +197,7 @@ export function generateFileMappings(
   // Stores
   for (const file of UI_SOURCE_FILES.stores) {
     mappings.push({
-      sourcePath: `stores/${file}`, // GitHub path
+      sourcePath: `stores/${file}`,
       destPath: join(componentsBasePath, 'stores', file),
       category: 'stores',
     });
@@ -170,7 +205,7 @@ export function generateFileMappings(
   // Utils
   for (const file of UI_SOURCE_FILES.utils) {
     mappings.push({
-      sourcePath: `utils/${file}`, // GitHub path
+      sourcePath: `utils/${file}`,
       destPath: join(resolvedPaths.lib, 'utils', file),
       category: 'utils',
     });
@@ -306,8 +341,8 @@ export async function copyFile(
     if (!existsSync(destDir)) {
       mkdirSync(destDir, { recursive: true });
     }
-    // Download source file from GitHub (sourcePath is now a GitHub path, not filesystem)
-    const content = await downloadFromGitHub(mapping.sourcePath);
+    // Read source file from bundled UI source
+    const content = await readUiSourceFile(mapping.sourcePath);
     // Transform imports
     const transformed = transformImports(content, config, mapping.destPath, componentsOutputPath);
     // Write to destination
