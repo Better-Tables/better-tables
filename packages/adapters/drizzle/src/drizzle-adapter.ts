@@ -53,6 +53,7 @@
 import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import type {
   AdapterMeta,
+  CellWriteTarget,
   DataEvent,
   ExportParams,
   ExportResult,
@@ -61,7 +62,6 @@ import type {
   FetchDataResult,
   FilterGroupNode,
   FilterNode,
-  CellWriteTarget,
   FilterOption,
   FilterState,
   InferredColumnSpec,

@@ -1,6 +1,11 @@
 'use client';
 
-import type { CellEditAction, ColumnDefinition, ScrollInfo, TableAdapter } from '@better-tables/core';
+import type {
+  CellEditAction,
+  ColumnDefinition,
+  ScrollInfo,
+  TableAdapter,
+} from '@better-tables/core';
 import { getColumnStyle, getFormatterForType } from '@better-tables/core';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';

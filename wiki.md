@@ -153,19 +153,28 @@ t.boolean('slaBreached').editable({ when: (row) => row.status !== 'resolved' })
 t.number('reopenCount').editable({ field: 'reopenCount' }) // field override when id ≠ storage key
 ```
 
+**Persistence paths** (plan 055) — pick by deployment shape:
+
+| # | Deployment | Wiring | Notes |
+|---|---|---|---|
+| 1 | **Monolith (RECOMMENDED, primary)** — Next.js, TanStack Start | `tables.cellEditAction(def)` exported through the framework's server boundary — a `'use server'` one-liner in Next (`export async function saveCell(input) { return tables.cellEditAction(def)(input); }`), `createServerFn` in TanStack Start — passed as `saveAction={saveCell}` | Zero boilerplate: the allow-list, per-type coercion, ValidationRules, and the write target all derive from the table definition. No API route, no fetch shim. |
+| 2 | **Split frontend/backend** — ONLY for genuinely separated deployments | `httpAdapter({ url, writes: true })` + `writes` (ideally `{ columns }`) + `authorize` on `createAdapterRouteHandler` | Double opt-in on both sides; server validates fail-closed via schema introspection. See `packages/core/docs/HTTP_ADAPTER.md` → Writes. |
+| 3 | **Full control** | `onCellEdit` callback | You own persistence entirely; wins over every other path. |
+
 **Save resolution** (first match wins):
 
 | Condition | Result |
 |---|---|
 | `editing={false}` on `<BetterTable>` | read-only |
 | column has no `editable` / `when(row)` false | read-only |
-| `onCellEdit` provided | callback save (required for `httpAdapter`) |
-| adapter `features.update` + `updateRecord` + resolvable field + row id | adapter save |
+| `onCellEdit` provided | callback save |
+| `saveAction` provided | serializable action save (`{ id, field: columnId, value }` — Dates as ISO strings; the server-side policy re-resolves column → table/field, so the client can never redirect a write) |
+| adapter `features.update` + `updateRecord` + resolvable target + row id | adapter save |
 | otherwise | read-only (+ one dev `console.warn` per column) |
 
-Field mapping for adapter saves: `editable.field` if set; else the column id when it has no dot; dotted relationship ids are callback-only in v1.
+**Joined-table editing**: a relationship-path column (`t.text('customer.company').editable()`) edits the RELATED row — the write target resolves through the adapter's `resolveCellWriteTarget` (own table for flat ids, the real related table + `relatedIdPath` for dotted ids). One-to-many paths are never cell-editable (rejected at policy build); a null related object renders that row's cell read-only; `editable.field` on a dotted id still means "write THIS own-table field" (the plan-053 semantic). Row-level authorization stays the APP's concern (wrap the action / use `authorize`) — the policy gates columns and values, not rows.
 
-Optimistic updates: the new value shows immediately; on save failure the cell rolls back and `onCellEditError` fires. Validation rules on the column run before any save.
+Optimistic updates: the new value shows immediately; on save failure (including a `{ ok: false }` action result) the cell rolls back and `onCellEditError` fires. Validation rules on the column run before any save. Edits are last-write-wins — there is no conflict detection.
 
 **V1 editors**: text (+ email/url/phone), number (+ currency/percentage), option, boolean, date. `multiOption`/`json` stay read-only; `custom` needs `editable.editRenderer`. Edits are last-write-wins (no version checks).
 
@@ -175,8 +184,9 @@ Optimistic updates: the new value shows immediately; on save failure the cell ro
 <BetterTable
   table={ticketsTable}
   data={rows}
-  adapter={adapter}           // drizzle: uses updateRecord when features.update
-  // onCellEdit={...}         // httpAdapter / custom persistence
+  adapter={adapter}           // reads + write-target resolution (+ direct saves when features.update)
+  saveAction={saveTicketCell} // monolith path: 'use server' wrapper over tables.cellEditAction
+  // onCellEdit={...}         // full-control path
 />
 ```
 

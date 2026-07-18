@@ -193,9 +193,7 @@ export interface BetterTablesInstance<TAdapter extends object = SchemaAwareAdapt
    * // client: <BetterTable table={ticketsTable} saveAction={saveTicketCell} />
    * ```
    */
-  cellEditAction<TName extends string, TRow>(
-    table: TableDefinition<TName, TRow>
-  ): CellEditAction;
+  cellEditAction<TName extends string, TRow>(table: TableDefinition<TName, TRow>): CellEditAction;
 }
 
 /**

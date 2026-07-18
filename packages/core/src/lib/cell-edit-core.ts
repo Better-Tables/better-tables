@@ -19,12 +19,7 @@
  */
 
 import type { CellWriteTarget, TableAdapter } from '../types/adapter';
-import type {
-  ColumnDefinition,
-  ColumnType,
-  EditableConfig,
-  ValidationRule,
-} from '../types/column';
+import type { ColumnDefinition, ColumnType, EditableConfig, ValidationRule } from '../types/column';
 import type { TableDefinition } from '../types/factory';
 import type { FilterOption } from '../types/filter';
 
@@ -345,11 +340,7 @@ export async function buildCellEditPolicy<TName extends string, TRow>(
         return { ok: false, error: `Column "${input.field}" is not editable.` };
       }
 
-      const coerced = coerceCellValue(
-        entry.column.type,
-        input.value,
-        entry.column.filter?.options
-      );
+      const coerced = coerceCellValue(entry.column.type, input.value, entry.column.filter?.options);
       if (!coerced.ok) {
         return { ok: false, error: coerced.error };
       }

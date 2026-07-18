@@ -297,7 +297,10 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       return result as InferredColumnSpec[];
     },
 
-    async resolveCellWriteTarget(columnId: string, table?: string): Promise<CellWriteTarget | null> {
+    async resolveCellWriteTarget(
+      columnId: string,
+      table?: string
+    ): Promise<CellWriteTarget | null> {
       // A READ (schema/relationship introspection, plan 055) — independent
       // of the write opt-in, cached like describeColumns.
       const body = {

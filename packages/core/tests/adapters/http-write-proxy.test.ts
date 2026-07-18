@@ -6,10 +6,7 @@
 
 import { describe, expect, it, spyOn } from 'bun:test';
 import { type FetchLike, HttpAdapterError, httpAdapter } from '../../src/adapters/http-adapter';
-import {
-  createAdapterRouteHandler,
-  handleAdapterRequest,
-} from '../../src/adapters/http-handler';
+import { createAdapterRouteHandler, handleAdapterRequest } from '../../src/adapters/http-handler';
 import type {
   CellWriteTarget,
   FacetQueryParams,
@@ -79,10 +76,7 @@ function ownTarget(field: string, writable = true): CellWriteTarget {
 }
 
 /** Server-side adapter with full write-validation capabilities. */
-function makeWritableServer(overrides?: {
-  omitResolveTarget?: boolean;
-  omitDescribe?: boolean;
-}) {
+function makeWritableServer(overrides?: { omitResolveTarget?: boolean; omitDescribe?: boolean }) {
   const updates: Array<{ id: string; data: Record<string, unknown>; options?: MutationOptions }> =
     [];
   const adapter: TableAdapter<Record<string, unknown>> = {
@@ -397,7 +391,14 @@ describe('resolveCellWriteTarget over the wire (read side — no opt-in needed)'
 
 describe('httpAdapter writes opt-in — client side', () => {
   it('without writes: shape stays read-only (no updateRecord, update: false)', () => {
-    const client = httpAdapter({ url: '/api/tables', fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, result: null }) }) });
+    const client = httpAdapter({
+      url: '/api/tables',
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, result: null }),
+      }),
+    });
     expect(client.updateRecord).toBeUndefined();
     expect(client.meta.features.update).toBe(false);
   });
@@ -425,11 +426,15 @@ describe('httpAdapter writes opt-in — client side', () => {
     const client = httpAdapter<Record<string, unknown>>({
       url: '/api/tables',
       writes: true,
-      fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, result: null }) }),
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, result: null }),
+      }),
     });
-    await expect(
-      client.updateRecord?.('1', { subject: 'a', status: 'closed' })
-    ).rejects.toThrow(/singular/);
+    await expect(client.updateRecord?.('1', { subject: 'a', status: 'closed' })).rejects.toThrow(
+      /singular/
+    );
   });
 
   it('a denied server write surfaces as an HttpAdapterError with the envelope message', async () => {

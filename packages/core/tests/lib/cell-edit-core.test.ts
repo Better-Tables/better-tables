@@ -99,13 +99,16 @@ describe('buildCellEditPolicy — admission', () => {
 
   it('rejects one-to-many and unwritable targets at build time (dev warn names why)', async () => {
     const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [
-        t.text('notes.body').editable(),
-        t.text('customer.company').editable(),
-      ],
+      columns: [t.text('notes.body').editable(), t.text('customer.company').editable()],
     }));
     const { adapter } = makeTargetStub({
-      'notes.body': { table: 'notes', field: 'body', relatedIdPath: 'notes.id', single: false, writable: true },
+      'notes.body': {
+        table: 'notes',
+        field: 'body',
+        relatedIdPath: 'notes.id',
+        single: false,
+        writable: true,
+      },
       'customer.company': { ...CUSTOMER_COMPANY_TARGET, writable: false },
     });
 
@@ -157,12 +160,15 @@ describe('policy.check — coercion, validation, rejection', () => {
   async function makeTicketsPolicy() {
     const def = defineTableRow<TicketRow>()('tickets', (t) => ({
       columns: [
-        t.text('subject').editable().validation([
-          {
-            id: 'non-empty',
-            validate: (value) => (value ?? '').length > 0 || 'Subject required',
-          },
-        ]),
+        t
+          .text('subject')
+          .editable()
+          .validation([
+            {
+              id: 'non-empty',
+              validate: (value) => (value ?? '').length > 0 || 'Subject required',
+            },
+          ]),
         t
           .option('status')
           .options([
@@ -236,9 +242,7 @@ describe('policy.check — coercion, validation, rejection', () => {
     expect(unknown.ok).toBe(false);
     if (!unknown.ok) expect(unknown.error).toBe('Column "nope" is not editable.');
     expect(policy.check({ id: '', field: 'subject', value: 'x' }).ok).toBe(false);
-    expect(
-      policy.check({ id: '1', field: '', value: 'x' } as never).ok
-    ).toBe(false);
+    expect(policy.check({ id: '1', field: '', value: 'x' } as never).ok).toBe(false);
   });
 
   it('a dot column check returns the RELATED table target', async () => {

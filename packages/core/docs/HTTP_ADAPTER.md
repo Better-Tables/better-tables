@@ -43,7 +43,51 @@ const adapter = httpAdapter({ url: '/api/tables/tickets' });
 | Maps | `getFacetedValues` and `fetchData.faceted` travel as `[value, count][]` entries; the client rebuilds `Map`s |
 | Dates | JSON serializes `Date` filter/row values as ISO strings; server emitters parse ISO |
 | AbortSignal | Never serialized; client uses it to cancel the underlying `fetch` (including facet reads) |
-| Mutations | Not proxied — writes stay on explicit app-owned endpoints |
+| Mutations | Not proxied by default — `cellEdit` (single-cell update) is available behind DOUBLE opt-in (see Writes) |
+
+## Writes (opt-in, plan 055)
+
+> Only for genuinely separated frontend/backend deployments. In a monolith
+> (Next.js, TanStack Start) use `tables.cellEditAction(def)` through your
+> framework's server boundary instead — no endpoint, no proxy.
+
+Writes are **disabled by default** and require opting in on BOTH sides:
+
+```ts
+// server — narrow to the columns your app actually makes editable
+export const POST = createAdapterRouteHandler(() => getTicketsAdapter(), {
+  authorize: async (request) => isAllowedToEdit(request), // REQUIRED in practice
+  writes: { columns: ['subject', 'status', 'customer.company'] },
+});
+
+// client
+const adapter = httpAdapter({ url: '/api/tables/tickets', writes: true });
+// -> implements updateRecord (single field per call) and advertises
+//    meta.features.update; the editable UI's adapter save path lights up.
+```
+
+Rules the handler enforces:
+
+- **Double opt-in.** Without `writes` on the handler, `cellEdit` → 403
+  (`kind: 'forbidden'`) and the adapter is never called. Without
+  `writes: true` on `httpAdapter`, the client shape stays read-only
+  (no `updateRecord`, `features.update: false`).
+- **Fail closed.** The server validates every write via the adapter's own
+  schema introspection (`resolveCellWriteTarget` + `describeColumns`):
+  column → (table, field) is re-resolved server-side and the value is
+  coerced by the column's schema type. An adapter without those
+  capabilities rejects all writes — the client is never trusted.
+- **`{ columns }` narrowing is RECOMMENDED.** `writes: true` alone allows
+  any schema-writable column; the handler has no `TableDefinition`, so
+  schema-writable is broader than what your app actually marks
+  `.editable()`. Pass the explicit column list.
+- **`authorize` runs before the write.** Enabling writes without
+  `authorize` logs a dev warning at handler creation — row-level
+  authorization is the app's concern.
+- The wire shape is cell-oriented and singular
+  (`{ id, field: columnId, value }`) — never a free-form data record.
+  Relationship-path columns (`'customer.company'`) write the RELATED table
+  after server-side re-resolution; `id` is the related row's id.
 
 ## Status semantics
 
@@ -51,6 +95,8 @@ const adapter = httpAdapter({ url: '/api/tables/tickets' });
 |---|---|---|
 | Success | 200 | `{ ok: true, result }` |
 | Malformed body / authorize `false` | 400 / 403 | `{ ok: false, error, kind: 'bad_request' }` |
+| `cellEdit` with writes disabled | 403 | `{ ok: false, error, kind: 'forbidden' }` |
+| Unknown/unwritable column, failed coercion, narrowing miss | 400 | `{ ok: false, error, kind: 'bad_request' }` |
 | Adapter / DB throw | 500 | `{ ok: false, error: 'Adapter request failed.', kind: 'server_error' }` |
 
 Server error messages are generic on purpose — use `onError` for the real
