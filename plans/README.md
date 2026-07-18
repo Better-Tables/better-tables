@@ -53,8 +53,8 @@ wave are in "Deferred by decision" at the bottom.
 
 ## Outstanding
 
-Twenty active plans (033–052 + the held 008). All 2026-07-17 audit findings
-are now planned. Statuses are TODO unless noted.
+Wave A and Wave B are merged. Remaining: Wave C (048–050) plus the held 008.
+All 2026-07-17 audit findings are planned.
 
 ### Wave A — pre-0.6-publish (do these before shipping 0.6)
 
@@ -75,16 +75,16 @@ the breaking window.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [037](037-cli-bundled-ui-source.md) | Bundle `ui/src` into the CLI tarball; `init` copies from disk (kills the mutable-`main` download) | 033 (same file) | DONE (wave-b branch) |
-| [038](038-operator-column-type-single-source.md) | Single-source the operator + `ColumnType` tables (kill the 4-way drift); option equality canonicalized to `is`/`isNot` | none | DONE (wave-b branch) |
-| [039](039-documentation-truth.md) | Docs truth: READMEs + lean 0.6 `wiki.md` handbook on the flagship API, migrate+compile drizzle examples, dead-link fixes, toolkit README, runbook erratum, `@deprecated` nudge | none | DONE (wave-b branch) |
-| [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | DONE (wave-b branch) |
-| [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | DONE (wave-b-quality-hardening, 91 tests) |
-| [043](043-integration-e2e-harness.md) | Cross-package integration test (real drizzle + real UI) + optional Playwright E2E over `/examples` | 033, 042 | DONE (wave-b branch; Playwright E2E deferred — not trivially wired) |
-| [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | DONE (wave-b-quality-hardening) |
-| [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | DONE (wave-b branch) |
-| [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | DONE (wave-b branch) |
-| [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | DONE (wave-b branch) |
+| [037](037-cli-bundled-ui-source.md) | Bundle `ui/src` into the CLI tarball; `init` copies from disk (kills the mutable-`main` download) | 033 (same file) | DONE (merged to main, PR #85) |
+| [038](038-operator-column-type-single-source.md) | Single-source the operator + `ColumnType` tables (kill the 4-way drift); option equality canonicalized to `is`/`isNot` | none | DONE (merged to main, PR #85) |
+| [039](039-documentation-truth.md) | Docs truth: READMEs + lean 0.6 `wiki.md` handbook on the flagship API, migrate+compile drizzle examples, dead-link fixes, toolkit README, runbook erratum, `@deprecated` nudge | none | DONE (merged to main, PR #85) |
+| [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | DONE (merged to main, PR #85) |
+| [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | DONE (merged to main, PR #85; ~91 tests) |
+| [043](043-integration-e2e-harness.md) | Cross-package integration test (real drizzle + real UI) + optional Playwright E2E over `/examples` | 033, 042 | DONE (merged to main, PR #85; Playwright E2E deferred) |
+| [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | DONE (merged to main, PR #85) |
+| [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | DONE (merged to main, PR #85) |
+| [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | DONE (merged to main, PR #85) |
+| [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | DONE (merged to main, PR #85) |
 
 ### Wave C — direction / fast-follow (post-0.6-publish)
 
@@ -128,8 +128,8 @@ Audit/scope calls:
 - Operator equality spelling = **`is`/`isNot`** (plan 038).
 - Facet queries default to **top-100 by count**, `limit: null` opts out
   (plan 040).
-- Local quality gates = **no git hooks**; Biome residue cleared and CI lint
-  **blocking** (plan 052 — DONE on wave-b branch).
+-   Local quality gates = **no git hooks**; Biome residue cleared and CI lint
+  **blocking** (plan 052 — DONE, merged to main via PR #85).
 - Bun pin **aligned to current ≥1.3.11** (plan 052).
 - `wiki.md` → **lean hand-written 0.6 handbook**, old wiki archived out of the
   agent path (plan 039).
