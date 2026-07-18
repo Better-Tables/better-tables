@@ -6,10 +6,12 @@ import type {
   DataEvent,
   ExportParams,
   ExportResult,
+  FacetQueryParams,
   FetchDataParams,
   FetchDataResult,
   FilterGroupNode,
   FilterState,
+  MutationOptions,
   TableAdapter,
 } from '../../src/types';
 
@@ -106,13 +108,54 @@ describe('Adapter Types', () => {
       };
 
       expectTypeOf(adapter.createRecord).toMatchTypeOf<
-        | ((data: Partial<{ id: string; name: string }>) => Promise<{ id: string; name: string }>)
+        | ((
+            data: Partial<{ id: string; name: string }>,
+            options?: MutationOptions
+          ) => Promise<{ id: string; name: string }>)
         | undefined
+      >();
+      expectTypeOf(adapter.updateRecord).toMatchTypeOf<
+        | ((
+            id: string,
+            data: Partial<{ id: string; name: string }>,
+            options?: MutationOptions
+          ) => Promise<{ id: string; name: string }>)
+        | undefined
+      >();
+      expectTypeOf(adapter.deleteRecord).toMatchTypeOf<
+        ((id: string, options?: MutationOptions) => Promise<void>) | undefined
       >();
       expectTypeOf(adapter.subscribe).toMatchTypeOf<
         | ((callback: (event: DataEvent<{ id: string; name: string }>) => void) => () => void)
         | undefined
       >();
+    });
+  });
+
+  describe('FacetQueryParams', () => {
+    it('accepts filters, signal, and limit', () => {
+      const params: FacetQueryParams = {
+        filters: [{ columnId: 'status', type: 'option', operator: 'is', values: ['active'] }],
+        signal: new AbortController().signal,
+        limit: 50,
+      };
+
+      expectTypeOf(params.filters).toMatchTypeOf<FilterState[] | FilterGroupNode | undefined>();
+      expectTypeOf(params.signal).toEqualTypeOf<AbortSignal | undefined>();
+      expectTypeOf(params.limit).toEqualTypeOf<number | null | undefined>();
+    });
+
+    it('allows null limit to disable the cap', () => {
+      const params: FacetQueryParams = { limit: null };
+      expectTypeOf(params.limit).toEqualTypeOf<number | null | undefined>();
+    });
+  });
+
+  describe('MutationOptions', () => {
+    it('accepts an optional table target', () => {
+      const options: MutationOptions = { table: 'users' };
+      expectTypeOf(options.table).toEqualTypeOf<string | undefined>();
+      expectTypeOf(options).toMatchTypeOf<{ table?: string }>();
     });
   });
 

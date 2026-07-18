@@ -519,11 +519,15 @@ export abstract class BaseQueryBuilder {
    * those against join fan-out is a separate, pre-existing concern outside
    * this plan's scope (facet *counts* specifically).
    */
-  /** Resolve facet value LIMIT: default 100, `null` disables, number overrides. */
+  /**
+   * Resolve facet value LIMIT per {@link FacetQueryParams.limit}:
+   * default 100, `null` disables, positive integers override.
+   * Invalid / non-positive / non-integer values fall back to 100.
+   */
   protected resolveFacetLimit(limit?: number | null): number | null {
     if (limit === null) return null;
-    if (typeof limit === 'number' && Number.isFinite(limit) && limit >= 0) {
-      return Math.floor(limit);
+    if (typeof limit === 'number' && Number.isFinite(limit) && Number.isInteger(limit) && limit > 0) {
+      return limit;
     }
     return 100;
   }
@@ -568,7 +572,8 @@ export abstract class BaseQueryBuilder {
     const joinedQuery = this.applyJoins(baseQuery, joinOrder);
     const query = this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
 
-    const grouped = query.groupBy(column).orderBy(desc(aggregateFn));
+    // Secondary `asc(column)` makes equal-count ties repeatable across runs.
+    const grouped = query.groupBy(column).orderBy(desc(aggregateFn), asc(column));
     const resolvedLimit = this.resolveFacetLimit(limit);
     return resolvedLimit === null ? grouped : grouped.limit(resolvedLimit);
   }
@@ -616,7 +621,8 @@ export abstract class BaseQueryBuilder {
     const joinedQuery = this.applyJoins(baseQuery, joinOrder);
     const query = this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
 
-    const grouped = query.groupBy(column).orderBy(desc(countFn));
+    // Secondary `asc(column)` makes equal-count ties repeatable across runs.
+    const grouped = query.groupBy(column).orderBy(desc(countFn), asc(column));
     const resolvedLimit = this.resolveFacetLimit(limit);
     return resolvedLimit === null ? grouped : grouped.limit(resolvedLimit);
   }

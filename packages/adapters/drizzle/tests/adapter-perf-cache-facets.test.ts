@@ -18,10 +18,18 @@ const items = sqliteTable('items', {
 const schema = { items };
 
 describe('Plan 040 — getTableColumns memoization', () => {
-  it('returns the same array reference for the same table object', () => {
+  it('memoizes introspection but returns a defensive copy', () => {
     const a = getTableColumns(items);
     const b = getTableColumns(items);
-    expect(a).toBe(b);
+    expect(a).not.toBe(b);
+    expect(a).toEqual(b);
+
+    a.pop();
+    a[0] = { ...a[0]!, name: 'mutated' };
+    const c = getTableColumns(items);
+    expect(c).toEqual(b);
+    expect(c.map((col) => col.name)).toContain('id');
+    expect(c.map((col) => col.name)).not.toContain('mutated');
   });
 });
 
@@ -98,6 +106,23 @@ describe('Plan 040 — bounded LRU cache', () => {
     // Expired entry deleted on access; a fresh entry may be written.
     expect(shortTtl.getCacheSizeForTests()).toBeLessThanOrEqual(1);
   });
+
+  it('maxSize: 0 disables caching (keeps zero entries)', async () => {
+    const noCache = drizzleAdapter(drizzle(sqlite, { schema }), {
+      driver: 'sqlite',
+      schema,
+      options: {
+        defaultPrimaryTable: 'items',
+        cache: { enabled: true, ttl: 60_000, maxSize: 0 },
+      },
+    });
+    await noCache.fetchData({
+      primaryTable: 'items',
+      columns: ['category'],
+      pagination: { page: 1, limit: 10 },
+    });
+    expect(noCache.getCacheSizeForTests()).toBe(0);
+  });
 });
 
 describe('Plan 040 — facet LIMIT top-100 default', () => {
@@ -147,5 +172,46 @@ describe('Plan 040 — facet LIMIT top-100 default', () => {
   it('limit: 5 returns five values', async () => {
     const facets = await adapter.getFacetedValues('category', { limit: 5 });
     expect(facets.size).toBe(5);
+  });
+
+  it('invalid limits (0, fraction, negative, NaN) fall back to default top-100', async () => {
+    for (const limit of [0, 1.9, -3, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const facets = await adapter.getFacetedValues('category', { limit });
+      expect(facets.size).toBe(100);
+    }
+  });
+});
+
+describe('Plan 040 — facet equal-count tie ordering', () => {
+  let sqlite: Database;
+  let adapter: ReturnType<typeof drizzleAdapter>;
+
+  beforeEach(async () => {
+    sqlite = new Database(':memory:');
+    const db = drizzle(sqlite, { schema });
+    db.run(sql`CREATE TABLE items (id INTEGER PRIMARY KEY, category TEXT NOT NULL)`);
+    // All categories appear once → equal counts; secondary value order must be stable.
+    const rows = ['zeta', 'alpha', 'mu', 'beta', 'gamma'].map((category, i) => ({
+      id: i + 1,
+      category,
+    }));
+    await db.insert(items).values(rows);
+    adapter = drizzleAdapter(db, {
+      driver: 'sqlite',
+      schema,
+      options: { defaultPrimaryTable: 'items', cache: { enabled: false, ttl: 0 } },
+    });
+  });
+
+  afterEach(() => {
+    sqlite.close();
+  });
+
+  it('orders equal-count ties by value ascending for repeatable top-N', async () => {
+    const first = await adapter.getFacetedValues('category', { limit: 3 });
+    const second = await adapter.getFacetedValues('category', { limit: 3 });
+    const keys = [...first.keys()];
+    expect(keys).toEqual(['alpha', 'beta', 'gamma']);
+    expect([...second.keys()]).toEqual(keys);
   });
 });

@@ -207,7 +207,11 @@ export interface FacetQueryParams {
   /**
    * Cap distinct facet values returned, ordered by count descending.
    * Default: `100`. Pass `null` to disable the cap (return all values).
-   * A positive number overrides the default.
+   * A positive integer overrides the default.
+   *
+   * Invalid values (`0`, negatives, `NaN`/`Infinity`, or non-integers) are
+   * treated as omitted: adapters SHOULD fall back to the default `100`, not
+   * return an empty list or silently floor (e.g. `1.9` → `1`).
    */
   limit?: number | null;
 }

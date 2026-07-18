@@ -115,8 +115,8 @@ Move the cache into `adapter-cache.ts` as a small class (`AdapterCache` with
 adapter holds an instance. Keep the default-on + TTL + write-invalidation
 semantics identical.
 
-**Verify**: `bun test` → cache tests pass (incl. plan 040's eviction test);
-build exit 0.
+**Verify**: `cd packages/adapters/drizzle && bun test` → cache tests pass
+(incl. plan 040's eviction test); build exit 0.
 
 ### Step 3: Extract the meta tables
 
@@ -125,8 +125,9 @@ core) + `canResolveMutationTable`'s meta-facing logic into `adapter-meta.ts`
 as a function taking the inputs it needs (resolvable-mutation flag, supported
 sets). The adapter calls it.
 
-**Verify**: `bun test` → meta tests pass; `adapter.meta` shape identical
-(add a snapshot-equality assertion if none exists).
+**Verify**: `cd packages/adapters/drizzle && bun test` → meta tests pass;
+`adapter.meta` shape identical (add a snapshot-equality assertion if none
+exists).
 
 ### Step 4: Split `types.ts` behind a barrel
 
@@ -136,8 +137,9 @@ each type group verbatim. Make `types.ts` (or `types/index.ts`, whichever
 keeps `from './types'` resolving) re-export everything so NO import site
 changes. If moving to `types/index.ts`, verify `./types` resolves to it.
 
-**Verify**: `grep -rn "from './types'" src | wc -l` unchanged;
-`bun run typecheck` → exit 0; `bun test` → pass.
+**Verify**: `grep -rn "from './types'" packages/adapters/drizzle/src | wc -l`
+unchanged; `bun run typecheck` → exit 0;
+`cd packages/adapters/drizzle && bun test` → pass.
 
 ### Step 5: Confirm no public surface drift + ledger
 
@@ -145,8 +147,10 @@ Diff the package's built `.d.ts` public exports before/after (or check
 `src/index.ts`'s re-exports are unchanged). Confirm `git diff` shows only
 moves, no logic edits. Update the plan 044 row.
 
-**Verify**: `bun run build` exit 0; the package's public export list is
-unchanged (grep `src/index.ts`); full drizzle SQLite suite green.
+**Verify**: `cd packages/adapters/drizzle && bun run build` exit 0; the
+package's public export list is unchanged
+(`grep` `packages/adapters/drizzle/src/index.ts`); full drizzle SQLite suite
+green (`cd packages/adapters/drizzle && bun test`).
 
 ## Test plan
 
@@ -158,9 +162,9 @@ unchanged (grep `src/index.ts`); full drizzle SQLite suite green.
 ## Done criteria
 
 - [ ] `adapter-cache.ts`, `export-format.ts`, `adapter-meta.ts` exist; `drizzle-adapter.ts` line count dropped ~350
-- [ ] `src/types/` split exists; `types.ts`/`types/index.ts` re-exports all; `grep -rn "from './types'" src | wc -l` unchanged
+- [ ] `src/types/` split exists; `types.ts`/`types/index.ts` re-exports all; `grep -rn "from './types'" packages/adapters/drizzle/src | wc -l` unchanged
 - [ ] `bun run typecheck` exit 0; `cd packages/adapters/drizzle && bun test` SQLite green
-- [ ] `bun run build` exit 0; public export list (`src/index.ts`) unchanged — NO changeset needed
+- [ ] `cd packages/adapters/drizzle && bun run build` exit 0; public export list (`packages/adapters/drizzle/src/index.ts`) unchanged — NO changeset needed
 - [ ] `git diff` shows moves, not logic changes
 - [ ] `plans/README.md` updated
 

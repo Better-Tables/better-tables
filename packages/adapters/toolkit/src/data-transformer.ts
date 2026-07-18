@@ -161,17 +161,18 @@ export class DataTransformer<TTable = unknown> {
     const groupedData = this.groupByMainTableKey(flatData, primaryTable);
 
     // Precompute per-query invariants once (paths / pk names / column lists are
-    // row-invariant). Cleared in finally so subsequent transforms start clean.
+    // row-invariant). Cleared in finally so subsequent transforms start clean —
+    // including when precompute or build throws.
     this.columnPathCache = new Map();
     this.primaryKeyNameCache = new WeakMap();
     this.columnNamesCache = new WeakMap();
-    if (columns) {
-      for (const columnId of columns) {
-        this.resolveColumnPathCached(columnId, primaryTable);
-      }
-    }
-
     try {
+      if (columns) {
+        for (const columnId of columns) {
+          this.resolveColumnPathCached(columnId, primaryTable);
+        }
+      }
+
       const nestedData: TData[] = [];
 
       for (const [, records] of groupedData) {
