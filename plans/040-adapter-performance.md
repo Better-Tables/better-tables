@@ -4,7 +4,7 @@
 > confirm before moving on. On any STOP condition, stop and report. Update
 > `plans/README.md` when done unless a reviewer maintains the index.
 >
-> **Drift check (run first)**: `git diff --stat 787a816..HEAD -- packages/adapters/toolkit/src/data-transformer.ts packages/adapters/drizzle/src/utils/drizzle-schema-utils.ts packages/adapters/toolkit/src/relationship-manager.ts packages/adapters/drizzle/src/drizzle-adapter.ts packages/adapters/drizzle/src/query-builders/base-query-builder.ts packages/core/src/types/adapter.ts`
+> **Drift check (run first)**: `git diff --stat 787a816..HEAD -- packages/adapters/toolkit/src/data-transformer.ts packages/adapters/drizzle/src/utils/drizzle-schema-utils.ts packages/adapters/drizzle/src/relationship-manager.ts packages/adapters/drizzle/src/drizzle-adapter.ts packages/adapters/drizzle/src/query-builders/base-query-builder.ts packages/core/src/types/adapter.ts`
 
 ## Status
 
@@ -54,7 +54,7 @@ Verified at `787a816`:
 - `packages/adapters/drizzle/src/utils/drizzle-schema-utils.ts:106-135` —
   `getTableColumns` runs `Object.entries(tableObj)` and allocates a fresh
   `ColumnInfo[]` every call; not memoized.
-- `packages/adapters/toolkit/src/relationship-manager.ts:109`
+- `packages/adapters/drizzle/src/relationship-manager.ts:109`
   `resolveColumnPath` — `joinPathCache` covers only multi-level paths, not
   1-/2-part.
 - `packages/adapters/drizzle/src/drizzle-adapter.ts`: `:154`
@@ -85,7 +85,7 @@ Verified at `787a816`:
 **In scope**:
 - `packages/adapters/toolkit/src/data-transformer.ts`
 - `packages/adapters/drizzle/src/utils/drizzle-schema-utils.ts`
-- `packages/adapters/toolkit/src/relationship-manager.ts` (1-/2-part path cache — optional if the transformer precompute covers it)
+- `packages/adapters/drizzle/src/relationship-manager.ts` (1-/2-part path cache — optional if the transformer precompute covers it)
 - `packages/adapters/drizzle/src/drizzle-adapter.ts` (cache eviction)
 - `packages/adapters/drizzle/src/query-builders/base-query-builder.ts` (facet LIMIT)
 - `packages/core/src/types/adapter.ts` (`FacetQueryParams.limit`)

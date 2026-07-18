@@ -11,9 +11,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Stable defaults so omitted `filters`/`params` don't recreate `fetchData`'s
 // identity (and retrigger the fetch effect) on every render the way inline
-// `= []` / `= {}` default-parameter literals would.
-const EMPTY_FILTERS: FilterState[] = [];
-const EMPTY_PARAMS: Record<string, unknown> = {};
+// `= []` / `= {}` default-parameter literals would. Frozen so a shared
+// constant can't be mutated via fetchParams (e.g. filters.push).
+const EMPTY_FILTERS = Object.freeze([] as FilterState[]) as FilterState[];
+const EMPTY_PARAMS = Object.freeze({}) as Record<string, unknown>;
 
 export interface UseTableDataOptions<TData = unknown> {
   /** Table adapter for data fetching */

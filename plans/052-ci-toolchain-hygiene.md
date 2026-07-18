@@ -65,6 +65,7 @@ Verified at `787a816`:
 | Purpose | Command | Expected |
 |---|---|---|
 | Install | `bun install` | exit 0 |
+| Build | `bun run build` | exit 0 |
 | Biome check | `bunx biome check .` | errors → 0 by end |
 | Biome safe-fix | `bunx biome check --write .` (per package or root — see Step) | applies safe fixes |
 | Typecheck | `bun run typecheck` | exit 0 |
@@ -102,12 +103,13 @@ In `test.yml`, add `actions/cache` for `~/.bun/install/cache` keyed on
 `hashFiles('bun.lock')` in each job (or a composite/reusable setup step), and
 a Turbo cache (cache `.turbo` or use a remote-cacheless local `--cache-dir`
 persisted via `actions/cache`) so `typecheck`/`test` skip unchanged packages.
-Consider building core once and reusing it across `test-ui`/`test-adapters`
-via an artifact instead of rebuilding per job.
+Build `@better-tables/core` once and reuse it across `test-ui`/`test-adapters`
+(artifact or shared workspace build) so core is not rebuilt redundantly per job.
 
 **Verify**: workflow YAML is valid; a `git diff` review shows cache keys on
-`bun.lock`. (CI timing is verified on the first real run once the remote is
-restored — note this.)
+`bun.lock`; core is built once and shared (not rebuilt per dependent job).
+(CI timing is verified on the first real run once the remote is restored —
+note this.)
 
 ### Step 2: Align the bun pin
 
