@@ -31,7 +31,7 @@ function makeColumnPath(columnId: string, primaryTable: string): ColumnPath {
     };
   }
 
-  const [alias, field = ''] = columnId.split('.');
+  const [, field = ''] = columnId.split('.');
   const relationship: RelationshipPath = {
     from: primaryTable,
     to: 'profiles',
