@@ -22,10 +22,11 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "ui-src"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && bun scripts/bundle-ui-src.ts",
     "dev": "tsdown --watch",
     "test": "bun test",
     "test:watch": "bun test --watch",

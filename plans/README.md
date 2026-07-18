@@ -71,7 +71,7 @@ the breaking window.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [037](037-cli-bundled-ui-source.md) | Bundle `ui/src` into the CLI tarball; `init` copies from disk (kills the mutable-`main` download) | 033 (same file) | TODO |
+| [037](037-cli-bundled-ui-source.md) | Bundle `ui/src` into the CLI tarball; `init` copies from disk (kills the mutable-`main` download) | 033 (same file) | DONE (wave-b branch) |
 | [038](038-operator-column-type-single-source.md) | Single-source the operator + `ColumnType` tables (kill the 4-way drift); option equality canonicalized to `is`/`isNot` | none | DONE (wave-b branch) |
 | [039](039-documentation-truth.md) | Docs truth: READMEs + lean 0.6 `wiki.md` handbook on the flagship API, migrate+compile drizzle examples, dead-link fixes, toolkit README, runbook erratum, `@deprecated` nudge | none | DONE (wave-b branch) |
 | [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | DONE (wave-b branch) |
