@@ -49,7 +49,7 @@
  * values-based guess unreliable on its own).
  */
 
-import type { ColumnType } from '../types/column';
+import { COLUMN_TYPES as CORE_COLUMN_TYPES, type ColumnType } from '../types/column';
 import type { TableDefinition } from '../types/factory';
 import type {
   BaseFilterState,
@@ -107,21 +107,7 @@ export type DefaultColumnTypeForValue<V> =
 /** Optional common `FilterState` fields `buildFilter` accepts besides `columnId`/`type`/`operator`/`values`. */
 export type BuildFilterOptions = Pick<BaseFilterState, 'id' | 'includeNull' | 'meta'>;
 
-const COLUMN_TYPES: ReadonlySet<ColumnType> = new Set([
-  'text',
-  'number',
-  'date',
-  'boolean',
-  'option',
-  'multiOption',
-  'currency',
-  'percentage',
-  'url',
-  'email',
-  'phone',
-  'json',
-  'custom',
-]);
+const COLUMN_TYPES: ReadonlySet<ColumnType> = new Set(CORE_COLUMN_TYPES);
 
 /**
  * Runtime mirror of {@link DefaultColumnTypeForValue} -- keep the two in

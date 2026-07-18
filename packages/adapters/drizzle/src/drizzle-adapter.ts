@@ -68,7 +68,12 @@ import type {
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
-import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
+import {
+  COLUMN_TYPES,
+  getOperatorsForType,
+  isFilterGroupNode,
+  normalizeFilterNode,
+} from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
@@ -1243,133 +1248,14 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       transactions: true,
     };
 
-    const supportedColumnTypes: ColumnType[] = [
-      'text',
-      'number',
-      'date',
-      'boolean',
-      'option',
-      'multiOption',
-      'currency',
-      'percentage',
-      'url',
-      'email',
-      'phone',
-      'json',
-      'custom',
-    ];
-
-    const supportedOperators: Record<ColumnType, FilterOperator[]> = {
-      text: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      number: [
-        'equals',
-        'notEquals',
-        'greaterThan',
-        'greaterThanOrEqual',
-        'lessThan',
-        'lessThanOrEqual',
-        'between',
-        'notBetween',
-        'isNull',
-        'isNotNull',
-      ],
-      date: [
-        'is',
-        'isNot',
-        'before',
-        'after',
-        'between',
-        'notBetween',
-        'isToday',
-        'isYesterday',
-        'isThisWeek',
-        'isThisMonth',
-        'isThisYear',
-        'isNull',
-        'isNotNull',
-      ],
-      boolean: ['isTrue', 'isFalse', 'isNull', 'isNotNull'],
-      option: ['equals', 'notEquals', 'isAnyOf', 'isNoneOf', 'isNull', 'isNotNull'],
-      multiOption: [
-        'includes',
-        'excludes',
-        'includesAny',
-        'includesAll',
-        'excludesAny',
-        'excludesAll',
-        'isNull',
-        'isNotNull',
-      ],
-      currency: [
-        'equals',
-        'notEquals',
-        'greaterThan',
-        'greaterThanOrEqual',
-        'lessThan',
-        'lessThanOrEqual',
-        'between',
-        'notBetween',
-        'isNull',
-        'isNotNull',
-      ],
-      percentage: [
-        'equals',
-        'notEquals',
-        'greaterThan',
-        'greaterThanOrEqual',
-        'lessThan',
-        'lessThanOrEqual',
-        'between',
-        'notBetween',
-        'isNull',
-        'isNotNull',
-      ],
-      url: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      email: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      phone: [
-        'contains',
-        'equals',
-        'startsWith',
-        'endsWith',
-        'isEmpty',
-        'isNotEmpty',
-        'notEquals',
-        'isNull',
-        'isNotNull',
-      ],
-      json: ['isNull', 'isNotNull'],
-      custom: ['isNull', 'isNotNull'],
-    };
+    // Derive from core so meta can't drift from FILTER_OPERATORS (plan 038).
+    const supportedColumnTypes: ColumnType[] = [...COLUMN_TYPES];
+    const supportedOperators = Object.fromEntries(
+      supportedColumnTypes.map((type) => [
+        type,
+        getOperatorsForType(type).map((o) => o.key as FilterOperator),
+      ])
+    ) as Record<ColumnType, FilterOperator[]>;
 
     return {
       name: customMeta?.name || 'Drizzle Adapter',

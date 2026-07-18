@@ -24,7 +24,12 @@
  */
 
 import type { ColumnType, FilterNode, FilterOperator, FilterState } from '@better-tables/core';
-import { getOperatorDefinition, isFilterGroupNode, validateOperatorValues } from '@better-tables/core';
+import {
+  getOperatorDefinition,
+  getOperatorsForType,
+  isFilterGroupNode,
+  validateOperatorValues,
+} from '@better-tables/core';
 
 /**
  * Thrown by {@link FilterRouter.mapOperatorToCondition} when an operator
@@ -219,7 +224,9 @@ export class FilterRouter<TColumn, TPredicate> {
     return ['isTrue', 'isFalse'].includes(op);
   }
   isOptionOperator(op: string): boolean {
-    return ['isAnyOf', 'isNoneOf'].includes(op);
+    // `is`/`isNot` are canonical for option columns (core FILTER_OPERATORS);
+    // `equals`/`notEquals` remain accepted as aliases for the same semantics.
+    return ['is', 'isNot', 'equals', 'notEquals', 'isAnyOf', 'isNoneOf'].includes(op);
   }
   isMultiOptionOperator(op: string): boolean {
     return [
@@ -278,6 +285,11 @@ export class FilterRouter<TColumn, TPredicate> {
       // asserts a string value and would throw on a numeric one. (Mirrors the
       // date-`between` guard below.)
       condition = this.emitter.numberOperator(column, operator, values);
+    } else if (columnType === 'option' && this.isOptionOperator(operator)) {
+      // Option `is`/`isNot` collide with date classifiers; route by columnType
+      // before the text/date branches so builder-default operators hit
+      // optionOperator (plan 038).
+      condition = this.emitter.optionOperator(column, operator, values);
     } else if (this.isTextOperator(operator)) {
       condition = this.emitter.textOperator(column, operator, values);
     } else if (
@@ -411,71 +423,10 @@ export class FilterRouter<TColumn, TPredicate> {
 
   /**
    * Get supported operators for a column type.
+   * Derived from core's {@link getOperatorsForType} so the adapter gate can't
+   * drift from the builder/UI canonical set (plan 038).
    */
   getSupportedOperators(columnType: ColumnType): FilterOperator[] {
-    const baseOperators: FilterOperator[] = ['isNull', 'isNotNull'];
-
-    switch (columnType) {
-      case 'text':
-        return [
-          ...baseOperators,
-          'contains',
-          'equals',
-          'startsWith',
-          'endsWith',
-          'isEmpty',
-          'isNotEmpty',
-          'notEquals',
-        ];
-
-      case 'number':
-        return [
-          ...baseOperators,
-          'equals',
-          'notEquals',
-          'greaterThan',
-          'greaterThanOrEqual',
-          'lessThan',
-          'lessThanOrEqual',
-          'between',
-          'notBetween',
-        ];
-
-      case 'date':
-        return [
-          ...baseOperators,
-          'is',
-          'isNot',
-          'before',
-          'after',
-          'between',
-          'notBetween',
-          'isToday',
-          'isYesterday',
-          'isThisWeek',
-          'isThisMonth',
-          'isThisYear',
-        ];
-
-      case 'boolean':
-        return [...baseOperators, 'isTrue', 'isFalse'];
-
-      case 'option':
-        return [...baseOperators, 'equals', 'notEquals', 'isAnyOf', 'isNoneOf'];
-
-      case 'multiOption':
-        return [
-          ...baseOperators,
-          'includes',
-          'excludes',
-          'includesAny',
-          'includesAll',
-          'excludesAny',
-          'excludesAll',
-        ];
-
-      default:
-        return baseOperators;
-    }
+    return getOperatorsForType(columnType).map((o) => o.key as FilterOperator);
   }
 }

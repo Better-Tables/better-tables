@@ -15,7 +15,11 @@ import type {
 import { getAllOperators } from '../types/filter-operators';
 
 /**
- * Known filter `type` discriminants (the eight members of the `FilterState` union).
+ * Known filter `type` discriminants (the members of the `FilterState` union).
+ * Same members as {@link COLUMN_TYPES} today, but kept as a separate list
+ * because it is keyed on `FilterState['type']` (the filter-state discriminant)
+ * rather than `ColumnType` — derive from COLUMN_TYPES only if those unions
+ * stay identical.
  */
 const KNOWN_FILTER_TYPES: ReadonlyArray<FilterState['type']> = [
   'text',

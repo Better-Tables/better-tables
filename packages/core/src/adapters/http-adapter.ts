@@ -15,25 +15,11 @@ import type {
   FetchDataResult,
   TableAdapter,
 } from '../types/adapter';
-import type { ColumnType } from '../types/column';
+import { COLUMN_TYPES, type ColumnType } from '../types/column';
 import type { FilterOperator, FilterOption } from '../types/filter';
 import type { AdapterRequestBody, AdapterResponseBody } from './http-protocol';
 
-const ALL_COLUMN_TYPES: ColumnType[] = [
-  'text',
-  'number',
-  'date',
-  'boolean',
-  'option',
-  'multiOption',
-  'currency',
-  'percentage',
-  'url',
-  'email',
-  'phone',
-  'json',
-  'custom',
-];
+const ALL_COLUMN_TYPES: ColumnType[] = [...COLUMN_TYPES];
 
 /**
  * Default `meta` for an HTTP adapter. Capabilities actually live on the SERVER
