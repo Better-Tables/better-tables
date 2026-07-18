@@ -67,7 +67,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "packageManager": "bun@1.3.1",
+  "packageManager": "bun@1.3.11",
   "repository": {
     "type": "git",
     "url": "https://github.com/Better-Tables/better-tables"
