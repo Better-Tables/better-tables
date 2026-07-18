@@ -5,7 +5,6 @@ import { drizzleAdapter } from '../src/factory';
 import type { RelationshipMap } from '../src/types';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
@@ -298,6 +297,7 @@ const customRelationships: RelationshipMap = {
   },
 };
 
+
 function buildUsersTable(_db: ReturnType<typeof drizzle>) {
   return defineTableRow<UserWithRelations>()('users', (t) => ({
     columns: [
@@ -561,7 +561,7 @@ async function setupComplexDatabase() {
   return { db, sqlite };
 }
 
-async function createAdvancedAdapter(): Promise<DrizzleAdapter<User>> {
+async function createAdvancedAdapter(): Promise<any> {
   const { db, sqlite } = await setupComplexDatabase();
 
   usersTable = buildUsersTable(db);
