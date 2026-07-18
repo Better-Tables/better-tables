@@ -58,9 +58,10 @@ function generateTestTexts(count: number): string[] {
   return texts;
 }
 
-describe('DrizzleAdapter - PostgreSQL Large Array Integration Tests', () => {
-  const testConnectionString =
-    process.env.POSTGRES_TEST_URL || 'postgresql://localhost:5432/drizzle_test';
+describe.skipIf(!process.env.POSTGRES_TEST_URL)(
+  'DrizzleAdapter - PostgreSQL Large Array Integration Tests',
+  () => {
+  const testConnectionString = process.env.POSTGRES_TEST_URL!;
   let testDb: ReturnType<typeof createPostgresDatabase>['db'];
   let client: ReturnType<typeof createPostgresDatabase>['client'];
   let adapter: DrizzleAdapter<typeof testSchema, 'postgres'>;
