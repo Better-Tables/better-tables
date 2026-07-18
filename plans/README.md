@@ -75,7 +75,7 @@ the breaking window.
 | [038](038-operator-column-type-single-source.md) | Single-source the operator + `ColumnType` tables (kill the 4-way drift); option equality canonicalized to `is`/`isNot` | none | DONE (wave-b branch) |
 | [039](039-documentation-truth.md) | Docs truth: READMEs + lean 0.6 `wiki.md` handbook on the flagship API, migrate+compile drizzle examples, dead-link fixes, toolkit README, runbook erratum, `@deprecated` nudge | none | DONE (wave-b branch) |
 | [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | DONE (wave-b branch) |
-| [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | TODO |
+| [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | DONE (wave-b-quality-hardening, 91 tests) |
 | [043](043-integration-e2e-harness.md) | Cross-package integration test (real drizzle + real UI) + optional Playwright E2E over `/examples` | 033, 042 | TODO |
 | [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | DONE (wave-b-quality-hardening) |
 | [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | TODO |
