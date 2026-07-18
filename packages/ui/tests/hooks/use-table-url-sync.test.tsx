@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
 import {
   clearAllTableStores,
   getOrCreateTableStore,
@@ -18,6 +18,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearAllTableStores();
+  jest.useRealTimers();
 });
 
 function createStore() {
@@ -25,6 +26,14 @@ function createStore() {
     columns: mockColumns,
     config: { pagination: { defaultPageSize: 10 } },
   });
+}
+
+async function advanceFakeTimers(ms: number) {
+  jest.useFakeTimers();
+  await act(async () => {
+    jest.advanceTimersByTime(ms);
+  });
+  jest.useRealTimers();
 }
 
 describe('useTableUrlSync', () => {
@@ -55,9 +64,7 @@ describe('useTableUrlSync', () => {
 
     unmount();
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    await advanceFakeTimers(200);
 
     expect(setParamsCalls.length - callsBeforeChange).toBe(0);
   });
@@ -69,11 +76,13 @@ describe('useTableUrlSync', () => {
 
     renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
 
+    jest.useFakeTimers();
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      jest.advanceTimersByTime(50);
       createStore();
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      jest.advanceTimersByTime(300);
     });
+    jest.useRealTimers();
 
     const store = getTableStore(TABLE_ID);
     expect(store).toBeDefined();
@@ -142,7 +151,6 @@ describe('useTableUrlSync', () => {
 
     const { rerender, getByTestId } = render(<TestComponent />);
 
-    // Mount-time hydration: store + chips reflect filters=A.
     await waitFor(() => expect(getByTestId('chips').textContent).toBe('alpha'));
 
     const store = getTableStore(TABLE_ID);
@@ -151,32 +159,17 @@ describe('useTableUrlSync', () => {
       throw new Error('Expected table store');
     }
 
-    // Simulate a soft nav: the URL's filters param changes to B behind the
-    // adapter (as it would when Next.js's useSearchParams() reflects a new
-    // router.push), then the component re-renders (as it would on a real
-    // client-side navigation).
     params.set('filters', filtersB);
     rerender(<TestComponent />);
 
-    // The store AND the filter-bar chips (rendered from useTableFilters, the
-    // same hook `<FilterBar>` uses) must pick up B -- not just re-fetch data
-    // while chips stay stale.
     await waitFor(() => expect(getByTestId('chips').textContent).toBe('bravo'));
     expect(store.getState().manager.getFilters()).toHaveLength(1);
     expect(store.getState().manager.getFilters()[0]?.values).toEqual(['bravo']);
 
-    // No hydrate -> serialize -> hydrate loop: setParams may be called once
-    // more to echo the already-current state back to the URL (harmless -- a
-    // real adapter would write the same value it just read), but must not
-    // keep growing.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
+    await advanceFakeTimers(250);
     const callsAfterSettling = setParamsCalls.length;
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
+    await advanceFakeTimers(250);
     expect(setParamsCalls.length).toBe(callsAfterSettling);
   });
 
@@ -216,9 +209,7 @@ describe('useTableUrlSync', () => {
       });
     });
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
+    await advanceFakeTimers(200);
 
     const burstCalls = setParamsCalls.slice(callsBeforeBurst);
     expect(burstCalls.length).toBe(1);

@@ -24,11 +24,11 @@ const HYDRATION_MAX_ATTEMPTS = 5;
  * Debounce utility to batch rapid updates.
  * Returns a cancel function so timers can be cleared on unmount.
  */
-function debounce<T extends (args: Record<string, string | null>) => void>(
+function debounce<T extends (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void>(
   func: T,
   wait: number
 ): {
-  fn: (args: Record<string, string | null>) => void;
+  fn: (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void;
   cancel: () => void;
 } {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -294,7 +294,8 @@ export function useTableUrlSync(
 
     const manager = store.getState().manager;
     const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce(
-      (urlParams: Record<string, string | null>) => {
+      (tableState) => {
+        const urlParams = serializeTableStateToUrl(tableState);
         adapter.setParams(urlParams);
       },
       150
@@ -331,8 +332,7 @@ export function useTableUrlSync(
           tableState.columnOrder = getColumnOrderModifications(columns, event.state.columnOrder);
         }
 
-        const urlParams = serializeTableStateToUrl(tableState);
-        debouncedUrlUpdate(urlParams);
+        debouncedUrlUpdate(tableState);
       }
     });
 
