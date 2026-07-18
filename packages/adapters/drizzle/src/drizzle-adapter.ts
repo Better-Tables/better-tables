@@ -52,9 +52,7 @@
 
 import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import type {
-  AdapterFeatures,
   AdapterMeta,
-  ColumnType,
   DataEvent,
   ExportParams,
   ExportResult,
@@ -63,18 +61,16 @@ import type {
   FetchDataResult,
   FilterGroupNode,
   FilterNode,
-  FilterOperator,
   FilterOption,
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
 import {
-  COLUMN_TYPES,
-  getOperatorsForType,
   isFilterGroupNode,
   normalizeFilterNode,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import { buildAdapterMeta } from './adapter-meta';
 import { AdapterCache } from './adapter-cache';
 import { convertToExportFormat, getMimeType } from './export-format';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
@@ -299,7 +295,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     });
 
     // Initialize metadata
-    this.meta = this.buildAdapterMeta(config.meta);
+    this.meta = buildAdapterMeta(this.canResolveMutationTable(), config.meta);
   }
 
   /**
@@ -1223,56 +1219,6 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       if (index > -1) {
         this.subscribers.splice(index, 1);
       }
-    };
-  }
-
-  /**
-   * Build adapter metadata
-   */
-  private buildAdapterMeta(customMeta?: Partial<AdapterMeta>): AdapterMeta {
-    // Mutation actions are only safe to advertise when resolveMutationTable()
-    // can actually resolve a target table (single-table schema, or
-    // options.defaultMutationTable configured) - otherwise callers would hit
-    // a SchemaError at call time.
-    const mutationsResolvable = this.canResolveMutationTable();
-
-    const features: AdapterFeatures = {
-      create: mutationsResolvable,
-      read: true,
-      update: mutationsResolvable,
-      delete: mutationsResolvable,
-      bulkOperations: mutationsResolvable,
-      realTimeUpdates: true,
-      export: true,
-      transactions: true,
-    };
-
-    // Derive from core so meta can't drift from FILTER_OPERATORS (plan 038).
-    const supportedColumnTypes: ColumnType[] = [...COLUMN_TYPES];
-    const supportedOperators = Object.fromEntries(
-      supportedColumnTypes.map((type) => [
-        type,
-        getOperatorsForType(type).map((o) => o.key as FilterOperator),
-      ])
-    ) as Record<ColumnType, FilterOperator[]>;
-
-    return {
-      name: customMeta?.name || 'Drizzle Adapter',
-      version: customMeta?.version || '1.0.0',
-      features,
-      supportedColumnTypes,
-      supportedOperators,
-      // Truthful capability flag (design core-contract-v2.md §1.5, plan 017):
-      // the adapter translates FilterNode/FilterGroupNode trees to real
-      // AND/OR SQL (base-query-builder.ts's applyFilters ->
-      // FilterHandler.buildTreeCondition). maxGroupDepth mirrors core's own
-      // default nesting cap (utils/type-guards.ts) and is enforced again on
-      // entry in normalizeIncomingFilters -- defense in depth over core's
-      // URL-boundary normalization, since fetchData is a public API callers
-      // hit directly with unnormalized trees.
-      supportsFilterGroups: true,
-      maxGroupDepth: 3,
-      ...customMeta,
     };
   }
 
