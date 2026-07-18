@@ -44,7 +44,7 @@
  * the JS) has something to actually call.
  */
 
-import type { AdapterMeta, FetchDataResult } from '../adapter';
+import type { AdapterMeta, FacetQueryParams, FetchDataResult } from '../adapter';
 import type { BaseFilterState, FilterOption } from '../filter';
 import type { PaginationParams } from '../pagination';
 import type { SortingParams } from '../sorting';
@@ -225,8 +225,17 @@ export interface FetchDataParamsV2<TReg = Record<string, unknown>> {
  */
 export interface TableAdapterV2<TData = unknown, TReg = Record<string, unknown>> {
   fetchData(params: FetchDataParamsV2<TReg>): Promise<FetchDataResult<TData>>;
-  getFilterOptions(columnId: keyof TReg & string): Promise<FilterOption[]>;
-  getFacetedValues(columnId: keyof TReg & string): Promise<Map<string, number>>;
-  getMinMaxValues(columnId: keyof TReg & string): Promise<[number, number]>;
+  getFilterOptions(
+    columnId: keyof TReg & string,
+    params?: FacetQueryParams
+  ): Promise<FilterOption[]>;
+  getFacetedValues(
+    columnId: keyof TReg & string,
+    params?: FacetQueryParams
+  ): Promise<Map<string, number>>;
+  getMinMaxValues(
+    columnId: keyof TReg & string,
+    params?: FacetQueryParams
+  ): Promise<[number, number]>;
   meta: AdapterMetaV2;
 }
