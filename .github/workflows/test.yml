@@ -308,6 +308,13 @@ jobs:
           name: core-dist
           path: packages/core/dist
 
+      # Plan 043: UI integration tests import @better-tables/adapters-drizzle
+      # (bun:sqlite fixture). Build toolkit + drizzle after restoring core dist.
+      - name: Build adapter deps for UI integration tests
+        run: |
+          cd ../..
+          bun run build --filter=@better-tables/adapters-toolkit --filter=@better-tables/adapters-drizzle
+
       - name: Run UI Tests
         run: bun test
 
