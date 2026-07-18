@@ -2,12 +2,11 @@
 // TODO: remove the any types
 
 import { defineTableRow } from '@better-tables/core';
-import { drizzleAdapter } from '../src/factory';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-
+import { drizzleAdapter } from '../src/factory';
 
 // Schema definition
 const users = sqliteTable('users', {
@@ -121,15 +120,49 @@ function buildUsersTable(_db: ReturnType<typeof drizzle>) {
       t.text('profile.avatar').displayName('Avatar'),
       t.text('profile.website').displayName('Website'),
       t.text('posts.title').displayName('Latest Post'),
-      t.computed('posts.views', (user) => user.posts?.[0]?.views ?? 0).displayName('Latest Post Views'),
+      t
+        .computed('posts.views', (user) => user.posts?.[0]?.views ?? 0)
+        .displayName('Latest Post Views'),
       t.computed('posts_count', (user) => user.posts?.length ?? 0).displayName('Posts'),
-      t.computed('total_views', (user) => user.posts?.reduce((sum, post) => sum + (post.views ?? 0), 0) ?? 0).displayName('Total Views'),
-      t.computed('total_likes', (user) => user.posts?.reduce((sum, post) => sum + (post.likes ?? 0), 0) ?? 0).displayName('Total Likes'),
-      t.computed('avg_views', (user) => { const posts = user.posts ?? []; return posts.length > 0 ? posts.reduce((sum, post) => sum + (post.views ?? 0), 0) / posts.length : 0; }).displayName('Avg Views'),
-      t.computed('engagement_score', (user) => { const posts = user.posts ?? []; const totalViews = posts.reduce((sum, post) => sum + (post.views ?? 0), 0); const totalLikes = posts.reduce((sum, post) => sum + (post.likes ?? 0), 0); return totalViews + totalLikes * 10; }).displayName('Engagement'),
+      t
+        .computed(
+          'total_views',
+          (user) => user.posts?.reduce((sum, post) => sum + (post.views ?? 0), 0) ?? 0
+        )
+        .displayName('Total Views'),
+      t
+        .computed(
+          'total_likes',
+          (user) => user.posts?.reduce((sum, post) => sum + (post.likes ?? 0), 0) ?? 0
+        )
+        .displayName('Total Likes'),
+      t
+        .computed('avg_views', (user) => {
+          const posts = user.posts ?? [];
+          return posts.length > 0
+            ? posts.reduce((sum, post) => sum + (post.views ?? 0), 0) / posts.length
+            : 0;
+        })
+        .displayName('Avg Views'),
+      t
+        .computed('engagement_score', (user) => {
+          const posts = user.posts ?? [];
+          const totalViews = posts.reduce((sum, post) => sum + (post.views ?? 0), 0);
+          const totalLikes = posts.reduce((sum, post) => sum + (post.likes ?? 0), 0);
+          return totalViews + totalLikes * 10;
+        })
+        .displayName('Engagement'),
       t.computed('has_profile', (user) => !!user.profile).displayName('Has Profile'),
       t.computed('has_posts', (user) => (user.posts?.length ?? 0) > 0).displayName('Has Posts'),
-      t.computed('is_active', (user) => { const posts = user.posts ?? []; return posts.filter((post) => (Date.now() - post.createdAt.getTime()) / 86400000 <= 30).length > 0; }).displayName('Active User'),
+      t
+        .computed('is_active', (user) => {
+          const posts = user.posts ?? [];
+          return (
+            posts.filter((post) => (Date.now() - post.createdAt.getTime()) / 86400000 <= 30)
+              .length > 0
+          );
+        })
+        .displayName('Active User'),
     ],
   }));
 }
@@ -137,7 +170,7 @@ let usersTable: ReturnType<typeof buildUsersTable> | undefined;
 let columns: ReturnType<typeof buildUsersTable>['columns'];
 
 // Example usage
-async function setupDatabase(): Promise<any> {
+async function setupDatabase() {
   // Create in-memory SQLite database
   const sqlite = new Database(':memory:');
   const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });
@@ -226,7 +259,15 @@ async function createAdapter() {
 
   usersTable = buildUsersTable(db);
   columns = usersTable.columns;
-  const adapter = drizzleAdapter(db, { options: { defaultPrimaryTable: 'users', defaultMutationTable: 'users', cache: { enabled: true, ttl: 300000, maxSize: 1000 }, logging: { enabled: true, level: 'info', logQueries: false }, performance: { trackTiming: true, maxQueryTime: 5000 } } });
+  const adapter = drizzleAdapter(db, {
+    options: {
+      defaultPrimaryTable: 'users',
+      defaultMutationTable: 'users',
+      cache: { enabled: true, ttl: 300000, maxSize: 1000 },
+      logging: { enabled: true, level: 'info', logQueries: false },
+      performance: { trackTiming: true, maxQueryTime: 5000 },
+    },
+  });
   return { adapter, sqlite, usersTable, columns };
 }
 

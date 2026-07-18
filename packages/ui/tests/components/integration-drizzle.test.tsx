@@ -6,18 +6,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   clearAllTableStores,
   defineTableRow,
-  formatDateWithConfig,
   type FilterState,
+  formatDateWithConfig,
 } from '@better-tables/core';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { BetterTable } from '../../src/components/table/table';
 import { useFacets } from '../../src/hooks/use-facets';
 import { useTableData } from '../../src/hooks/use-table-data';
-import {
-  createIntegrationAdapter,
-  SEEDED_CREATED_AT,
-} from '../helpers/drizzle-sqlite-fixture';
+import { createIntegrationAdapter, SEEDED_CREATED_AT } from '../helpers/drizzle-sqlite-fixture';
 
 type UserRow = {
   id: number;
@@ -42,13 +39,10 @@ const usersTable = defineTableRow<UserRow>()('users', (t) => ({
         { label: 'Active', value: 'active' },
         { label: 'Inactive', value: 'inactive' },
       ]),
-    t
-      .date('createdAt')
-      .displayName('Joined')
-      .format(DATE_FORMAT.format, {
-        locale: DATE_FORMAT.locale,
-        timeZone: DATE_FORMAT.timeZone,
-      }),
+    t.date('createdAt').displayName('Joined').format(DATE_FORMAT.format, {
+      locale: DATE_FORMAT.locale,
+      timeZone: DATE_FORMAT.timeZone,
+    }),
   ],
 }));
 

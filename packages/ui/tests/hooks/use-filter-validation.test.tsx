@@ -43,9 +43,8 @@ function renderValidation(
   values: unknown[],
   immediate = true
 ) {
-  return renderHook(() =>
-    useFilterValidation({ filter, column, values, immediate })
-  ).result.current;
+  return renderHook(() => useFilterValidation({ filter, column, values, immediate })).result
+    .current;
 }
 
 describe('useFilterValidation (plan 042 step 3)', () => {

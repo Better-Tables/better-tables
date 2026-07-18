@@ -3,8 +3,8 @@
  */
 import type { ColumnType, FilterState } from '@better-tables/core';
 import type { SQL, SQLWrapper } from 'drizzle-orm';
-import type { DatabaseDriver } from './drivers';
 import type { AnyTableType, DrizzleDatabase, FilterTablesFromSchema } from './core';
+import type { DatabaseDriver } from './drivers';
 
 /**
  * Context provided to computed field functions

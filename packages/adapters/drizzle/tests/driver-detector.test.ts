@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { describe, expect, it } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { detectDriver } from '../src/utils/driver-detector';
 

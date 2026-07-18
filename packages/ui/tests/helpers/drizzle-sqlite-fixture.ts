@@ -7,8 +7,8 @@ import { Database } from 'bun:sqlite';
 import type { DrizzleAdapterConfig } from '@better-tables/adapters-drizzle';
 import { DrizzleAdapter } from '@better-tables/adapters-drizzle';
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey(),
@@ -25,9 +25,7 @@ type PublicDrizzleDatabase = DrizzleAdapterConfig<typeof schema, 'sqlite'>['db']
 /** Fixed epoch ms — 2024-06-15T12:00:00.000Z — for deterministic date cells. */
 export const SEEDED_CREATED_AT = new Date('2024-06-15T12:00:00.000Z');
 
-export async function createIntegrationAdapter(): Promise<
-  DrizzleAdapter<typeof schema, 'sqlite'>
-> {
+export async function createIntegrationAdapter(): Promise<DrizzleAdapter<typeof schema, 'sqlite'>> {
   const sqlite = new Database(':memory:');
   const db: TestDB = drizzle(sqlite, { schema });
 

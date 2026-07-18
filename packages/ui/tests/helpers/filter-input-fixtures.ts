@@ -8,10 +8,7 @@ export interface FixtureRow {
   tags: string[];
 }
 
-export function makeOptionColumn(
-  optionCount = 3,
-  id = 'status'
-): ColumnDefinition<FixtureRow> {
+export function makeOptionColumn(optionCount = 3, id = 'status'): ColumnDefinition<FixtureRow> {
   const options = Array.from({ length: optionCount }, (_, index) => ({
     value: `opt-${index}`,
     label: `Option ${index}`,

@@ -18,7 +18,11 @@ import { ActiveFilters } from './active-filters';
 import { FilterButton } from './filter-button';
 import { FilterDropdown } from './filter-dropdown';
 
-function useLatest<T>(value: T): React.RefObject<T> { const ref = React.useRef(value); ref.current = value; return ref; }
+function useLatest<T>(value: T): React.RefObject<T> {
+  const ref = React.useRef(value);
+  ref.current = value;
+  return ref;
+}
 
 export interface FilterBarTheme {
   /** Container styling */
@@ -188,42 +192,36 @@ export function FilterBar<TData = unknown>({
   const columnsRef = useLatest(columns);
   const hasReachedMaxFiltersRef = useLatest(hasReachedMaxFilters);
 
-  const handleAddFilter = React.useCallback(
-    (columnId: string) => {
-      const column = columnsRef.current.find((col) => col.id === columnId);
-      if (!column || hasReachedMaxFiltersRef.current) return;
+  const handleAddFilter = React.useCallback((columnId: string) => {
+    const column = columnsRef.current.find((col) => col.id === columnId);
+    if (!column || hasReachedMaxFiltersRef.current) return;
 
-      // Use first custom operator if available, otherwise use default for column type
-      const customOperators = column.filter?.operators;
-      const defaultOperator =
-        (customOperators && customOperators.length > 0
-          ? customOperators[0]
-          : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
+    // Use first custom operator if available, otherwise use default for column type
+    const customOperators = column.filter?.operators;
+    const defaultOperator =
+      (customOperators && customOperators.length > 0
+        ? customOperators[0]
+        : getDefaultOperatorsForType(column.type)[0]) ?? 'is';
 
-      // `column.type`/`defaultOperator` are widened (`ColumnType`/`FilterOperator`)
-      // at this dynamic call site -- there's no single column known at compile
-      // time to narrow `FilterState`'s per-type `operator` field against (plan
-      // 031 Step 1). Runtime behavior is unchanged; `as FilterState` mirrors
-      // the same dynamic-merge cast `handleUpdateFilter` already uses below.
-      const newFilter = {
-        columnId,
-        type: column.type,
-        operator: defaultOperator,
-        values: [],
-      } as FilterState;
+    // `column.type`/`defaultOperator` are widened (`ColumnType`/`FilterOperator`)
+    // at this dynamic call site -- there's no single column known at compile
+    // time to narrow `FilterState`'s per-type `operator` field against (plan
+    // 031 Step 1). Runtime behavior is unchanged; `as FilterState` mirrors
+    // the same dynamic-merge cast `handleUpdateFilter` already uses below.
+    const newFilter = {
+      columnId,
+      type: column.type,
+      operator: defaultOperator,
+      values: [],
+    } as FilterState;
 
-      onFiltersChangeRef.current([...filtersRef.current, newFilter]);
-      setIsDropdownOpen(false);
-    },
-    []
-  );
+    onFiltersChangeRef.current([...filtersRef.current, newFilter]);
+    setIsDropdownOpen(false);
+  }, []);
 
-  const handleRemoveFilter = React.useCallback(
-    (columnId: string) => {
-      onFiltersChangeRef.current(filtersRef.current.filter((f) => f.columnId !== columnId));
-    },
-    []
-  );
+  const handleRemoveFilter = React.useCallback((columnId: string) => {
+    onFiltersChangeRef.current(filtersRef.current.filter((f) => f.columnId !== columnId));
+  }, []);
 
   const handleUpdateFilter = React.useCallback(
     (columnId: string, updates: Partial<FilterState>) => {

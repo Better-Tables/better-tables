@@ -2,10 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import LZString from 'lz-string';
 import type { FilterGroupNode, FilterState } from '../../src/types';
 import {
-  MAX_COMPRESSED_ENCODED_LENGTH,
-  MAX_RENAME_KEYS_DEPTH,
   compressAndEncode,
   decompressAndDecode,
+  MAX_COMPRESSED_ENCODED_LENGTH,
+  MAX_RENAME_KEYS_DEPTH,
 } from '../../src/utils/compression';
 
 function buildDeepCompressedTree(depth: number): string {

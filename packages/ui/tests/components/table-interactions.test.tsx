@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import {
-  clearAllTableStores,
-  getTableStore,
-  type ColumnDefinition,
-} from '@better-tables/core';
+import { type ColumnDefinition, clearAllTableStores, getTableStore } from '@better-tables/core';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { BetterTable } from '../../src/components/table/table';
 

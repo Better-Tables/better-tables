@@ -65,13 +65,10 @@ import type {
   FilterState,
   TableAdapter,
 } from '@better-tables/core';
-import {
-  isFilterGroupNode,
-  normalizeFilterNode,
-} from '@better-tables/core';
+import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
-import { buildAdapterMeta } from './adapter-meta';
 import { AdapterCache } from './adapter-cache';
+import { buildAdapterMeta } from './adapter-meta';
 import { convertToExportFormat, getMimeType } from './export-format';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
@@ -1431,5 +1428,4 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     );
     return context.joinPaths.size;
   }
-
 }

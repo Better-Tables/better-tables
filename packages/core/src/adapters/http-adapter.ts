@@ -136,7 +136,8 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     throw new HttpAdapterError('No fetch implementation available; pass `fetch` in the config.');
   }
 
-  const cacheTtlMs = config.cacheTtlMs === false || config.cacheTtlMs === 0 ? 0 : (config.cacheTtlMs ?? 2000);
+  const cacheTtlMs =
+    config.cacheTtlMs === false || config.cacheTtlMs === 0 ? 0 : (config.cacheTtlMs ?? 2000);
   const inFlight = new Map<string, Promise<unknown>>();
   const resultCache = new Map<string, { result: unknown; expiresAt: number }>();
 
@@ -225,7 +226,11 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     async getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]> {
       const { signal, ...serializable } = params ?? {};
       const hasParams = Object.keys(serializable).length > 0;
-      const body = { method: 'getFilterOptions' as const, columnId, ...(hasParams ? { params: serializable } : {}) };
+      const body = {
+        method: 'getFilterOptions' as const,
+        columnId,
+        ...(hasParams ? { params: serializable } : {}),
+      };
       const result = signal ? await send(body, signal) : await sendCacheable(body);
       return result as FilterOption[];
     },
@@ -236,7 +241,11 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     ): Promise<Map<string, number>> {
       const { signal, ...serializable } = params ?? {};
       const hasParams = Object.keys(serializable).length > 0;
-      const body = { method: 'getFacetedValues' as const, columnId, ...(hasParams ? { params: serializable } : {}) };
+      const body = {
+        method: 'getFacetedValues' as const,
+        columnId,
+        ...(hasParams ? { params: serializable } : {}),
+      };
       const result = signal ? await send(body, signal) : await sendCacheable(body);
       return new Map(result as [string, number][]);
     },
@@ -244,7 +253,11 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     async getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]> {
       const { signal, ...serializable } = params ?? {};
       const hasParams = Object.keys(serializable).length > 0;
-      const body = { method: 'getMinMaxValues' as const, columnId, ...(hasParams ? { params: serializable } : {}) };
+      const body = {
+        method: 'getMinMaxValues' as const,
+        columnId,
+        ...(hasParams ? { params: serializable } : {}),
+      };
       const result = signal ? await send(body, signal) : await sendCacheable(body);
       return result as [number, number];
     },

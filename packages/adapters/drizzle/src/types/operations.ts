@@ -5,9 +5,15 @@ import type { AdapterMeta } from '@better-tables/core';
 import type { InferSelectModel, SQL, SQLWrapper } from 'drizzle-orm';
 import type { BaseQueryBuilder } from '../query-builders';
 import type { RelationshipManager } from '../relationship-manager';
-import type { DatabaseDriver } from './drivers';
-import type { AnyColumnType, AnyTableType, DrizzleDatabase, FilterTablesFromSchema, TableWithId } from './core';
 import type { ComputedFieldConfig } from './computed-fields';
+import type {
+  AnyColumnType,
+  AnyTableType,
+  DrizzleDatabase,
+  FilterTablesFromSchema,
+  TableWithId,
+} from './core';
+import type { DatabaseDriver } from './drivers';
 import type { FilterHandlerHooks } from './filter-hooks';
 import type { RelationshipMap } from './relationships';
 

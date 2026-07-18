@@ -75,8 +75,9 @@ describe('FilterDropdown (plan 042 step 2)', () => {
     expect(screen.getByRole('heading', { name: 'Metrics' })).toBeDefined();
     expect(screen.getByText('Amount')).toBeDefined();
 
-    const detailHeader = screen.getByRole('heading', { name: 'Metrics' }).closest('div')
-      ?.parentElement;
+    const detailHeader = screen
+      .getByRole('heading', { name: 'Metrics' })
+      .closest('div')?.parentElement;
     fireEvent.click(within(detailHeader as HTMLElement).getByRole('button'));
 
     expect(screen.queryByRole('heading', { name: 'Metrics', level: 3 })).toBeNull();
@@ -157,9 +158,7 @@ describe('FilterDropdown (plan 042 step 2)', () => {
       target: { value: 'amount' },
     });
 
-    rerender(
-      <Harness onSelect={onSelect} searchTerm="amount" onSearchChange={onSearchChange} />
-    );
+    rerender(<Harness onSelect={onSelect} searchTerm="amount" onSearchChange={onSearchChange} />);
 
     expect(screen.getByText('Amount')).toBeDefined();
     expect(screen.queryByText('Name')).toBeNull();

@@ -1,7 +1,17 @@
 /**
  * @fileoverview Drizzle adapter type seam.
  */
-import type { AnyColumn, BuildQueryResult, ExtractTablesWithRelations, FindTableByDBName, InferSelectModel, SQL, SQLWrapper, TableRelationalConfig, TablesRelationalConfig } from 'drizzle-orm';
+import type {
+  AnyColumn,
+  BuildQueryResult,
+  ExtractTablesWithRelations,
+  FindTableByDBName,
+  InferSelectModel,
+  SQL,
+  SQLWrapper,
+  TableRelationalConfig,
+  TablesRelationalConfig,
+} from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
 import type { MySql2Database } from 'drizzle-orm/mysql2';

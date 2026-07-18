@@ -8,6 +8,7 @@
       "!!**/node_modules",
       "!!**/.next",
       "!!**/.claude",
+      "!!**/.worktrees",
       "!!**/.source",
       "!!**/build",
       "!!coverage",
