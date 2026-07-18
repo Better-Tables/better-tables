@@ -43,6 +43,11 @@ import {
   isAutoColumnsSentinel,
   type PathColumnFactory,
 } from './builders/path-builders';
+import {
+  buildCellEditPolicy,
+  type CellEditAction,
+  type CellEditPolicy,
+} from './lib/cell-edit-core';
 import type { FacetQueryParams, InferredColumnSpec, TableAdapter } from './types/adapter';
 import type { ColumnDefinition, ColumnType } from './types/column';
 import type {
@@ -172,6 +177,50 @@ export function betterTables<TAdapter extends object>(
     }
     return adapter.deleteRecord(id, { table: table.tableName });
   }) as unknown as BetterTablesInstance<TAdapter>['deleteRecord'];
+
+  // Zero-boilerplate cell saves (plan 055): one generated plain-async
+  // function per table definition, memoized so a `'use server'` module can
+  // call `tables.cellEditAction(def)(input)` per request without rebuilding
+  // the policy. The policy itself builds lazily on the FIRST call (it is
+  // async — dot columns resolve through the adapter capability).
+  const cellEditActions = new WeakMap<object, CellEditAction>();
+  instance.cellEditAction = ((tableDef: TableDefinition<string, unknown>) => {
+    const existing = cellEditActions.get(tableDef);
+    if (existing) return existing;
+
+    let policyPromise: Promise<CellEditPolicy> | null = null;
+    const action: CellEditAction = async (input) => {
+      policyPromise ??= buildCellEditPolicy(tableDef, asTableAdapter(config.database));
+      const policy = await policyPromise;
+
+      const check = policy.check(input);
+      if (!check.ok) {
+        return { ok: false, error: check.error };
+      }
+
+      try {
+        const adapter = asTableAdapter(config.database);
+        if (typeof adapter.updateRecord !== 'function') {
+          return { ok: false, error: 'Adapter does not support updates.' };
+        }
+        // Low-level adapter form with an EXPLICIT table: dot columns write
+        // the RELATED table; own-table targets carry the def's own tableName.
+        const data = await adapter.updateRecord(
+          input.id,
+          { [check.target.field]: check.value },
+          { table: check.target.table }
+        );
+        return { ok: true, data };
+      } catch (error) {
+        // Never leak adapter/DB internals across the action boundary.
+        console.error('[better-tables] cellEditAction failed:', error);
+        return { ok: false, error: 'Save failed.' };
+      }
+    };
+
+    cellEditActions.set(tableDef, action);
+    return action;
+  }) as BetterTablesInstance<TAdapter>['cellEditAction'];
 
   return instance;
 }

@@ -17,6 +17,7 @@
 
 import type { ColumnBuilder } from '../builders/column-builder';
 import type { PathColumnFactory } from '../builders/path-builders';
+import type { CellEditAction } from '../lib/cell-edit-core';
 import type { FacetQueryParams, FetchDataParams, FetchDataResult } from './adapter';
 import type { ColumnDefinition } from './column';
 import type { FilterOption } from './filter';
@@ -165,6 +166,36 @@ export interface BetterTablesInstance<TAdapter extends object = SchemaAwareAdapt
     table: TableDefinition<TName, TRow>,
     id: string
   ): Promise<void>;
+
+  /**
+   * Generate the zero-boilerplate cell-save function for a table
+   * (plan 055): a PLAIN async function over serializable input/output —
+   * exactly what a framework's server boundary wants to wrap
+   * (`'use server'` one-liner in Next, `createServerFn` in TanStack Start).
+   *
+   * The action derives its entire allow-list from the table definition (the
+   * columns with `.editable()`, including relationship-path columns via the
+   * adapter's `resolveCellWriteTarget`), coerces the wire value by column
+   * type, runs the column's ValidationRules, and persists through the
+   * adapter's `updateRecord` with an explicit table target — so a client
+   * can never redirect a write to a table/field no editable column exposes.
+   * Row-level authorization remains the APP's concern (wrap the action).
+   *
+   * Memoized per table definition; the policy builds lazily on first call.
+   *
+   * @example
+   * ```ts
+   * // app/lib/actions.ts
+   * 'use server';
+   * export async function saveTicketCell(input: CellEditActionInput) {
+   *   return tables.cellEditAction(ticketsTable)(input);
+   * }
+   * // client: <BetterTable table={ticketsTable} saveAction={saveTicketCell} />
+   * ```
+   */
+  cellEditAction<TName extends string, TRow>(
+    table: TableDefinition<TName, TRow>
+  ): CellEditAction;
 }
 
 /**
