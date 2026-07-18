@@ -1,3 +1,4 @@
+export * from './cell-edit-core';
 export * from './date-presets';
 export * from './date-utils';
 export * from './filter-value-utils';

@@ -1,12 +1,17 @@
 'use client';
 
-import type {
-  ColumnDefinition,
-  EditableConfig,
-  TableAdapter,
-  ValidationRule,
+import type { ColumnDefinition, TableAdapter } from '@better-tables/core';
+import {
+  normalizeEditableConfig,
+  resolveEditableField,
+  runValidationRules,
 } from '@better-tables/core';
 import { useCallback, useRef, useState } from 'react';
+
+// ONE implementation (plan 055 Step 1): the editable helpers moved to core's
+// cell-edit-core module (shared with `cellEditAction` and the HTTP write
+// proxy); re-exported here so this module's public surface is unchanged.
+export { normalizeEditableConfig, resolveEditableField, runValidationRules };
 
 /** Column types that ship a built-in in-cell editor in v1 (plan 053). */
 export const V1_EDITABLE_TYPES = new Set([
@@ -64,28 +69,6 @@ export type CellEditState = {
 
 function cellKey(rowId: string, columnId: string): string {
   return `${rowId}:${columnId}`;
-}
-
-/** Normalize `column.editable` to a config object, or null when disabled. */
-export function normalizeEditableConfig<TData, TValue>(
-  editable: ColumnDefinition<TData, TValue>['editable']
-): EditableConfig<TData, TValue> | null {
-  if (editable == null || editable === false) return null;
-  if (editable === true) return {};
-  return editable;
-}
-
-/**
- * Resolve the storage field for the adapter save path.
- * Returns null when the column id is a relationship path and no `field` override is set.
- */
-export function resolveEditableField(
-  columnId: string,
-  config: { field?: string } | null
-): string | null {
-  if (config?.field) return config.field;
-  if (!columnId.includes('.')) return columnId;
-  return null;
 }
 
 export type EditabilityResult =
@@ -175,23 +158,6 @@ export function isRowEditable<TData, TValue>(
   if (!config) return false;
   if (config.when) return config.when(row);
   return true;
-}
-
-export function runValidationRules<TValue>(
-  rules: ValidationRule<TValue>[] | undefined,
-  value: TValue
-): string | null {
-  if (!rules?.length) return null;
-  for (const rule of rules) {
-    const result = rule.validate(value);
-    if (result === false) {
-      return rule.message ?? `Validation failed (${rule.id})`;
-    }
-    if (typeof result === 'string') {
-      return result;
-    }
-  }
-  return null;
 }
 
 const EMPTY_OVERLAY: Readonly<Record<string, unknown>> = Object.freeze({});
