@@ -33,16 +33,17 @@ wave are in "Deferred by decision" at the bottom.
 
 ---
 
-## Current status (2026-07-17, Wave B on `wave-b-quality-hardening`)
+## Current status (2026-07-18, Wave B merged to `main`)
 
 - **All 32 plans from the first audit are DONE and merged** except 008
   (Prisma spike — ON HOLD by maintainer decision). See the done archive.
 - **Wave A (033–036, 040, 046, 047) is DONE and merged to `main`** via
   [PR #83](https://github.com/Better-Tables/better-tables/pull/83)
   (`b9f9bef`, 2026-07-18). Pre-0.6-publish gates landed.
-- **Wave B (037–039, 041–045, 051, 052) is DONE on branch
-  `wave-b-quality-hardening`** (rebased on `main` @ `ef7c156`); awaiting PR
-  merge after Cubic + CI. Wave C remains TODO.
+- **Wave B (037–039, 041–045, 051, 052) is DONE and merged to `main`** via
+  [PR #85](https://github.com/Better-Tables/better-tables/pull/85)
+  (`46c9f73`, 2026-07-18). Cubic AI review completed (pass, no findings)
+  and required CI was green before merge. Wave C remains TODO.
 - **Second deep audit produced plans 033–052** (written 2026-07-17);
   maintainer decisions folded into the relevant plans — see below.
 - **0.6 remains SHIPPABLE**; Wave A landed the pre-publish obligations
