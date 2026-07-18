@@ -80,7 +80,7 @@ the breaking window.
 | [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | TODO |
 | [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | TODO |
 | [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | TODO |
-| [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | TODO |
+| [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | DONE (wave-b branch) |
 
 ### Wave C — direction / fast-follow (post-0.6-publish)
 
@@ -124,8 +124,8 @@ Audit/scope calls:
 - Operator equality spelling = **`is`/`isNot`** (plan 038).
 - Facet queries default to **top-100 by count**, `limit: null` opts out
   (plan 040).
-- Local quality gates = **no git hooks**; clear Biome residue and flip CI lint
-  **blocking** instead (plan 052).
+- Local quality gates = **no git hooks**; Biome residue cleared and CI lint
+  **blocking** (plan 052 — DONE on wave-b branch).
 - Bun pin **aligned to current ≥1.3.11** (plan 052).
 - `wiki.md` → **lean hand-written 0.6 handbook**, old wiki archived out of the
   agent path (plan 039).
@@ -158,15 +158,14 @@ Audit/scope calls:
   fixed by `bunfig.toml` pinning `linker = "hoisted"` + clean reinstall.
   (Plan 052 aligns the CI/`packageManager` pin up to ≥1.3.11.)
 - CI: first real run happens when the git remote is restored. Lint step is
-  `continue-on-error` until Biome residue hits 0 — plan 052 clears the residue
-  and flips it blocking.
+  **blocking** (plan 052 cleared Biome residue to 0 errors).
 - mysql-operations intentionally un-deduped (no RETURNING support —
   documented dialect difference, not drift).
 - `apps/docs/.next` survives on disk as untracked, gitignored cruft from the
-  5319fb1 removal — safe to `rm -rf` (plan 052 handles the `next typegen`
-  poisoning of marketing typecheck).
-- Biome residue at `787a816`: `bunx biome check .` → 44 errors / 78 warnings
-  (core/cli/adapters; ui + marketing clean) — plan 052's target is 0 errors.
+  5319fb1 removal — safe to `rm -rf`. Marketing typecheck prepends
+  `next typegen` (plan 052) so stale `.next/types` cannot poison `tsc`.
+- Biome: `bunx biome check .` → **0 errors** (plan 052); 82 warnings remain
+  (mostly `noConsole` in CLI/examples/tests).
 
 ---
 
