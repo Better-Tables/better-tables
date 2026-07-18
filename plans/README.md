@@ -77,7 +77,7 @@ the breaking window.
 | [041](041-client-render-performance.md) | Client perf: facet request dedup/cache, debounced URL serialization, stable filter-bar handlers (UI-09) | 035 (shares `http-adapter.ts`) | DONE (wave-b branch) |
 | [042](042-ui-test-coverage.md) | UI coverage: filter components + inputs + hooks, `table.tsx` interactions, deterministic timers | 033 | TODO |
 | [043](043-integration-e2e-harness.md) | Cross-package integration test (real drizzle + real UI) + optional Playwright E2E over `/examples` | 033, 042 | TODO |
-| [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | TODO |
+| [044](044-drizzle-module-decomposition.md) | Decompose the drizzle god modules: extract cache/export/meta; split `types.ts` behind a barrel | 038, 040 | DONE (wave-b-quality-hardening) |
 | [045](045-column-builder-dedup.md) | De-duplicate the six column builders (shared operator setter; normalized accessor constraint) | 038 | TODO |
 | [051](051-robustness-sweep.md) | Robustness sweep: marketing singleton race, URL-decompression bound, resolver suggestion, detectDriver (investigate), computed-TREE (investigate), pg/mysql skip-guards | none | TODO |
 | [052](052-ci-toolchain-hygiene.md) | CI + toolchain: cache CI, clear Biome residue → **blocking lint**, postcss/turbo bumps, align bun pin ≥1.3.11, unused deps, `next typegen` | 033 | TODO |
