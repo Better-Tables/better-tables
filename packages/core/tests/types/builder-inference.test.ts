@@ -137,6 +137,48 @@ describe('Literal-preserving column ids (plan 014)', () => {
   });
 });
 
+describe('Plan 045: column builder dedup', () => {
+  describe('Step 2: fluent return types preserved via super delegation', () => {
+    it('text().id("x").accessor(...) infers literal id and accessor value type', () => {
+      const cb = createColumnBuilder<User>();
+      const builder = cb.text().id('name').displayName('Name').accessor((u) => u.name);
+      expectTypeOf(builder).toEqualTypeOf<
+        import('../../src/builders/text-column-builder').TextColumnBuilder<User, string, 'name'>
+      >();
+    });
+    it('number().id("age").accessor(...) preserves numeric narrowing', () => {
+      const cb = createColumnBuilder<User>();
+      const builder = cb.number().id('age').displayName('Age').accessor((u) => u.age);
+      expectTypeOf(builder).toEqualTypeOf<
+        import('../../src/builders/number-column-builder').NumberColumnBuilder<User, number, 'age'>
+      >();
+    });
+  });
+  describe('Step 3: accessor constraint policy', () => {
+    it('option builder rejects accessor return type outside narrowed option union', () => {
+      const cb = createColumnBuilder<User>();
+      cb.option().id('role').displayName('Role').options([
+        { value: 'admin', label: 'Admin' },
+        { value: 'editor', label: 'Editor' },
+      ])
+        // @ts-expect-error - plain string is wider than 'admin' | 'editor'
+        .accessor((u: User) => u.name);
+      expect(true).toBe(true);
+    });
+    it('multi-option builder rejects accessor element type outside option union', () => {
+      type Article = { tags: string[] };
+      const cb = createColumnBuilder<Article>();
+      cb.multiOption().id('tags').displayName('Tags').options([
+        { value: 'javascript', label: 'JavaScript' },
+        { value: 'react', label: 'React' },
+      ])
+        // @ts-expect-error - string[] is wider than ('javascript' | 'react')[]
+        .accessor((a: Article) => a.tags);
+      expect(true).toBe(true);
+    });
+  });
+});
+
 describe('build() runtime: accessor output feeds cellRenderer untouched', () => {
   it('passes the accessor-derived value straight through to cellRenderer', () => {
     const cb = createColumnBuilder<User>();
