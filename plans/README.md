@@ -97,8 +97,8 @@ the breaking window.
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
 | [053](053-editable-cells.md) | **`.editable()` inline cell editing** — builder API, per-type in-cell editors (text/number/option/boolean/date), adapter+callback save, optimistic rollback, gating matrix, integration proof, dogfood example | 047, 042 (done) | DONE on `editable-cells` |
-| [054](054-schema-driven-auto-columns.md) | **Auto columns from the schema** — `describeColumns` adapter capability (wire-proxied), `t.auto()` + no-factory `define` with explicit-wins merge, enum→option inference with humanized labels, facet-fallback dropdown options | 053 merged | TODO — magic-DX pillar 1 |
-| [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop in the save resolution, opt-in double-sided HTTP write proxy for split deployments, dogfood rewired to the direct path (custom route deleted) | 053 merged (hard), 054 (soft — proxy allow-list) | TODO — magic-DX pillar 2 |
+| [054](054-schema-driven-auto-columns.md) | **Auto columns from the schema** — `describeColumns` adapter capability (wire-proxied), `t.auto()` + no-factory `define` with explicit-wins merge, enum→option inference with humanized labels, facet-fallback dropdown options | 053 merged | DONE — executor-run in worktree, advisor-reviewed (criteria re-run, APPROVED), merged into `editable-cells` at `ec60f80` |
+| [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop, opt-in double-sided cell-oriented HTTP write proxy, **joined-table editing** (`resolveCellWriteTarget`; related-row writes proven in browser + integration test), dogfood on the direct path (custom route deleted) | 053, 054 | DONE — executor-run, advisor-reviewed (APPROVED), merged into `editable-cells` at `ec60f80` |
 | [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
 | [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
 | [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049 | TODO (reconciled 2026-07-18 — export seams moved by 044; line refs refreshed) |
@@ -243,6 +243,12 @@ Magic-DX decisions (collected 2026-07-18 after 053 shipped; folded into plans 05
 - bun ≥1.3.11's isolated linker races turbo-spawned tasks (bogus TS2307s) —
   fixed by `bunfig.toml` pinning `linker = "hoisted"` + clean reinstall.
   (Plan 052 aligns the CI/`packageManager` pin up to ≥1.3.11.)
+  **Watch (2026-07-18)**: a residual variant persists under `turbo run
+  typecheck --force` in a warm tree — a ROTATING package fails with TS2307
+  "Cannot find module '@better-tables/core'" (tsc reading core's dist while
+  tsdown rewrites it) while direct per-package `tsc --noEmit` and settled
+  non-forced runs pass 10/10. Retry the run before believing a TS2307; CI
+  (fresh install, cached but unforced) has not exhibited it.
 - CI: first real run happens when the git remote is restored. Lint step is
   **blocking** (plan 052 cleared Biome residue to 0 errors).
 - mysql-operations intentionally un-deduped (no RETURNING support —
