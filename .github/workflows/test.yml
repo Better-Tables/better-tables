@@ -267,17 +267,16 @@ jobs:
           echo "Workspace packages:"
           bun pm ls 2>/dev/null | head -20 || echo "Package list command not available"
 
-      - name: Build Core Package (dependency)
+      - name: Build Core + Toolkit (dependencies)
         run: |
-          echo "Building @better-tables/core package as dependency..."
+          echo "Building adapter test dependencies..."
           cd ../../..
-          echo "Building core package..."
-          cd packages/core
-          bun run build
+          bun run build --filter=@better-tables/core --filter=@better-tables/adapters-toolkit
           echo ""
-          echo "Verifying core package was built..."
-          ls -la dist/ || echo "Warning: dist directory not found"
-          echo "✓ Core package built successfully"
+          echo "Verifying builds..."
+          ls -la packages/core/dist/ || echo "Warning: core dist not found"
+          ls -la packages/adapters/toolkit/dist/ || echo "Warning: toolkit dist not found"
+          echo "✓ Core and toolkit built successfully"
 
       - name: Run Adapter Tests
         env:
