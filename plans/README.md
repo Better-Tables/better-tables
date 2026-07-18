@@ -33,12 +33,13 @@ wave are in "Deferred by decision" at the bottom.
 
 ---
 
-## Current status (2026-07-17, Wave A on `wave-a-pre-0.6`)
+## Current status (2026-07-17, Wave A merged to `main`)
 
 - **All 32 plans from the first audit are DONE and merged** except 008
   (Prisma spike — ON HOLD by maintainer decision). See the done archive.
-- **Wave A (033–036, 040, 046, 047) is DONE** on branch `wave-a-pre-0.6`
-  (pre-0.6-publish gates). Wave B/C remain TODO.
+- **Wave A (033–036, 040, 046, 047) is DONE and merged to `main`** via
+  [PR #83](https://github.com/Better-Tables/better-tables/pull/83)
+  (`b9f9bef`, 2026-07-18). Pre-0.6-publish gates landed. Wave B/C remain TODO.
 - **Second deep audit produced plans 033–052** (written 2026-07-17);
   maintainer decisions folded into the relevant plans — see below.
 - **0.6 remains SHIPPABLE**; Wave A landed the pre-publish obligations
@@ -58,13 +59,13 @@ the breaking window.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [033](033-verification-infra-truth.md) | Verification-infra truth: turbo `tests/**` glob (stale-cache fix), marketing test wiring, `lint:fix` repair ×5, unskip+reconcile drizzle error-handling (SQLite), `.env.example`, `@types/bun` pin, happy-dom ≥20 | none | DONE (wave-a) |
-| [034](034-usetabledata-loop-and-date-render.md) | Fix `useTableData` unbounded refetch loop + formatter coercion for ISO-string/epoch dates | none | DONE (wave-a) |
-| [035](035-http-adapter-hardening.md) | HTTP adapter: `authorize`/`constrainRequest`/`onError` seam, 500-vs-400, generic errors, `faceted` wire fix, `FacetQueryParams.signal`, demo route pinned, docs + tests | none; **wire format free only pre-publish** | DONE (wave-a) |
-| [036](036-date-between-timestamp-fallback.md) | Date `between`/`notBetween` timestamp fallback + pg/mysql `between` coverage + router unit tests | none | DONE (wave-a) |
-| [040](040-adapter-performance.md) | Adapter perf: transformer memoization, bounded LRU cache, **facet LIMIT default top-100** (behavior change — 0.6 window) | none | DONE (wave-a) |
-| [046](046-path-types-finalization.md) | Finalize path-typed columns: promote from `experimental/` → core, runtime `humanize()` auto-labels, document depth-3 override, retire stale prototypes | none | DONE (wave-a) |
-| [047](047-typed-write-surface.md) | Typed explicit-table writes (`createRecord/updateRecord/deleteRecord`) on the instance — **into the 0.6 train** | 018, 002 (done) | DONE (wave-a) |
+| [033](033-verification-infra-truth.md) | Verification-infra truth: turbo `tests/**` glob (stale-cache fix), marketing test wiring, `lint:fix` repair ×5, unskip+reconcile drizzle error-handling (SQLite), `.env.example`, `@types/bun` pin, happy-dom ≥20 | none | DONE (merged to main, PR #83) |
+| [034](034-usetabledata-loop-and-date-render.md) | Fix `useTableData` unbounded refetch loop + formatter coercion for ISO-string/epoch dates | none | DONE (merged to main, PR #83) |
+| [035](035-http-adapter-hardening.md) | HTTP adapter: `authorize`/`constrainRequest`/`onError` seam, 500-vs-400, generic errors, `faceted` wire fix, `FacetQueryParams.signal`, demo route pinned, docs + tests | none; **wire format free only pre-publish** | DONE (merged to main, PR #83) |
+| [036](036-date-between-timestamp-fallback.md) | Date `between`/`notBetween` timestamp fallback + pg/mysql `between` coverage + router unit tests | none | DONE (merged to main, PR #83) |
+| [040](040-adapter-performance.md) | Adapter perf: transformer memoization, bounded LRU cache, **facet LIMIT default top-100** (behavior change — 0.6 window) | none | DONE (merged to main, PR #83) |
+| [046](046-path-types-finalization.md) | Finalize path-typed columns: promote from `experimental/` → core, runtime `humanize()` auto-labels, document depth-3 override, retire stale prototypes | none | DONE (merged to main, PR #83) |
+| [047](047-typed-write-surface.md) | Typed explicit-table writes (`createRecord/updateRecord/deleteRecord`) on the instance — **into the 0.6 train** | 018, 002 (done) | DONE (merged to main, PR #83) |
 
 ### Wave B — quality, hardening, hygiene (any time; several rebase over Wave A)
 
