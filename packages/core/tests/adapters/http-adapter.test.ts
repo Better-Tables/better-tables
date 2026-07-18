@@ -223,6 +223,7 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     const { adapter: server } = makeServerAdapter();
     const client = httpAdapter({
       url: '/api/tables',
+      cacheTtlMs: 0,
       headers: async () => {
         n += 1;
         return { 'x-call': String(n) };
@@ -512,5 +513,35 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     const value = (sent.filters as Array<{ values: unknown[] }>)[0]?.values[0];
     expect(typeof value).toBe('string');
     expect(value).toBe(when.toISOString());
+  });
+}
+  it('dedups in-flight and caches getFacetedValues within cacheTtlMs', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({ url: '/api/tables', cacheTtlMs: 50, fetch: async (url, init) => { fetchCount += 1; return loopbackFetch(server)(url, init); } });
+    const params = { filters: [{ columnId: 'priority', type: 'option' as const, operator: 'is' as const, values: ['high'] }] };
+    await Promise.all([client.getFacetedValues('status', params), client.getFacetedValues('status', params)]);
+    expect(fetchCount).toBe(1);
+    await client.getFacetedValues('status', params);
+    expect(fetchCount).toBe(1);
+    await new Promise((r) => setTimeout(r, 60));
+    await client.getFacetedValues('status', params);
+    expect(fetchCount).toBe(2);
+  });
+  it('does not cache fetchData even when cacheTtlMs is set', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({ url: '/api/tables', cacheTtlMs: 5000, fetch: async (url, init) => { fetchCount += 1; return loopbackFetch(server)(url, init); } });
+    await client.fetchData({ pagination: { page: 1, limit: 10 } });
+    await client.fetchData({ pagination: { page: 1, limit: 10 } });
+    expect(fetchCount).toBe(2);
+  });
+  it('does not cache failed facet requests', async () => {
+    let fetchCount = 0;
+    const failing: TableAdapter = { meta: TEST_META, async fetchData() { return { data: [], total: 0, pagination: { page: 1, limit: 10, totalPages: 0, hasNext: false, hasPrev: false } }; }, async getFilterOptions() { return []; }, async getFacetedValues() { throw new Error('boom'); }, async getMinMaxValues() { return [0, 0]; } };
+    const client = httpAdapter({ url: '/api/tables', cacheTtlMs: 5000, fetch: async (url, init) => { fetchCount += 1; return loopbackFetch(failing)(url, init); } });
+    await expect(client.getFacetedValues('status')).rejects.toBeInstanceOf(HttpAdapterError);
+    await expect(client.getFacetedValues('status')).rejects.toBeInstanceOf(HttpAdapterError);
+    expect(fetchCount).toBe(2);
   });
 });
