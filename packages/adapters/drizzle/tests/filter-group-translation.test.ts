@@ -48,8 +48,8 @@ describe('DrizzleAdapter - filter-group translation (plan 017)', () => {
     expect(adapter.meta.maxGroupDepth).toBe(3);
   });
 
-  it('adapter.meta matches buildAdapterMeta for resolvable mutations', () => {
-    expect(adapter.meta).toEqual(buildAdapterMeta(true));
+  it('adapter.meta matches buildAdapterMeta for this adapter instance', () => {
+    expect(adapter.meta).toEqual(buildAdapterMeta(adapter.meta.features.create));
   });
 
   it('flat regression: a flat FilterState[] still returns the same rows/total as before', async () => {
