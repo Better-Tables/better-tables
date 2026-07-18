@@ -9,6 +9,12 @@ import type {
 } from '@better-tables/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+// Stable defaults so omitted `filters`/`params` don't recreate `fetchData`'s
+// identity (and retrigger the fetch effect) on every render the way inline
+// `= []` / `= {}` default-parameter literals would.
+const EMPTY_FILTERS: FilterState[] = [];
+const EMPTY_PARAMS: Record<string, unknown> = {};
+
 export interface UseTableDataOptions<TData = unknown> {
   /** Table adapter for data fetching */
   adapter: TableAdapter<TData>;
@@ -83,9 +89,9 @@ export interface UseTableDataResult<TData = unknown> {
  */
 export function useTableData<TData = unknown>({
   adapter,
-  filters = [],
+  filters = EMPTY_FILTERS,
   pagination,
-  params = {},
+  params = EMPTY_PARAMS,
   enabled = true,
 }: UseTableDataOptions<TData>): UseTableDataResult<TData> {
   const [data, setData] = useState<TData[]>([]);

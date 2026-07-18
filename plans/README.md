@@ -67,7 +67,7 @@ the breaking window.
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
 | [033](033-verification-infra-truth.md) | Verification-infra truth: turbo `tests/**` glob (stale-cache fix), marketing test wiring, `lint:fix` repair ×5, unskip+reconcile drizzle error-handling (SQLite), `.env.example`, `@types/bun` pin, happy-dom ≥20 | none | DONE (wave-a) |
-| [034](034-usetabledata-loop-and-date-render.md) | Fix `useTableData` unbounded refetch loop + formatter coercion for ISO-string/epoch dates | none | TODO |
+| [034](034-usetabledata-loop-and-date-render.md) | Fix `useTableData` unbounded refetch loop + formatter coercion for ISO-string/epoch dates | none | DONE (wave-a) |
 | [035](035-http-adapter-hardening.md) | HTTP adapter: `authorize`/`constrainRequest`/`onError` seam, 500-vs-400, generic errors, `faceted` wire fix, `FacetQueryParams.signal`, demo route pinned, docs + tests | none; **wire format free only pre-publish** | TODO |
 | [036](036-date-between-timestamp-fallback.md) | Date `between`/`notBetween` timestamp fallback + pg/mysql `between` coverage + router unit tests | none | TODO |
 | [040](040-adapter-performance.md) | Adapter perf: transformer memoization, bounded LRU cache, **facet LIMIT default top-100** (behavior change — 0.6 window) | none | TODO |

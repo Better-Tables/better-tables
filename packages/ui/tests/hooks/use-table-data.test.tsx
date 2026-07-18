@@ -104,6 +104,32 @@ describe('useTableData', () => {
     expect(secondCall.params.signal?.aborted).toBe(false);
   });
 
+  it('does not refetch in a loop when filters/params are omitted', async () => {
+    let fetchCount = 0;
+    const { adapter } = createDeferredFetchAdapter();
+    const countingAdapter = {
+      ...adapter,
+      fetchData: async (params: FetchDataParams) => {
+        fetchCount += 1;
+        return makeFetchResult([{ id: `row-${fetchCount}` }]);
+      },
+    };
+
+    const { rerender } = renderHook(() => useTableData({ adapter: countingAdapter }));
+
+    await act(async () => {});
+    await waitFor(() => expect(fetchCount).toBe(1));
+
+    rerender();
+    await act(async () => {});
+    rerender();
+    await act(async () => {});
+    rerender();
+    await act(async () => {});
+
+    expect(fetchCount).toBe(1);
+  });
+
   it('does not apply results after unmount', async () => {
     const { adapter, calls } = createDeferredFetchAdapter();
     const onUpdate = { count: 0 };
