@@ -2,14 +2,14 @@
  * Cross-package integration: real Drizzle (bun:sqlite) + BetterTable / useTableData
  * (plan 043). Product `src/**` is not modified — tests + fixture helpers only.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import {
   clearAllTableStores,
   defineTableRow,
   type FilterState,
   formatDateWithConfig,
 } from '@better-tables/core';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { BetterTable } from '../../src/components/table/table';
 import { useFacets } from '../../src/hooks/use-facets';
@@ -31,14 +31,15 @@ const DATE_FORMAT = {
 
 const usersTable = defineTableRow<UserRow>()('users', (t) => ({
   columns: [
-    t.text('name').displayName('Name'),
+    t.text('name').displayName('Name').editable(),
     t
       .option('status')
       .displayName('Status')
       .options([
         { label: 'Active', value: 'active' },
         { label: 'Inactive', value: 'inactive' },
-      ]),
+      ])
+      .editable(),
     t.date('createdAt').displayName('Joined').format(DATE_FORMAT.format, {
       locale: DATE_FORMAT.locale,
       timeZone: DATE_FORMAT.timeZone,
@@ -87,6 +88,7 @@ function IntegrationHarness({
         id={TABLE_ID}
         table={usersTable}
         data={data}
+        adapter={adapter as never}
         totalCount={totalCount}
         loading={loading}
         virtualized={false}
@@ -193,5 +195,68 @@ describe('Drizzle + BetterTable integration (plan 043)', () => {
       expect(byValue.active).toBe(2);
       expect(byValue.inactive).toBe(1);
     });
+  });
+
+  it('commits an editable cell into sqlite and displays the new value (plan 053)', async () => {
+    render(<IntegrationHarness adapter={adapter} filters={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading').textContent).toBe('ready');
+    });
+
+    const nameCell = screen.getAllByRole('button', { name: /edit name/i })[0];
+    if (!nameCell) throw new Error('expected editable name cell');
+    fireEvent.doubleClick(nameCell);
+    const input = screen.getByRole('textbox', { name: /edit cell/i });
+    fireEvent.change(input, { target: { value: 'Alicia Updated' } });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Alicia Updated')).toBeTruthy();
+    });
+
+    // Prove the write landed in sqlite via a fresh adapter read (same path as
+    // the harness's useTableData — defaultPrimaryTable: 'users').
+    const refetch = await adapter.fetchData({
+      pagination: { page: 1, limit: 10 },
+    } as never);
+    const alice = refetch.data.find((r) => r.id === 1);
+    expect(alice?.name).toBe('Alicia Updated');
+  });
+
+  it('rolls back the display when updateRecord fails (plan 053)', async () => {
+    const originalUpdate = adapter.updateRecord?.bind(adapter);
+    adapter.updateRecord = mock(async () => {
+      throw new Error('constraint failed');
+    });
+
+    try {
+      render(<IntegrationHarness adapter={adapter} filters={[]} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading').textContent).toBe('ready');
+      });
+
+      expect(screen.getByText('Alice')).toBeTruthy();
+      const nameCell = screen.getAllByRole('button', { name: /edit name/i })[0];
+      if (!nameCell) throw new Error('expected editable name cell');
+      fireEvent.doubleClick(nameCell);
+      const input = screen.getByRole('textbox', { name: /edit cell/i });
+      fireEvent.change(input, { target: { value: 'Should Rollback' } });
+      await act(async () => {
+        fireEvent.keyDown(input, { key: 'Enter' });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice')).toBeTruthy();
+        expect(screen.queryByText('Should Rollback')).toBeNull();
+      });
+    } finally {
+      if (originalUpdate) {
+        adapter.updateRecord = originalUpdate;
+      }
+    }
   });
 });
