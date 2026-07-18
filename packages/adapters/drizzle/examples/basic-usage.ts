@@ -1,12 +1,13 @@
 // TODO: Now we are type safe this can be updated to use the types from the schema
 // TODO: remove the any types
 
-import { createColumnBuilder } from '@better-tables/core';
+import { betterTables, defineTable } from '@better-tables/core';
+import { drizzleAdapter } from '../src/factory';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { DrizzleAdapter } from '../src/drizzle-adapter';
+
 
 // Schema definition
 const users = sqliteTable('users', {
@@ -108,148 +109,41 @@ type UserWithRelations = User & {
   comments?: Comment[];
 };
 
-// Create a typed column builder
-const cb = createColumnBuilder<UserWithRelations>();
-
-// Column definitions with dot notation
-const columns = [
-  // Direct user columns
-  cb
-    .text()
-    .id('name')
-    .displayName('Name')
-    .accessor((user) => user.name)
-    .build(),
-  cb
-    .text()
-    .id('email')
-    .displayName('Email')
-    .accessor((user) => user.email)
-    .build(),
-  cb
-    .number()
-    .id('age')
-    .displayName('Age')
-    .nullableAccessor((user) => user.age, 0)
-    .build(),
-  cb
-    .date()
-    .id('createdAt')
-    .displayName('Joined')
-    .accessor((user) => user.createdAt)
-    .build(),
-
-  // One-to-one relationship (profile)
-  cb
-    .text()
-    .id('profile.bio')
-    .displayName('Bio')
-    .nullableAccessor((user) => user.profile?.bio)
-    .build(),
-  cb
-    .text()
-    .id('profile.avatar')
-    .displayName('Avatar')
-    .nullableAccessor((user) => user.profile?.avatar)
-    .build(),
-  cb
-    .text()
-    .id('profile.website')
-    .displayName('Website')
-    .nullableAccessor((user) => user.profile?.website)
-    .build(),
-
-  // One-to-many relationship (posts) - first post
-  cb
-    .text()
-    .id('posts.title')
-    .displayName('Latest Post')
-    .nullableAccessor((user) => user.posts?.[0]?.title)
-    .build(),
-  cb
-    .number()
-    .id('posts.views')
-    .displayName('Latest Post Views')
-    .nullableAccessor((user) => user.posts?.[0]?.views, 0)
-    .build(),
-
-  // Aggregate columns
-  cb
-    .number()
-    .id('posts_count')
-    .displayName('Posts')
-    .accessor((user) => user.posts?.length || 0)
-    .build(),
-  cb
-    .number()
-    .id('total_views')
-    .displayName('Total Views')
-    .accessor((user) => user.posts?.reduce((sum, post) => sum + (post.views || 0), 0) || 0)
-    .build(),
-  cb
-    .number()
-    .id('total_likes')
-    .displayName('Total Likes')
-    .accessor((user) => user.posts?.reduce((sum, post) => sum + (post.likes || 0), 0) || 0)
-    .build(),
-  cb
-    .number()
-    .id('avg_views')
-    .displayName('Avg Views')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      return posts.length > 0
-        ? posts.reduce((sum, post) => sum + (post.views || 0), 0) / posts.length
-        : 0;
-    })
-    .build(),
-
-  // Engagement score (custom calculation)
-  cb
-    .number()
-    .id('engagement_score')
-    .displayName('Engagement')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0);
-      const totalLikes = posts.reduce((sum, post) => sum + (post.likes || 0), 0);
-      return totalViews + totalLikes * 10; // Likes worth 10x views
-    })
-    .build(),
-
-  // Status indicators
-  cb
-    .boolean()
-    .id('has_profile')
-    .displayName('Has Profile')
-    .accessor((user) => !!user.profile)
-    .build(),
-  cb
-    .boolean()
-    .id('has_posts')
-    .displayName('Has Posts')
-    .accessor((user) => (user.posts?.length || 0) > 0)
-    .build(),
-  cb
-    .boolean()
-    .id('is_active')
-    .displayName('Active User')
-    .accessor((user) => {
-      const posts = user.posts || [];
-      const recentPosts = posts.filter((post) => {
-        const daysSinceCreated = (Date.now() - post.createdAt.getTime()) / (1000 * 60 * 60 * 24);
-        return daysSinceCreated <= 30;
-      });
-      return recentPosts.length > 0;
-    })
-    .build(),
-];
+// Flagship table definition
+function buildUsersTable(db: ReturnType<typeof drizzle>) {
+  const tables = betterTables({
+    database: drizzleAdapter(db, { options: { defaultPrimaryTable: 'users' } }),
+  });
+  return defineTable<typeof tables>()('users', (t) => ({
+    columns: [
+      t.text('name').displayName('Name'),
+      t.text('email').displayName('Email'),
+      t.number('age').displayName('Age'),
+      t.date('createdAt').displayName('Joined'),
+      t.text('profile.bio').displayName('Bio'),
+      t.text('profile.avatar').displayName('Avatar'),
+      t.text('profile.website').displayName('Website'),
+      t.text('posts.title').displayName('Latest Post'),
+      t.computed('posts.views', (user) => user.posts?.[0]?.views ?? 0).displayName('Latest Post Views'),
+      t.computed('posts_count', (user) => user.posts?.length ?? 0).displayName('Posts'),
+      t.computed('total_views', (user) => user.posts?.reduce((sum, post) => sum + (post.views ?? 0), 0) ?? 0).displayName('Total Views'),
+      t.computed('total_likes', (user) => user.posts?.reduce((sum, post) => sum + (post.likes ?? 0), 0) ?? 0).displayName('Total Likes'),
+      t.computed('avg_views', (user) => { const posts = user.posts ?? []; return posts.length > 0 ? posts.reduce((sum, post) => sum + (post.views ?? 0), 0) / posts.length : 0; }).displayName('Avg Views'),
+      t.computed('engagement_score', (user) => { const posts = user.posts ?? []; const totalViews = posts.reduce((sum, post) => sum + (post.views ?? 0), 0); const totalLikes = posts.reduce((sum, post) => sum + (post.likes ?? 0), 0); return totalViews + totalLikes * 10; }).displayName('Engagement'),
+      t.computed('has_profile', (user) => !!user.profile).displayName('Has Profile'),
+      t.computed('has_posts', (user) => (user.posts?.length ?? 0) > 0).displayName('Has Posts'),
+      t.computed('is_active', (user) => { const posts = user.posts ?? []; return posts.filter((post) => (Date.now() - post.createdAt.getTime()) / 86400000 <= 30).length > 0; }).displayName('Active User'),
+    ],
+  }));
+}
+let usersTable: ReturnType<typeof buildUsersTable> | undefined;
+let columns: ReturnType<typeof buildUsersTable>['columns'];
 
 // Example usage
 async function setupDatabase(): Promise<any> {
   // Create in-memory SQLite database
   const sqlite = new Database(':memory:');
-  const db: any = drizzle(sqlite);
+  const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });
 
   // Create tables
   await db.run(sql`CREATE TABLE users (
@@ -333,36 +227,10 @@ async function setupDatabase(): Promise<any> {
 async function createAdapter() {
   const { db, sqlite } = await setupDatabase();
 
-  const adapter = new DrizzleAdapter({
-    db,
-    schema,
-    mainTable: 'users',
-    driver: 'sqlite',
-    autoDetectRelationships: true,
-    options: {
-      cache: {
-        enabled: true,
-        ttl: 300000, // 5 minutes
-        maxSize: 1000,
-      },
-      optimization: {
-        maxJoins: 5,
-        enableBatching: true,
-        batchSize: 1000,
-      },
-      logging: {
-        enabled: true,
-        level: 'info',
-        logQueries: false,
-      },
-      performance: {
-        trackTiming: true,
-        maxQueryTime: 5000,
-      },
-    },
-  });
-
-  return { adapter, sqlite };
+  usersTable = buildUsersTable(db);
+  columns = usersTable.columns;
+  const adapter = drizzleAdapter(db, { options: { defaultPrimaryTable: 'users', cache: { enabled: true, ttl: 300000, maxSize: 1000 }, logging: { enabled: true, level: 'info', logQueries: false }, performance: { trackTiming: true, maxQueryTime: 5000 } } });
+  return { adapter, sqlite, usersTable, columns };
 }
 
 // Example queries

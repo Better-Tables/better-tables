@@ -179,4 +179,49 @@ describe('useTableUrlSync', () => {
     });
     expect(setParamsCalls.length).toBe(callsAfterSettling);
   });
+
+  it('coalesces rapid state changes into a single setParams call with the final state', async () => {
+    createStore();
+    const { adapter, setParamsCalls } = createFakeUrlAdapter();
+    const config: UrlSyncConfig = { filters: true, pagination: true };
+
+    renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+
+    const store = getTableStore(TABLE_ID);
+    expect(store).toBeDefined();
+    if (!store) {
+      throw new Error('Expected table store');
+    }
+
+    const callsBeforeBurst = setParamsCalls.length;
+
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['first'],
+      });
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['second'],
+      });
+      const pagination = store.getState().manager.getPagination();
+      store.getState().manager.updateState({
+        pagination: { ...pagination, page: 2 },
+      });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    const burstCalls = setParamsCalls.slice(callsBeforeBurst);
+    expect(burstCalls.length).toBe(1);
+    expect(burstCalls[0]?.page).toBe('2');
+  });
 });
