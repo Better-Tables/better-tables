@@ -33,24 +33,16 @@ wave are in "Deferred by decision" at the bottom.
 
 ---
 
-## Current status (2026-07-17, HEAD `787a816`)
+## Current status (2026-07-17, Wave A on `wave-a-pre-0.6`)
 
 - **All 32 plans from the first audit are DONE and merged** except 008
   (Prisma spike — ON HOLD by maintainer decision). See the done archive.
-- **Second deep audit produced plans 033–052** (all TODO, written 2026-07-17):
-  every finding — from the top-5 leverage items down to the small robustness
-  and hygiene sweeps — is now a self-contained plan. Maintainer decisions
-  (design-doc open questions + several behavior/scope calls) were collected
-  2026-07-17 and folded into the relevant plans; see "Maintainer decisions
-  folded into the wave" below.
-- **Gates at `787a816`**: root typecheck 10/10 · core 1181/0 · toolkit 100/0
-  · ui 49/0 · cli 137/0 · drizzle SQLite green (pg/mysql integration suites
-  need env DBs — they fail locally without URLs; CI provisions service
-  containers).
-- **0.6 remains SHIPPABLE** (every release-policy obligation met). Two
-  timing notes: land **035 before the publish** (the HTTP adapter's wire
-  format and option signatures are only free to change while unpublished),
-  and 033's infra fixes protect the publish-gate test runs themselves.
+- **Wave A (033–036, 040, 046, 047) is DONE** on branch `wave-a-pre-0.6`
+  (pre-0.6-publish gates). Wave B/C remain TODO.
+- **Second deep audit produced plans 033–052** (written 2026-07-17);
+  maintainer decisions folded into the relevant plans — see below.
+- **0.6 remains SHIPPABLE**; Wave A landed the pre-publish obligations
+  (033 infra truth, 035 HTTP wire hardening, 040 facet top-100, 047 writes).
 
 ---
 
