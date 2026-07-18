@@ -103,9 +103,17 @@ export interface ColumnInfo {
  * malformed or invalid schemas by returning an empty array rather than throwing errors.
  * It never throws - if the schema is invalid, it returns an empty array instead.
  */
+/** Memoize schema-derived column lists by table object identity (immutable). */
+const tableColumnsCache = new WeakMap<object, ColumnInfo[]>();
+
 export function getTableColumns(tableSchema: AnyTableType): ColumnInfo[] {
   if (!tableSchema || typeof tableSchema !== 'object') {
     return [];
+  }
+
+  const cached = tableColumnsCache.get(tableSchema as object);
+  if (cached) {
+    return cached;
   }
 
   const tableObj = tableSchema as unknown as Record<string, AnyColumnType>;
@@ -131,6 +139,7 @@ export function getTableColumns(tableSchema: AnyTableType): ColumnInfo[] {
     }
   }
 
+  tableColumnsCache.set(tableSchema as object, columns);
   return columns;
 }
 

@@ -802,7 +802,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     const primaryTable = this.resolvePrimaryTableForRead([columnId]);
     try {
       const facetFilters = this.buildFacetFilters(columnId, params);
-      const query = this.queryBuilder.buildFilterOptionsQuery(columnId, primaryTable, facetFilters);
+      const query = this.queryBuilder.buildFilterOptionsQuery(
+        columnId,
+        primaryTable,
+        facetFilters,
+        params?.limit
+      );
       const results = await query.execute();
 
       return results.map((row: Record<string, unknown>) => ({
@@ -834,7 +839,8 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         columnId,
         'count',
         primaryTable,
-        facetFilters
+        facetFilters,
+        params?.limit
       );
       const results = await query.execute();
 
@@ -1432,7 +1438,18 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     key: string
   ): FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>> | undefined {
     const cached = this.cache.get(key);
-    return cached ? cached.value : undefined;
+    if (!cached) return undefined;
+
+    const ttl = cached.ttl || this.options?.cache?.ttl || 300000;
+    if (Date.now() - cached.timestamp > ttl) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    // LRU: re-insert so this key is most-recently-used.
+    this.cache.delete(key);
+    this.cache.set(key, cached);
+    return cached.value;
   }
 
   private setCache(
@@ -1440,13 +1457,25 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>,
     ttl?: number
   ): void {
-    if (this.options?.cache?.enabled !== false) {
-      this.cache.set(key, {
-        value,
-        timestamp: Date.now(),
-        ttl: ttl || this.options?.cache?.ttl || 300000, // 5 minutes default
-      });
+    if (this.options?.cache?.enabled === false) {
+      return;
     }
+
+    const maxSize = this.options?.cache?.maxSize ?? 500;
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+    while (this.cache.size >= maxSize) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest === undefined) break;
+      this.cache.delete(oldest);
+    }
+
+    this.cache.set(key, {
+      value,
+      timestamp: Date.now(),
+      ttl: ttl || this.options?.cache?.ttl || 300000, // 5 minutes default
+    });
   }
 
   private isCacheExpired(key: string): boolean {
@@ -1454,11 +1483,20 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     if (!cached) return true;
 
     const ttl = cached.ttl || this.options?.cache?.ttl || 300000;
-    return Date.now() - cached.timestamp > ttl;
+    if (Date.now() - cached.timestamp > ttl) {
+      this.cache.delete(key);
+      return true;
+    }
+    return false;
   }
 
   private invalidateCache(): void {
     this.cache.clear();
+  }
+
+  /** Test/introspection helper — current in-memory cache entry count. */
+  getCacheSizeForTests(): number {
+    return this.cache.size;
   }
 
   /**

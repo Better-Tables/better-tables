@@ -541,6 +541,21 @@ export function getTables() {
 }
 ```
 
+## 13. Facet value queries default to top-100 by count
+
+`getFacetedValues` / `getFilterOptions` now return at most **100** distinct
+values, ordered by count descending. This is a behavior change in the 0.6
+window — high-cardinality facets no longer ship every distinct value by
+default.
+
+To restore the previous return-everything behavior:
+
+```ts
+await adapter.getFacetedValues('city', { limit: null });
+```
+
+Pass a positive `limit` to override the default cap for a single call.
+
 ## What did NOT change
 
 Migration guides that only list breakage overstate the pain. In 0.6:

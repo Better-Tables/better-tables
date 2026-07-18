@@ -70,7 +70,7 @@ the breaking window.
 | [034](034-usetabledata-loop-and-date-render.md) | Fix `useTableData` unbounded refetch loop + formatter coercion for ISO-string/epoch dates | none | DONE (wave-a) |
 | [035](035-http-adapter-hardening.md) | HTTP adapter: `authorize`/`constrainRequest`/`onError` seam, 500-vs-400, generic errors, `faceted` wire fix, `FacetQueryParams.signal`, demo route pinned, docs + tests | none; **wire format free only pre-publish** | DONE (wave-a) |
 | [036](036-date-between-timestamp-fallback.md) | Date `between`/`notBetween` timestamp fallback + pg/mysql `between` coverage + router unit tests | none | DONE (wave-a) |
-| [040](040-adapter-performance.md) | Adapter perf: transformer memoization, bounded LRU cache, **facet LIMIT default top-100** (behavior change — 0.6 window) | none | TODO |
+| [040](040-adapter-performance.md) | Adapter perf: transformer memoization, bounded LRU cache, **facet LIMIT default top-100** (behavior change — 0.6 window) | none | DONE (wave-a) |
 | [046](046-path-types-finalization.md) | Finalize path-typed columns: promote from `experimental/` → core, runtime `humanize()` auto-labels, document depth-3 override, retire stale prototypes | none | TODO |
 | [047](047-typed-write-surface.md) | Typed explicit-table writes (`createRecord/updateRecord/deleteRecord`) on the instance — **into the 0.6 train** | 018, 002 (done) | TODO |
 

@@ -519,11 +519,21 @@ export abstract class BaseQueryBuilder {
    * those against join fan-out is a separate, pre-existing concern outside
    * this plan's scope (facet *counts* specifically).
    */
+  /** Resolve facet value LIMIT: default 100, `null` disables, number overrides. */
+  protected resolveFacetLimit(limit?: number | null): number | null {
+    if (limit === null) return null;
+    if (typeof limit === 'number' && Number.isFinite(limit) && limit >= 0) {
+      return Math.floor(limit);
+    }
+    return 100;
+  }
+
   buildAggregateQuery<TColumnId extends string>(
     columnId: TColumnId,
     aggregateFunction: AggregateFunction = 'count',
     primaryTable: string,
-    filters?: FilterState[] | FilterGroupNode
+    filters?: FilterState[] | FilterGroupNode,
+    limit?: number | null
   ): QueryBuilderWithJoins {
     this.validateColumnId(columnId, primaryTable);
     this.validateAggregateFunction(aggregateFunction);
@@ -558,7 +568,9 @@ export abstract class BaseQueryBuilder {
     const joinedQuery = this.applyJoins(baseQuery, joinOrder);
     const query = this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
 
-    return query.groupBy(column).orderBy(column);
+    const grouped = query.groupBy(column).orderBy(desc(aggregateFn));
+    const resolvedLimit = this.resolveFacetLimit(limit);
+    return resolvedLimit === null ? grouped : grouped.limit(resolvedLimit);
   }
 
   /**
@@ -572,7 +584,8 @@ export abstract class BaseQueryBuilder {
   buildFilterOptionsQuery(
     columnId: string,
     primaryTable: string,
-    filters?: FilterState[] | FilterGroupNode
+    filters?: FilterState[] | FilterGroupNode,
+    limit?: number | null
   ): QueryBuilderWithJoins {
     const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
     const column = this.getColumn(columnPath);
@@ -603,7 +616,9 @@ export abstract class BaseQueryBuilder {
     const joinedQuery = this.applyJoins(baseQuery, joinOrder);
     const query = this.applyFilters(joinedQuery, filters || [], primaryTable, [isNotNull(column)]);
 
-    return query.groupBy(column).orderBy(column);
+    const grouped = query.groupBy(column).orderBy(desc(countFn));
+    const resolvedLimit = this.resolveFacetLimit(limit);
+    return resolvedLimit === null ? grouped : grouped.limit(resolvedLimit);
   }
 
   /**

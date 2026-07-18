@@ -203,6 +203,13 @@ export interface FacetQueryParams {
    * adapters; in-process adapters may ignore it.
    */
   signal?: AbortSignal;
+
+  /**
+   * Cap distinct facet values returned, ordered by count descending.
+   * Default: `100`. Pass `null` to disable the cap (return all values).
+   * A positive number overrides the default.
+   */
+  limit?: number | null;
 }
 
 /**

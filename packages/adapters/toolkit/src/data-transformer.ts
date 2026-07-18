@@ -76,6 +76,13 @@ export class DataTransformer<TTable = unknown> {
   private relationshipManager: RelationshipManagerPort;
   private schemaPort: SchemaIntrospectionPort<TTable>;
 
+  /** Per-transform memo of resolveColumnPath results (cleared after each transform). */
+  private columnPathCache: Map<string, ColumnPath> | null = null;
+  /** Per-transform memo of primary-key names by table schema identity. */
+  private primaryKeyNameCache: WeakMap<object, string> | null = null;
+  /** Per-transform memo of column-name lists by table schema identity. */
+  private columnNamesCache: WeakMap<object, string[]> | null = null;
+
   constructor(
     schema: Record<string, TTable>,
     relationshipManager: RelationshipManagerPort,
@@ -84,6 +91,37 @@ export class DataTransformer<TTable = unknown> {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
     this.schemaPort = schemaPort;
+  }
+
+  private resolveColumnPathCached(columnId: string, primaryTable: string): ColumnPath {
+    const key = `${primaryTable}\0${columnId}`;
+    const cached = this.columnPathCache?.get(key);
+    if (cached) return cached;
+    const path = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    this.columnPathCache?.set(key, path);
+    return path;
+  }
+
+  private getPrimaryKeyNameCached(tableSchema: TTable): string {
+    if (this.primaryKeyNameCache && tableSchema && typeof tableSchema === 'object') {
+      const hit = this.primaryKeyNameCache.get(tableSchema as object);
+      if (hit !== undefined) return hit;
+      const name = this.getPrimaryKeyName(tableSchema);
+      this.primaryKeyNameCache.set(tableSchema as object, name);
+      return name;
+    }
+    return this.getPrimaryKeyName(tableSchema);
+  }
+
+  private getColumnNamesCached(tableSchema: TTable): string[] {
+    if (this.columnNamesCache && tableSchema && typeof tableSchema === 'object') {
+      const hit = this.columnNamesCache.get(tableSchema as object);
+      if (hit) return hit;
+      const names = this.schemaPort.getColumnNames(tableSchema);
+      this.columnNamesCache.set(tableSchema as object, names);
+      return names;
+    }
+    return this.schemaPort.getColumnNames(tableSchema);
   }
 
   /**
@@ -122,17 +160,31 @@ export class DataTransformer<TTable = unknown> {
     // Group data by main table primary key
     const groupedData = this.groupByMainTableKey(flatData, primaryTable);
 
-    // Transform each group to nested structure
-    const nestedData: TData[] = [];
-
-    for (const [, records] of groupedData) {
-      // Process each group of records with the same primary key
-      // Records with the same primary key are grouped together by groupByMainTableKey
-      const nestedRecord = this.buildNestedRecord(records, primaryTable, columns, columnMetadata);
-      nestedData.push(nestedRecord as TData);
+    // Precompute per-query invariants once (paths / pk names / column lists are
+    // row-invariant). Cleared in finally so subsequent transforms start clean.
+    this.columnPathCache = new Map();
+    this.primaryKeyNameCache = new WeakMap();
+    this.columnNamesCache = new WeakMap();
+    if (columns) {
+      for (const columnId of columns) {
+        this.resolveColumnPathCached(columnId, primaryTable);
+      }
     }
 
-    return nestedData;
+    try {
+      const nestedData: TData[] = [];
+
+      for (const [, records] of groupedData) {
+        const nestedRecord = this.buildNestedRecord(records, primaryTable, columns, columnMetadata);
+        nestedData.push(nestedRecord as TData);
+      }
+
+      return nestedData;
+    } finally {
+      this.columnPathCache = null;
+      this.primaryKeyNameCache = null;
+      this.columnNamesCache = null;
+    }
   }
 
   /**
@@ -235,7 +287,7 @@ export class DataTransformer<TTable = unknown> {
     const directColumns = new Set<string>();
 
     for (const columnId of columns) {
-      const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+      const columnPath = this.resolveColumnPathCached(columnId, primaryTable);
 
       if (columnPath.isNested) {
         // Extract relationship alias and field
@@ -319,7 +371,7 @@ export class DataTransformer<TTable = unknown> {
       // Always include primary key
       const primaryTableSchema = this.schema[primaryTable];
       if (primaryTableSchema) {
-        const primaryKeyName = this.getPrimaryKeyName(primaryTableSchema);
+        const primaryKeyName = this.getPrimaryKeyNameCached(primaryTableSchema);
         if (primaryKeyName && recordObj[primaryKeyName] !== undefined) {
           filtered[primaryKeyName] = recordObj[primaryKeyName];
         }
@@ -346,7 +398,7 @@ export class DataTransformer<TTable = unknown> {
       // If schema not found, return empty map or handle gracefully
       return grouped;
     }
-    const primaryKeyName = this.getPrimaryKeyName(tableSchema);
+    const primaryKeyName = this.getPrimaryKeyNameCached(tableSchema);
     if (!primaryKeyName) {
       return grouped;
     }
@@ -459,7 +511,7 @@ export class DataTransformer<TTable = unknown> {
         const parts = columnId.split('.');
         if (parts.length > 1) {
           // Check if this is a JSON accessor column (not a relationship)
-          const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+          const columnPath = this.resolveColumnPathCached(columnId, primaryTable);
 
           if (!columnPath.isNested) {
             // This is a JSON accessor column - process it individually
@@ -543,7 +595,7 @@ export class DataTransformer<TTable = unknown> {
         if (parts.length > 1) {
           // This is a relationship column (e.g., 'authors.id', 'authors.name')
           try {
-            const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+            const columnPath = this.resolveColumnPathCached(columnId, primaryTable);
             const relationshipPath = columnPath.relationshipPath;
             if (columnPath.isNested && relationshipPath && relationshipPath.length > 0) {
               // Get the relationship alias (e.g., 'authors', 'organizers')
@@ -676,7 +728,7 @@ export class DataTransformer<TTable = unknown> {
     // This ensures grouping works correctly and records can be identified
     const primaryTableSchema = this.schema[primaryTable];
     if (primaryTableSchema) {
-      const primaryKeyName = this.getPrimaryKeyName(primaryTableSchema);
+      const primaryKeyName = this.getPrimaryKeyNameCached(primaryTableSchema);
       if (primaryKeyName) {
         // Always try to get primary key value, prioritizing direct field, then prefixed field
         const pkValue =
@@ -726,7 +778,7 @@ export class DataTransformer<TTable = unknown> {
       return;
     }
 
-    const columnPath = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    const columnPath = this.resolveColumnPathCached(columnId, primaryTable);
 
     if (!columnPath.isNested) {
       // Check if this is a JSON accessor column (e.g., "survey.title")
@@ -813,7 +865,7 @@ export class DataTransformer<TTable = unknown> {
       // Instead of extracting all columns, only extract what's actually in the record
       const relatedTableSchema = this.schema[realTableName];
       const relatedColumns = relatedTableSchema
-        ? this.schemaPort.getColumnNames(relatedTableSchema)
+        ? this.getColumnNamesCached(relatedTableSchema)
         : [];
 
       for (const col of relatedColumns) {
@@ -875,7 +927,7 @@ export class DataTransformer<TTable = unknown> {
       // Get the primary key name dynamically
       const relatedTableSchema = this.schema[realTableName];
       if (!relatedTableSchema) continue;
-      const primaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
+      const primaryKeyName = this.getPrimaryKeyNameCached(relatedTableSchema);
       // CRITICAL: Skip record if primary key cannot be determined
       // This matches the behavior in groupByMainTableKey() which also checks for null/undefined
       if (!primaryKeyName) continue;
@@ -911,7 +963,7 @@ export class DataTransformer<TTable = unknown> {
         if (allRelationshipColumns && allRelationshipColumns.length > 0) {
           // Extract only requested columns for this relationship
           // CRITICAL: Always include primary key for identification and grouping
-          const relatedPrimaryKeyName = this.getPrimaryKeyName(relatedTableSchema);
+          const relatedPrimaryKeyName = this.getPrimaryKeyNameCached(relatedTableSchema);
           if (relatedPrimaryKeyName) {
             const pkFlatKeyForExtract = generateAlias(relationshipPath, relatedPrimaryKeyName);
             // CRITICAL: Only use the flattened field name from generateAlias
@@ -940,7 +992,7 @@ export class DataTransformer<TTable = unknown> {
         } else {
           // Fallback: extract all columns from schema that are present in the record
           const relatedColumns = relatedTableSchema
-            ? this.schemaPort.getColumnNames(relatedTableSchema)
+            ? this.getColumnNamesCached(relatedTableSchema)
             : [];
           for (const col of relatedColumns) {
             const flatKey = generateAlias(relationshipPath, col);
@@ -1074,7 +1126,7 @@ export class DataTransformer<TTable = unknown> {
             const field = key.substring(tableName.length + 1);
             // Use the adapter's schema introspection port to verify the field exists
             const tableSchema = this.schema[tableName];
-            if (tableSchema && this.schemaPort.getColumnNames(tableSchema).includes(field)) {
+            if (tableSchema && this.getColumnNamesCached(tableSchema).includes(field)) {
               // Check if this is a foreign key column via the schema introspection port
               const foreignKeyColumns = this.schemaPort.getForeignKeyColumns(tableSchema);
               const isForeignKey = foreignKeyColumns.some((fk) => fk.name === field);
@@ -1243,7 +1295,7 @@ export class DataTransformer<TTable = unknown> {
       for (const [key, value] of Object.entries(processedRecord)) {
         if (value === null || value === undefined) {
           // Check if this is a relationship field
-          const columnPath = this.relationshipManager.resolveColumnPath(key, primaryTable);
+          const columnPath = this.resolveColumnPathCached(key, primaryTable);
 
           if (columnPath.isNested) {
             // Set to null for one-to-one, empty array for one-to-many
