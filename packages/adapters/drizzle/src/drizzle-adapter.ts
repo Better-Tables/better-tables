@@ -63,6 +63,7 @@ import type {
   FilterNode,
   FilterOption,
   FilterState,
+  InferredColumnSpec,
   TableAdapter,
 } from '@better-tables/core';
 import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
@@ -92,6 +93,7 @@ import type {
 } from './types';
 import { QueryError, SchemaError } from './types';
 import {
+  describeTableColumns,
   getColumnNames,
   getForeignKeyColumns,
   getPrimaryKeyColumns,
@@ -879,6 +881,32 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         { columnId, error }
       );
     }
+  }
+
+  /**
+   * Describe a table's columns from the Drizzle schema — powers auto column
+   * inference (`t.auto()` / no-factory `define`, plan 054).
+   *
+   * Pure schema introspection: no query is executed, so this is safe to call
+   * without a live connection. `table` follows the same resolution as the
+   * other read entry points ({@link resolvePrimaryTableForRead}): an explicit
+   * table is validated against the schema; when omitted, single-table
+   * schemas stay zero-config and multi-table schemas fall back to
+   * `options.defaultPrimaryTable` or throw a `SchemaError`.
+   *
+   * Results are memoized per table object ({@link describeTableColumns}'s
+   * WeakMap, mirroring plan 040's caches).
+   */
+  async describeColumns(table?: string): Promise<InferredColumnSpec[]> {
+    const primaryTable = this.resolvePrimaryTableForRead(undefined, table);
+    const tableSchema = this.schema[primaryTable];
+    if (!tableSchema) {
+      throw new SchemaError(`Table '${primaryTable}' is not present in the schema`, {
+        table: primaryTable,
+        availableTables: Object.keys(this.schema),
+      });
+    }
+    return describeTableColumns(tableSchema as AnyTableType);
   }
 
   /**
