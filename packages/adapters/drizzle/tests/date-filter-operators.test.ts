@@ -123,4 +123,35 @@ describe('DrizzleAdapter — date operators on a timestamp column', () => {
     expect(dateOps).toContain('between');
     expect(dateOps).toContain('notBetween');
   });
+
+  describe('untyped between/notBetween on timestamp columns (plan 036)', () => {
+    const endpoints = ['2026-03-09T00:00:00Z', '2026-03-11T23:59:59Z'];
+
+    function untypedFilter(operator: string, values: unknown[]): FilterState {
+      // Realistic misroute: timestamp column + non-date columnType.
+      return {
+        columnId: 'occurredAt',
+        type: 'number',
+        operator,
+        values,
+      } as unknown as FilterState;
+    }
+
+    it('`between` with type number still matches three days via timestamp fallback', async () => {
+      const res = await fetch(untypedFilter('between', endpoints));
+      expect(res.total).toBe(3);
+    });
+
+    it('`notBetween` with type number matches the complement via timestamp fallback', async () => {
+      const res = await fetch(untypedFilter('notBetween', endpoints));
+      expect(res.total).toBe(2);
+    });
+
+    it('typed date between/notBetween agree with the untyped fallback counts', async () => {
+      const typedBetween = await fetch(dateFilter('between', endpoints));
+      const typedNotBetween = await fetch(dateFilter('notBetween', endpoints));
+      expect(typedBetween.total).toBe(3);
+      expect(typedNotBetween.total).toBe(2);
+    });
+  });
 });

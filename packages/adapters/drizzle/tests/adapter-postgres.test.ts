@@ -507,6 +507,28 @@ describe('DrizzleAdapter - PostgreSQL [Integration Tests]', () => {
       });
       expect(result.data).toHaveLength(3); // All have created dates
     });
+
+    it('should filter by date between', async () => {
+      const start = new Date('2020-01-01');
+      const end = new Date(Date.now() + 86400000); // tomorrow
+      const result = await adapter.fetchData({
+        filters: [
+          { columnId: 'createdAt', type: 'date', operator: 'between', values: [start, end] },
+        ],
+      });
+      expect(result.data).toHaveLength(3); // all seeded rows are "today"
+    });
+
+    it('should filter by date notBetween', async () => {
+      const start = new Date('2020-01-01');
+      const end = new Date('2020-12-31');
+      const result = await adapter.fetchData({
+        filters: [
+          { columnId: 'createdAt', type: 'date', operator: 'notBetween', values: [start, end] },
+        ],
+      });
+      expect(result.data).toHaveLength(3); // none of today's rows fall in 2020
+    });
   });
 
   describe('Sorting Tests', () => {

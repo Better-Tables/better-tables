@@ -109,7 +109,7 @@ describe('useTableData', () => {
     const { adapter } = createDeferredFetchAdapter();
     const countingAdapter = {
       ...adapter,
-      fetchData: async (params: FetchDataParams) => {
+      fetchData: async (_params: FetchDataParams) => {
         fetchCount += 1;
         return makeFetchResult([{ id: `row-${fetchCount}` }]);
       },

@@ -1147,6 +1147,15 @@ export class DrizzlePredicateEmitter
   }
 
   /**
+   * Report whether `column` stores date/timestamp semantics even when the
+   * filter's `columnType` isn't `'date'` — used by the router for
+   * `between`/`notBetween` timestamp fallback.
+   */
+  prefersDateSemantics(column: ColumnOrExpression): boolean {
+    return this.isTimestampColumn(column);
+  }
+
+  /**
    * Check if a column is a timestamp/date column.
    */
   private isTimestampColumn(column: ColumnOrExpression): boolean {
