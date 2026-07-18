@@ -1,6 +1,6 @@
 'use client';
 
-import type { ColumnDefinition, ScrollInfo, TableAdapter } from '@better-tables/core';
+import type { CellEditAction, ColumnDefinition, ScrollInfo, TableAdapter } from '@better-tables/core';
 import { getColumnStyle, getFormatterForType } from '@better-tables/core';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -8,7 +8,6 @@ import { TableAdapterProvider } from '../../hooks/use-column-options';
 import {
   type CellEditErrorHandler,
   type CellEditHandler,
-  isRowEditable,
   useEditableCells,
 } from '../../hooks/use-editable-cells';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
@@ -75,6 +74,8 @@ export interface VirtualizedTableProps<T = unknown> {
   tableName?: string;
   onCellEdit?: CellEditHandler<T>;
   onCellEditError?: CellEditErrorHandler<T>;
+  /** Serializable cell-save function (plan 055) — see `BetterTableProps.saveAction`. */
+  saveAction?: CellEditAction;
   /** Table-level master switch for inline editing. Default true. */
   editing?: boolean;
   getRowId?: (item: T, index: number) => string;
@@ -105,6 +106,8 @@ interface VirtualizedRowProps<T> {
    * `VirtualizedTable`). */
   onMeasure: (rowIndex: number, height: number) => void;
   editableColumnIds: ReadonlySet<string> | null;
+  /** Row-level gate: `editable.when` + related-row-id presence (plan 055). */
+  isRowCellEditable: (column: ColumnDefinition<T, unknown>, row: T) => boolean;
   rowOverlay: Readonly<Record<string, unknown>>;
   rowErrors: Readonly<Record<string, string>>;
   rowSavingColumns: ReadonlySet<string>;
@@ -130,6 +133,7 @@ function VirtualizedRow<T>({
   onRowClick,
   onMeasure,
   editableColumnIds,
+  isRowCellEditable,
   rowOverlay,
   rowErrors,
   rowSavingColumns,
@@ -179,7 +183,9 @@ function VirtualizedRow<T>({
           column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
         const colStyle = getColumnStyle(column.meta);
         const cellEditable =
-          !renderCell && editableColumnIds?.has(column.id) === true && isRowEditable(column, item);
+          !renderCell &&
+          editableColumnIds?.has(column.id) === true &&
+          isRowCellEditable(column as ColumnDefinition<T, unknown>, item);
         const display = renderCell
           ? renderCell(value, column, item, index)
           : getFormatterForType(column.type, value, column.meta);
@@ -248,6 +254,7 @@ function areVirtualizedRowPropsEqual<T>(
     prev.onRowClick === next.onRowClick &&
     prev.onMeasure === next.onMeasure &&
     prev.editableColumnIds === next.editableColumnIds &&
+    prev.isRowCellEditable === next.isRowCellEditable &&
     prev.rowOverlay === next.rowOverlay &&
     prev.rowErrors === next.rowErrors &&
     prev.rowSavingColumns === next.rowSavingColumns &&
@@ -328,6 +335,7 @@ export function VirtualizedTable<T = unknown>({
   tableName,
   onCellEdit,
   onCellEditError,
+  saveAction,
   editing = true,
   getRowId = defaultGetRowId,
   'aria-label': ariaLabel,
@@ -339,6 +347,7 @@ export function VirtualizedTable<T = unknown>({
     ...(tableName != null ? { tableName } : {}),
     ...(onCellEdit != null ? { onCellEdit } : {}),
     ...(onCellEditError != null ? { onCellEditError } : {}),
+    ...(saveAction != null ? { saveAction } : {}),
   });
 
   const editableColumnIds = useMemo(() => {
@@ -537,6 +546,7 @@ export function VirtualizedTable<T = unknown>({
                       {...(onRowClick !== undefined && { onRowClick })}
                       onMeasure={onMeasure}
                       editableColumnIds={editableColumnIds}
+                      isRowCellEditable={editableCells.isRowCellEditable}
                       rowOverlay={editableCells.getRowOverlay(rowId)}
                       rowErrors={editableCells.getRowErrors(rowId)}
                       rowSavingColumns={editableCells.getRowSavingColumns(rowId)}

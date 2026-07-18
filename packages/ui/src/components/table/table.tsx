@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CellEditAction,
   type ColumnDefinition,
   type ColumnVisibility,
   destroyTableStore,
@@ -25,7 +26,6 @@ import { TableAdapterProvider } from '../../hooks/use-column-options';
 import {
   type CellEditErrorHandler,
   type CellEditHandler,
-  isRowEditable,
   useEditableCells,
 } from '../../hooks/use-editable-cells';
 import {
@@ -242,6 +242,13 @@ export interface BetterTableProps<TData = unknown>
   onCellEditError?: CellEditErrorHandler<TData>;
 
   /**
+   * Serializable cell-save function (plan 055) — typically the app's
+   * `'use server'` wrapper around `tables.cellEditAction(def)`. Save
+   * resolution order: `onCellEdit` → `saveAction` → direct adapter.
+   */
+  saveAction?: CellEditAction;
+
+  /**
    * Table-level master switch for inline editing. Default `true`. Set `false`
    * to render every cell read-only without changing column defs.
    */
@@ -270,6 +277,8 @@ interface TableRowComponentProps<TData> {
   onToggleSelection: (rowId: string, selected: boolean) => void;
   /** Column ids that can edit when a save path exists (stable Set), or null when none. */
   editableColumnIds: ReadonlySet<string> | null;
+  /** Row-level gate: `editable.when` + related-row-id presence (plan 055). */
+  isRowCellEditable: (column: ColumnDefinition<TData, unknown>, row: TData) => boolean;
   rowOverlay: Readonly<Record<string, unknown>>;
   rowErrors: Readonly<Record<string, string>>;
   rowSavingColumns: ReadonlySet<string>;
@@ -297,6 +306,7 @@ function TableRowComponent<TData>({
   onActivate,
   onToggleSelection,
   editableColumnIds,
+  isRowCellEditable,
   rowOverlay,
   rowErrors,
   rowSavingColumns,
@@ -335,7 +345,8 @@ function TableRowComponent<TData>({
         const value =
           column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
         const cellEditable =
-          editableColumnIds?.has(column.id) === true && isRowEditable(column, row);
+          editableColumnIds?.has(column.id) === true &&
+          isRowCellEditable(column as ColumnDefinition<TData, unknown>, row);
         const isEditing = editingColumnId === column.id;
 
         const display = column.cellRenderer
@@ -592,9 +603,10 @@ function BetterTableInner<TData = unknown>({
   // Filter protection
   isFilterProtected,
 
-  // Inline editing (plan 053)
+  // Inline editing (plan 053; saveAction — plan 055)
   onCellEdit,
   onCellEditError,
+  saveAction,
   editing = true,
   ...props
 }: BetterTableProps<TData>) {
@@ -971,6 +983,7 @@ function BetterTableInner<TData = unknown>({
     ...(table?.tableName != null ? { tableName: table.tableName } : {}),
     ...(onCellEdit != null ? { onCellEdit } : {}),
     ...(onCellEditError != null ? { onCellEditError } : {}),
+    ...(saveAction != null ? { saveAction } : {}),
   });
 
   const editableColumnIds = useMemo(() => {
@@ -1399,6 +1412,7 @@ function BetterTableInner<TData = unknown>({
                   onActivate={handleRowActivate}
                   onToggleSelection={handleRowSelection}
                   editableColumnIds={editableColumnIds}
+                  isRowCellEditable={editableCells.isRowCellEditable}
                   rowOverlay={editableCells.getRowOverlay(rowId)}
                   rowErrors={editableCells.getRowErrors(rowId)}
                   rowSavingColumns={editableCells.getRowSavingColumns(rowId)}
