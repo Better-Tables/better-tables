@@ -75,6 +75,7 @@ import {
   normalizeFilterNode,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import { AdapterCache } from './adapter-cache';
 import { convertToExportFormat, getMimeType } from './export-format';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
@@ -157,14 +158,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   private primaryTableResolver: PrimaryTableResolver<AnyTableType>;
   private queryBuilder: BaseQueryBuilder;
   private dataTransformer: DataTransformer<AnyTableType>;
-  private cache: Map<
-    string,
-    {
-      value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>;
-      timestamp: number;
-      ttl: number;
-    }
-  > = new Map();
+  private cache: AdapterCache<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>>;
   private subscribers: Array<
     (event: DataEvent<InferSelectModelFromFilteredSchema<TSchema>>) => void
   > = [];
@@ -240,6 +234,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     // Filter out relations from schema at runtime - schema may include both tables and relations
     this.schema = filterTablesFromSchema(config.schema) as FilterTablesFromSchema<TSchema>;
     this.options = config.options || {};
+    this.cache = new AdapterCache(this.options);
     if (config.hooks !== undefined) {
       this.hooks = config.hooks;
     }
@@ -608,10 +603,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         // Note: computedFieldFilters are already in cache key (set above before processing)
         // This ensures different filter values produce different cache keys even when using filterSql
       }
-      const cacheKey = this.getCacheKey(cacheParams);
-      const cached = this.getFromCache(cacheKey);
+      const cacheKey = this.cache.getKey(cacheParams);
+      const cached = this.cache.get(cacheKey);
 
-      if (cached && !this.isCacheExpired(cacheKey)) {
+      if (cached && !this.cache.isExpired(cacheKey)) {
         // Mark as cached and add computed fields
         const resultWithComputed = await this.addComputedFields(
           cached,
@@ -771,7 +766,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       };
 
       // Cache result
-      this.setCache(cacheKey, result);
+      this.cache.set(cacheKey, result);
 
       return result;
     } catch (error) {
@@ -1044,7 +1039,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.executeInsert(mainTableSchema, data);
 
       this.emit({ type: 'insert', data: result });
-      this.invalidateCache();
+      this.cache.invalidate();
 
       return result;
     } catch (error) {
@@ -1079,7 +1074,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.executeUpdate(mainTableSchema, id, data);
 
       this.emit({ type: 'update', data: result });
-      this.invalidateCache();
+      this.cache.invalidate();
 
       return result;
     } catch (error) {
@@ -1110,7 +1105,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const result = await this.executeDelete(mainTableSchema, id);
 
       this.emit({ type: 'delete', data: result });
-      this.invalidateCache();
+      this.cache.invalidate();
     } catch (error) {
       throw new QueryError(
         `Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -1142,7 +1137,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const results = await this.executeBulkUpdate(mainTableSchema, ids, data);
 
       this.emit({ type: 'update', data: results });
-      this.invalidateCache();
+      this.cache.invalidate();
 
       return results;
     } catch (error) {
@@ -1173,7 +1168,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const results = await this.executeBulkDelete(mainTableSchema, ids);
 
       this.emit({ type: 'delete', data: results });
-      this.invalidateCache();
+      this.cache.invalidate();
     } catch (error) {
       throw new QueryError(
         `Failed to bulk delete records: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -1282,18 +1277,6 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   }
 
   /**
-   * Cache management
-   */
-  private getCacheKey(
-    params: FetchDataParams & {
-      computedFields?: string[];
-      computedFieldFilters?: FilterState[];
-    }
-  ): string {
-    return JSON.stringify(params);
-  }
-
-  /**
    * Add computed fields to result data
    */
   private async addComputedFields(
@@ -1337,75 +1320,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     };
   }
 
-  private getFromCache(
-    key: string
-  ): FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>> | undefined {
-    const cached = this.cache.get(key);
-    if (!cached) return undefined;
-
-    const ttl = cached.ttl || this.options?.cache?.ttl || 300000;
-    if (Date.now() - cached.timestamp > ttl) {
-      this.cache.delete(key);
-      return undefined;
-    }
-
-    // LRU: re-insert so this key is most-recently-used.
-    this.cache.delete(key);
-    this.cache.set(key, cached);
-    return cached.value;
-  }
-
-  private setCache(
-    key: string,
-    value: FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>,
-    ttl?: number
-  ): void {
-    if (this.options?.cache?.enabled === false) {
-      return;
-    }
-
-    const maxSize = this.options?.cache?.maxSize ?? 500;
-    // Non-positive / non-finite capacity means no-cache (clear any residual).
-    if (!Number.isFinite(maxSize) || maxSize <= 0) {
-      this.cache.clear();
-      return;
-    }
-
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    }
-    while (this.cache.size >= maxSize) {
-      const oldest = this.cache.keys().next().value;
-      if (oldest === undefined) break;
-      this.cache.delete(oldest);
-    }
-
-    this.cache.set(key, {
-      value,
-      timestamp: Date.now(),
-      ttl: ttl || this.options?.cache?.ttl || 300000, // 5 minutes default
-    });
-  }
-
-  private isCacheExpired(key: string): boolean {
-    const cached = this.cache.get(key);
-    if (!cached) return true;
-
-    const ttl = cached.ttl || this.options?.cache?.ttl || 300000;
-    if (Date.now() - cached.timestamp > ttl) {
-      this.cache.delete(key);
-      return true;
-    }
-    return false;
-  }
-
-  private invalidateCache(): void {
-    this.cache.clear();
-  }
-
   /** Test/introspection helper — current in-memory cache entry count. */
   getCacheSizeForTests(): number {
-    return this.cache.size;
+    return this.cache.getSizeForTests();
   }
 
   /**
