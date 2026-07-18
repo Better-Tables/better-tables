@@ -1148,7 +1148,7 @@ export function BetterTable<TData = unknown>({
               column alignment (and dynamic row heights) working.
             */}
             {virtualTopPad > 0 && (
-              <tr aria-hidden="true">
+              <tr data-virtual-spacer="true">
                 <td colSpan={virtualSpacerColSpan} style={virtualSpacerStyle(virtualTopPad)} />
               </tr>
             )}
@@ -1172,7 +1172,7 @@ export function BetterTable<TData = unknown>({
               );
             })}
             {virtualBottomPad > 0 && (
-              <tr aria-hidden="true">
+              <tr data-virtual-spacer="true">
                 <td colSpan={virtualSpacerColSpan} style={virtualSpacerStyle(virtualBottomPad)} />
               </tr>
             )}

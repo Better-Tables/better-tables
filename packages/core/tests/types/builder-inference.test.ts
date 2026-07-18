@@ -113,13 +113,25 @@ describe('Literal-preserving column ids (plan 014)', () => {
   it('registry smoke test: a tuple of built defs derives { name: string; age: number } — the blocker plan 006/011 needed removed', () => {
     const cb = createColumnBuilder<User>();
 
-    const nameCol = cb.text().id('name').displayName('Name').accessor((u) => u.name).build();
-    const ageCol = cb.number().id('age').displayName('Age').accessor((u) => u.age).build();
+    const nameCol = cb
+      .text()
+      .id('name')
+      .displayName('Name')
+      .accessor((u) => u.name)
+      .build();
+    const ageCol = cb
+      .number()
+      .id('age')
+      .displayName('Age')
+      .accessor((u) => u.age)
+      .build();
 
     type Columns = readonly [typeof nameCol, typeof ageCol];
 
     // Local mapped-type registry, per the plan's acceptance proof.
+    // biome-ignore lint/suspicious/noExplicitAny: polymorphic column params required for registry proof
     type LocalRegistry<T extends readonly ColumnDefinition<any, any, any>[]> = {
+      // biome-ignore lint/suspicious/noExplicitAny: infer value type from heterogeneous column definitions
       [C in T[number] as C['id']]: C extends ColumnDefinition<any, infer V, any> ? V : never;
     };
 

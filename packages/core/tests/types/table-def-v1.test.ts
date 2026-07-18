@@ -153,8 +153,10 @@ describe('table-def-v1 prototype (plan 011), retargeted to production types (pla
     it('rejects an option value outside the literal union', () => {
       defineTable<typeof tables>()('users', (t) => ({
         columns: [
-          // @ts-expect-error - 'bogus' is not a member of 'admin' | 'editor'
-          t.option('role').options([{ value: 'bogus', label: 'Bogus' }]),
+          t
+            .option('role')
+            // @ts-expect-error - 'bogus' is not a member of 'admin' | 'editor'
+            .options([{ value: 'bogus', label: 'Bogus' }]),
         ],
       }));
       expect(true).toBe(true);

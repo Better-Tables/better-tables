@@ -104,7 +104,9 @@ describe('tables.fetchData(table, params) -- table-scoped read surface', () => {
     // A same-shape-but-different-row assertion would still pass if the
     // return type had degraded to `unknown`/`any`; pin the User-specific
     // field directly instead.
-    expectTypeOf(tables.fetchData(usersTable, {})).resolves.not.toEqualTypeOf<FetchDataResult<Post>>();
+    expectTypeOf(tables.fetchData(usersTable, {})).resolves.not.toEqualTypeOf<
+      FetchDataResult<Post>
+    >();
   });
 
   it('primaryTable need not be passed -- params omits it entirely, not just makes it optional', () => {

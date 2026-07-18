@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { TicketsTableClient } from '@/components/sections/tickets-table-client';
 import { buttonVariants } from '@/components/ui/button';
+import type { FetchTicketsResult } from '@/lib/demo/support/fetch-tickets';
 import {
   buildRelationshipTrail,
   supportScenarioPresets,
@@ -11,7 +12,6 @@ import {
 import { serializeSupportPresetToUrl } from '@/lib/demo/support/serialize-preset';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 import { cn } from '@/lib/utils';
-import type { FetchTicketsResult } from '@/lib/demo/support/fetch-tickets';
 
 interface SupportDemoWorkspaceProps {
   fetchResult: FetchTicketsResult;
@@ -163,7 +163,10 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
           </div>
         </div>
         <div className="mt-4">
-          <Link href="/#interactive-demo" className={cn(buttonVariants({ variant: 'ghost' }), 'px-0')}>
+          <Link
+            href="/#interactive-demo"
+            className={cn(buttonVariants({ variant: 'ghost' }), 'px-0')}
+          >
             Back to homepage demo
           </Link>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { isFilterGroupNode } from '@better-tables/core';
+import { useMemo, useState } from 'react';
 import { QueryGroupsTableClient } from '@/components/sections/query-groups-table-client';
 import { buttonVariants } from '@/components/ui/button';
 import type { FetchTicketsResult } from '@/lib/demo/support/fetch-tickets';

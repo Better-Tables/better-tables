@@ -5,6 +5,7 @@ import { defineTableRow } from '@better-tables/core';
 import { drizzleAdapter } from '../src/factory';
 import Database from 'better-sqlite3';
 import { relations, sql } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
@@ -137,7 +138,7 @@ let usersTable: ReturnType<typeof buildUsersTable> | undefined;
 let columns: ReturnType<typeof buildUsersTable>['columns'];
 
 // Example usage
-async function setupDatabase(): Promise<any> {
+async function setupDatabase(): Promise<{ db: BetterSQLite3Database; sqlite: Database }> {
   // Create in-memory SQLite database
   const sqlite = new Database(':memory:');
   const db = drizzle(sqlite, { schema: { ...schema, ...relationsSchema } });

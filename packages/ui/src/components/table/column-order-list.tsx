@@ -177,7 +177,11 @@ function ColumnOrderItem<TData = unknown>({
           {isVisible ? (
             <Eye size={COLUMN_ORDER_ICON_SIZE} className="text-muted-foreground" strokeWidth={2} />
           ) : (
-            <EyeOff size={COLUMN_ORDER_ICON_SIZE} className="text-muted-foreground" strokeWidth={2} />
+            <EyeOff
+              size={COLUMN_ORDER_ICON_SIZE}
+              className="text-muted-foreground"
+              strokeWidth={2}
+            />
           )}
         </button>
       ) : (
@@ -192,7 +196,9 @@ function ColumnOrderItem<TData = unknown>({
       )}
 
       {/* Column name */}
-      <span className={cn('min-w-0 flex-1 truncate text-left', !isVisible && 'text-muted-foreground')}>
+      <span
+        className={cn('min-w-0 flex-1 truncate text-left', !isVisible && 'text-muted-foreground')}
+      >
         {column.displayName}
       </span>
     </div>

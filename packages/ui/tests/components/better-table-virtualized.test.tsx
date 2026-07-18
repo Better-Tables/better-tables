@@ -16,9 +16,9 @@ const usersTable = defineTableRow<Row>()('users', (t) => ({
   columns: [t.text('name')],
 }));
 
-/** Data rows only — excludes the two aria-hidden spacer rows. */
+/** Data rows only — excludes the two virtual spacer rows. */
 function dataRowCount(container: HTMLElement): number {
-  return container.querySelectorAll('tbody tr:not([aria-hidden="true"])').length;
+  return container.querySelectorAll('tbody tr:not([data-virtual-spacer="true"])').length;
 }
 
 /**
@@ -27,8 +27,8 @@ function dataRowCount(container: HTMLElement): number {
  * (happy-dom won't show that, so read the cell the browser actually sizes).
  */
 function spacerHeights(container: HTMLElement): number[] {
-  return Array.from(container.querySelectorAll('tbody tr[aria-hidden="true"] > td')).map((td) =>
-    Number.parseFloat((td as HTMLElement).style.height || '0')
+  return Array.from(container.querySelectorAll('tbody tr[data-virtual-spacer="true"] > td')).map(
+    (td) => Number.parseFloat((td as HTMLElement).style.height || '0')
   );
 }
 
@@ -117,7 +117,7 @@ describe('BetterTable `virtualized` prop (finding 6)', () => {
       <BetterTable table={usersTable} data={makeRows(1000)} virtualized={{ height: 500 }} />
     );
 
-    const spacerRows = container.querySelectorAll('tbody tr[aria-hidden="true"]');
+    const spacerRows = container.querySelectorAll('tbody tr[data-virtual-spacer="true"]');
     expect(spacerRows.length).toBeGreaterThan(0);
 
     for (const spacerRow of spacerRows) {

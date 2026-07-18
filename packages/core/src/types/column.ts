@@ -31,11 +31,7 @@ export type ColumnType = (typeof COLUMN_TYPES)[number];
 /**
  * Column definition for table columns
  */
-export interface ColumnDefinition<
-  TData = unknown,
-  TValue = unknown,
-  TId extends string = string,
-> {
+export interface ColumnDefinition<TData = unknown, TValue = unknown, TId extends string = string> {
   /** Unique column identifier */
   id: TId;
 

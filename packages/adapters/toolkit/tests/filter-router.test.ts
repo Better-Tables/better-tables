@@ -342,10 +342,7 @@ describe('FilterRouter.buildNodeCondition (plan 017 group translation)', () => {
     const node: FilterGroupNode = {
       kind: 'group',
       logic: 'or',
-      children: [
-        leaf('a'),
-        { kind: 'group', logic: 'and', children: [leaf('b'), leaf('c')] },
-      ],
+      children: [leaf('a'), { kind: 'group', logic: 'and', children: [leaf('b'), leaf('c')] }],
     };
     const result = router.buildNodeCondition(node, leafCondition);
     expect(result?.kind).toBe('or');

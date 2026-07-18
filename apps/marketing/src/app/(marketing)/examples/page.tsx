@@ -3,7 +3,8 @@ import { constructMetadata } from '@/lib/utils';
 
 export const metadata = constructMetadata({
   title: 'Examples',
-  description: 'Four live Better Tables examples: relationship filtering, query groups, virtualization, and facets.',
+  description:
+    'Four live Better Tables examples: relationship filtering, query groups, virtualization, and facets.',
 });
 
 const EXAMPLES = [

@@ -526,7 +526,12 @@ export abstract class BaseQueryBuilder {
    */
   protected resolveFacetLimit(limit?: number | null): number | null {
     if (limit === null) return null;
-    if (typeof limit === 'number' && Number.isFinite(limit) && Number.isInteger(limit) && limit > 0) {
+    if (
+      typeof limit === 'number' &&
+      Number.isFinite(limit) &&
+      Number.isInteger(limit) &&
+      limit > 0
+    ) {
       return limit;
     }
     return 100;

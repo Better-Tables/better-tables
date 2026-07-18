@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
 import { parseTableSearchParams } from '@better-tables/core';
+import { Suspense } from 'react';
 import { FacetsSidebar } from '@/components/sections/facets-sidebar';
 import { FacetsTableClient } from '@/components/sections/facets-table-client';
 import { SourceView } from '@/components/sections/source-view';
@@ -9,7 +9,8 @@ import { constructMetadata } from '@/lib/utils';
 
 export const metadata = constructMetadata({
   title: 'Facets example',
-  description: 'A filter-aware facet sidebar built on getFacetedValues/getMinMaxValues, with self-exclusion.',
+  description:
+    'A filter-aware facet sidebar built on getFacetedValues/getMinMaxValues, with self-exclusion.',
 });
 
 interface FacetsPageProps {
@@ -46,8 +47,8 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
           The sidebar wires <code>useFacets</code> + <code>httpAdapter</code> to a one-line{' '}
-          <code>createAdapterRouteHandler</code>: the batching, self-exclusion, and{' '}
-          <code>Map</code> handling are shipped primitives. Only the presentation below is app code.
+          <code>createAdapterRouteHandler</code>: the batching, self-exclusion, and <code>Map</code>{' '}
+          handling are shipped primitives. Only the presentation below is app code.
         </p>
       </div>
 
@@ -67,7 +68,9 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
           aria-label="Facets ticket table"
           className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-6"
         >
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading table...</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">Loading table...</div>}
+          >
             <FacetsTableClient
               data={fetchResult.result.data ?? []}
               totalCount={fetchResult.result.total ?? 0}

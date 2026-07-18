@@ -10,9 +10,7 @@ describe('getFormatterForType date coercion', () => {
   });
 
   it('formats epoch-millisecond numbers like Date instances', () => {
-    expect(getFormatterForType('date', asDate.getTime())).toBe(
-      getFormatterForType('date', asDate)
-    );
+    expect(getFormatterForType('date', asDate.getTime())).toBe(getFormatterForType('date', asDate));
   });
 
   it('returns unparseable strings as-is', () => {

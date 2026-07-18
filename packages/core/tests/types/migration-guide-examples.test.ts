@@ -24,9 +24,12 @@ import { betterTables, defineTable } from '../../src/factory';
 import { FilterManager } from '../../src/managers/filter-manager';
 import type { FetchDataParams, FetchDataResult, TableAdapter } from '../../src/types/adapter';
 import type { ColumnDefinition } from '../../src/types/column';
-import { deserializeFiltersFromURL, serializeFiltersToURL } from '../../src/utils/filter-serialization';
 import type { FilterGroupNode, FilterState } from '../../src/types/filter';
 import type { SchemaAwareAdapter } from '../../src/types/paths';
+import {
+  deserializeFiltersFromURL,
+  serializeFiltersToURL,
+} from '../../src/utils/filter-serialization';
 
 interface User {
   id: string;
@@ -46,12 +49,14 @@ describe('MIGRATION.md §1 — betterTables + defineTable', () => {
   const fakeAdapter = {} as SchemaAwareAdapter<{ tables: Schema }>;
 
   it('0.6: app-level betterTables() instance + defineTable() per table', () => {
-    const tables = betterTables({ // 0.6
+    const tables = betterTables({
+      // 0.6
       database: fakeAdapter,
       defaults: { pageSize: 20 },
     });
 
-    const usersTable = defineTable<typeof tables>()('users', (t) => ({ // 0.6
+    const usersTable = defineTable<typeof tables>()('users', (t) => ({
+      // 0.6
       columns: [t.text('name'), t.text('email')],
     }));
     // also supported: tables.define('users', (t) => ({ ... })) -- method form
@@ -211,14 +216,16 @@ describe('MIGRATION.md §4 — literal-preserving column ids', () => {
 
 describe('MIGRATION.md §5 — filter groups', () => {
   it('0.6: a flat array still means implicit AND (unchanged ergonomics)', () => {
-    const flatParams: FetchDataParams = { // 0.6
+    const flatParams: FetchDataParams = {
+      // 0.6
       filters: [{ columnId: 'status', type: 'text', operator: 'equals', values: ['active'] }],
     };
     expect(Array.isArray(flatParams.filters)).toBe(true);
   });
 
   it('0.6: a FilterGroupNode expresses OR / nesting', () => {
-    const groupParams: FetchDataParams = { // 0.6
+    const groupParams: FetchDataParams = {
+      // 0.6
       filters: {
         kind: 'group',
         logic: 'or',
@@ -240,7 +247,9 @@ describe('MIGRATION.md §5 — filter groups', () => {
   });
 
   it('0.6: deserializeFiltersFromURL widens to FilterState[] | FilterGroupNode -- narrow before indexing', () => {
-    const flat: FilterState[] = [{ columnId: 'status', type: 'text', operator: 'equals', values: ['active'] }];
+    const flat: FilterState[] = [
+      { columnId: 'status', type: 'text', operator: 'equals', values: ['active'] },
+    ];
     const url = serializeFiltersToURL(flat); // always emits c2:
     expect(url.startsWith('c2:')).toBe(true);
 
@@ -256,7 +265,9 @@ describe('MIGRATION.md §5 — filter groups', () => {
   });
 
   it('0.5: indexing the deserialized result as an array unconditionally no longer type-checks', () => {
-    const flat: FilterState[] = [{ columnId: 'status', type: 'text', operator: 'equals', values: ['active'] }];
+    const flat: FilterState[] = [
+      { columnId: 'status', type: 'text', operator: 'equals', values: ['active'] },
+    ];
     const url = serializeFiltersToURL(flat);
     const filters = deserializeFiltersFromURL(url);
     // @ts-expect-error - MIGRATION.md §5: `filters` may be a FilterGroupNode
@@ -306,13 +317,17 @@ describe('MIGRATION.md §6 — filter state layer semantics', () => {
   it('0.6: getFilters() is a flattened display view; setFilters() replaces the whole stored value', () => {
     const filterManager = new FilterManager<User>(columns, []);
 
-    filterManager.setFilters([{ columnId: 'status', type: 'text', operator: 'equals', values: ['active'] }]); // 0.6
-    expect(filterManager.getFilters()).toEqual([ // 0.6
+    filterManager.setFilters([
+      { columnId: 'status', type: 'text', operator: 'equals', values: ['active'] },
+    ]); // 0.6
+    expect(filterManager.getFilters()).toEqual([
+      // 0.6
       { columnId: 'status', type: 'text', operator: 'equals', values: ['active'] },
     ]);
 
     // setFilterNode() with a group is stored as a real tree...
-    filterManager.setFilterNode({ // 0.6
+    filterManager.setFilterNode({
+      // 0.6
       kind: 'group',
       logic: 'or',
       children: [
@@ -321,7 +336,8 @@ describe('MIGRATION.md §6 — filter state layer semantics', () => {
       ],
     });
     // ...getFilterNode() reads the real tree back...
-    expect(filterManager.getFilterNode()).toEqual({ // 0.6
+    expect(filterManager.getFilterNode()).toEqual({
+      // 0.6
       kind: 'group',
       logic: 'or',
       children: [
@@ -330,14 +346,18 @@ describe('MIGRATION.md §6 — filter state layer semantics', () => {
       ],
     });
     // ...while getFilters() flattens it to leaves for display.
-    expect(filterManager.getFilters()).toEqual([ // 0.6
+    expect(filterManager.getFilters()).toEqual([
+      // 0.6
       { columnId: 'status', type: 'text', operator: 'equals', values: ['active'] },
       { columnId: 'role', type: 'text', operator: 'equals', values: ['admin'] },
     ]);
 
     // setFilters() deterministically REPLACES the tree -- no silent merge.
-    filterManager.setFilters([{ columnId: 'status', type: 'text', operator: 'equals', values: ['inactive'] }]); // 0.6
-    expect(filterManager.getFilterNode()).toEqual([ // 0.6
+    filterManager.setFilters([
+      { columnId: 'status', type: 'text', operator: 'equals', values: ['inactive'] },
+    ]); // 0.6
+    expect(filterManager.getFilterNode()).toEqual([
+      // 0.6
       { columnId: 'status', type: 'text', operator: 'equals', values: ['inactive'] },
     ]);
   });
@@ -406,7 +426,8 @@ describe('MIGRATION.md §12 — tables.fetchData(table, params)', () => {
       columns: [t.text('name'), t.text('email')],
     }));
 
-    const result = await tables.fetchData(usersTable, { // 0.6
+    const result = await tables.fetchData(usersTable, {
+      // 0.6
       pagination: { page: 1, limit: 20 },
     });
 

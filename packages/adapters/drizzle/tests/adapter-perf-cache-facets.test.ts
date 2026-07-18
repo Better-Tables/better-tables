@@ -2,13 +2,13 @@
  * Plan 040: bounded LRU cache + facet LIMIT default top-100.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { getTableColumns } from '../src/utils/drizzle-schema-utils';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { drizzleAdapter } from '../src/factory';
+import { getTableColumns } from '../src/utils/drizzle-schema-utils';
 
 const items = sqliteTable('items', {
   id: integer('id').primaryKey(),
@@ -80,17 +80,14 @@ describe('Plan 040 — bounded LRU cache', () => {
   });
 
   it('deletes expired entries on access', async () => {
-    const shortTtl = drizzleAdapter(
-      drizzle(sqlite, { schema }),
-      {
-        driver: 'sqlite',
-        schema,
-        options: {
-          defaultPrimaryTable: 'items',
-          cache: { enabled: true, ttl: 1, maxSize: 10 },
-        },
-      }
-    );
+    const shortTtl = drizzleAdapter(drizzle(sqlite, { schema }), {
+      driver: 'sqlite',
+      schema,
+      options: {
+        defaultPrimaryTable: 'items',
+        cache: { enabled: true, ttl: 1, maxSize: 10 },
+      },
+    });
     await shortTtl.fetchData({
       primaryTable: 'items',
       columns: ['category'],
