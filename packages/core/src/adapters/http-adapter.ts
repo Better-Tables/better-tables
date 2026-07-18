@@ -186,16 +186,33 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     async fetchData(params: FetchDataParams): Promise<FetchDataResult<TData>> {
       // `signal` drives THIS fetch's cancellation; it's not sent over the wire.
       const { signal, ...serializable } = params;
-      const result = await send({ method: 'fetchData', params: serializable }, signal);
-      return result as FetchDataResult<TData>;
+      const result = (await send(
+        { method: 'fetchData', params: serializable },
+        signal
+      )) as FetchDataResult<TData> & {
+        faceted?: Record<string, [string, number][] | Map<string, number>>;
+      };
+      if (result.faceted) {
+        const rebuilt: Record<string, Map<string, number>> = {};
+        for (const [key, value] of Object.entries(result.faceted)) {
+          rebuilt[key] = value instanceof Map ? value : new Map(value);
+        }
+        return { ...result, faceted: rebuilt };
+      }
+      return result;
     },
 
     async getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]> {
-      const result = await send({
-        method: 'getFilterOptions',
-        columnId,
-        ...(params ? { params } : {}),
-      });
+      const { signal, ...serializable } = params ?? {};
+      const hasParams = Object.keys(serializable).length > 0;
+      const result = await send(
+        {
+          method: 'getFilterOptions',
+          columnId,
+          ...(hasParams ? { params: serializable } : {}),
+        },
+        signal
+      );
       return result as FilterOption[];
     },
 
@@ -203,21 +220,31 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       columnId: string,
       params?: FacetQueryParams
     ): Promise<Map<string, number>> {
-      const result = await send({
-        method: 'getFacetedValues',
-        columnId,
-        ...(params ? { params } : {}),
-      });
+      const { signal, ...serializable } = params ?? {};
+      const hasParams = Object.keys(serializable).length > 0;
+      const result = await send(
+        {
+          method: 'getFacetedValues',
+          columnId,
+          ...(hasParams ? { params: serializable } : {}),
+        },
+        signal
+      );
       // The server sends a `Map` as its `[value, count][]` entries.
       return new Map(result as [string, number][]);
     },
 
     async getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]> {
-      const result = await send({
-        method: 'getMinMaxValues',
-        columnId,
-        ...(params ? { params } : {}),
-      });
+      const { signal, ...serializable } = params ?? {};
+      const hasParams = Object.keys(serializable).length > 0;
+      const result = await send(
+        {
+          method: 'getMinMaxValues',
+          columnId,
+          ...(hasParams ? { params: serializable } : {}),
+        },
+        signal
+      );
       return result as [number, number];
     },
   };

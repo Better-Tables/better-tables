@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
   const { result, error } = await fetchTickets({ page, limit, filters, sorting });
 
   if (error) {
-    return NextResponse.json({ error, details: error }, { status: 500 });
+    console.error('[api/tickets]', error);
+    return NextResponse.json({ error: 'Failed to load demo data.' }, { status: 500 });
   }
 
   return NextResponse.json({

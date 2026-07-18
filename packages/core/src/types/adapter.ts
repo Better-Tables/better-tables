@@ -197,6 +197,12 @@ export interface FacetQueryParams {
    * responsibility, not the caller's.
    */
   filters?: FilterState[] | FilterGroupNode;
+
+  /**
+   * Transport-level cancellation for this read. Never serialized by wire
+   * adapters; in-process adapters may ignore it.
+   */
+  signal?: AbortSignal;
 }
 
 /**
