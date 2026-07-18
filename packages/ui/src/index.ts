@@ -19,6 +19,7 @@ export * from './components/filters/inputs/text-filter-input';
 export * from './components/table/action-confirmation-dialog';
 export * from './components/table/actions-toolbar';
 export * from './components/table/column-visibility-toggle';
+export * from './components/table/editable-cell';
 export * from './components/table/empty-state';
 export * from './components/table/error-state';
 export * from './components/table/sort-order-list';

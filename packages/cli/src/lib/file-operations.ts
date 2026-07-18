@@ -102,6 +102,7 @@ const UI_SOURCE_FILES = {
       'column-order-list.tsx',
       'column-visibility-toggle.tsx',
       'drop-indicator.tsx',
+      'editable-cell.tsx',
       'empty-state.tsx',
       'error-state.tsx',
       'index.ts',
@@ -134,6 +135,7 @@ const UI_SOURCE_FILES = {
   hooks: [
     'index.ts',
     'use-debounce.ts',
+    'use-editable-cells.ts',
     'use-filter-validation.ts',
     'use-has-primary-touch.tsx',
     'use-keyboard-navigation.ts',
