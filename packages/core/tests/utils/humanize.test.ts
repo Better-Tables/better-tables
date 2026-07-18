@@ -1,24 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 import { OptionColumnBuilder } from '../../src/builders/option-column-builder';
-import { humanize } from '../../src/utils/humanize';
-
-describe('humanize', () => {
-  it('humanizes snake_case', () => {
-    expect(humanize('multi_word_value')).toBe('Multi Word Value');
-  });
-
-  it('humanizes kebab-case', () => {
-    expect(humanize('multi-word-value')).toBe('Multi Word Value');
-  });
-
-  it('humanizes camelCase', () => {
-    expect(humanize('multiWordValue')).toBe('Multi Word Value');
-  });
-
-  it('humanizes a single word', () => {
-    expect(humanize('active')).toBe('Active');
-  });
-});
 
 describe('option auto-labels via humanize', () => {
   it('humanizes bare option values as default labels', () => {

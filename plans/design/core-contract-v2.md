@@ -572,9 +572,11 @@ and can be added later as an explicit `SearchNode` union member without breaking
 the base shape. Revisit only if scoped/boolean search demand appears.
 
 **(d) How does plan 002's mutation routing surface in v2 write signatures?**
-**Recommendation:** make the target table **explicit** in write signatures,
-keyed off plan 011's schema, instead of the current implicit "first schema
-table" default that plan 002 is fixing. Sketch:
+**RESOLVED (maintainer, 2026-07-17 / plan 047):** explicit table on the
+instance write surface (`tables.createRecord(table, data)`), with option A —
+instance injects `{ table }` via `MutationOptions`; low-level
+`database.createRecord(data)` keeps `defaultMutationTable` as fallback.
+Shipped in the 0.6 train. Original sketch:
 
 ```typescript
 // v2 write surface on the instance (schema-aware, table is a checked key):

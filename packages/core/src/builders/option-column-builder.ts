@@ -7,8 +7,8 @@
  * @module builders/option-column-builder
  */
 
+import { humanize } from '../lib/format-utils';
 import type { FilterConfig, FilterOption } from '../types/filter';
-import { humanize } from '../utils/humanize';
 import { ColumnBuilder } from './column-builder';
 
 /** Default priority levels used by `.priority()` when called with no arguments. */

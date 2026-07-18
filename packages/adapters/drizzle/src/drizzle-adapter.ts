@@ -959,10 +959,21 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    *   the schema, or if the schema has multiple tables and no
    *   `defaultMutationTable` is configured.
    */
-  private resolveMutationTable(): string {
+  private resolveMutationTable(explicitTable?: string): string {
     const tableNames = Object.keys(this.schema);
     if (tableNames.length === 0) {
       throw new SchemaError('No tables found in schema', { schema: this.schema });
+    }
+
+    // Per-call target from the instance write surface (plan 047) wins.
+    if (explicitTable !== undefined) {
+      if (!tableNames.includes(explicitTable)) {
+        throw new SchemaError(`Mutation table '${explicitTable}' is not present in the schema`, {
+          table: explicitTable,
+          availableTables: tableNames,
+        });
+      }
+      return explicitTable;
     }
 
     const configuredTable = this.options?.defaultMutationTable;
@@ -1008,11 +1019,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Create new record
    */
   async createRecord(
-    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>,
+    options?: { table?: string }
   ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     // Resolved before the try block so routing failures surface as SchemaError
     // rather than being wrapped in a QueryError below.
-    const primaryTable = this.resolveMutationTable();
+    const primaryTable = this.resolveMutationTable(options?.table);
     try {
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
         primaryTable
@@ -1042,11 +1054,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
   async updateRecord(
     id: string,
-    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>
+    data: Partial<InferSelectModelFromFilteredSchema<TSchema>>,
+    options?: { table?: string }
   ): Promise<InferSelectModelFromFilteredSchema<TSchema>> {
     // Resolved before the try block so routing failures surface as SchemaError
     // rather than being wrapped in a QueryError below.
-    const primaryTable = this.resolveMutationTable();
+    const primaryTable = this.resolveMutationTable(options?.table);
     try {
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[
         primaryTable
@@ -1074,10 +1087,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   /**
    * Delete record
    */
-  async deleteRecord(id: string): Promise<void> {
+  async deleteRecord(id: string, options?: { table?: string }): Promise<void> {
     // Resolved before the try block so routing failures surface as SchemaError
     // rather than being wrapped in a QueryError below.
-    const primaryTable = this.resolveMutationTable();
+    const primaryTable = this.resolveMutationTable(options?.table);
     try {
       const mainTableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable] as
         | TableWithId

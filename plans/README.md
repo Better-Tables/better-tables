@@ -72,7 +72,7 @@ the breaking window.
 | [036](036-date-between-timestamp-fallback.md) | Date `between`/`notBetween` timestamp fallback + pg/mysql `between` coverage + router unit tests | none | DONE (wave-a) |
 | [040](040-adapter-performance.md) | Adapter perf: transformer memoization, bounded LRU cache, **facet LIMIT default top-100** (behavior change — 0.6 window) | none | DONE (wave-a) |
 | [046](046-path-types-finalization.md) | Finalize path-typed columns: promote from `experimental/` → core, runtime `humanize()` auto-labels, document depth-3 override, retire stale prototypes | none | DONE (wave-a) |
-| [047](047-typed-write-surface.md) | Typed explicit-table writes (`createRecord/updateRecord/deleteRecord`) on the instance — **into the 0.6 train** | 018, 002 (done) | TODO |
+| [047](047-typed-write-surface.md) | Typed explicit-table writes (`createRecord/updateRecord/deleteRecord`) on the instance — **into the 0.6 train** | 018, 002 (done) | DONE (wave-a) |
 
 ### Wave B — quality, hardening, hygiene (any time; several rebase over Wave A)
 

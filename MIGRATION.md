@@ -541,6 +541,25 @@ export function getTables() {
 }
 ```
 
+## 14. Instance writes take an explicit table
+
+Reads already used `tables.fetchData(table, params)`. Writes now match:
+
+```ts
+// Before (0.5 / early 0.6 interim): implicit mutation table via
+// defaultMutationTable / first schema table
+await database.createRecord({ subject: '…' });
+
+// After: table-scoped instance writes (plan 047)
+await tables.createRecord(ticketsTable, { subject: '…' });
+await tables.updateRecord(ticketsTable, id, { subject: '…' });
+await tables.deleteRecord(ticketsTable, id);
+```
+
+The low-level `database.createRecord(data)` path remains for single-table
+schemas and for callers who set `defaultMutationTable`. The instance surface
+is the recommended multi-table write API.
+
 ## 13. Facet value queries default to top-100 by count
 
 `getFacetedValues` / `getFilterOptions` now return at most **100** distinct

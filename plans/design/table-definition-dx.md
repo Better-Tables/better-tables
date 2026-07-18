@@ -890,8 +890,9 @@ type). Re-measure the perf fixture before ever changing the global default.
 
 **(d) `t.option` auto-label: `Capitalize` vs. a humanize runtime helper.**
 **RESOLVED (maintainer, 2026-07-17 / plan 046):** runtime `humanize()` helper
-(`packages/core/src/utils/humanize.ts`); bare `.options(['multi_word_value'])`
-defaults to `'Multi Word Value'`; explicit `{value,label}` still overrides.
+(existing `packages/core/src/lib/format-utils.ts`); bare
+`.options(['multi_word_value'])` defaults to `'Multi Word Value'`; explicit
+`{value,label}` still overrides.
 
 **(e) Data-bridge shape for RSC: route handler vs. server actions vs.
 both.**

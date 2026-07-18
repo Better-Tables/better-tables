@@ -290,6 +290,46 @@ describe('betterTables() instance', () => {
     });
   });
 
+  describe('tables.createRecord/updateRecord/deleteRecord -- table-scoped writes (plan 047)', () => {
+    it('injects { table: table.tableName } into createRecord/updateRecord/deleteRecord', async () => {
+      const adapter = createMockAdapter();
+      const createCalls: unknown[] = [];
+      const updateCalls: unknown[] = [];
+      const deleteCalls: unknown[] = [];
+      adapter.createRecord = async (data, options) => {
+        createCalls.push({ data, options });
+        return { id: '1', name: 'Ada', email: 'a@x.com', age: 1, ...data } as TestRecord;
+      };
+      adapter.updateRecord = async (id, data, options) => {
+        updateCalls.push({ id, data, options });
+        return { id, name: 'Ada', email: 'a@x.com', age: 1, ...data } as TestRecord;
+      };
+      adapter.deleteRecord = async (id, options) => {
+        deleteCalls.push({ id, options });
+      };
+
+      const tables = betterTables({ database: adapter });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name')],
+      }));
+
+      await tables.createRecord(usersTable, { name: 'Ada' });
+      await tables.updateRecord(usersTable, '1', { name: 'Ada Lovelace' });
+      await tables.deleteRecord(usersTable, '1');
+
+      expect(createCalls[0]).toEqual({
+        data: { name: 'Ada' },
+        options: { table: 'users' },
+      });
+      expect(updateCalls[0]).toEqual({
+        id: '1',
+        data: { name: 'Ada Lovelace' },
+        options: { table: 'users' },
+      });
+      expect(deleteCalls[0]).toEqual({ id: '1', options: { table: 'users' } });
+    });
+  });
+
   describe('defineTableRow() -- tier-2 escape hatch (schema-less adapters)', () => {
     interface RestCustomer {
       id: string;
