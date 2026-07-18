@@ -160,6 +160,23 @@ describe('PrimaryTableResolver', () => {
       expect(suggestions.slgu).toContain('surveys.slug');
     });
 
+    it('should suggest the correct table prefix when the column name is exact but the prefix is wrong', () => {
+      const resolver = new PrimaryTableResolver(schema, relationships);
+      let caught: unknown;
+      try {
+        resolver.resolve(['user.name']);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(SchemaError);
+      const schemaError = caught as SchemaError;
+      expect(schemaError.message).toContain('did you mean');
+      expect(schemaError.message).toContain('users.name');
+      const suggestions = schemaError.details?.suggestions as Record<string, string[]>;
+      expect(suggestions['user.name']).toContain('users.name');
+    });
+
     it('should handle mixed direct and accessor columns correctly', () => {
       const resolver = new PrimaryTableResolver(schema, relationships);
       // 'slug' is direct, 'title' is accessor-based

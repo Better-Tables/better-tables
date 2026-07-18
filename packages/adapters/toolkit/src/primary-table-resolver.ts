@@ -338,8 +338,9 @@ export class PrimaryTableResolver<TTable = unknown> {
           continue;
         }
         const distance = calculateLevenshteinDistance(fieldName, columnName);
-        if (distance > 0 && distance <= maxDistance) {
-          candidates.push({ qualified: `${tableName}.${columnName}`, distance });
+        const qualified = `${tableName}.${columnName}`;
+        if (distance >= 0 && distance <= maxDistance && qualified !== columnId) {
+          candidates.push({ qualified, distance });
         }
       }
     }
