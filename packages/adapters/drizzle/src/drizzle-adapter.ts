@@ -1475,6 +1475,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     }
 
     const maxSize = this.options?.cache?.maxSize ?? 500;
+    // Non-positive / non-finite capacity means no-cache (clear any residual).
+    if (!Number.isFinite(maxSize) || maxSize <= 0) {
+      this.cache.clear();
+      return;
+    }
+
     if (this.cache.has(key)) {
       this.cache.delete(key);
     }

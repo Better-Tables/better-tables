@@ -904,7 +904,10 @@ export interface DrizzleAdapterOptions {
   cache?: {
     enabled: boolean;
     ttl: number;
-    /** Max cached entries (LRU eviction). Default 500. */
+    /**
+     * Max cached entries (LRU eviction). Default 500.
+     * Non-positive values disable caching (no entries retained).
+     */
     maxSize?: number;
   };
 

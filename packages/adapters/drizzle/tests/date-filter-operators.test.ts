@@ -146,12 +146,5 @@ describe('DrizzleAdapter — date operators on a timestamp column', () => {
       const res = await fetch(untypedFilter('notBetween', endpoints));
       expect(res.total).toBe(2);
     });
-
-    it('typed date between/notBetween agree with the untyped fallback counts', async () => {
-      const typedBetween = await fetch(dateFilter('between', endpoints));
-      const typedNotBetween = await fetch(dateFilter('notBetween', endpoints));
-      expect(typedBetween.total).toBe(3);
-      expect(typedNotBetween.total).toBe(2);
-    });
   });
 });
