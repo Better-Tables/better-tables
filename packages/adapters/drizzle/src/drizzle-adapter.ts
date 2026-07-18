@@ -899,14 +899,14 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
   async describeColumns(table?: string): Promise<InferredColumnSpec[]> {
     const primaryTable = this.resolvePrimaryTableForRead(undefined, table);
-    const tableSchema = this.schema[primaryTable];
+    const tableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable];
     if (!tableSchema) {
       throw new SchemaError(`Table '${primaryTable}' is not present in the schema`, {
         table: primaryTable,
         availableTables: Object.keys(this.schema),
       });
     }
-    return describeTableColumns(tableSchema as AnyTableType);
+    return describeTableColumns(tableSchema);
   }
 
   /**

@@ -19,7 +19,7 @@ import {
   timestamp as pgTimestamp,
 } from 'drizzle-orm/pg-core';
 import { blob, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { AnyTableType } from '../src/types';
+import type { AnyColumnType, AnyTableType } from '../src/types';
 import {
   describeTableColumns,
   isTimestampDrizzleColumn,
@@ -160,12 +160,11 @@ describe('describeTableColumns (plan 054)', () => {
 
 describe('isTimestampDrizzleColumn (shared with the predicate emitter)', () => {
   it('recognizes pg and sqlite timestamp columns, rejects plain columns', () => {
-    const pgCols = pgTickets as unknown as Record<string, never>;
-    const sqCols = sqliteTickets as unknown as Record<string, never>;
-    expect(isTimestampDrizzleColumn(pgCols.createdAt)).toBe(true);
-    expect(isTimestampDrizzleColumn(sqCols.createdAt)).toBe(true);
-    expect(isTimestampDrizzleColumn(pgCols.subject)).toBe(false);
-    expect(isTimestampDrizzleColumn(sqCols.resolved)).toBe(false);
+    const asColumn = (column: unknown) => column as AnyColumnType;
+    expect(isTimestampDrizzleColumn(asColumn(pgTickets.createdAt))).toBe(true);
+    expect(isTimestampDrizzleColumn(asColumn(sqliteTickets.createdAt))).toBe(true);
+    expect(isTimestampDrizzleColumn(asColumn(pgTickets.subject))).toBe(false);
+    expect(isTimestampDrizzleColumn(asColumn(sqliteTickets.resolved))).toBe(false);
   });
 });
 
