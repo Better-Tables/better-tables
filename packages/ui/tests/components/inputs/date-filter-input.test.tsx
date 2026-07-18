@@ -68,6 +68,6 @@ describe('DateFilterInput (plan 042 step 1)', () => {
     expect(screen.getByText(/doesn't require a date selection/i)).toBeDefined();
     expect(screen.queryByRole('button', { name: /pick a date/i })).toBeNull();
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange.mock.calls[0]?.[0]).toEqual([]);
+    expect((onChange.mock.calls[0] as unknown[] | undefined)?.[0]).toEqual([]);
   });
 });

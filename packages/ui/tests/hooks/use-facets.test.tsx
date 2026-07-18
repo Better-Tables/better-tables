@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, jest } from 'bun:test';
 import type { FilterState } from '@better-tables/core';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useFacets } from '../../src/hooks/use-facets';
 import {
   createDeferredFetchAdapter,
@@ -165,7 +165,11 @@ describe('useFacets (plan 032 step 4, finding 7)', () => {
 
     renderHook(() => useFacets({ adapter, filters: [] }));
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    jest.useFakeTimers();
+    await act(async () => {
+      jest.advanceTimersByTime(50);
+    });
+    jest.useRealTimers();
     expect(facetCalls.length).toBe(0);
     expect(rangeCalls.length).toBe(0);
   });

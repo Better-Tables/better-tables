@@ -183,17 +183,14 @@ describe('useTableUrlSync', () => {
     renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
 
     await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    await act(async () => {});
 
     const store = getTableStore(TABLE_ID);
     if (!store) throw new Error('Expected table store');
 
-    // Prime hydration so the subscribe handler is active.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
     const callsBeforeBurst = setParamsCalls.length;
 
+    jest.useFakeTimers();
     act(() => {
       store.getState().manager.addFilter({
         columnId: 'name',
@@ -214,8 +211,9 @@ describe('useTableUrlSync', () => {
     });
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
     });
+    jest.useRealTimers();
 
     const burstCalls = setParamsCalls.slice(callsBeforeBurst);
     expect(burstCalls.length).toBe(1);

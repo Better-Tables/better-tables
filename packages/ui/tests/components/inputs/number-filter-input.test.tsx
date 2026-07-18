@@ -39,10 +39,14 @@ describe('NumberFilterInput (plan 042 step 1)', () => {
       />
     );
 
-    const [minInput, maxInput] = screen.getAllByRole('spinbutton');
-    fireEvent.change(minInput, { target: { value: '10' } });
-    fireEvent.change(maxInput, { target: { value: '20' } });
-    fireEvent.blur(maxInput);
+    const inputs = screen.getAllByRole('spinbutton');
+    const minInput = inputs[0];
+    const maxInput = inputs[1];
+    expect(minInput).toBeDefined();
+    expect(maxInput).toBeDefined();
+    fireEvent.change(minInput!, { target: { value: '10' } });
+    fireEvent.change(maxInput!, { target: { value: '20' } });
+    fireEvent.blur(maxInput!);
 
     expect(onChange.mock.calls[0]?.[0]).toEqual([10, 20]);
   });
