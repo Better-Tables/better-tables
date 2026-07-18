@@ -521,6 +521,8 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
             computedFieldFilters.push({ filter, config: computedField });
           }
         }
+      } else {
+        this.rejectComputedFieldFiltersInTree(processedFilters, tableComputedFields);
       }
 
       // Build cache params early (needed for error handling)
@@ -1416,6 +1418,32 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   /**
    * Utility methods
    */
+
+  /**
+   * Computed-field filter substitution (plan 017) only runs on flat
+   * `FilterState[]` inputs. Filter trees must fail loudly until the
+   * computed-fields owner extends substitution to walk `FilterGroupNode`
+   * trees (plan 051 — documented, not implemented here).
+   */
+  private rejectComputedFieldFiltersInTree(
+    node: FilterGroupNode,
+    tableComputedFields: ComputedFieldConfig[]
+  ): void {
+    for (const child of node.children) {
+      if (isFilterGroupNode(child)) {
+        this.rejectComputedFieldFiltersInTree(child, tableComputedFields);
+        continue;
+      }
+
+      const computedField = tableComputedFields.find((cf) => cf.field === child.columnId);
+      if (computedField?.filter || computedField?.filterSql) {
+        throw new QueryError(
+          `Computed-field filters inside a FilterGroupNode are not supported yet (columnId: "${child.columnId}"). Use a flat FilterState[] (implicit AND) for computed-field filters, or flatten the tree at the call site. See MIGRATION.md "Known gaps".`,
+          { columnId: child.columnId, field: computedField.field }
+        );
+      }
+    }
+  }
 
   /**
    * Depth of a {@link FilterNode}'s group nesting: a leaf is depth 0; a group
