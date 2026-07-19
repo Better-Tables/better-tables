@@ -101,8 +101,13 @@ export function TablePagination({
   };
 
   return (
-    <div className={cn('flex items-center justify-between px-2', className)}>
-      <div className="flex items-center gap-4">
+    <div
+      className={cn(
+        'flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between',
+        className
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {showPageSizeSelector && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Show</span>
@@ -128,22 +133,31 @@ export function TablePagination({
         )}
 
         {showPageInfo && totalItems != null && totalItems > 0 && isClient && (
-          <div className="text-xs text-muted-foreground tabular-nums">
-            Showing {startItem} to {endItem} of {totalItems} entries
+          <div className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+            {/* Full sentence needs room; small screens get the compact form. */}
+            <span className="hidden md:inline">
+              Showing {startItem.toLocaleString()} to {endItem.toLocaleString()} of{' '}
+              {totalItems.toLocaleString()} entries
+            </span>
+            <span className="md:hidden">
+              {startItem.toLocaleString()}–{endItem.toLocaleString()} of{' '}
+              {totalItems.toLocaleString()}
+            </span>
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
+          aria-label="Previous page"
           className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Previous
+          <ChevronLeft className="h-4 w-4 lg:mr-1" />
+          <span className="hidden lg:inline">Previous</span>
         </Button>
 
         <div className="flex items-center gap-1">{renderPageNumbers()}</div>
@@ -153,10 +167,11 @@ export function TablePagination({
           size="sm"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
+          aria-label="Next page"
           className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          Next
-          <ChevronRight className="w-4 h-4 ml-1" />
+          <span className="hidden lg:inline">Next</span>
+          <ChevronRight className="h-4 w-4 lg:ml-1" />
         </Button>
       </div>
     </div>

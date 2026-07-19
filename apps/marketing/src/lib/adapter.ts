@@ -11,6 +11,20 @@ let adapterPromise: Promise<void> | null = null;
 let tablesInstance: TablesInstance | null = null;
 let tablesPromise: Promise<void> | null = null;
 
+/**
+ * Discard objects tied to the current in-memory SQLite connection.
+ *
+ * `resetDatabase()` cannot call this directly: adapter.ts imports db/index.ts,
+ * so importing this module back into db/index.ts would create a circular
+ * dependency. The reset API route calls this after resetting the database.
+ */
+export function resetAdapterCaches() {
+  adapterInstance = null;
+  adapterPromise = null;
+  tablesInstance = null;
+  tablesPromise = null;
+}
+
 export async function getAdapter(): Promise<AdapterInstance> {
   if (!adapterPromise) {
     adapterPromise = getDatabase()

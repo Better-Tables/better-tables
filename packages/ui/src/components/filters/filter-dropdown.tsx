@@ -538,7 +538,10 @@ export function FilterDropdown<TData = unknown>({
   }
 
   return (
-    <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange}>
+    // Modal locks page scroll while open. Without it, cmdk's initial
+    // scrollIntoView fires during Base UI's pre-position frame (popup parked
+    // at document top with opacity 0) and yanks the page toward the top.
+    <Popover open={open} onOpenChange={disabled ? undefined : onOpenChange} modal>
       <PopoverTrigger
         disabled={disabled}
         render={
@@ -553,7 +556,14 @@ export function FilterDropdown<TData = unknown>({
           )
         }
       />
-      <PopoverContent className="w-64 p-0" align="start">
+      <PopoverContent
+        className="w-64 max-h-(--available-height) overflow-y-auto p-0"
+        align="start"
+        side="bottom"
+        // Always open downward over the table; never flip above the trigger
+        // (flipping scrolls the page when focus moves into the popup).
+        collisionAvoidance={{ side: 'none' }}
+      >
         {commandContent}
       </PopoverContent>
     </Popover>

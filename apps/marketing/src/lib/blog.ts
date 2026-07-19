@@ -48,11 +48,9 @@ export async function markdownToHTML(markdown: string) {
     .use(remarkGfm)
     .use(remarkRehype)
     .use(rehypePrettyCode, {
-      // https://rehype-pretty.pages.dev/#usage
-      theme: {
-        light: 'min-light',
-        dark: 'min-dark',
-      },
+      // https://rehype-pretty.pages.dev/#usage — single theme; the vessel
+      // (.prose pre) paints the site's code-island background.
+      theme: 'everforest-dark',
       keepBackground: false,
     })
     .use(rehypeStringify)
@@ -62,8 +60,20 @@ export async function markdownToHTML(markdown: string) {
 }
 
 export async function getPost(slug: string) {
+  // Reject anything that isn't a plain slug before touching the filesystem.
+  if (!/^[a-z0-9-]+$/i.test(slug)) {
+    return null;
+  }
   const filePath = path.join('content', `${slug}.mdx`);
-  const source = fs.readFileSync(filePath, 'utf-8');
+  let source: string;
+  try {
+    source = fs.readFileSync(filePath, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
   const { content: rawContent, data: metadata } = parseFrontmatter(source);
   const content = await markdownToHTML(rawContent);
   const defaultImage = `${siteConfig.url}/og?title=${encodeURIComponent(metadata.title)}`;
@@ -77,21 +87,20 @@ export async function getPost(slug: string) {
   };
 }
 
-async function getAllPosts(dir: string) {
+function getPostSummaries(dir: string) {
   const mdxFiles = getMDXFiles(dir);
-  return Promise.all(
-    mdxFiles.map(async (file) => {
-      const slug = path.basename(file, path.extname(file));
-      const { metadata, source } = await getPost(slug);
-      return {
-        ...metadata,
-        slug,
-        source,
-      };
-    })
-  );
+  return mdxFiles.map((file) => {
+    const slug = path.basename(file, path.extname(file));
+    const source = fs.readFileSync(path.join(dir, file), 'utf-8');
+    const { data: metadata } = parseFrontmatter(source);
+    return { ...metadata, slug };
+  });
+}
+
+export function getBlogPostSummaries() {
+  return getPostSummaries(path.join(process.cwd(), 'content'));
 }
 
 export async function getBlogPosts() {
-  return getAllPosts(path.join(process.cwd(), 'content'));
+  return getBlogPostSummaries();
 }

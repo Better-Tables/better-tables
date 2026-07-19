@@ -1,37 +1,62 @@
-import BlogCard from '@/components/blog-card';
+import { ArrowRightIcon } from 'lucide-react';
+import Link from 'next/link';
 import { getBlogPosts } from '@/lib/blog';
-import { siteConfig } from '@/lib/config';
-import { constructMetadata } from '@/lib/utils';
+import { constructMetadata, formatDate } from '@/lib/utils';
 
 export const metadata = constructMetadata({
   title: 'Blog',
-  description: `Latest news and updates from ${siteConfig.name}.`,
+  description: 'Release notes, design notes, and progress on Better Tables.',
 });
 
 export default async function Blog() {
   const allPosts = await getBlogPosts();
-
-  const articles = await Promise.all(
-    allPosts.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-  );
+  const articles = allPosts.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 
   return (
-    <>
-      <div className="mx-auto w-full max-w-screen-xl px-2.5 lg:px-20 mt-24">
-        <div className="text-center py-16">
-          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Articles</h1>
-          <p className="mt-4 text-xl text-muted-foreground">
-            Latest news and updates from {siteConfig.name}
-          </p>
-        </div>
+    <div className="shell pt-14 pb-20 md:pt-20">
+      <div className="max-w-2xl">
+        <p className="row-eyebrow">
+          <b>{String(articles.length).padStart(2, '0')}</b>
+          entries
+        </p>
+        <h1 className="mt-5 font-display text-[2.25rem] font-semibold leading-tight tracking-tight md:text-[3rem]">
+          Blog
+        </h1>
+        <p className="mt-4 text-[15.5px] leading-relaxed text-muted-foreground">
+          Release notes, design notes, and progress.
+        </p>
       </div>
-      <div className="min-h-[50vh] bg-white/50 shadow-[inset_10px_-50px_94px_0_rgb(199,199,199,0.2)] backdrop-blur-lg">
-        <div className="mx-auto grid w-full max-w-screen-xl grid-cols-1 gap-8 px-2.5 py-10 lg:px-20 lg:grid-cols-3">
-          {articles.map((data, idx) => (
-            <BlogCard key={data.slug} data={data} priority={idx <= 1} />
-          ))}
-        </div>
+
+      <div className="mt-12 overflow-hidden rounded-lg border bg-card">
+        {articles.map((post, i) => (
+          <Link
+            key={post.slug}
+            href={`/blog/${post.slug}`}
+            className={[
+              'group grid gap-x-6 gap-y-1 px-5 py-5 transition-colors hover:bg-ledger-wash md:grid-cols-[10rem_1fr_2.5rem] md:items-baseline md:px-7',
+              i > 0 ? 'border-t' : '',
+            ].join(' ')}
+          >
+            <time
+              dateTime={post.publishedAt}
+              className="tnum font-mono text-[11.5px] tracking-wide text-muted-foreground"
+            >
+              {formatDate(post.publishedAt)}
+            </time>
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="font-display text-[17px] font-semibold tracking-tight">
+                {post.title}
+              </span>
+              <span className="max-w-[62ch] text-[13.5px] leading-relaxed text-muted-foreground">
+                {post.summary}
+              </span>
+            </span>
+            <span className="hidden self-center justify-self-end text-muted-foreground transition-colors group-hover:text-ledger md:block">
+              <ArrowRightIcon className="size-4" />
+            </span>
+          </Link>
+        ))}
       </div>
-    </>
+    </div>
   );
 }

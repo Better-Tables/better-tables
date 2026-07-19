@@ -58,9 +58,9 @@ export function FacetsSidebar({ activeFilters }: FacetsSidebarProps) {
   return (
     <aside
       aria-label="Facet sidebar"
-      className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-5"
+      className="rounded-lg border border-border bg-card p-4 md:p-5"
     >
-      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#60A5FA]">Facets</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ledger">Facets</p>
       <p className="mt-2 text-sm text-muted-foreground">
         Counts reflect every OTHER active filter -- a column's own filter never narrows its own
         facet (self-exclusion).
@@ -71,7 +71,7 @@ export function FacetsSidebar({ activeFilters }: FacetsSidebarProps) {
       >
         {FACET_COLUMNS.map((config) => (
           <div key={config.columnId}>
-            <p className="font-mono text-xs text-[#5EEAD4]">{config.label}</p>
+            <p className="font-mono text-xs text-ledger">{config.label}</p>
             <div className="mt-2 space-y-1">
               {(facets[config.columnId] ?? []).map((option) => (
                 <button
@@ -81,7 +81,7 @@ export function FacetsSidebar({ activeFilters }: FacetsSidebarProps) {
                   className={cn(
                     'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors',
                     isActive(config.columnId, option.value)
-                      ? 'bg-[#60A5FA]/15 text-[#60A5FA]'
+                      ? 'bg-ledger/15 text-ledger'
                       : 'text-foreground hover:bg-white/5'
                   )}
                 >
@@ -96,7 +96,7 @@ export function FacetsSidebar({ activeFilters }: FacetsSidebarProps) {
         ))}
 
         <div>
-          <p className="font-mono text-xs text-[#FBBF24]">Reopens (getMinMaxValues)</p>
+          <p className="font-mono text-xs text-muted-foreground">Reopens (getMinMaxValues)</p>
           <p className="mt-2 text-sm text-muted-foreground tabular-nums">
             {reopenRange ? `${reopenRange[0]} – ${reopenRange[1]}` : 'Loading...'}
           </p>

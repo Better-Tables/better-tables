@@ -1,16 +1,9 @@
-import { Footer } from '@/components/sections/footer';
-import { Header } from '@/components/sections/header';
-
 interface ExamplesLayoutProps {
   children: React.ReactNode;
 }
 
+// Header and footer come from the root layout; this layout only provides the
+// landmark element for the example pages.
 export default function ExamplesLayout({ children }: ExamplesLayoutProps) {
-  return (
-    <>
-      <Header />
-      <main>{children}</main>
-      <Footer />
-    </>
-  );
+  return <main>{children}</main>;
 }

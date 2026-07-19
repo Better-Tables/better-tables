@@ -12,7 +12,7 @@ export function absoluteUrl(path: string) {
 }
 
 export function constructMetadata({
-  title = siteConfig.name,
+  title,
   description = siteConfig.description,
   image = absoluteUrl('/og'),
   ...props
@@ -21,16 +21,19 @@ export function constructMetadata({
   description?: string;
   image?: string;
   [key: string]: Metadata[keyof Metadata];
-}): Metadata {
+} = {}): Metadata {
+  const resolvedTitle = title ?? `${siteConfig.name} — ${siteConfig.tagline}`;
   return {
-    title: {
-      template: `%s | ${siteConfig.name}`,
-      default: siteConfig.name,
+    // Pages pass a plain string and inherit the root template; the root
+    // layout passes no title and sets the template + default for the site.
+    title: title ?? {
+      template: `%s — ${siteConfig.name}`,
+      default: resolvedTitle,
     },
     description: description || siteConfig.description,
     keywords: siteConfig.keywords,
     openGraph: {
-      title,
+      title: resolvedTitle,
       description,
       url: siteConfig.url,
       siteName: siteConfig.name,
@@ -39,7 +42,7 @@ export function constructMetadata({
           url: image,
           width: 1200,
           height: 630,
-          alt: title,
+          alt: resolvedTitle,
         },
       ],
       type: 'website',

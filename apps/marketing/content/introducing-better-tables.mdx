@@ -1,0 +1,61 @@
+---
+title: "Introducing Better Tables"
+publishedAt: "2026-07-19"
+summary: "A data table is two problems wearing one trench coat. Better Tables solves both: columns defined once in TypeScript, compiled to real SQL, rendered by UI you own."
+author: "Tom Ebeyer"
+---
+
+Every admin panel has a table. Every table library solves half of it.
+
+The half they solve is rendering: headers, rows, sorting arrows, pagination controls. The half they leave you is the part that actually takes the time — turning filter state into WHERE clauses, sort state into ORDER BY, page state into LIMIT/OFFSET, and doing it across joins without leaking your whole database into the client. You write that glue for every table, in every project, slightly differently each time.
+
+Better Tables is built on a simple position: **the table should reach the database.**
+
+## One definition, three layers
+
+You define columns once, in TypeScript, against your Drizzle schema:
+
+```tsx
+export const tickets = defineTable<Tables>()('tickets', (t) => ({
+  columns: [
+    ...t.auto(),                 // inferred from your schema
+    t.text('customer.company')   // joined table, typed path
+      .searchable()
+      .editable(),
+    t.number('reopenCount').filterable(),
+    t.date('createdAt').sortable(),
+  ],
+}));
+```
+
+That definition drives everything:
+
+- **The adapter compiles state to SQL.** Filters, sorts, and pagination become real queries against Postgres, MySQL, or SQLite. Dot-paths like `customer.company` detect your Drizzle relations and generate only the JOINs a query actually needs.
+- **The UI renders it.** Table, filter bar, pagination, column controls — shadcn-style components the CLI copies into your repo as source. You restyle them the way you restyle any of your own components, because they are your own components.
+- **The URL carries it.** Filters, sorting, pagination, column visibility, and column order sync to the URL, so every view is shareable and survives refresh.
+
+And because the definition is typed against your schema, a renamed column is a compile error, not a production incident.
+
+## Recently shipped
+
+The last few releases pushed writes through the same pipeline as reads:
+
+- **Editable cells.** Mark a column `.editable()` and the table mounts a type-aware inline editor — optimistic updates, rollback on failure, validation before write. Editing a joined column like `customer.company` updates the related row.
+- **Schema-inferred columns.** `t.auto()` reads your database schema and builds the column list for you. Enum columns become option dropdowns with humanized labels — no options array to maintain.
+- **Zero-boilerplate saves.** `tables.cellEditAction(def)` returns a save handler you can export directly as a Next.js server action.
+
+## Honest scope
+
+Better Tables is pre-1.0 and MIT licensed. The nested AND/OR filter model ships today, but its visual builder UI doesn't yet. CSV export and REST/in-memory adapters are on the roadmap, not in the box. The [spec sheet on the homepage](/#examples) stays current with what's real.
+
+## See it run
+
+Everything on [the examples pages](/examples) queries a live SQLite database seeded inside the site's server — filter a table and the URL will reproduce your view for anyone you send it to. The homepage goes one further and shows you the SQL each interaction generates.
+
+When you're ready:
+
+```bash
+npx better-tables@latest init
+```
+
+It detects your shadcn/ui setup, installs the packages, and copies the table source into your project — where it's yours.

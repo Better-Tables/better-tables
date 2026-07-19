@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { postsRelations, profilesRelations, schema, usersRelations } from './schema';
 import { seedDatabase } from './seed';
+import { sqlCaptureLogger } from './sql-capture';
 
 type DatabaseBundle = {
   db: ReturnType<typeof drizzle>;
@@ -27,6 +28,9 @@ async function initDatabase(): Promise<DatabaseBundle> {
   // `Relations` object -- object spread, later keys win (plan 030, finding 11).
   const db = drizzle(sqlite, {
     schema: { ...schema, usersRelations, profilesRelations, postsRelations },
+    // Feeds the homepage's live "generated SQL" readout; no-op outside a
+    // withSqlCapture scope.
+    logger: sqlCaptureLogger,
   });
 
   // Create tables

@@ -1,5 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
+import { ExampleShell } from '@/components/examples/example-shell';
 import { SupportDemoWorkspace } from '@/components/sections/support-demo-workspace';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { supportSeed } from '@/lib/demo/support/seed-data';
@@ -37,27 +38,31 @@ export default async function RelationshipFilteringPage({
   });
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-      <div className="mb-10 max-w-3xl">
-        <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#60A5FA]">
-          Support operations
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-          Filter tickets across relationships
-        </h1>
-        <p className="mt-4 text-lg leading-8 text-muted-foreground">
+    <ExampleShell
+      index="01"
+      label="relationship filtering"
+      title="Filter tickets across relationships"
+      lede={
+        <>
           {supportSeed.tickets.length} tickets joined to {supportSeed.customers.length} customers
           and {supportSeed.assignees.length} assignees. Filter on related fields like{' '}
           <code>customer.plan</code> or <code>assignee.team</code> — the adapter resolves the joins
-          from your schema.
-        </p>
-      </div>
-
+          from your schema, and the query trail shows each one.
+        </>
+      }
+      sourcePath="src/app/(marketing)/examples/relationship-filtering/page.tsx"
+      facts={[
+        `${supportSeed.tickets.length} tickets`,
+        '3 joined tables',
+        't.auto() columns',
+        'editable cells',
+      ]}
+    >
       <Suspense
         fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}
       >
         <SupportDemoWorkspace fetchResult={fetchResult} />
       </Suspense>
-    </div>
+    </ExampleShell>
   );
 }

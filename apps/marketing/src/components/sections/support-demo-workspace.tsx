@@ -40,7 +40,7 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section
           aria-label="Support ticket table"
-          className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-6"
+          className="rounded-lg border border-border bg-card p-4 md:p-6"
         >
           {error ? (
             <div
@@ -70,9 +70,9 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
 
         <aside
           aria-label="Relationship query trail"
-          className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-5 xl:sticky xl:top-[calc(var(--header-height)+1rem)] xl:self-start"
+          className="rounded-lg border border-border bg-card p-4 md:p-5 xl:sticky xl:top-[calc(var(--header-height)+1rem)] xl:self-start"
         >
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#60A5FA]">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ledger">
             Query trail
           </p>
           <h2 className="mt-2 text-lg font-semibold text-foreground">Active relationships</h2>
@@ -83,19 +83,19 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
 
           <div className="mt-4 space-y-3">
             {relationshipTrail.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-[#27272A] px-3 py-4 text-sm text-muted-foreground">
+              <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
                 Add a filter on customer or assignee fields to see the relationship trail update.
               </p>
             ) : (
               relationshipTrail.map((step, index) => (
                 <div
                   key={step.id}
-                  className="rounded-lg border border-[#27272A] bg-[#09090B] px-3 py-3"
+                  className="rounded-lg border border-border bg-background px-3 py-3"
                 >
                   <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                     Step {index + 1}
                   </p>
-                  <p className="mt-2 font-mono text-xs text-[#5EEAD4]">
+                  <p className="mt-2 font-mono text-xs text-ledger">
                     {step.entity}.{step.field}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-foreground">{step.sentence}</p>
@@ -104,8 +104,8 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
             )}
           </div>
 
-          <div className="mt-6 border-t border-[#27272A] pt-4">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#FBBF24]">
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Scenarios
             </p>
             <div className="mt-3 space-y-2">
@@ -114,7 +114,7 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
                   key={preset.id}
                   type="button"
                   onClick={() => applyPreset(preset.id)}
-                  className="w-full rounded-lg border border-[#27272A] bg-[#09090B] px-3 py-3 text-left transition-colors hover:border-[#60A5FA]/50"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-3 text-left transition-colors hover:border-ledger/50"
                 >
                   <p className="text-sm font-medium text-foreground">{preset.label}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{preset.description}</p>

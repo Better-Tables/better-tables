@@ -7,9 +7,8 @@ const repoRoot = path.join(__dirname, '../..');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [{ hostname: 'localhost' }, { hostname: 'randomuser.me' }],
+    remotePatterns: [{ hostname: 'localhost' }],
   },
-  transpilePackages: ['geist'],
   // Turbopack (Next 16 default) auto-transpiles workspace packages from source,
   // which breaks each package's internal `@/*` path aliases. Resolve to dist instead.
   turbopack: {

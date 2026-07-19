@@ -61,7 +61,7 @@ export function QueryGroupsWorkspace({ fetchResult, activePresetId }: QueryGroup
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section
           aria-label="Query groups ticket table"
-          className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-6"
+          className="rounded-lg border border-border bg-card p-4 md:p-6"
         >
           {error ? (
             <div
@@ -91,25 +91,23 @@ export function QueryGroupsWorkspace({ fetchResult, activePresetId }: QueryGroup
 
         <aside
           aria-label="Query tree and scenarios"
-          className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-5 xl:sticky xl:top-[calc(var(--header-height)+1rem)] xl:self-start"
+          className="rounded-lg border border-border bg-card p-4 md:p-5 xl:sticky xl:top-[calc(var(--header-height)+1rem)] xl:self-start"
         >
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#60A5FA]">
-            Query tree
-          </p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ledger">Query tree</p>
           <h2 className="mt-2 text-lg font-semibold text-foreground">
             {activePreset ? activePreset.label : 'No scenario selected'}
           </h2>
 
           {sentence ? (
-            <div className="mt-4 rounded-lg border border-[#27272A] bg-[#09090B] p-4">
+            <div className="mt-4 rounded-lg border border-border bg-background p-4">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                 {leafCount} condition{leafCount === 1 ? '' : 's'} &middot;{' '}
                 {isGroup ? 'group node (AND/OR tree)' : 'flat array (implicit AND)'}
               </p>
-              <p className="mt-2 font-mono text-sm leading-6 text-[#5EEAD4]">{sentence}</p>
+              <p className="mt-2 font-mono text-sm leading-6 text-ledger">{sentence}</p>
             </div>
           ) : (
-            <p className="mt-4 rounded-lg border border-dashed border-[#27272A] px-3 py-4 text-sm text-muted-foreground">
+            <p className="mt-4 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
               Pick a scenario below to see its filter tree rendered as a sentence.
             </p>
           )}
@@ -124,8 +122,8 @@ export function QueryGroupsWorkspace({ fetchResult, activePresetId }: QueryGroup
             </button>
           ) : null}
 
-          <div className="mt-6 border-t border-[#27272A] pt-4">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#FBBF24]">
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Scenarios
             </p>
             <div className="mt-3 space-y-2">
@@ -137,8 +135,8 @@ export function QueryGroupsWorkspace({ fetchResult, activePresetId }: QueryGroup
                   className={cn(
                     'w-full rounded-lg border px-3 py-3 text-left transition-colors',
                     activePresetId === preset.id
-                      ? 'border-[#60A5FA]/60 bg-[#60A5FA]/10'
-                      : 'border-[#27272A] bg-[#09090B] hover:border-[#60A5FA]/50'
+                      ? 'border-ledger/60 bg-ledger/10'
+                      : 'border-border bg-background hover:border-ledger/50'
                   )}
                 >
                   <p className="text-sm font-medium text-foreground">{preset.label}</p>

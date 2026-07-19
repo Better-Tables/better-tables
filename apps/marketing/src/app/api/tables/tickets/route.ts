@@ -29,6 +29,7 @@ export const POST = createAdapterRouteHandler(
       return true;
     },
     constrainRequest: (body) => constrainTicketsAdapterRequest(body),
+    // biome-ignore lint/suspicious/noConsole: server-side demo log
     onError: (error) => console.error('[api/tables/tickets]', error),
   }
 );
