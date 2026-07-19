@@ -12,6 +12,7 @@ const fetchUsersMock = mock(
       },
       filters: [],
       sorting: [],
+      queries: [],
       error: null,
     })
 );
@@ -45,6 +46,7 @@ describe('GET /api/users', () => {
         },
         filters: [],
         sorting: [],
+        queries: [],
         error: 'secret sql fragment /Users/tome/.local/db',
       })
     );
@@ -70,6 +72,7 @@ describe('GET /api/users', () => {
         },
         filters: [],
         sorting: [],
+        queries: [],
         error: null,
       })
     );

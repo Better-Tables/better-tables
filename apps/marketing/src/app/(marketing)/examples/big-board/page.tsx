@@ -1,5 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
+import { ExampleShell } from '@/components/examples/example-shell';
 import { BigBoardClient } from '@/components/sections/big-board-client';
 import { fetchBulkTickets } from '@/lib/demo/support/fetch-bulk-tickets';
 import { constructMetadata } from '@/lib/utils';
@@ -27,21 +28,20 @@ export default async function BigBoardPage({ searchParams }: BigBoardPageProps) 
   });
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-      <div className="mb-10 max-w-3xl">
-        <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#60A5FA]">
-          Virtualization
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-          12,000 rows, smooth scrolling
-        </h1>
-        <p className="mt-4 text-lg leading-8 text-muted-foreground">
+    <ExampleShell
+      index="03"
+      label="virtualization"
+      title="12,000 rows, smooth scrolling"
+      lede={
+        <>
           Same <code>&lt;BetterTable&gt;</code> as the other examples — add <code>virtualized</code>{' '}
           so only rows near the viewport mount. Filtering and sorting work the same way over{' '}
-          {total.toLocaleString()} tickets.
-        </p>
-      </div>
-
+          {total.toLocaleString()} tickets, with variable row heights.
+        </>
+      }
+      sourcePath="src/app/(marketing)/examples/big-board/page.tsx"
+      facts={[`${total.toLocaleString()} rows`, 'variable heights', 'one prop']}
+    >
       {error ? (
         <div
           role="alert"
@@ -61,6 +61,6 @@ export default async function BigBoardPage({ searchParams }: BigBoardPageProps) 
           initialSorting={sorting}
         />
       </Suspense>
-    </div>
+    </ExampleShell>
   );
 }

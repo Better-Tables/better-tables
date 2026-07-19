@@ -48,11 +48,9 @@ export async function markdownToHTML(markdown: string) {
     .use(remarkGfm)
     .use(remarkRehype)
     .use(rehypePrettyCode, {
-      // https://rehype-pretty.pages.dev/#usage
-      theme: {
-        light: 'min-light',
-        dark: 'min-dark',
-      },
+      // https://rehype-pretty.pages.dev/#usage — single theme; the vessel
+      // (.prose pre) paints the site's code-island background.
+      theme: 'everforest-dark',
       keepBackground: false,
     })
     .use(rehypeStringify)
@@ -62,8 +60,17 @@ export async function markdownToHTML(markdown: string) {
 }
 
 export async function getPost(slug: string) {
+  // Reject anything that isn't a plain slug before touching the filesystem.
+  if (!/^[a-z0-9-]+$/i.test(slug)) {
+    return null;
+  }
   const filePath = path.join('content', `${slug}.mdx`);
-  const source = fs.readFileSync(filePath, 'utf-8');
+  let source: string;
+  try {
+    source = fs.readFileSync(filePath, 'utf-8');
+  } catch {
+    return null;
+  }
   const { content: rawContent, data: metadata } = parseFrontmatter(source);
   const content = await markdownToHTML(rawContent);
   const defaultImage = `${siteConfig.url}/og?title=${encodeURIComponent(metadata.title)}`;
@@ -79,17 +86,14 @@ export async function getPost(slug: string) {
 
 async function getAllPosts(dir: string) {
   const mdxFiles = getMDXFiles(dir);
-  return Promise.all(
+  const posts = await Promise.all(
     mdxFiles.map(async (file) => {
       const slug = path.basename(file, path.extname(file));
-      const { metadata, source } = await getPost(slug);
-      return {
-        ...metadata,
-        slug,
-        source,
-      };
+      const post = await getPost(slug);
+      return post ? { ...post.metadata, slug, source: post.source } : null;
     })
   );
+  return posts.filter((post): post is NonNullable<typeof post> => post !== null);
 }
 
 export async function getBlogPosts() {

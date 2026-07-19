@@ -1,5 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
+import { ExampleShell } from '@/components/examples/example-shell';
 import { FacetsSidebar } from '@/components/sections/facets-sidebar';
 import { FacetsTableClient } from '@/components/sections/facets-table-client';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
@@ -32,20 +33,19 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
   });
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-      <div className="mb-10 max-w-3xl">
-        <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#60A5FA]">
-          Faceted search
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-          Filter-aware facets
-        </h1>
-        <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          Click a facet to narrow the table. Counts respect every other active filter — a column
-          never excludes itself from its own facet list.
-        </p>
-      </div>
-
+    <ExampleShell
+      index="04"
+      label="faceted search"
+      title="Filter-aware facets"
+      lede={
+        <>
+          Click a facet to narrow the table. Counts respect every other active filter — and a column
+          never excludes itself from its own facet list, so its remaining options stay visible.
+        </>
+      }
+      sourcePath="src/app/(marketing)/examples/facets/page.tsx"
+      facts={['getFacetedValues', 'getMinMaxValues', 'self-exclusion']}
+    >
       {fetchResult.error ? (
         <div
           role="alert"
@@ -58,10 +58,7 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <FacetsSidebar activeFilters={fetchResult.filters} />
 
-        <section
-          aria-label="Facets ticket table"
-          className="rounded-xl border border-[#27272A] bg-[#111217] p-4 md:p-6"
-        >
+        <section aria-label="Facets ticket table" className="rounded-lg border bg-card p-4 md:p-6">
           <Suspense
             fallback={<div className="text-sm text-muted-foreground">Loading table...</div>}
           >
@@ -83,6 +80,6 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
           </Suspense>
         </section>
       </div>
-    </div>
+    </ExampleShell>
   );
 }

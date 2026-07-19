@@ -34,17 +34,18 @@ export const deleteUserAction = createActionBuilder<UserWithRelations>()
   .build();
 
 /**
- * Archive action for users
+ * Suspend action for users — sets the (real) `suspended` status so the
+ * change is visible in the status column and filterable afterwards.
  */
-export const archiveUserAction = createActionBuilder<UserWithRelations>()
-  .id('archive')
-  .label('Archive Selected')
+export const suspendUserAction = createActionBuilder<UserWithRelations>()
+  .id('suspend')
+  .label('Suspend Selected')
   .icon(Archive)
   .variant('secondary')
   .confirmationDialog({
-    title: 'Archive Users',
-    description: 'Are you sure you want to archive {count} user(s)?',
-    confirmLabel: 'Archive',
+    title: 'Suspend Users',
+    description: 'Set {count} user(s) to suspended?',
+    confirmLabel: 'Suspend',
     cancelLabel: 'Cancel',
     destructive: false,
   })
@@ -54,12 +55,12 @@ export const archiveUserAction = createActionBuilder<UserWithRelations>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ids: selectedIds,
-        status: 'archived',
+        status: 'suspended',
       }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to archive users');
+      throw new Error('Failed to suspend users');
     }
 
     return response.json();
@@ -69,4 +70,4 @@ export const archiveUserAction = createActionBuilder<UserWithRelations>()
 /**
  * All user actions
  */
-export const userActions = [deleteUserAction, archiveUserAction];
+export const userActions = [deleteUserAction, suspendUserAction];

@@ -13,6 +13,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .accessor((user) => user.name)
     .filterable()
     .sortable()
+    .editable()
     .build(),
 
   cb
@@ -22,6 +23,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .accessor((user) => user.email)
     .filterable()
     .sortable()
+    .editable()
     .build(),
 
   cb
@@ -32,6 +34,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .range(18, 100, { includeNull: true })
     .filterable()
     .sortable()
+    .editable()
     .build(),
 
   cb
@@ -47,6 +50,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     ])
     .filterable()
     .sortable()
+    .editable()
     .cellRenderer(({ value }) => {
       const colors: Record<string, string> = {
         admin: 'bg-purple-100 text-purple-800',
@@ -75,6 +79,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     ])
     .filterable()
     .sortable()
+    .editable()
     .cellRenderer(({ value }) => {
       const colors: Record<string, string> = {
         active: 'bg-green-100 text-green-800',
@@ -128,6 +133,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .accessor((user) => user.createdAt)
     .filterable(true) // Enable filtering for date testing
     .sortable()
+    .editable()
     .build(),
 
   // One-to-one relationship (profile)
@@ -139,6 +145,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .searchable({ includeNull: true })
     .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
     .filterable()
+    .editable()
     .build(),
 
   cb
@@ -185,6 +192,7 @@ export const userColumns = defineColumns<UserWithRelations>()([
     .accessorWithDefault((user) => user.profile?.location)
     .searchable({ includeNull: true })
     .filterable()
+    .editable()
     .build(),
 
   cb

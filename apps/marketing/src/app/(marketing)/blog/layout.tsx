@@ -1,16 +1,9 @@
-import { Footer } from '@/components/sections/footer';
-import { Header } from '@/components/sections/header';
-
-interface MarketingLayoutProps {
+interface BlogLayoutProps {
   children: React.ReactNode;
 }
 
-export default async function Layout({ children }: MarketingLayoutProps) {
-  return (
-    <>
-      <Header />
-      <main>{children}</main>
-      <Footer />
-    </>
-  );
+// Header and footer come from the root layout; this layout only provides the
+// landmark element for the blog pages.
+export default function BlogLayout({ children }: BlogLayoutProps) {
+  return <main>{children}</main>;
 }

@@ -1,5 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
+import { ExampleShell } from '@/components/examples/example-shell';
 import { QueryGroupsWorkspace } from '@/components/sections/query-groups-workspace';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { constructMetadata } from '@/lib/utils';
@@ -32,26 +33,25 @@ export default async function QueryGroupsPage({ searchParams }: QueryGroupsPageP
   });
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-      <div className="mb-10 max-w-3xl">
-        <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#60A5FA]">
-          Query groups
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-          AND/OR filter groups, as a sentence
-        </h1>
-        <p className="mt-4 text-lg leading-8 text-muted-foreground">
+    <ExampleShell
+      index="02"
+      label="query groups"
+      title="AND/OR filter groups, as a sentence"
+      lede={
+        <>
           Nest AND/OR groups (or a flat filter list), including null-only filters like
-          &ldquo;tickets with no assignee.&rdquo; Apply a scenario and the URL updates so the link
+          &ldquo;tickets with no assignee.&rdquo; Apply a scenario and the URL updates, so the link
           you copy reproduces the same query.
-        </p>
-      </div>
-
+        </>
+      }
+      sourcePath="src/app/(marketing)/examples/query-groups/page.tsx"
+      facts={['nested and/or trees', 'null-only filters', 'shareable urls']}
+    >
       <Suspense
         fallback={<div className="text-sm text-muted-foreground">Loading workspace...</div>}
       >
         <QueryGroupsWorkspace fetchResult={fetchResult} activePresetId={params.preset ?? null} />
       </Suspense>
-    </div>
+    </ExampleShell>
   );
 }
