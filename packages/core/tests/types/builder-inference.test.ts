@@ -1,7 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 import { ColumnBuilder } from '../../src/builders/column-builder';
 import { createColumnBuilder } from '../../src/builders/column-factory';
-import type { ColumnDefinition } from '../../src/types/column';
+import { createPathColumnFactory } from '../../src/builders/path-builders';
+import type { ColumnDefinition, EditableConfig } from '../../src/types/column';
 // Tests may import experimental prototypes; src must not (see plan 014).
 import type { ColumnRegistry } from '../../src/types/experimental/contract-v2';
 
@@ -108,6 +109,17 @@ describe('Literal-preserving column ids (plan 014)', () => {
 
     expectTypeOf(def.id).toEqualTypeOf<'profile.location'>();
     expect(def.id).toBe('profile.location');
+  });
+
+  it("t.text('name').editable() preserves literal id and value type", () => {
+    const t = createPathColumnFactory<User>();
+    const def = t.text('name').editable().build();
+
+    expectTypeOf(def.id).toEqualTypeOf<'name'>();
+    expectTypeOf(def.accessor).toEqualTypeOf<(data: User) => string>();
+    expectTypeOf(def.editable).toEqualTypeOf<boolean | EditableConfig<User, string> | undefined>();
+    expect(def.editable).toBe(true);
+    expect(def.id).toBe('name');
   });
 
   it('registry smoke test: a tuple of built defs derives { name: string; age: number } — the blocker plan 006/011 needed removed', () => {

@@ -62,6 +62,12 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown, TId extends
   /** Whether column is visible by default */
   defaultVisible?: boolean;
 
+  /**
+   * Inline editing for this column. `true` enables defaults; pass
+   * {@link EditableConfig} for per-row gating, field mapping, or a custom editor.
+   */
+  editable?: boolean | EditableConfig<TData, TValue>;
+
   /** Default column width */
   width?: number;
 
@@ -130,6 +136,43 @@ export interface ValidationRule<TValue = unknown> {
   validate: (value: TValue) => boolean | string;
   /** Error message */
   message?: string;
+}
+
+/**
+ * Per-column inline-edit configuration (see plan 053).
+ */
+export interface EditableConfig<TData = unknown, TValue = unknown> {
+  /** Per-row gate — return false to render this row's cell read-only. */
+  when?: (row: TData) => boolean;
+  /**
+   * Data field written by the adapter save path. Defaults to the column id
+   * when it contains no dot; REQUIRED for adapter-saves on columns whose id
+   * is not the storage field. Dot-path ids are callback-only (v1).
+   */
+  field?: string;
+  /** Text editor renders a textarea instead of a single-line input. */
+  multiline?: boolean;
+  /** Placeholder for empty text/number editors. */
+  placeholder?: string;
+  /**
+   * Custom editor (escape hatch, and the ONLY editor for `custom` columns).
+   * Receives current value + commit/cancel; the table still owns save/
+   * validation/rollback around it.
+   */
+  editRenderer?: (props: EditRendererProps<TData, TValue>) => ReactNode;
+}
+
+/**
+ * Props for custom inline cell editors.
+ */
+export interface EditRendererProps<TData = unknown, TValue = unknown> {
+  value: TValue;
+  row: TData;
+  column: ColumnDefinition<TData, TValue>;
+  /** Commit the new value (runs validation + save pipeline). */
+  commit: (value: TValue) => void;
+  /** Cancel editing, restore display. */
+  cancel: () => void;
 }
 
 /**

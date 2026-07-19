@@ -25,13 +25,10 @@ export const tickets = sqliteTable('support_tickets', {
   customerId: integer('customer_id')
     .notNull()
     .references(() => customers.id),
-  // Nullable: an unassigned ticket is valid data, and is what the
-  // null-only-filter showcase (assignee.name includeNull:true, no values --
-  // plan 027) filters for.
+  // Nullable so "no assignee" filters can match unassigned tickets.
   assigneeId: integer('assignee_id').references(() => assignees.id),
   slaBreached: integer('sla_breached', { mode: 'boolean' }).notNull().default(false),
-  // A direct (non-relation) numeric column -- the `facets` example needs at
-  // least one to demonstrate `getMinMaxValues` alongside `getFacetedValues`.
+  // Numeric column for the facets min/max range demo.
   reopenCount: integer('reopen_count').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
@@ -92,7 +89,3 @@ export type SupportCustomer = typeof customers.$inferSelect;
 export type SupportAssignee = typeof assignees.$inferSelect;
 export type SupportTicket = typeof tickets.$inferSelect;
 export type BulkTicket = typeof bulkTickets.$inferSelect;
-
-// No hand-shaped `TicketWithRelations` here: the row type with its relations
-// is derived from the schema as `ticketsTable.$infer.Row` (exported as
-// `TicketRow` from `./columns`), so there's no duplicate to drift (finding 12).

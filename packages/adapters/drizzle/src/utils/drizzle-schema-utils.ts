@@ -38,6 +38,8 @@
  * with '_') and access column metadata directly from the column objects.
  */
 
+import type { ColumnType, InferredColumnSpec } from '@better-tables/core';
+import { humanize } from '@better-tables/core';
 import type { AnyColumn } from 'drizzle-orm';
 import type { AnyColumnType, AnyTableType } from '../types';
 
@@ -454,4 +456,199 @@ export function getArrayElementType(column: AnyColumnType): string | null {
   // Default fallback to text for unknown types
   // This allows the feature to work even if type detection fails
   return 'text';
+}
+
+/**
+ * Check whether a Drizzle column stores date/timestamp semantics.
+ *
+ * @description
+ * The single source of truth for the timestamp `columnType` family across
+ * dialects (plan 054) — extracted from the predicate emitter's private
+ * `isTimestampColumn` so `describeColumns` inference and predicate emission
+ * share one list instead of re-listing it. Checks, in order:
+ * - `columnType` in the Pg/MySql/SQLite timestamp families
+ * - `dataType === 'date'` (Drizzle's own date classification)
+ * - integer columns with `mode: 'timestamp' | 'date'` (SQLite epoch storage)
+ *
+ * The integer-mode check intentionally carries no dialect guard (the emitter
+ * scoped it to sqlite): only SQLite integer columns carry those modes, so the
+ * broader check is behavior-identical for real schemas.
+ *
+ * @since 0.7.0 (plan 054)
+ */
+export function isTimestampDrizzleColumn(column: AnyColumnType): boolean {
+  if (!column || typeof column !== 'object') {
+    return false;
+  }
+
+  const col = column as unknown as { columnType?: string; dataType?: string; mode?: string };
+
+  // Check columnType first (more specific than dataType)
+  if (col.columnType) {
+    // PostgreSQL timestamp column types
+    if (
+      col.columnType === 'PgTimestamp' ||
+      col.columnType === 'PgTimestampString' ||
+      col.columnType === 'PgTimestampNumber'
+    ) {
+      return true;
+    }
+
+    // MySQL datetime/timestamp column types
+    if (
+      col.columnType === 'MySqlDateTime' ||
+      col.columnType === 'MySqlTimestamp' ||
+      col.columnType === 'MySqlDate'
+    ) {
+      return true;
+    }
+
+    // SQLite timestamp column types (integer with mode: 'timestamp', text
+    // with mode: 'date')
+    if (
+      col.columnType === 'SQLiteTimestamp' ||
+      col.columnType === 'SQLiteDate' ||
+      (col.columnType === 'SQLiteInteger' && col.mode === 'timestamp')
+    ) {
+      return true;
+    }
+  }
+
+  // dataType fallback ('date' is a valid Drizzle dataType)
+  if (col.dataType === 'date') {
+    return true;
+  }
+
+  // Integer columns storing epoch timestamps (SQLite modes)
+  if (col.dataType === 'number' && (col.mode === 'timestamp' || col.mode === 'date')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Read the enum choices Drizzle attaches to a column, if any.
+ *
+ * @description
+ * Both `pgEnum(...)` columns and `text(name, { enum: [...] })` (pg, mysql and
+ * sqlite) expose their allowed values as a runtime `enumValues` array;
+ * columns without a declared enum have no such property (verified against
+ * drizzle-orm's runtime column objects, plan 054 Step 2).
+ */
+export function getEnumValues(column: AnyColumnType): string[] | null {
+  if (!column || typeof column !== 'object') {
+    return null;
+  }
+  const enumValues = (column as unknown as { enumValues?: unknown }).enumValues;
+  if (Array.isArray(enumValues) && enumValues.length > 0) {
+    return enumValues.map((value) => String(value));
+  }
+  return null;
+}
+
+/** Drizzle `dataType`s with a direct Better Tables column type mapping. */
+const DATA_TYPE_TO_COLUMN_TYPE: Record<string, ColumnType> = {
+  string: 'text',
+  number: 'number',
+  // BigInt columns are numeric for filtering/sorting purposes.
+  bigint: 'number',
+  boolean: 'boolean',
+  date: 'date',
+  json: 'json',
+};
+
+/**
+ * Map one introspected Drizzle column to a Better Tables column type.
+ *
+ * @description
+ * The correctness heart of `describeColumns` (plan 054). Precedence:
+ * 1. Array columns → `multiOption` (regardless of element type)
+ * 2. Declared enum values → `option`
+ * 3. Timestamp family ({@link isTimestampDrizzleColumn}) → `date`
+ * 4. `dataType` mapping (`string`/`number`/`bigint`/`boolean`/`date`/`json`)
+ * 5. Anything else → `text`, with a dev-mode warn — inference must be total,
+ *    never throw.
+ */
+export function mapColumnInfoToColumnType(info: ColumnInfo): ColumnType {
+  if (info.isArray) {
+    return 'multiOption';
+  }
+  if (getEnumValues(info.column)) {
+    return 'option';
+  }
+  if (isTimestampDrizzleColumn(info.column)) {
+    return 'date';
+  }
+  const mapped = DATA_TYPE_TO_COLUMN_TYPE[info.dataType];
+  if (mapped) {
+    return mapped;
+  }
+  if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production') {
+    console.warn(
+      `[better-tables] describeColumns: no column-type mapping for '${info.name}' ` +
+        `(dataType '${info.dataType}') — falling back to 'text'.`
+    );
+  }
+  return 'text';
+}
+
+/**
+ * Memoize schema-derived {@link InferredColumnSpec} lists by table object
+ * identity (same WeakMap pattern as {@link getTableColumns} / plan 040's
+ * caches). Callers receive a deep clone (top-level array AND each spec's
+ * `options` array) so mutation of either cannot corrupt the cache.
+ */
+const describeColumnsCache = new WeakMap<object, readonly InferredColumnSpec[]>();
+
+/** Deep-enough clone for {@link InferredColumnSpec}: own fields plus the `options` array/entries. */
+function cloneInferredColumnSpec(spec: InferredColumnSpec): InferredColumnSpec {
+  return {
+    ...spec,
+    ...(spec.options ? { options: spec.options.map((option) => ({ ...option })) } : {}),
+  };
+}
+
+/**
+ * Describe every column of a Drizzle table schema as an
+ * {@link InferredColumnSpec} — the schema-derived raw material for auto
+ * columns (plan 054).
+ *
+ * @param tableSchema - The Drizzle table schema to describe
+ * @returns One spec per column, in stable schema order. Empty array for
+ *   invalid/malformed schemas (never throws).
+ */
+export function describeTableColumns(tableSchema: AnyTableType): InferredColumnSpec[] {
+  try {
+    if (!tableSchema || typeof tableSchema !== 'object') {
+      return [];
+    }
+
+    const cached = describeColumnsCache.get(tableSchema as object);
+    if (cached) {
+      return cached.map(cloneInferredColumnSpec);
+    }
+
+    const specs = getTableColumns(tableSchema).map((info): InferredColumnSpec => {
+      const columnType = mapColumnInfoToColumnType(info);
+      const enumValues = info.isArray ? null : getEnumValues(info.column);
+      return {
+        field: info.name,
+        columnType,
+        label: humanize(info.name),
+        ...(enumValues
+          ? { options: enumValues.map((value) => ({ value, label: humanize(value) })) }
+          : {}),
+        nullable: info.isNullable,
+        primaryKey: info.isPrimaryKey,
+        foreignKey: info.isForeignKey,
+        writable: !info.isPrimaryKey,
+      };
+    });
+
+    describeColumnsCache.set(tableSchema as object, specs);
+    return specs.map(cloneInferredColumnSpec);
+  } catch {
+    return [];
+  }
 }

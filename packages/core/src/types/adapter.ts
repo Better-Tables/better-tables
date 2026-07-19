@@ -217,6 +217,48 @@ export interface FacetQueryParams {
 }
 
 /**
+ * Schema-derived column description — the raw material for auto columns
+ * (plan 054). Returned by {@link TableAdapter.describeColumns}; consumed by
+ * `resolveTableColumns` (core) to enrich explicit column definitions and to
+ * build inferred ones for `t.auto()` / no-factory `define`.
+ */
+export interface InferredColumnSpec {
+  /** Storage field name (own-table). Doubles as the auto column id. */
+  field: string;
+  /** Mapped Better Tables column type. */
+  columnType: ColumnType;
+  /** Humanized display label. */
+  label: string;
+  /** Declared enum choices, when the schema knows them. */
+  options?: Array<{ value: string; label: string }>;
+  nullable: boolean;
+  primaryKey: boolean;
+  foreignKey: boolean;
+  /** False for PKs and anything the adapter cannot write back. */
+  writable: boolean;
+}
+
+/**
+ * Where a single cell edit for a column actually lands (plan 055) — resolved
+ * by {@link TableAdapter.resolveCellWriteTarget}. For a flat column this is
+ * the primary table itself; for a relationship-path column
+ * (`'customer.company'`) it is the RELATED table, plus the row-data path to
+ * the related row's id so the caller can address the write.
+ */
+export interface CellWriteTarget {
+  /** JS schema key of the table the write lands in. */
+  table: string;
+  /** Storage field on that table. */
+  field: string;
+  /** Row-data path to the target row's id (e.g. 'customer.id'), or null for own-table. */
+  relatedIdPath: string | null;
+  /** False for one-to-many paths — never cell-editable. */
+  single: boolean;
+  /** Schema-level writability (PK/unknown → false). */
+  writable: boolean;
+}
+
+/**
  * Optional per-call options for adapter write methods. The instance surface
  * (`tables.createRecord(table, data)`) injects `{ table: table.tableName }`
  * so multi-table schemas don't rely on `defaultMutationTable`.
@@ -224,6 +266,18 @@ export interface FacetQueryParams {
 export interface MutationOptions {
   /** Explicit mutation target — JS schema key of the table to write. */
   table?: string;
+  /**
+   * The originating COLUMN id for a single-cell edit (plan 055 bug fix),
+   * e.g. `'customer.company'` for a relationship-path column whose
+   * `data` key is the RELATED table's storage field (`'company'`). Direct
+   * DB adapters (Drizzle, etc.) ignore this — they key `data` by storage
+   * field already. Wire adapters (`httpAdapter`) MUST prefer it over the
+   * `data` key when present: allow-lists and `resolveCellWriteTarget` are
+   * keyed by column id, not storage field, so sending the storage field on
+   * the wire lets it collide with an unrelated column/table that happens
+   * to share the same field name.
+   */
+  columnId?: string;
 }
 
 /**
@@ -375,6 +429,34 @@ export interface TableAdapter<TData = unknown> {
    * ```
    */
   getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]>;
+
+  /**
+   * Optional: describe a table's columns from the underlying schema —
+   * powers auto column inference (`t.auto()` / no-factory `define`).
+   * `table` follows the same resolution as {@link FetchDataParams.primaryTable}.
+   *
+   * @param table - Explicit table to describe. When omitted, the adapter
+   *   resolves it exactly like a read with no `columns`/`primaryTable`
+   *   (single-table schemas stay zero-config; multi-table schemas need the
+   *   argument or a configured default).
+   * @returns Promise resolving to one {@link InferredColumnSpec} per
+   *   own-table column, in stable schema order.
+   */
+  describeColumns?(table?: string): Promise<InferredColumnSpec[]>;
+
+  /**
+   * Optional: resolve where a cell edit for `columnId` actually lands
+   * (plan 055) — the own table for flat ids, the RELATED table for
+   * relationship-path ids ('customer.company'). Returns `null` when the
+   * column cannot be cell-written (unknown id, JSON accessor, bare alias,
+   * composite related PK). `table` follows the same resolution as
+   * {@link FetchDataParams.primaryTable}.
+   *
+   * This is a READ (pure schema/relationship introspection) — wire adapters
+   * proxy it like {@link TableAdapter.describeColumns}, independent of any
+   * write opt-in.
+   */
+  resolveCellWriteTarget?(columnId: string, table?: string): Promise<CellWriteTarget | null>;
 
   /**
    * Create a new record (optional operation).

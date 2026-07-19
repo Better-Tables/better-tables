@@ -15,6 +15,17 @@
 - **Depends on**: 018 (done — the `plugins` config seam exists)
 - **Category**: direction
 - **Planned at**: commit `787a816`, 2026-07-17
+- **Reconciled 2026-07-18 at `7b58ed8`**: finding still valid — the seam is
+  still stored-only (`git grep beforeFetch\|afterFetch packages/core/src` →
+  nothing; `plugins?: TableDefPlugin[]` now at `types/factory.ts:59`).
+  Plan 047 added instance WRITE methods to `factory.ts` (createRecord/
+  updateRecord/deleteRecord, ~`:141-170`) — line refs in "Current state"
+  shifted; the fetch choke point (`instance.fetchData`) is unchanged in
+  shape. Consider whether `beforeFetch`/`afterFetch` should be joined by
+  write-path hooks NOW that writes exist on the instance — the plan's
+  minimal-hooks rule still says no (wait for a second real plugin); plan
+  053's `commitEdit` is designed to adopt a future `beforeSave`/`afterSave`
+  without rework.
 - **Maintainer decision (2026-07-17)**: build this. It is the delivery vehicle
   the Export UI (plan 050) and future saved-views want. Validate the seam with
   a first real plugin so the interface is proven, not speculative.

@@ -53,6 +53,7 @@
 import { DataTransformer, PrimaryTableResolver } from '@better-tables/adapters-toolkit';
 import type {
   AdapterMeta,
+  CellWriteTarget,
   DataEvent,
   ExportParams,
   ExportResult,
@@ -63,6 +64,7 @@ import type {
   FilterNode,
   FilterOption,
   FilterState,
+  InferredColumnSpec,
   TableAdapter,
 } from '@better-tables/core';
 import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
@@ -92,6 +94,8 @@ import type {
 } from './types';
 import { QueryError, SchemaError } from './types';
 import {
+  describeTableColumns,
+  getColumnInfo,
   getColumnNames,
   getForeignKeyColumns,
   getPrimaryKeyColumns,
@@ -879,6 +883,128 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         { columnId, error }
       );
     }
+  }
+
+  /**
+   * Describe a table's columns from the Drizzle schema — powers auto column
+   * inference (`t.auto()` / no-factory `define`, plan 054).
+   *
+   * Pure schema introspection: no query is executed, so this is safe to call
+   * without a live connection. `table` follows the same resolution as the
+   * other read entry points ({@link resolvePrimaryTableForRead}): an explicit
+   * table is validated against the schema; when omitted, single-table
+   * schemas stay zero-config and multi-table schemas fall back to
+   * `options.defaultPrimaryTable` or throw a `SchemaError`.
+   *
+   * Results are memoized per table object ({@link describeTableColumns}'s
+   * WeakMap, mirroring plan 040's caches).
+   */
+  async describeColumns(table?: string): Promise<InferredColumnSpec[]> {
+    const primaryTable = this.resolvePrimaryTableForRead(undefined, table);
+    const tableSchema = (this.schema as Record<string, AnyTableType>)[primaryTable];
+    if (!tableSchema) {
+      throw new SchemaError(`Table '${primaryTable}' is not present in the schema`, {
+        table: primaryTable,
+        availableTables: Object.keys(this.schema),
+      });
+    }
+    return describeTableColumns(tableSchema);
+  }
+
+  /** Memoized {@link resolveCellWriteTarget} results per `${table}:${columnId}`. */
+  private cellWriteTargetCache = new Map<string, CellWriteTarget | null>();
+
+  /**
+   * Resolve where a cell edit for `columnId` actually lands (plan 055) —
+   * pure schema/relationship introspection, no query.
+   *
+   * - Flat id → own-table field; `writable` from the schema (PK → false).
+   * - Relationship path (`'customer.company'`) → the REAL related table
+   *   (from the relationship path's last hop `to`, not the alias), with
+   *   `relatedIdPath` addressing the related row's PK through the ALIAS
+   *   path in row data (`'customer.id'`) and `single` false when any hop is
+   *   one-to-many.
+   * - `null` for anything a single-cell write can't express: unknown ids,
+   *   JSON accessors (`'survey.title'` where `survey` is a JSON column),
+   *   bare relation aliases, composite related PKs.
+   */
+  async resolveCellWriteTarget(columnId: string, table?: string): Promise<CellWriteTarget | null> {
+    const primaryTable = this.resolvePrimaryTableForRead(undefined, table);
+    const cacheKey = `${primaryTable}:${columnId}`;
+    const cached = this.cellWriteTargetCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const target = this.resolveCellWriteTargetUncached(columnId, primaryTable);
+    this.cellWriteTargetCache.set(cacheKey, target);
+    return target;
+  }
+
+  /** @private Uncached body of {@link resolveCellWriteTarget}. */
+  private resolveCellWriteTargetUncached(
+    columnId: string,
+    primaryTable: string
+  ): CellWriteTarget | null {
+    let path: ReturnType<RelationshipManager['resolveColumnPath']>;
+    try {
+      path = this.relationshipManager.resolveColumnPath(columnId, primaryTable);
+    } catch {
+      return null;
+    }
+
+    const schema = this.schema as Record<string, AnyTableType>;
+
+    if (!path.isNested) {
+      // A dotted id resolving to a NON-nested path is a JSON accessor
+      // ('survey.title' → field 'survey') — a cell write can't express a
+      // JSON sub-field update.
+      if (columnId.includes('.')) {
+        return null;
+      }
+      const ownSchema = schema[primaryTable];
+      if (!ownSchema) return null;
+      const info = getColumnInfo(ownSchema, path.field);
+      return {
+        table: primaryTable,
+        field: path.field,
+        relatedIdPath: null,
+        single: true,
+        writable: info ? !info.isPrimaryKey : false,
+      };
+    }
+
+    // Bare relation alias ('customer') — nothing to write.
+    if (!path.field) {
+      return null;
+    }
+
+    const hops = path.relationshipPath ?? [];
+    const realTable = hops[hops.length - 1]?.to;
+    if (!realTable) return null;
+    const relatedSchema = schema[realTable];
+    if (!relatedSchema) return null;
+
+    const primaryKeys = getPrimaryKeyColumns(relatedSchema);
+    const pkName = primaryKeys[0]?.name;
+    // Composite related PKs are unsupported for cell writes (v1) — the
+    // target row can't be addressed by a single id.
+    if (!pkName || primaryKeys.length > 1) {
+      return null;
+    }
+
+    const fieldInfo = getColumnInfo(relatedSchema, path.field);
+    // The alias path in ROW DATA (nested objects are keyed by alias, not by
+    // the real table name): 'customer.company' → 'customer.id'.
+    const aliasPath = columnId.split('.').slice(0, -1).join('.');
+
+    return {
+      table: realTable,
+      field: path.field,
+      relatedIdPath: `${aliasPath}.${pkName}`,
+      single: hops.every((hop) => hop.cardinality === 'one'),
+      writable: fieldInfo ? !fieldInfo.isPrimaryKey : false,
+    };
   }
 
   /**

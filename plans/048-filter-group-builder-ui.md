@@ -15,6 +15,15 @@
 - **Depends on**: 015/016/017 (done — FilterNode core, state layer, group translation)
 - **Category**: direction
 - **Planned at**: commit `787a816`, 2026-07-17
+- **Reconciled 2026-07-18 at `7b58ed8`** (Waves A+B merged on top): finding
+  still valid — `filter-bar.tsx` remains flat (zero `FilterGroupNode`
+  references). Two updates for the executor: (1) plan 041 rewrote the
+  filter-bar handlers to stable identities via `useLatest` refs — the group
+  builder MUST follow that handler idiom (and must not regress the
+  badge render-count test from 041); (2) plan 042 gave every
+  `inputs/*` filter input a value-emission test suite — model the group
+  builder's leaf tests on those. Line refs in "Current state" may have
+  shifted slightly; re-locate by symbol.
 - **Maintainer decision (2026-07-17)**: **fast-follow after the 0.6 publish**,
   NOT gated into the release (per `core-contract-v2.md` open question (b)).
   The flat filter bar stays for 0.6 and is forward-compatible; this adds the

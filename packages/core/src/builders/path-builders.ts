@@ -25,6 +25,7 @@
  */
 
 import { humanize, lastPathSegment } from '../lib/format-utils';
+import type { ColumnDefinition } from '../types/column';
 import type { Paths, PathsOfType, PathValue } from '../types/paths';
 import { BooleanColumnBuilder } from './boolean-column-builder';
 import { ColumnBuilder } from './column-builder';
@@ -68,6 +69,51 @@ export function buildPathAccessor(path: string): (row: unknown) => unknown {
     }
     return current;
   };
+}
+
+// ============================================================================
+// The `t.auto()` sentinel (plan 054)
+// ============================================================================
+
+/**
+ * Marker property identifying the `t.auto()` sentinel entry. A plain string
+ * property (not a symbol) so the marker survives any structural copying a
+ * caller might do to the columns array before `defineTable` collects it.
+ */
+const AUTO_COLUMNS_MARKER = '__betterTablesAutoColumns';
+
+/** Well-known id of the sentinel — never rendered; filtered out at build time. */
+export const AUTO_COLUMNS_SENTINEL_ID = '__better_tables_auto__';
+
+/**
+ * True when a columns-array entry is the `t.auto()` sentinel. Used by
+ * `defineTable`'s implicit-build step to strip the sentinel and set the
+ * definition's `autoColumns` marker instead — the sentinel itself never
+ * becomes a real column.
+ */
+export function isAutoColumnsSentinel(entry: unknown): boolean {
+  return (
+    typeof entry === 'object' &&
+    entry !== null &&
+    (entry as Record<string, unknown>)[AUTO_COLUMNS_MARKER] === true
+  );
+}
+
+/**
+ * Build the sentinel `t.auto()` returns (inside a one-element array so it can
+ * be SPREAD into a columns list: `[...t.auto(), overrides]`). Shaped like a
+ * minimal `ColumnDefinition` so it flows through `TableDefResult`'s existing
+ * public shape unchanged; `buildTableColumns` removes it before validation.
+ */
+function createAutoColumnsSentinel<TRow>(): ColumnDefinition<TRow, unknown> {
+  const sentinel = {
+    [AUTO_COLUMNS_MARKER]: true,
+    id: AUTO_COLUMNS_SENTINEL_ID,
+    displayName: 'Auto columns',
+    type: 'custom' as const,
+    accessor: () => undefined,
+  };
+  return sentinel as unknown as ColumnDefinition<TRow, unknown>;
 }
 
 // ============================================================================
@@ -158,6 +204,23 @@ export interface PathColumnFactory<TRow> {
    * Step 2 section 8) when no path fits. Unconfigured -- caller must still
    * call `.id()`/`.accessor()`/`.displayName()` themselves. */
   custom<TValue = unknown>(): ColumnBuilder<TRow, TValue>;
+
+  /**
+   * Include every REMAINING schema column, inferred from
+   * `adapter.describeColumns` lazily at mount (plan 054). Spread it into the
+   * columns list — explicit entries always win by id:
+   *
+   * ```typescript
+   * columns: [...t.auto(), t.text('subject').editable()]
+   * ```
+   *
+   * `t.auto()`'s ONLY job is column-SET inclusion ("and the rest of the
+   * table's columns"). Per-column enrichment (e.g. enum options on a
+   * declared `t.option()` with no `.options()`) happens with or without it.
+   * Inferred columns are read-only — `.editable()` requires an explicit
+   * entry.
+   */
+  auto(): ColumnDefinition<TRow, unknown>[];
 }
 
 // ============================================================================
@@ -248,6 +311,10 @@ export function createPathColumnFactory<TRow>(): PathColumnFactory<TRow> {
 
     custom<TValue = unknown>() {
       return new ColumnBuilder<TRow, TValue>('custom');
+    },
+
+    auto() {
+      return [createAutoColumnsSentinel<TRow>()];
     },
   };
 }

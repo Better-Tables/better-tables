@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CellEditAction,
   type ColumnDefinition,
   type ColumnVisibility,
   destroyTableStore,
@@ -9,9 +10,11 @@ import {
   getOrCreateTableStore,
   getTableStore,
   type PaginationState,
+  resolveTableColumns,
   type SortingState,
   type TableConfig,
   type TableDefinition,
+  tableNeedsColumnResolution,
   type UrlSyncAdapter,
   type UrlSyncConfig,
 } from '@better-tables/core';
@@ -19,6 +22,12 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
 import * as React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { TableAdapterProvider } from '../../hooks/use-column-options';
+import {
+  type CellEditErrorHandler,
+  type CellEditHandler,
+  useEditableCells,
+} from '../../hooks/use-editable-cells';
 import {
   useTableColumnOrder,
   useTableColumnVisibility,
@@ -29,13 +38,14 @@ import {
 } from '../../hooks/use-table-store';
 import { useTableUrlSync } from '../../hooks/use-table-url-sync';
 import { useVirtualization } from '../../hooks/use-virtualization';
-import { cn } from '../../lib/utils';
+import { cn, defaultGetRowId } from '../../lib/utils';
 import { FilterBar } from '../filters/filter-bar';
 import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { ActionsToolbar } from './actions-toolbar';
+import { EditableCell } from './editable-cell';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { TableHeaderContextMenu } from './table-header-context-menu';
@@ -221,6 +231,28 @@ export interface BetterTableProps<TData = unknown>
    * Protected filters will be shown with a lock icon and cannot be removed.
    */
   isFilterProtected?: (filter: FilterState) => boolean;
+
+  /**
+   * Persist a cell edit. When provided, wins over the adapter `updateRecord`
+   * path (required for `httpAdapter` and custom writes). See plan 053.
+   */
+  onCellEdit?: CellEditHandler<TData>;
+
+  /** Called when a cell save fails after optimistic update + rollback. */
+  onCellEditError?: CellEditErrorHandler<TData>;
+
+  /**
+   * Serializable cell-save function (plan 055) — typically the app's
+   * `'use server'` wrapper around `tables.cellEditAction(def)`. Save
+   * resolution order: `onCellEdit` → `saveAction` → direct adapter.
+   */
+  saveAction?: CellEditAction;
+
+  /**
+   * Table-level master switch for inline editing. Default `true`. Set `false`
+   * to render every cell read-only without changing column defs.
+   */
+  editing?: boolean;
 }
 
 /** Ref-latch a frequently-changing callback/value prop so a `useEffect` (or
@@ -243,6 +275,24 @@ interface TableRowComponentProps<TData> {
   clickable: boolean;
   onActivate: (row: TData) => void;
   onToggleSelection: (rowId: string, selected: boolean) => void;
+  /** Column ids that can edit when a save path exists (stable Set), or null when none. */
+  editableColumnIds: ReadonlySet<string> | null;
+  /** Row-level gate: `editable.when` + related-row-id presence (plan 055). */
+  isRowCellEditable: (column: ColumnDefinition<TData, unknown>, row: TData) => boolean;
+  rowOverlay: Readonly<Record<string, unknown>>;
+  rowErrors: Readonly<Record<string, string>>;
+  rowSavingColumns: ReadonlySet<string>;
+  /** Column id currently being edited in this row, or null. */
+  editingColumnId: string | null;
+  onBeginCellEdit: (rowId: string, columnId: string) => void;
+  onCancelCellEdit: (rowId: string, columnId: string) => void;
+  onCommitCellEdit: (args: {
+    row: TData;
+    rowId: string;
+    column: ColumnDefinition<TData, unknown>;
+    value: unknown;
+    previousValue: unknown;
+  }) => void;
 }
 
 function TableRowComponent<TData>({
@@ -255,6 +305,15 @@ function TableRowComponent<TData>({
   clickable,
   onActivate,
   onToggleSelection,
+  editableColumnIds,
+  isRowCellEditable,
+  rowOverlay,
+  rowErrors,
+  rowSavingColumns,
+  editingColumnId,
+  onBeginCellEdit,
+  onCancelCellEdit,
+  onCommitCellEdit,
 }: TableRowComponentProps<TData>) {
   return (
     <TableRow
@@ -282,7 +341,53 @@ function TableRowComponent<TData>({
         </TableCell>
       )}
       {visibleColumns.map((column) => {
-        const value = column.accessor(row);
+        const accessorValue = column.accessor(row);
+        const value =
+          column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
+        const cellEditable =
+          editableColumnIds?.has(column.id) === true &&
+          isRowCellEditable(column as ColumnDefinition<TData, unknown>, row);
+        const isEditing = editingColumnId === column.id;
+
+        const display = column.cellRenderer
+          ? column.cellRenderer({
+              value,
+              row,
+              column,
+              rowIndex: index,
+            })
+          : (() => {
+              const formatted = getFormatterForType(column.type, value, column.meta);
+              const truncateConfig = column.meta?.truncate as
+                | { maxLength?: number; suffix?: string; showTooltip?: boolean }
+                | undefined;
+
+              // Show tooltip for truncated text if showTooltip is enabled
+              if (truncateConfig?.showTooltip && value != null) {
+                const originalValue = String(value);
+                const maxLen = truncateConfig.maxLength || 50;
+                const isTruncated = originalValue.length > maxLen;
+
+                if (isTruncated) {
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<span className="cursor-help truncate max-w-full inline-block" />}
+                      >
+                        {formatted}
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <div className="wrap-break-word whitespace-pre-wrap text-pretty">
+                          {originalValue}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+              }
+
+              return <span>{formatted}</span>;
+            })();
 
         return (
           <TableCell
@@ -298,47 +403,32 @@ function TableRowComponent<TData>({
               column.align === 'right' && 'text-right'
             )}
           >
-            {column.cellRenderer
-              ? column.cellRenderer({
-                  value,
-                  row,
-                  column,
-                  rowIndex: index,
-                })
-              : (() => {
-                  const formatted = getFormatterForType(column.type, value, column.meta);
-                  const truncateConfig = column.meta?.truncate as
-                    | { maxLength?: number; suffix?: string; showTooltip?: boolean }
-                    | undefined;
-
-                  // Show tooltip for truncated text if showTooltip is enabled
-                  if (truncateConfig?.showTooltip && value != null) {
-                    const originalValue = String(value);
-                    const maxLen = truncateConfig.maxLength || 50;
-                    const isTruncated = originalValue.length > maxLen;
-
-                    if (isTruncated) {
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <span className="cursor-help truncate max-w-full inline-block" />
-                            }
-                          >
-                            {formatted}
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            <div className="wrap-break-word whitespace-pre-wrap text-pretty">
-                              {originalValue}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    }
-                  }
-
-                  return <span>{formatted}</span>;
-                })()}
+            {cellEditable ? (
+              <EditableCell
+                row={row}
+                rowId={rowId}
+                column={column}
+                value={value}
+                editing={isEditing}
+                saving={rowSavingColumns.has(column.id)}
+                error={rowErrors[column.id] ?? null}
+                onBeginEdit={() => onBeginCellEdit(rowId, column.id)}
+                onCancel={() => onCancelCellEdit(rowId, column.id)}
+                onCommit={(next) =>
+                  void onCommitCellEdit({
+                    row,
+                    rowId,
+                    column,
+                    value: next,
+                    previousValue: accessorValue,
+                  })
+                }
+              >
+                {display}
+              </EditableCell>
+            ) : (
+              display
+            )}
           </TableCell>
         );
       })}
@@ -357,7 +447,158 @@ function TableRowComponent<TData>({
  */
 const MemoizedTableRow = memo(TableRowComponent) as typeof TableRowComponent;
 
-export function BetterTable<TData = unknown>({
+/**
+ * Lazily resolve a `table` definition's columns against the adapter (plan
+ * 054): auto columns (`t.auto()` / no-factory `define`) and enrichable gaps
+ * (an option column without options) resolve through core's ONE
+ * `resolveTableColumns` helper. Returns `columns: null` while a needed
+ * resolution is in flight; when `enabled` is false this hook is inert (no
+ * state churn, no async hop) so fully-declared tables pay nothing.
+ *
+ * `generation` increments every time `table`/`adapter` change identity
+ * (bug fix: auto-column stale schema in store, P1) -- `BetterTable` keys
+ * `BetterTableInner` on it so a table/adapter switch always remounts Inner
+ * (destroying and recreating its `TableStateManager` store) rather than
+ * risk `getOrCreateTableStore` baking in a stale columns/columnVisibility
+ * shape from before the switch (the store has no way to update columns
+ * after creation).
+ */
+function useResolvedTableColumns<TData>(
+  enabled: boolean,
+  table: TableDefinition<string, TData> | undefined,
+  adapter: BetterTableProps<TData>['adapter']
+): { columns: ColumnDefinition<TData, unknown>[] | null; generation: number } {
+  const [resolved, setResolved] = React.useState<ColumnDefinition<TData, unknown>[] | null>(null);
+  const generationRef = useRef(0);
+  const inputsRef = useRef<{
+    table: TableDefinition<string, TData> | undefined;
+    adapter: BetterTableProps<TData>['adapter'];
+  } | null>(null);
+
+  // Render-time reset (React "adjusting state during render" pattern): a
+  // plain `useEffect`-only reset (the previous approach) still lets THIS
+  // render commit once with `resolved` holding the PREVIOUS table/adapter's
+  // columns, and `BetterTable` mount `BetterTableInner` (and therefore
+  // `getOrCreateTableStore`) with them before the effect has a chance to
+  // clear it. Clearing synchronously here closes that window: by the time
+  // this render's return value is used, `resolved` is already `null` for a
+  // new table/adapter identity.
+  if (enabled) {
+    const inputsChanged =
+      inputsRef.current === null ||
+      inputsRef.current.table !== table ||
+      inputsRef.current.adapter !== adapter;
+    if (inputsChanged) {
+      inputsRef.current = { table, adapter };
+      generationRef.current += 1;
+      if (resolved !== null) setResolved(null);
+    }
+  } else {
+    inputsRef.current = null;
+  }
+
+  useEffect(() => {
+    if (!enabled || !table) return undefined;
+    let cancelled = false;
+    void resolveTableColumns(table, adapter).then((columns) => {
+      if (!cancelled) setResolved(columns);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, table, adapter]);
+
+  return { columns: enabled ? resolved : null, generation: generationRef.current };
+}
+
+/** Column count for the columns-resolving skeleton (real columns unknown yet). */
+const AUTO_COLUMNS_SKELETON_KEYS = ['first', 'second', 'third'] as const;
+
+/** Skeleton shown while auto columns resolve — mirrors the loading state. */
+function AutoColumnsLoading({ className }: { className?: string | undefined }) {
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: Fine for live regions
+    <div
+      className={cn('space-y-4', className)}
+      role="status"
+      aria-live="polite"
+      aria-label="Loading table columns"
+    >
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {AUTO_COLUMNS_SKELETON_KEYS.map((key) => (
+                <TableHead key={key}>
+                  <Skeleton className="h-4 w-[100px]" />
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...Array(5)].map((_, rowIdx) => {
+              const rowKey = `auto-columns-skeleton-${rowIdx}`;
+              return (
+                <TableRow key={rowKey}>
+                  {AUTO_COLUMNS_SKELETON_KEYS.map((key) => (
+                    <TableCell key={`${rowKey}-${key}`}>
+                      <Skeleton className="h-4 w-[100px]" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The mount seam for auto columns (plan 054): when the `table` definition
+ * needs resolution (`t.auto()` / no-factory `define`, or an explicit option
+ * column with no options to enrich), resolve columns against the adapter
+ * BEFORE mounting the real table — the store is created once, with the
+ * final column list. Fully-declared tables (or an explicit `columns` prop,
+ * which wins over `table` — existing semantics) skip the async hop entirely
+ * and render exactly as before.
+ */
+export function BetterTable<TData = unknown>(props: BetterTableProps<TData>) {
+  const { columns: columnsProp, table, adapter } = props;
+  const needsResolution = !columnsProp && !!table && tableNeedsColumnResolution(table);
+  const { columns: resolvedColumns, generation } = useResolvedTableColumns(
+    needsResolution,
+    table,
+    adapter
+  );
+
+  if (needsResolution && resolvedColumns === null) {
+    return <AutoColumnsLoading className={props.className} />;
+  }
+
+  // Keyed on the resolution's generation (bug fix: auto-column stale schema
+  // in store, P1) so a table/adapter switch always remounts `Inner` --
+  // destroying its `TableStateManager` store instead of reusing one that
+  // may have been created with a previous switch's (or this same id's
+  // pre-switch) columns baked in.
+  const innerKey = needsResolution ? `resolved-${generation}` : undefined;
+
+  // The adapter context powers the facet fallback for option dropdowns
+  // (plan 054 Step 5) — leaf inputs (option editor, option filter input)
+  // lazily fetch choices for option columns that declare none.
+  return (
+    <TableAdapterProvider adapter={adapter}>
+      {needsResolution && resolvedColumns !== null ? (
+        <BetterTableInner key={innerKey} {...props} columns={resolvedColumns} />
+      ) : (
+        <BetterTableInner {...props} />
+      )}
+    </TableAdapterProvider>
+  );
+}
+
+function BetterTableInner<TData = unknown>({
   // Core table config (minus adapter)
   id: idProp,
   name: nameProp,
@@ -370,6 +611,7 @@ export function BetterTable<TData = unknown>({
 
   // Data props (handled by parent)
   data,
+  adapter,
   virtualized = false,
   loading = false,
   error = null,
@@ -403,6 +645,12 @@ export function BetterTable<TData = unknown>({
 
   // Filter protection
   isFilterProtected,
+
+  // Inline editing (plan 053; saveAction — plan 055)
+  onCellEdit,
+  onCellEditError,
+  saveAction,
+  editing = true,
   ...props
 }: BetterTableProps<TData>) {
   // `table` (a defineTable() result) is sugar for columns={table.columns},
@@ -696,28 +944,10 @@ export function BetterTable<TData = unknown>({
     previousFiltersRef.current = filters;
   }, [autoShowFilteredColumns, filters, defaultVisibleColumns, setColumnVisibility, store]);
 
-  // Get row ID function from rowConfig or use default
+  // Get row ID function from rowConfig or use the shared default (also used
+  // by `<VirtualizedTable>` -- see `lib/utils.ts` for why this is ONE helper).
   const getRowId = useMemo(() => {
-    return (
-      rowConfig?.getId ||
-      ((row: TData, _index: number) => {
-        // Try to find an id field using common patterns
-        if (typeof row === 'object' && row !== null) {
-          const obj = row as Record<string, unknown>;
-          if ('id' in obj && obj.id != null) {
-            return String(obj.id);
-          }
-          if ('_id' in obj && obj._id != null) {
-            return String(obj._id);
-          }
-          if ('uuid' in obj && obj.uuid != null) {
-            return String(obj.uuid);
-          }
-        }
-        // Fallback to index only if no ID field found
-        return `row-${_index}`;
-      })
-    );
+    return rowConfig?.getId || defaultGetRowId;
   }, [rowConfig?.getId]);
 
   // Handle filter changes - just update store
@@ -772,6 +1002,40 @@ export function BetterTable<TData = unknown>({
   );
   const rowsClickable = Boolean(onRowClick || rowConfig?.onClick);
 
+  const editableCells = useEditableCells<TData>({
+    editing,
+    ...(adapter != null ? { adapter } : {}),
+    ...(table?.tableName != null ? { tableName: table.tableName } : {}),
+    ...(onCellEdit != null ? { onCellEdit } : {}),
+    ...(onCellEditError != null ? { onCellEditError } : {}),
+    ...(saveAction != null ? { saveAction } : {}),
+  });
+
+  const editableColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const column of columnsWithDefaults) {
+      if (editableCells.isColumnPotentiallyEditable(column)) {
+        ids.add(column.id);
+      }
+    }
+    return ids.size > 0 ? ids : null;
+  }, [columnsWithDefaults, editableCells.isColumnPotentiallyEditable]);
+
+  const handleBeginCellEdit = editableCells.beginEdit;
+  const handleCancelCellEdit = editableCells.cancelEdit;
+  const handleCommitCellEdit = useCallback(
+    (args: {
+      row: TData;
+      rowId: string;
+      column: ColumnDefinition<TData, unknown>;
+      value: unknown;
+      previousValue: unknown;
+    }) => {
+      void editableCells.commitEdit(args);
+    },
+    [editableCells.commitEdit]
+  );
+
   // Clear filters handler
   const handleClearFilters = useCallback(() => {
     clearFilters();
@@ -786,15 +1050,29 @@ export function BetterTable<TData = unknown>({
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;
 
-  // Screen reader announcement for sort changes
-  const sortAnnouncement = React.useMemo(() => {
-    if (sortingState.length === 0) return '';
-    return sortingState
-      .map((sort) => {
-        const column = columnsWithDefaults.find((c) => c.id === sort.columnId);
-        return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
-      })
-      .join(', ');
+  // Live-region text must stay empty during SSR/hydration: the module-level
+  // table store can already hold client URL-synced sorting while the server
+  // store is empty (or vice versa). Announcing only after mount keeps the
+  // DOM structure stable and matches aria-live's "announce changes" role.
+  const [sortAnnouncement, setSortAnnouncement] = React.useState('');
+  const sortAnnouncementMountedRef = useRef(false);
+  useEffect(() => {
+    const next =
+      sortingState.length === 0
+        ? ''
+        : sortingState
+            .map((sort) => {
+              const column = columnsWithDefaults.find((c) => c.id === sort.columnId);
+              return `${column?.displayName} sorted ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
+            })
+            .join(', ');
+    // Skip the first effect run so loading a pre-sorted URL doesn't announce
+    // static initial state — only later user-driven sort changes speak.
+    if (!sortAnnouncementMountedRef.current) {
+      sortAnnouncementMountedRef.current = true;
+      return;
+    }
+    setSortAnnouncement(next);
   }, [sortingState, columnsWithDefaults]);
 
   // Filter columns by visibility and apply column order (must be before any early returns)
@@ -942,12 +1220,10 @@ export function BetterTable<TData = unknown>({
 
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props} {...(name !== undefined && { name })}>
-      {/* Screen reader announcement for sort changes */}
-      {sortAnnouncement && (
-        <div aria-live="polite" aria-atomic="true" className="sr-only">
-          {sortAnnouncement}
-        </div>
-      )}
+      {/* Always mounted so SSR/client DOM structure matches */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {sortAnnouncement}
+      </div>
 
       <div className="flex items-center gap-2">
         {/* Actions Toolbar - render independently of filtering */}
@@ -1155,6 +1431,7 @@ export function BetterTable<TData = unknown>({
             {virtualBodyRows.map(({ row, index }) => {
               const rowId = getRowId(row, index);
               const isSelected = selectedRows.has(rowId);
+              const editingColumnId = editableCells.getEditingColumnId(rowId);
 
               return (
                 <MemoizedTableRow
@@ -1168,6 +1445,15 @@ export function BetterTable<TData = unknown>({
                   clickable={rowsClickable}
                   onActivate={handleRowActivate}
                   onToggleSelection={handleRowSelection}
+                  editableColumnIds={editableColumnIds}
+                  isRowCellEditable={editableCells.isRowCellEditable}
+                  rowOverlay={editableCells.getRowOverlay(rowId)}
+                  rowErrors={editableCells.getRowErrors(rowId)}
+                  rowSavingColumns={editableCells.getRowSavingColumns(rowId)}
+                  editingColumnId={editingColumnId}
+                  onBeginCellEdit={handleBeginCellEdit}
+                  onCancelCellEdit={handleCancelCellEdit}
+                  onCommitCellEdit={handleCommitCellEdit}
                 />
               );
             })}

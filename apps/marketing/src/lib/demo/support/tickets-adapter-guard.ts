@@ -42,6 +42,26 @@ export function collectTicketsAdapterColumnIds(body: AdapterRequestBody): string
     return ids;
   }
 
+  // describeColumns references no column ids — it's constrained to the
+  // tickets table in constrainTicketsAdapterRequest instead.
+  if (body.method === 'describeColumns') {
+    return ids;
+  }
+
+  // resolveCellWriteTarget is a read against one column id (plan 055).
+  if (body.method === 'resolveCellWriteTarget') {
+    ids.push(body.columnId);
+    return ids;
+  }
+
+  // cellEdit: this endpoint does not enable writes (the demo saves through
+  // the direct server action), so the handler rejects it — but keep the
+  // allowlist total over the union anyway.
+  if (body.method === 'cellEdit') {
+    ids.push(body.field);
+    return ids;
+  }
+
   ids.push(body.columnId);
   ids.push(...collectFilterColumnIds(body.params?.filters));
   return ids;
@@ -53,7 +73,8 @@ export function isAllowedTicketsAdapterRequest(body: AdapterRequestBody): boolea
 }
 
 /**
- * Pin `fetchData` to the tickets table. Facet methods are gated by
+ * Pin `fetchData` and `describeColumns` to the tickets table (the schema has
+ * other tables this endpoint must not expose). Facet methods are gated by
  * {@link isAllowedTicketsAdapterRequest} instead (column-id allowlist).
  */
 export function constrainTicketsAdapterRequest(body: AdapterRequestBody): AdapterRequestBody {
@@ -62,6 +83,12 @@ export function constrainTicketsAdapterRequest(body: AdapterRequestBody): Adapte
       ...body,
       params: { ...body.params, primaryTable: 'tickets' },
     };
+  }
+  if (body.method === 'describeColumns') {
+    return { ...body, table: 'tickets' };
+  }
+  if (body.method === 'resolveCellWriteTarget') {
+    return { ...body, table: 'tickets' };
   }
   return body;
 }

@@ -1,8 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
 import { QueryGroupsWorkspace } from '@/components/sections/query-groups-workspace';
-import { SourceView } from '@/components/sections/source-view';
-import { readSourceFile } from '@/lib/demo/read-source';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { constructMetadata } from '@/lib/utils';
 
@@ -33,9 +31,6 @@ export default async function QueryGroupsPage({ searchParams }: QueryGroupsPageP
     sorting: tableParams.sorting,
   });
 
-  const filterSentenceSource = readSourceFile('src/lib/demo/support/filter-sentence.ts');
-  const presetsSource = readSourceFile('src/lib/demo/support/relationship-trail.ts');
-
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
       <div className="mb-10 max-w-3xl">
@@ -46,10 +41,9 @@ export default async function QueryGroupsPage({ searchParams }: QueryGroupsPageP
           AND/OR filter groups, as a sentence
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          Every scenario below is a real <code>FilterGroupNode</code> tree -- some AND, one OR, one
-          a flat implicit-AND array, and one a null-only filter (&ldquo;tickets with no
-          assignee&rdquo;). Each is shareable: applying a scenario updates the URL with the{' '}
-          <code>c2:</code> wire format, so the link you copy reproduces the exact same query.
+          Nest AND/OR groups (or a flat filter list), including null-only filters like
+          &ldquo;tickets with no assignee.&rdquo; Apply a scenario and the URL updates so the link
+          you copy reproduces the same query.
         </p>
       </div>
 
@@ -58,16 +52,6 @@ export default async function QueryGroupsPage({ searchParams }: QueryGroupsPageP
       >
         <QueryGroupsWorkspace fetchResult={fetchResult} activePresetId={params.preset ?? null} />
       </Suspense>
-
-      <div className="mt-6">
-        <SourceView
-          title="Implementation: filter groups and sentence rendering"
-          files={[
-            { label: 'src/lib/demo/support/filter-sentence.ts', code: filterSentenceSource },
-            { label: 'src/lib/demo/support/relationship-trail.ts (presets)', code: presetsSource },
-          ]}
-        />
-      </div>
     </div>
   );
 }

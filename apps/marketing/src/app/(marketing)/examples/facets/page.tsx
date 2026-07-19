@@ -2,8 +2,6 @@ import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
 import { FacetsSidebar } from '@/components/sections/facets-sidebar';
 import { FacetsTableClient } from '@/components/sections/facets-table-client';
-import { SourceView } from '@/components/sections/source-view';
-import { readSourceFile } from '@/lib/demo/read-source';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { constructMetadata } from '@/lib/utils';
 
@@ -33,9 +31,6 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
     sorting: tableParams.sorting,
   });
 
-  const routeSource = readSourceFile('src/app/api/tables/tickets/route.ts');
-  const sidebarSource = readSourceFile('src/components/sections/facets-sidebar.tsx');
-
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
       <div className="mb-10 max-w-3xl">
@@ -46,9 +41,8 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
           Filter-aware facets
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          The sidebar wires <code>useFacets</code> + <code>httpAdapter</code> to a one-line{' '}
-          <code>createAdapterRouteHandler</code>: the batching, self-exclusion, and <code>Map</code>{' '}
-          handling are shipped primitives. Only the presentation below is app code.
+          Click a facet to narrow the table. Counts respect every other active filter — a column
+          never excludes itself from its own facet list.
         </p>
       </div>
 
@@ -88,16 +82,6 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
             />
           </Suspense>
         </section>
-      </div>
-
-      <div className="mt-6">
-        <SourceView
-          title="Implementation: adapter route handler and sidebar"
-          files={[
-            { label: 'src/app/api/tables/tickets/route.ts', code: routeSource },
-            { label: 'src/components/sections/facets-sidebar.tsx', code: sidebarSource },
-          ]}
-        />
       </div>
     </div>
   );

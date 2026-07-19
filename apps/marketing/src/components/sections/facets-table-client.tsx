@@ -1,7 +1,10 @@
 'use client';
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import { httpAdapter } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { useMemo } from 'react';
+import { saveTicketCell } from '@/lib/demo/support/actions';
 import {
   defaultVisibleTicketColumns,
   type TicketRow,
@@ -34,14 +37,21 @@ export function FacetsTableClient({
     urlAdapter
   );
 
+  // Auto columns (plan 054): `ticketsTable` spreads `t.auto()`, so BetterTable
+  // resolves the inferred columns at mount through this adapter's
+  // `describeColumns` (same endpoint the facets sidebar reads); the joined
+  // `customer.company` column also resolves its write target through it.
+  // SAVES go through the DIRECT server-action path (`saveAction` below) --
+  // this endpoint proxies reads only.
+  const adapter = useMemo(() => httpAdapter<TicketRow>({ url: '/api/tables/tickets' }), []);
+
   return (
     <BetterTable
-      // Explicit `id` (not the table prop's `tableName` default): three
-      // separate pages render this same table definition and each needs its
-      // own store/URL-sync identity.
+      // Unique id so this page's store/URL state stays separate from other demos.
       id={TABLE_ID}
       name="Tickets"
       table={ticketsTable}
+      adapter={adapter}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}
@@ -49,12 +59,19 @@ export function FacetsTableClient({
       initialFilters={initialFilters}
       defaultVisibleColumns={defaultVisibleTicketColumns}
       autoShowFilteredColumns
+      saveAction={saveTicketCell}
       features={{
         filtering: true,
         sorting: true,
         pagination: true,
         rowSelection: false,
         columnReordering: false,
+        headerContextMenu: {
+          enabled: true,
+          showSortToggle: true,
+          allowSortReorder: false,
+          showColumnVisibility: true,
+        },
       }}
       sorting={{ enabled: true, multiSort: false }}
       emptyMessage="No tickets match the active facets."

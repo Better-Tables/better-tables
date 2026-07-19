@@ -8,17 +8,25 @@
 
 import type { FacetQueryParams, FetchDataParams } from '../types/adapter';
 
-/** The four read methods of `TableAdapter` the HTTP transport proxies. */
+/**
+ * The methods the HTTP transport proxies: the reads (always available) plus
+ * `cellEdit` — the ONE write, available only behind double opt-in
+ * (`writes` on the route handler AND on `httpAdapter`; plan 055).
+ */
 export type AdapterMethod =
   | 'fetchData'
   | 'getFilterOptions'
   | 'getFacetedValues'
-  | 'getMinMaxValues';
+  | 'getMinMaxValues'
+  | 'describeColumns'
+  | 'resolveCellWriteTarget'
+  | 'cellEdit';
 
 /**
  * A single request over the wire. `fetchData` carries a `params` object
  * (minus the non-serializable `AbortSignal`); the three column-scoped facet
- * methods carry a `columnId` plus optional `params`.
+ * methods carry a `columnId` plus optional `params`; `describeColumns`
+ * (plan 054) carries an optional `table` — a plain-JSON read, same envelope.
  */
 export type AdapterRequestBody =
   | {
@@ -31,6 +39,33 @@ export type AdapterRequestBody =
       columnId: string;
       /** {@link FacetQueryParams} without `signal` (handled client-side). */
       params?: Omit<FacetQueryParams, 'signal'>;
+    }
+  | {
+      method: 'describeColumns';
+      /** Table to describe — same resolution as `FetchDataParams.primaryTable`. */
+      table?: string;
+    }
+  | {
+      method: 'resolveCellWriteTarget';
+      /** The column id to resolve (may be dotted, e.g. 'customer.company'). */
+      columnId: string;
+      /** Primary-table context — same resolution as `FetchDataParams.primaryTable`. */
+      table?: string;
+    }
+  | {
+      method: 'cellEdit';
+      /** TARGET row id (the RELATED row's id for relationship-path columns). */
+      id: string;
+      /**
+       * The COLUMN id (cell-oriented, singular — NOT a free-form data
+       * record): the server re-resolves column → (table, field) through
+       * `resolveCellWriteTarget`, so the client can never redirect a write.
+       */
+      field: string;
+      /** Wire-safe value (dates as ISO strings). */
+      value: unknown;
+      /** Primary-table context — same resolution as `FetchDataParams.primaryTable`. */
+      table?: string;
     };
 
 /**
@@ -41,9 +76,10 @@ export type AdapterRequestBody =
  *   (`Record<string, [value, count][]>`) and rebuilt into `Map`s on the client
  * - `Date` values in filter params / rows serialize as ISO strings (JSON)
  *
- * Failure envelopes carry a `kind` so transports can map `bad_request` → 400
- * and `server_error` → 500 without leaking adapter/DB messages to clients.
+ * Failure envelopes carry a `kind` so transports can map `bad_request` → 400,
+ * `forbidden` → 403 (writes not enabled / not authorized), and
+ * `server_error` → 500 without leaking adapter/DB messages to clients.
  */
 export type AdapterResponseBody =
   | { ok: true; result: unknown }
-  | { ok: false; error: string; kind: 'bad_request' | 'server_error' };
+  | { ok: false; error: string; kind: 'bad_request' | 'forbidden' | 'server_error' };

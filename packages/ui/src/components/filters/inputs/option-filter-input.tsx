@@ -4,6 +4,7 @@ import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { Search } from 'lucide-react';
 import * as React from 'react';
 import { useId } from 'react';
+import { useColumnOptions } from '../../../hooks/use-column-options';
 import { useFilterValidation } from '../../../hooks/use-filter-validation';
 import { cn } from '../../../lib/utils';
 import { Checkbox } from '../../ui/checkbox';
@@ -32,7 +33,10 @@ export function OptionFilterInput<TData = unknown>({
   const id = useId();
   const [search, setSearch] = React.useState('');
 
-  const options = column.filter?.options || [];
+  // Declared/enriched options first; a column without any lazily fetches
+  // facet values through the table's adapter context (plan 054 Step 5). This
+  // component mounts when the filter dropdown opens, so mount == first open.
+  const { options, loading: optionsLoading } = useColumnOptions(column);
   const allowsMultiple = filter.operator === 'isAnyOf' || filter.operator === 'isNoneOf';
   const needsNoValues = filter.operator === 'isNull' || filter.operator === 'isNotNull';
   const selectedValues = (filter.values || []) as string[];
@@ -93,7 +97,9 @@ export function OptionFilterInput<TData = unknown>({
       )}
 
       <ScrollArea className="max-h-60 px-1">
-        {filteredOptions.length === 0 ? (
+        {optionsLoading ? (
+          <p className="px-1 py-2 text-xs text-muted-foreground">Loading options…</p>
+        ) : filteredOptions.length === 0 ? (
           <p className="px-1 py-2 text-xs text-muted-foreground">No options found.</p>
         ) : allowsMultiple ? (
           <div className="flex flex-col gap-0.5 pr-2">

@@ -16,16 +16,9 @@ interface BigBoardClientProps {
 }
 
 /**
- * 12,000 rows through the SAME `<BetterTable>` every other example uses --
- * `virtualized` is the only difference. Windowing is a rendering detail, so the
- * filter bar, header sort UI, column visibility and URL sync all come for free;
- * there's no separate virtualized component, no hand-built sort toolbar, and no
- * per-column `renderCell` (the column definitions' own `.dateTime()`/
- * `.cellRenderer()` config drives formatting).
- *
- * `pagination: false` because windowing already handles arbitrarily many rows:
- * the server returns every matching row in one query and the table renders only
- * the ones in view.
+ * Virtualized board: same `<BetterTable>` API, with `virtualized` so only
+ * visible rows mount. Pagination is off — the server returns matching rows
+ * and the table windows them in the client.
  */
 export function BigBoardClient({
   data,

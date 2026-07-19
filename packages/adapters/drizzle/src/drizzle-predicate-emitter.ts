@@ -64,7 +64,11 @@ import type {
   FilterHandlerHooks,
 } from './types';
 import { QueryError } from './types';
-import { getArrayElementType, isArrayColumn } from './utils/drizzle-schema-utils';
+import {
+  getArrayElementType,
+  isArrayColumn,
+  isTimestampDrizzleColumn,
+} from './utils/drizzle-schema-utils';
 
 /**
  * Drizzle's implementation of the toolkit's `PredicateEmitter` interface.
@@ -1158,7 +1162,9 @@ export class DrizzlePredicateEmitter
   }
 
   /**
-   * Check if a column is a timestamp/date column.
+   * Check if a column is a timestamp/date column. Delegates to the shared
+   * {@link isTimestampDrizzleColumn} predicate (plan 054) so `describeColumns`
+   * inference and predicate emission share ONE timestamp-family list.
    */
   private isTimestampColumn(column: ColumnOrExpression): boolean {
     // If it's a SQL expression, we can't determine the type
@@ -1166,57 +1172,7 @@ export class DrizzlePredicateEmitter
       return false;
     }
 
-    const col = column as AnyColumnType;
-
-    // Check columnType first (more specific than dataType)
-    const columnType = (col as unknown as { columnType?: string }).columnType;
-    if (columnType) {
-      // Check for PostgreSQL timestamp column types
-      if (
-        columnType === 'PgTimestamp' ||
-        columnType === 'PgTimestampString' ||
-        columnType === 'PgTimestampNumber'
-      ) {
-        return true;
-      }
-
-      // Check for MySQL datetime/timestamp column types
-      if (
-        columnType === 'MySqlDateTime' ||
-        columnType === 'MySqlTimestamp' ||
-        columnType === 'MySqlDate'
-      ) {
-        return true;
-      }
-
-      // Check for SQLite timestamp column types
-      // SQLite uses integer with mode: 'timestamp' or text with mode: 'date'
-      if (
-        columnType === 'SQLiteTimestamp' ||
-        columnType === 'SQLiteDate' ||
-        // SQLite integer columns with timestamp mode
-        (columnType === 'SQLiteInteger' &&
-          (col as unknown as { mode?: string }).mode === 'timestamp')
-      ) {
-        return true;
-      }
-    }
-
-    // Check dataType as fallback (date is a valid dataType)
-    const dataType = col.dataType;
-    if (dataType === 'date') {
-      return true;
-    }
-
-    // For SQLite, also check if it's an integer with timestamp mode
-    if (this.databaseType === 'sqlite' && dataType === 'number') {
-      const mode = (col as unknown as { mode?: string }).mode;
-      if (mode === 'timestamp' || mode === 'date') {
-        return true;
-      }
-    }
-
-    return false;
+    return isTimestampDrizzleColumn(column as AnyColumnType);
   }
 
   /**

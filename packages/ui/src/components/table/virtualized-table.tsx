@@ -1,12 +1,24 @@
 'use client';
 
-import type { ColumnDefinition, ScrollInfo } from '@better-tables/core';
+import type {
+  CellEditAction,
+  ColumnDefinition,
+  ScrollInfo,
+  TableAdapter,
+} from '@better-tables/core';
 import { getColumnStyle, getFormatterForType } from '@better-tables/core';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { TableAdapterProvider } from '../../hooks/use-column-options';
+import {
+  type CellEditErrorHandler,
+  type CellEditHandler,
+  useEditableCells,
+} from '../../hooks/use-editable-cells';
 import { type UseVirtualizationConfig, useVirtualization } from '../../hooks/use-virtualization';
-import { cn } from '../../lib/utils';
+import { cn, defaultGetRowId } from '../../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { EditableCell } from './editable-cell';
 
 /**
  * Props for the VirtualizedTable component
@@ -24,7 +36,11 @@ export interface VirtualizedTableProps<T = unknown> {
   /** Custom row renderer */
   renderRow?: (item: T, index: number, style: React.CSSProperties) => React.ReactNode;
 
-  /** Custom cell renderer */
+  /**
+   * Custom cell renderer. When provided, built-in inline editing is skipped
+   * for that cell path (v1 — opt out; use `<BetterTable virtualized />` for
+   * full editable support).
+   */
   renderCell?: (
     value: unknown,
     column: ColumnDefinition<T>,
@@ -58,6 +74,17 @@ export interface VirtualizedTableProps<T = unknown> {
   onScroll?: (scrollInfo: ScrollInfo) => void;
   onViewportChange?: (startIndex: number, endIndex: number) => void;
 
+  /** Adapter for the default cell-edit save path (plan 053). */
+  adapter?: TableAdapter<T>;
+  tableName?: string;
+  onCellEdit?: CellEditHandler<T>;
+  onCellEditError?: CellEditErrorHandler<T>;
+  /** Serializable cell-save function (plan 055) — see `BetterTableProps.saveAction`. */
+  saveAction?: CellEditAction;
+  /** Table-level master switch for inline editing. Default true. */
+  editing?: boolean;
+  getRowId?: (item: T, index: number) => string;
+
   /** Accessibility props */
   'aria-label'?: string;
   'aria-describedby'?: string;
@@ -69,6 +96,7 @@ export interface VirtualizedTableProps<T = unknown> {
 interface VirtualizedRowProps<T> {
   item: T;
   index: number;
+  rowId: string;
   columns: ColumnDefinition<T>[];
   style: React.CSSProperties;
   renderCell?: (
@@ -82,16 +110,42 @@ interface VirtualizedRowProps<T> {
    * single top-level callback can serve every row (see `onMeasure` in
    * `VirtualizedTable`). */
   onMeasure: (rowIndex: number, height: number) => void;
+  editableColumnIds: ReadonlySet<string> | null;
+  /** Row-level gate: `editable.when` + related-row-id presence (plan 055). */
+  isRowCellEditable: (column: ColumnDefinition<T, unknown>, row: T) => boolean;
+  rowOverlay: Readonly<Record<string, unknown>>;
+  rowErrors: Readonly<Record<string, string>>;
+  rowSavingColumns: ReadonlySet<string>;
+  editingColumnId: string | null;
+  onBeginCellEdit: (rowId: string, columnId: string) => void;
+  onCancelCellEdit: (rowId: string, columnId: string) => void;
+  onCommitCellEdit: (args: {
+    row: T;
+    rowId: string;
+    column: ColumnDefinition<T, unknown>;
+    value: unknown;
+    previousValue: unknown;
+  }) => void;
 }
 
 function VirtualizedRow<T>({
   item,
   index,
+  rowId,
   columns,
   style,
   renderCell,
   onRowClick,
   onMeasure,
+  editableColumnIds,
+  isRowCellEditable,
+  rowOverlay,
+  rowErrors,
+  rowSavingColumns,
+  editingColumnId,
+  onBeginCellEdit,
+  onCancelCellEdit,
+  onCommitCellEdit,
 }: VirtualizedRowProps<T>) {
   const rowRef = useRef<HTMLTableRowElement>(null);
 
@@ -129,8 +183,18 @@ function VirtualizedRow<T>({
       data-row-index={index}
     >
       {columns.map((column) => {
-        const value = item[column.id as keyof T];
+        const accessorValue = column.accessor ? column.accessor(item) : item[column.id as keyof T];
+        const value =
+          column.id in rowOverlay ? (rowOverlay[column.id] as typeof accessorValue) : accessorValue;
         const colStyle = getColumnStyle(column.meta);
+        const cellEditable =
+          !renderCell &&
+          editableColumnIds?.has(column.id) === true &&
+          isRowCellEditable(column as ColumnDefinition<T, unknown>, item);
+        const display = renderCell
+          ? renderCell(value, column, item, index)
+          : getFormatterForType(column.type, value, column.meta);
+
         return (
           <TableCell
             key={column.id}
@@ -141,9 +205,32 @@ function VirtualizedRow<T>({
               maxWidth: colStyle.maxWidth,
             }}
           >
-            {renderCell
-              ? renderCell(value, column, item, index)
-              : getFormatterForType(column.type, value, column.meta)}
+            {cellEditable ? (
+              <EditableCell
+                row={item}
+                rowId={rowId}
+                column={column}
+                value={value}
+                editing={editingColumnId === column.id}
+                saving={rowSavingColumns.has(column.id)}
+                error={rowErrors[column.id] ?? null}
+                onBeginEdit={() => onBeginCellEdit(rowId, column.id)}
+                onCancel={() => onCancelCellEdit(rowId, column.id)}
+                onCommit={(next) =>
+                  onCommitCellEdit({
+                    row: item,
+                    rowId,
+                    column,
+                    value: next,
+                    previousValue: accessorValue,
+                  })
+                }
+              >
+                {display}
+              </EditableCell>
+            ) : (
+              display
+            )}
           </TableCell>
         );
       })}
@@ -166,10 +253,20 @@ function areVirtualizedRowPropsEqual<T>(
   return (
     prev.item === next.item &&
     prev.index === next.index &&
+    prev.rowId === next.rowId &&
     prev.columns === next.columns &&
     prev.renderCell === next.renderCell &&
     prev.onRowClick === next.onRowClick &&
     prev.onMeasure === next.onMeasure &&
+    prev.editableColumnIds === next.editableColumnIds &&
+    prev.isRowCellEditable === next.isRowCellEditable &&
+    prev.rowOverlay === next.rowOverlay &&
+    prev.rowErrors === next.rowErrors &&
+    prev.rowSavingColumns === next.rowSavingColumns &&
+    prev.editingColumnId === next.editingColumnId &&
+    prev.onBeginCellEdit === next.onBeginCellEdit &&
+    prev.onCancelCellEdit === next.onCancelCellEdit &&
+    prev.onCommitCellEdit === next.onCommitCellEdit &&
     prev.style.top === next.style.top &&
     prev.style.left === next.style.left &&
     prev.style.right === next.style.right &&
@@ -230,9 +327,47 @@ export function VirtualizedTable<T = unknown>({
   onRowClick,
   onScroll,
   onViewportChange,
+  adapter,
+  tableName,
+  onCellEdit,
+  onCellEditError,
+  saveAction,
+  editing = true,
+  getRowId = defaultGetRowId,
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedBy,
 }: VirtualizedTableProps<T>) {
+  const editableCells = useEditableCells<T>({
+    editing,
+    ...(adapter != null ? { adapter } : {}),
+    ...(tableName != null ? { tableName } : {}),
+    ...(onCellEdit != null ? { onCellEdit } : {}),
+    ...(onCellEditError != null ? { onCellEditError } : {}),
+    ...(saveAction != null ? { saveAction } : {}),
+  });
+
+  const editableColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const column of columns) {
+      if (editableCells.isColumnPotentiallyEditable(column)) {
+        ids.add(column.id);
+      }
+    }
+    return ids.size > 0 ? ids : null;
+  }, [columns, editableCells.isColumnPotentiallyEditable]);
+
+  const handleCommitCellEdit = useCallback(
+    (args: {
+      row: T;
+      rowId: string;
+      column: ColumnDefinition<T, unknown>;
+      value: unknown;
+      previousValue: unknown;
+    }) => {
+      void editableCells.commitEdit(args);
+    },
+    [editableCells.commitEdit]
+  );
   // Virtualization configuration
   const virtualizationConfig: UseVirtualizationConfig = useMemo(
     () => ({
@@ -310,122 +445,138 @@ export function VirtualizedTable<T = unknown>({
   }
 
   return (
-    <div className={cn('border rounded-md overflow-hidden', className)} style={{ height, width }}>
-      {/* Performance metrics (dev mode only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-muted-foreground p-2 border-b bg-muted/50">
-          Rendering {metrics.renderedRows}/{metrics.totalRows} rows ({metrics.efficiency.toFixed(1)}
-          % efficiency)
-        </div>
-      )}
+    // Adapter context powers the option editor's facet fallback (plan 054).
+    <TableAdapterProvider adapter={adapter}>
+      <div className={cn('border rounded-md overflow-hidden', className)} style={{ height, width }}>
+        {/* Performance metrics (dev mode only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-muted-foreground p-2 border-b bg-muted/50">
+            Rendering {metrics.renderedRows}/{metrics.totalRows} rows (
+            {metrics.efficiency.toFixed(1)}% efficiency)
+          </div>
+        )}
 
-      {/* Table header - always visible */}
-      <div className="border-b bg-background sticky top-0 z-10">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-none">
-              {columns.map((column) => {
-                const colStyle = getColumnStyle(column.meta);
-                return (
-                  <TableHead
-                    key={column.id}
-                    className={cn(
-                      'h-12 px-4 text-left align-middle font-medium',
-                      colStyle.headerClassName
-                    )}
-                    style={{
-                      width: colStyle.width,
-                      minWidth: colStyle.minWidth,
-                      maxWidth: colStyle.maxWidth,
-                    }}
-                  >
-                    {column.displayName}
-                  </TableHead>
-                );
-              })}
-            </TableRow>
-          </TableHeader>
-        </Table>
-      </div>
-
-      {/* Virtualized content area */}
-      <section
-        ref={containerRef}
-        className="overflow-auto"
-        style={{
-          ...styles.container,
-          height: typeof height === 'number' ? height - 48 : 'calc(100% - 48px)', // Subtract header height
-        }}
-        aria-label={ariaLabel || 'Virtualized table content'}
-        aria-describedby={ariaDescribedBy}
-      >
-        <div
-          ref={contentRef}
-          style={{
-            ...styles.content,
-            minWidth: totalWidth,
-          }}
-          role="presentation"
-        >
-          <Table style={{ tableLayout: 'fixed', width: totalWidth }}>
-            <TableBody>
-              {virtualRows.map((virtualRow) => {
-                const item = data[virtualRow.index];
-                if (!item) return null;
-
-                const rowStyle = styles.getRowStyle(virtualRow);
-
-                if (renderRow) {
+        {/* Table header - always visible */}
+        <div className="border-b bg-background sticky top-0 z-10">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-none">
+                {columns.map((column) => {
+                  const colStyle = getColumnStyle(column.meta);
                   return (
-                    <tr
-                      key={virtualRow.index}
-                      style={rowStyle}
-                      aria-rowindex={virtualRow.index + 1}
+                    <TableHead
+                      key={column.id}
+                      className={cn(
+                        'h-12 px-4 text-left align-middle font-medium',
+                        colStyle.headerClassName
+                      )}
+                      style={{
+                        width: colStyle.width,
+                        minWidth: colStyle.minWidth,
+                        maxWidth: colStyle.maxWidth,
+                      }}
                     >
-                      {renderRow(item, virtualRow.index, rowStyle)}
-                    </tr>
+                      {column.displayName}
+                    </TableHead>
                   );
-                }
-
-                return (
-                  <MemoizedVirtualizedRow
-                    key={virtualRow.index}
-                    item={item}
-                    index={virtualRow.index}
-                    columns={columns}
-                    style={rowStyle}
-                    {...(renderCell !== undefined && { renderCell })}
-                    {...(onRowClick !== undefined && { onRowClick })}
-                    onMeasure={onMeasure}
-                  />
-                );
-              })}
-            </TableBody>
+                })}
+              </TableRow>
+            </TableHeader>
           </Table>
         </div>
-      </section>
 
-      {/* Scroll indicators (optional) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-muted-foreground p-2 border-t bg-muted/50 flex justify-between">
-          <span>
-            Scroll:{' '}
-            {Math.round(
-              utils.getTotalHeight() > 0
-                ? ((virtualRows[0]?.start || 0) / utils.getTotalHeight()) * 100
-                : 0
-            )}
-            %
-          </span>
-          <span>
-            Visible:{' '}
-            {virtualRows.length > 0
-              ? `${virtualRows[0]?.index}-${virtualRows[virtualRows.length - 1]?.index}`
-              : 'None'}
-          </span>
-        </div>
-      )}
-    </div>
+        {/* Virtualized content area */}
+        <section
+          ref={containerRef}
+          className="overflow-auto"
+          style={{
+            ...styles.container,
+            height: typeof height === 'number' ? height - 48 : 'calc(100% - 48px)', // Subtract header height
+          }}
+          aria-label={ariaLabel || 'Virtualized table content'}
+          aria-describedby={ariaDescribedBy}
+        >
+          <div
+            ref={contentRef}
+            style={{
+              ...styles.content,
+              minWidth: totalWidth,
+            }}
+            role="presentation"
+          >
+            <Table style={{ tableLayout: 'fixed', width: totalWidth }}>
+              <TableBody>
+                {virtualRows.map((virtualRow) => {
+                  const item = data[virtualRow.index];
+                  if (!item) return null;
+
+                  const rowStyle = styles.getRowStyle(virtualRow);
+
+                  if (renderRow) {
+                    return (
+                      <tr
+                        key={virtualRow.index}
+                        style={rowStyle}
+                        aria-rowindex={virtualRow.index + 1}
+                      >
+                        {renderRow(item, virtualRow.index, rowStyle)}
+                      </tr>
+                    );
+                  }
+
+                  const rowId = getRowId(item, virtualRow.index);
+                  const editingColumnId = editableCells.getEditingColumnId(rowId);
+
+                  return (
+                    <MemoizedVirtualizedRow
+                      key={virtualRow.index}
+                      item={item}
+                      index={virtualRow.index}
+                      rowId={rowId}
+                      columns={columns}
+                      style={rowStyle}
+                      {...(renderCell !== undefined && { renderCell })}
+                      {...(onRowClick !== undefined && { onRowClick })}
+                      onMeasure={onMeasure}
+                      editableColumnIds={editableColumnIds}
+                      isRowCellEditable={editableCells.isRowCellEditable}
+                      rowOverlay={editableCells.getRowOverlay(rowId)}
+                      rowErrors={editableCells.getRowErrors(rowId)}
+                      rowSavingColumns={editableCells.getRowSavingColumns(rowId)}
+                      editingColumnId={editingColumnId}
+                      onBeginCellEdit={editableCells.beginEdit}
+                      onCancelCellEdit={editableCells.cancelEdit}
+                      onCommitCellEdit={handleCommitCellEdit}
+                    />
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </section>
+
+        {/* Scroll indicators (optional) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-muted-foreground p-2 border-t bg-muted/50 flex justify-between">
+            <span>
+              Scroll:{' '}
+              {Math.round(
+                utils.getTotalHeight() > 0
+                  ? ((virtualRows[0]?.start || 0) / utils.getTotalHeight()) * 100
+                  : 0
+              )}
+              %
+            </span>
+            <span>
+              Visible:{' '}
+              {virtualRows.length > 0
+                ? `${virtualRows[0]?.index}-${virtualRows[virtualRows.length - 1]?.index}`
+                : 'None'}
+            </span>
+          </div>
+        )}
+      </div>
+    </TableAdapterProvider>
   );
 }
 

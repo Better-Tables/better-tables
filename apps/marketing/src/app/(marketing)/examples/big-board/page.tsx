@@ -1,8 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
 import { BigBoardClient } from '@/components/sections/big-board-client';
-import { SourceView } from '@/components/sections/source-view';
-import { readSourceFile } from '@/lib/demo/read-source';
 import { fetchBulkTickets } from '@/lib/demo/support/fetch-bulk-tickets';
 import { constructMetadata } from '@/lib/utils';
 
@@ -21,18 +19,12 @@ interface BigBoardPageProps {
 
 export default async function BigBoardPage({ searchParams }: BigBoardPageProps) {
   const params = await searchParams;
-  // The same URL-state parsing every other example uses -- the big board's
-  // filters/sorting come from `<BetterTable>`'s own filter bar and header now,
-  // not a hand-built toolbar with bespoke params.
   const tableParams = parseTableSearchParams(params, { page: 1, limit: 12_500 });
 
   const { data, total, filters, sorting, error } = await fetchBulkTickets({
     filters: tableParams.filters,
     sorting: tableParams.sorting,
   });
-
-  const bulkColumnsSource = readSourceFile('src/lib/demo/support/bulk-columns.tsx');
-  const bigBoardClientSource = readSourceFile('src/components/sections/big-board-client.tsx');
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
@@ -44,11 +36,9 @@ export default async function BigBoardPage({ searchParams }: BigBoardPageProps) 
           12,000 rows, smooth scrolling
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          A deterministic synthetic dataset of {total.toLocaleString()} tickets, fetched in one
-          query and rendered through the same <code>&lt;BetterTable&gt;</code> as every other
-          example -- the only difference is the <code>virtualized</code> prop, so just the rows in
-          (and near) the viewport are ever mounted. Filtering and sorting still work exactly as they
-          do everywhere else.
+          Same <code>&lt;BetterTable&gt;</code> as the other examples — add <code>virtualized</code>{' '}
+          so only rows near the viewport mount. Filtering and sorting work the same way over{' '}
+          {total.toLocaleString()} tickets.
         </p>
       </div>
 
@@ -71,16 +61,6 @@ export default async function BigBoardPage({ searchParams }: BigBoardPageProps) 
           initialSorting={sorting}
         />
       </Suspense>
-
-      <div className="mt-6">
-        <SourceView
-          title="Implementation: bulk table definition and virtualized client"
-          files={[
-            { label: 'src/lib/demo/support/bulk-columns.tsx', code: bulkColumnsSource },
-            { label: 'src/components/sections/big-board-client.tsx', code: bigBoardClientSource },
-          ]}
-        />
-      </div>
     </div>
   );
 }

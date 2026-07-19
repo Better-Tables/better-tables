@@ -1,12 +1,7 @@
 import { serializeTableStateToUrl } from '@better-tables/core';
 import type { SupportScenarioPreset } from './relationship-trail';
 
-/**
- * `serializeFiltersToURL` only covers filters; `serializeTableStateToUrl`
- * serializes filters + sorting (+ pagination/columnVisibility/columnOrder)
- * together using core's own built-in compression -- so a preset link needs no
- * hand-rolled compression and no extra dependency (finding 3).
- */
+/** Serialize a scenario preset into URL search params (filters + sorting). */
 export function serializeSupportPresetToUrl(
   preset: Pick<SupportScenarioPreset, 'filters' | 'sorting'>
 ): Record<string, string | null> {

@@ -93,7 +93,7 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm',
+        'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs',
         'bg-muted/50 hover:bg-muted',
         'transition-opacity duration-200',
         isDragging && 'opacity-30 scale-95'
@@ -107,26 +107,26 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
         className="cursor-grab active:cursor-grabbing touch-none"
         aria-label={`Drag to reorder sort for ${columnName}`}
       >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <GripVertical className="size-3.5 shrink-0 text-muted-foreground" />
       </button>
 
       {/* Priority number */}
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">
         {index + 1}
       </span>
 
       {/* Column name */}
-      <span className="flex-1 truncate">{columnName}</span>
+      <span className="min-w-0 flex-1 truncate">{columnName}</span>
 
       {/* Direction icon */}
       {sort.direction === 'asc' ? (
-        <div className="flex items-center">
-          <ArrowUp className="h-3 w-3 text-muted-foreground" aria-label="Ascending" />
+        <div className="flex shrink-0 items-center">
+          <ArrowUp className="size-3 text-muted-foreground" aria-label="Ascending" />
           <span className="sr-only">Ascending</span>
         </div>
       ) : (
-        <div className="flex items-center">
-          <ArrowDown className="h-3 w-3 text-muted-foreground" aria-label="Descending" />
+        <div className="flex shrink-0 items-center">
+          <ArrowDown className="size-3 text-muted-foreground" aria-label="Descending" />
           <span className="sr-only">Descending</span>
         </div>
       )}
@@ -139,10 +139,10 @@ function SortOrderItem({ sort, index, columnName, onRemove }: SortOrderItemProps
             e.stopPropagation();
             onRemove(sort.columnId);
           }}
-          className="ml-1 rounded-md p-0.5 hover:bg-muted"
+          className="ml-0.5 shrink-0 rounded-md p-0.5 hover:bg-muted"
           aria-label={`Remove sort for ${columnName}`}
         >
-          <X className="h-3.5 w-3.5 text-muted-foreground" />
+          <X className="size-3 text-muted-foreground" />
         </button>
       )}
     </div>

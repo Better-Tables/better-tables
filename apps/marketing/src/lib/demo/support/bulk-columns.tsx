@@ -1,5 +1,4 @@
 import { defineTable } from '@better-tables/core';
-// See columns.tsx for why this is a type-only import (RSC-safe boundary).
 import type { SupportTables } from './db';
 
 const bulkStatusColors: Record<string, string> = {
@@ -10,14 +9,9 @@ const bulkStatusColors: Record<string, string> = {
 };
 
 /**
- * The `big-board` example's table definition -- same `betterTables()` instance
- * as `ticketsTable` (columns.tsx), a different table (`bulkTickets`).
- *
- * These are ordinary column definitions: the big board renders them through
- * `<BetterTable ... virtualized />`, so the same `filterable()`/`sortable()`/
- * `.dateTime()` config drives the filter bar, the header sort UI, and cell
- * formatting over 12k windowed rows -- no separate component, no per-column
- * hand-rolled rendering.
+ * Big-board table definition — same `betterTables()` instance as tickets,
+ * different table (`bulkTickets`). Ordinary column config; pair with
+ * `<BetterTable virtualized />` for windowed rendering.
  */
 export const bulkTicketsTable = defineTable<SupportTables>()('bulkTickets', (t) => ({
   columns: [

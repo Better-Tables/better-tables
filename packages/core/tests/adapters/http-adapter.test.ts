@@ -565,6 +565,83 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     await client.fetchData({ pagination: { page: 1, limit: 10 } });
     expect(fetchCount).toBe(2);
   });
+  it('round-trips describeColumns spec lists (plan 054)', async () => {
+    const specs = [
+      {
+        field: 'status',
+        columnType: 'option' as const,
+        label: 'Status',
+        options: [
+          { value: 'open', label: 'Open' },
+          { value: 'closed', label: 'Closed' },
+        ],
+        nullable: false,
+        primaryKey: false,
+        foreignKey: false,
+        writable: true,
+      },
+    ];
+    const tables: Array<string | undefined> = [];
+    const { adapter: server } = makeServerAdapter();
+    server.describeColumns = async (table?: string) => {
+      tables.push(table);
+      return specs;
+    };
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+
+    expect(await client.describeColumns?.('tickets')).toEqual(specs);
+    expect(tables).toEqual(['tickets']);
+
+    // Table omitted — the optional arg crosses the wire as absent.
+    expect(await client.describeColumns?.()).toEqual(specs);
+    expect(tables).toEqual(['tickets', undefined]);
+  });
+
+  it('describeColumns on an adapter without the capability is a bad_request', async () => {
+    const { adapter: server } = makeServerAdapter();
+    expect(server.describeColumns).toBeUndefined();
+    expect(await handleAdapterRequest(server, { method: 'describeColumns' })).toEqual({
+      ok: false,
+      error: 'Adapter does not support describeColumns.',
+      kind: 'bad_request',
+    });
+
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+    await expect(client.describeColumns?.('tickets')).rejects.toThrow(
+      'Adapter does not support describeColumns.'
+    );
+  });
+
+  it('rejects a describeColumns body with a non-string table', async () => {
+    const { adapter: server } = makeServerAdapter();
+    expect(await handleAdapterRequest(server, { method: 'describeColumns', table: 42 })).toEqual({
+      ok: false,
+      error: 'Malformed adapter request body.',
+      kind: 'bad_request',
+    });
+  });
+
+  it('caches describeColumns within cacheTtlMs (schema answers are stable)', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    server.describeColumns = async () => [];
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 5000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    await client.describeColumns?.('tickets');
+    await client.describeColumns?.('tickets');
+    expect(fetchCount).toBe(1);
+    // A different table is a different cache key.
+    await client.describeColumns?.('customers');
+    expect(fetchCount).toBe(2);
+  });
+
   it('does not cache failed facet requests', async () => {
     let fetchCount = 0;
     const failing: TableAdapter = {

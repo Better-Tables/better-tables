@@ -40,4 +40,7 @@ export { DateColumnBuilder } from './date-column-builder';
 export { MultiOptionColumnBuilder } from './multi-option-column-builder';
 export { NumberColumnBuilder } from './number-column-builder';
 export { OptionColumnBuilder } from './option-column-builder';
+// Path-derived accessor walker (dot-notation, array-hop semantics) — shared
+// with the UI's relationship-path cell editing (plan 055).
+export { buildPathAccessor, type PathColumnFactory } from './path-builders';
 export { TextColumnBuilder } from './text-column-builder';

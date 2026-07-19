@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo } from 'react';
 import { TicketsTableClient } from '@/components/sections/tickets-table-client';
 import { buttonVariants } from '@/components/ui/button';
@@ -132,45 +131,6 @@ export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps)
           </div>
         </aside>
       </div>
-
-      <section
-        aria-label="Implementation anatomy"
-        className="rounded-xl border border-[#27272A] bg-[#111217] p-5 md:p-6"
-      >
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-          Implementation anatomy
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-[#27272A] bg-[#09090B] p-4">
-            <p className="font-mono text-xs text-[#60A5FA]">Column ids</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Relationship columns use dotted paths like <code>customer.plan</code> and{' '}
-              <code>assignee.team</code>.
-            </p>
-          </div>
-          <div className="rounded-lg border border-[#27272A] bg-[#09090B] p-4">
-            <p className="font-mono text-xs text-[#5EEAD4]">Adapter</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              The Drizzle adapter resolves joins from schema relations — no hand-written JOIN
-              clauses in the page code.
-            </p>
-          </div>
-          <div className="rounded-lg border border-[#27272A] bg-[#09090B] p-4">
-            <p className="font-mono text-xs text-[#FBBF24]">URL state</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Filters and sorting stay in the query string so every scenario is shareable.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4">
-          <Link
-            href="/#interactive-demo"
-            className={cn(buttonVariants({ variant: 'ghost' }), 'px-0')}
-          >
-            Back to homepage demo
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }

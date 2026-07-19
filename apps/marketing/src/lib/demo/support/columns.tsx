@@ -1,10 +1,7 @@
 import { defineTable } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
-// `import type` only -- the RSC-safe pattern MIGRATION.md documents.
-// `defineTable` has no DB-driver dependency, so importing just the instance's
-// TYPE (`SupportTables`, exported by `./db` alongside its lazy runtime getter)
-// keeps `better-sqlite3` out of any client bundle that imports THIS file.
-// Verified via `bun run build --filter=@better-tables/site`.
+// Type-only import keeps the SQLite driver out of any client bundle that
+// pulls in this table definition.
 import type { SupportTables } from './db';
 
 const statusColors: Record<string, string> = {
@@ -22,16 +19,26 @@ const priorityColors: Record<string, string> = {
 };
 
 /**
- * The flagship 018 entry point: `defineTable<SupportTables>()(...)`
- * derives `'tickets'` and every column path (including dot-notation
- * relation paths like `'customer.plan'`) from the REAL schema `supportTables`
- * carries via `$types` -- a typo'd path or table name is a compile error
- * here, not a runtime throw (see plans/findings/029-dx-findings.md #4 for
- * why the WIP didn't start here).
+ * Table definition for the support-tickets examples.
+ *
+ * `defineTable<SupportTables>()` types the table name and every column path
+ * (including relation paths like `customer.plan`) from your schema — typos
+ * are compile errors.
+ *
+ * Since plan 054 this is also the `[...t.auto(), overrides]` showcase: the
+ * spread pulls in every REMAINING own-table column from the adapter schema
+ * at mount (`channel` -- whose dropdown options come straight from the DB
+ * enum, no `.options()` anywhere -- plus `id`/`customerId`/`assigneeId`),
+ * while the explicit entries below keep their richer config (`.editable()`,
+ * cell renderers, relation paths -- relations stay explicit by design) and
+ * always win by id. Inferred columns are read-only until explicitly
+ * overridden.
  */
 export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
   columns: [
-    t.text('subject').searchable().filterable().sortable(),
+    ...t.auto(),
+
+    t.text('subject').searchable().filterable().sortable().editable(),
 
     t
       .option('status')
@@ -43,6 +50,7 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       ])
       .filterable()
       .sortable()
+      .editable()
       .cellRenderer(({ value }) => (
         <Badge variant="outline" className={statusColors[value] ?? ''}>
           {value}
@@ -65,24 +73,22 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
         </span>
       )),
 
-    t
-      .option('channel')
-      .options([
-        { value: 'email', label: 'Email' },
-        { value: 'chat', label: 'Chat' },
-        { value: 'phone', label: 'Phone' },
-      ])
-      .filterable()
-      .sortable(),
+    // `channel` is deliberately NOT declared: `t.auto()` infers it as an
+    // option column with Email/Chat/Phone choices read from the DB enum --
+    // the plan-054 "enum becomes a dropdown by itself" showcase. Same for
+    // `reopenCount` (inferred number; the facets example's `getMinMaxValues`
+    // showcase keeps working against the inferred column id).
 
     t
       .boolean('slaBreached')
       .displayName('SLA breached')
       .activeInactive({ activeText: 'Breached', inactiveText: 'On track', showBadges: true })
-      .filterable(),
+      .filterable()
+      .editable(),
 
-    // Direct numeric column -- the `facets` example's `getMinMaxValues`
-    // showcase needs one.
+    // Numeric column used by the facets example's min/max range. Kept
+    // EXPLICIT (not t.auto()-inferred) for the custom "Reopens" label —
+    // explicit entries win by id, so the spread skips it.
     t
       .number('reopenCount')
       .displayName('Reopens')
@@ -94,7 +100,12 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       .displayName('Customer')
       .searchable({ includeNull: true })
       .filterable()
-      .sortable(),
+      .sortable()
+      // JOINED editing (plan 055): this edits the RELATED customer row —
+      // the write target resolves through `resolveCellWriteTarget` and the
+      // save lands in `customers.company` (every ticket of that customer
+      // reflects it). Unassigned relations render read-only per row.
+      .editable(),
 
     t
       .option('customer.plan')
@@ -145,31 +156,37 @@ export const ticketsTable = defineTable<SupportTables>()('tickets', (t) => ({
       ])
       .filterable(),
 
-    // 028 showcase: an explicit, non-UTC `timeZone` on `.dateTime()` -- per
-    // MIGRATION.md §11, `.dateTime()`/`.format()`/`.timeOnly()` default to
-    // `'UTC'` when `timeZone` is omitted (a behavior change from 0.5's
-    // silently-ignored `timeZone`), so this column deliberately sets one to
-    // demonstrate the real conversion rather than relying on the default.
+    // `.dateTime()` defaults to UTC; set `timeZone` when you want a local zone.
     t
       .date('createdAt')
       .displayName('Opened')
       .dateTime({ timeZone: 'America/New_York' })
       .filterable()
-      .sortable(),
+      .sortable()
+      .editable(),
   ],
 }));
 
-/**
- * The ticket row type, derived straight from the SCHEMA -- there is no
- * hand-shaped duplicate to keep in sync. `$infer.Row` now carries the forward
- * relations (`customer`, `assignee`) as a clean intersection and omits inverse
- * back-references, so it IS the shape a fetch actually returns (plan 030,
- * finding 12).
- */
+/** Row type inferred from the table definition — includes related `customer` / `assignee`. */
 export type TicketRow = typeof ticketsTable.$infer.Row;
 
-/** Typed against `TicketRow` by construction -- no cast (finding 12). */
+/** Typed against `TicketRow` by construction -- no cast (finding 12).
+ * NOTE: with `t.auto()` in play this is the EXPLICIT list only -- the
+ * inferred columns materialize at mount via `resolveTableColumns` (BetterTable
+ * does this itself when given an adapter). */
 export const ticketColumns = ticketsTable.columns;
+
+/**
+ * The own-table columns `t.auto()` adds at mount, in schema order. Static
+ * (not introspected) because two SERVER-side consumers need the full column
+ * surface where resolving through an adapter would be circular or async:
+ * the fetch column list and the API route's column-id allowlist
+ * (tickets-adapter-guard). The RENDERED auto set still comes from
+ * `describeColumns` at mount -- if this list drifts from the schema, the
+ * symptom is an empty (fetch) or facet-blocked (guard) column, not a wrong
+ * render.
+ */
+export const inferredTicketColumnIds = ['id', 'channel', 'customerId', 'assigneeId'];
 
 export const defaultVisibleTicketColumns = [
   'subject',
@@ -188,9 +205,13 @@ export const defaultVisibleTicketColumns = [
  * column visibility toggling is client-side (no refetch), so a
  * hidden-but-toggleable column still needs its data in the initial fetch.
  * (Relations touched by filters/sorting auto-embed on their own -- finding 10
- * -- but toggling reaches columns no filter mentions.)
+ * -- but toggling reaches columns no filter mentions.) Includes the
+ * `t.auto()`-inferred own-table columns for the same reason.
  */
-export const allTicketColumnIds = ticketColumns.map((column) => column.id);
+export const allTicketColumnIds = [
+  ...ticketColumns.map((column) => column.id),
+  ...inferredTicketColumnIds,
+];
 
 export const relationshipColumnIds = new Set([
   'customer.company',

@@ -20,6 +20,17 @@ export function getOrCreateTableStore(
   initialState: TableStoreInitialState
 ): StoreApi<TableStoreState> {
   let store = storeRegistry.get(id);
+
+  // The registry is module-scoped, so it survives across SSR requests in the
+  // same Node process. Reusing a store seeded by a previous request (e.g.
+  // empty sorting) while the new request passes different `initialSorting`
+  // produces HTML that doesn't match the client's fresh store → hydration
+  // mismatch. Always recreate on the server.
+  if (store && typeof window === 'undefined') {
+    storeRegistry.delete(id);
+    store = undefined;
+  }
+
   if (!store) {
     if (!initialState.columns) {
       throw new Error(

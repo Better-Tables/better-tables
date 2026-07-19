@@ -38,12 +38,8 @@ export async function fetchTickets({
 
   try {
     const supportTables = await getSupportTables();
-    // Table-scoped read (plan 030, findings 9 + 16): `primaryTable` is
-    // injected from `ticketsTable` (no wrong-table hazard) and the result is
-    // typed as the table's own inferred row -- no `as FetchDataResult<...>`
-    // cast. `columns` still lists every renderable column so client-side
-    // visibility toggling has the data without a refetch (relations touched
-    // by filters/sorting auto-embed on their own -- finding 10).
+    // Pass the table definition so the result is typed as `TicketRow`.
+    // `columns` lists every renderable id so visibility toggles need no refetch.
     const result = await supportTables.fetchData(ticketsTable, {
       pagination: { page, limit },
       filters,

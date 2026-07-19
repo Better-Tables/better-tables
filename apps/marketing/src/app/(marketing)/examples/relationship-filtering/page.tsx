@@ -1,8 +1,6 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { Suspense } from 'react';
-import { SourceView } from '@/components/sections/source-view';
 import { SupportDemoWorkspace } from '@/components/sections/support-demo-workspace';
-import { readSourceFile } from '@/lib/demo/read-source';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
 import { supportSeed } from '@/lib/demo/support/seed-data';
 import { constructMetadata } from '@/lib/utils';
@@ -38,9 +36,6 @@ export default async function RelationshipFilteringPage({
     sorting: tableParams.sorting,
   });
 
-  const columnsSource = readSourceFile('src/lib/demo/support/columns.tsx');
-  const dbSource = readSourceFile('src/lib/demo/support/db.ts');
-
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
       <div className="mb-10 max-w-3xl">
@@ -51,10 +46,10 @@ export default async function RelationshipFilteringPage({
           Filter tickets across relationships
         </h1>
         <p className="mt-4 text-lg leading-8 text-muted-foreground">
-          This workspace uses a deterministic in-memory SQLite dataset with{' '}
-          {supportSeed.tickets.length} tickets, {supportSeed.customers.length} customers, and{' '}
-          {supportSeed.assignees.length} assignees. Add filters on related customer or assignee
-          fields and watch the query trail explain what the adapter resolves.
+          {supportSeed.tickets.length} tickets joined to {supportSeed.customers.length} customers
+          and {supportSeed.assignees.length} assignees. Filter on related fields like{' '}
+          <code>customer.plan</code> or <code>assignee.team</code> — the adapter resolves the joins
+          from your schema.
         </p>
       </div>
 
@@ -63,16 +58,6 @@ export default async function RelationshipFilteringPage({
       >
         <SupportDemoWorkspace fetchResult={fetchResult} />
       </Suspense>
-
-      <div className="mt-6">
-        <SourceView
-          title="Implementation: table definition and flagship betterTables() instance"
-          files={[
-            { label: 'src/lib/demo/support/columns.tsx', code: columnsSource },
-            { label: 'src/lib/demo/support/db.ts', code: dbSource },
-          ]}
-        />
-      </div>
     </div>
   );
 }
