@@ -13,12 +13,18 @@ export function ResetDemoButton() {
   const reset = async () => {
     setBusy(true);
     try {
-      await fetch('/api/users', {
+      const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reset' }),
       });
+      if (!response.ok) {
+        throw new Error(`Failed to reset demo data (${response.status})`);
+      }
       router.refresh();
+    } catch (error) {
+      // biome-ignore lint/suspicious/noConsole: client-side reset failure is actionable during demos
+      console.error('[reset-demo-data]', error);
     } finally {
       setBusy(false);
     }

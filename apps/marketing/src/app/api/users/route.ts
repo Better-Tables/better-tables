@@ -1,6 +1,7 @@
 import { parseTableSearchParams } from '@better-tables/core';
 import { inArray } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
+import { resetAdapterCaches } from '@/lib/adapter';
 import { getDatabase, resetDatabase } from '@/lib/db';
 import { schema } from '@/lib/db/schema';
 import { fetchUsers } from '@/lib/demo/fetch-users';
@@ -99,5 +100,8 @@ export async function POST(request: NextRequest) {
   }
 
   await resetDatabase();
+  // adapter.ts depends on db/index.ts, so keep this cache reset here rather
+  // than introducing a db ↔ adapter circular import.
+  resetAdapterCaches();
   return NextResponse.json({ reset: true });
 }

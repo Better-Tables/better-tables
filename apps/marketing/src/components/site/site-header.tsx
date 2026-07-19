@@ -87,6 +87,7 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setOpen(false)}
                 className="border-b border-border/60 py-3 text-[15px] font-medium text-foreground last:border-b-0"
               >
                 {item.label}
@@ -96,12 +97,16 @@ export function SiteHeader() {
               href={siteConfig.links.github}
               target="_blank"
               rel="noreferrer"
+              onClick={() => setOpen(false)}
               className="flex items-center gap-2 py-3 text-[15px] font-medium text-foreground"
             >
               <Icons.github className="size-4" /> GitHub
             </a>
-            <div className="py-3">
-              <CopyChip command={siteConfig.installCommand} className="w-full justify-between" />
+            <div className="min-w-0 py-3">
+              <CopyChip
+                command={siteConfig.installCommand}
+                className="w-full max-w-full justify-between"
+              />
             </div>
           </nav>
         </div>

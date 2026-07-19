@@ -13,6 +13,37 @@ function renderParam(param: unknown): string {
   return `'${String(param).replaceAll("'", "''")}'`;
 }
 
+function substituteParams(sql: string, params: unknown[]): string {
+  let paramIndex = 0;
+  let inStringLiteral = false;
+  let result = '';
+
+  for (let index = 0; index < sql.length; index++) {
+    const character = sql[index];
+
+    if (character === "'") {
+      result += character;
+
+      if (inStringLiteral && sql[index + 1] === "'") {
+        result += sql[++index];
+      } else {
+        inStringLiteral = !inStringLiteral;
+      }
+
+      continue;
+    }
+
+    if (!inStringLiteral && character === '?') {
+      result += renderParam(params[paramIndex++]);
+      continue;
+    }
+
+    result += character;
+  }
+
+  return result;
+}
+
 /** Wrap a long `select a, b, c, …` line at `width`, indenting continuations. */
 function wrapSelectList(line: string, width = 76): string {
   if (!/^select\s/i.test(line) || line.length <= width) return line;
@@ -52,9 +83,8 @@ export function formatSqlForDisplay({ query, params }: CapturedQuery): string {
     .map((line) => wrapSelectList(line))
     .join('\n');
 
-  // Substitute bound params in order.
-  let i = 0;
-  sql = sql.replace(/\?/g, () => renderParam(params[i++]));
+  // Substitute only placeholders outside single-quoted SQL literals.
+  sql = substituteParams(sql, params);
 
   return sql;
 }

@@ -68,8 +68,11 @@ export async function getPost(slug: string) {
   let source: string;
   try {
     source = fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
   }
   const { content: rawContent, data: metadata } = parseFrontmatter(source);
   const content = await markdownToHTML(rawContent);
@@ -84,18 +87,20 @@ export async function getPost(slug: string) {
   };
 }
 
-async function getAllPosts(dir: string) {
+function getPostSummaries(dir: string) {
   const mdxFiles = getMDXFiles(dir);
-  const posts = await Promise.all(
-    mdxFiles.map(async (file) => {
-      const slug = path.basename(file, path.extname(file));
-      const post = await getPost(slug);
-      return post ? { ...post.metadata, slug, source: post.source } : null;
-    })
-  );
-  return posts.filter((post): post is NonNullable<typeof post> => post !== null);
+  return mdxFiles.map((file) => {
+    const slug = path.basename(file, path.extname(file));
+    const source = fs.readFileSync(path.join(dir, file), 'utf-8');
+    const { data: metadata } = parseFrontmatter(source);
+    return { ...metadata, slug };
+  });
+}
+
+export function getBlogPostSummaries() {
+  return getPostSummaries(path.join(process.cwd(), 'content'));
 }
 
 export async function getBlogPosts() {
-  return getAllPosts(path.join(process.cwd(), 'content'));
+  return getBlogPostSummaries();
 }

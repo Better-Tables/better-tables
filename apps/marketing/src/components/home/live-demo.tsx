@@ -31,6 +31,11 @@ export async function LiveDemo({ searchParams }: LiveDemoProps) {
     sorting,
   });
 
+  if (error) {
+    // biome-ignore lint/suspicious/noConsole: server-side demo log
+    console.error('[live-demo]', error);
+  }
+
   return (
     <SectionRow
       index="01"
@@ -51,7 +56,7 @@ export async function LiveDemo({ searchParams }: LiveDemoProps) {
           role="alert"
           className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-          Could not load demo data: {error}
+          Could not load demo data. Please try again.
         </div>
       ) : null}
 

@@ -29,8 +29,14 @@ export function SectionRow({
   children,
   className,
 }: SectionRowProps) {
+  const titleId = title ? `${id ?? `section-${index}`}-title` : undefined;
+
   return (
-    <section id={id} className={cn('border-t', className)}>
+    <section
+      id={id}
+      {...(titleId ? { 'aria-labelledby': titleId } : {})}
+      className={cn('border-t', className)}
+    >
       <div className="shell py-14 md:py-20">
         <div className="mb-8 flex items-baseline justify-between gap-4">
           <p className="row-eyebrow">
@@ -43,7 +49,10 @@ export function SectionRow({
         {(title || description) && (
           <div className="mb-10 max-w-2xl">
             {title && (
-              <h2 className="font-display text-[1.75rem] font-semibold leading-tight tracking-tight md:text-[2.125rem]">
+              <h2
+                id={titleId}
+                className="font-display text-[1.75rem] font-semibold leading-tight tracking-tight md:text-[2.125rem]"
+              >
                 {title}
               </h2>
             )}

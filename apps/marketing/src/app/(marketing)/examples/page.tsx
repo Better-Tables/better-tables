@@ -72,7 +72,7 @@ export default function ExamplesIndexPage() {
       <p className="mt-6 flex flex-wrap items-center gap-1.5 font-mono text-[11.5px] tracking-wide text-muted-foreground">
         The shared data layer lives in{' '}
         <a
-          href={`${siteConfig.sourceBase}/src/lib/demo/support`}
+          href={`${siteConfig.sourceBase.replace('/blob/', '/tree/')}/src/lib/demo/support`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-ledger transition-colors hover:text-ledger-strong"
