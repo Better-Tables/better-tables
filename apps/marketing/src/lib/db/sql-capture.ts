@@ -12,9 +12,10 @@ export interface CapturedQuery {
 const globalCapture = globalThis as typeof globalThis & {
   __btSqlCaptureStore?: AsyncLocalStorage<CapturedQuery[]>;
 };
-const captureStore = (globalCapture.__btSqlCaptureStore ??= new AsyncLocalStorage<
-  CapturedQuery[]
->());
+if (!globalCapture.__btSqlCaptureStore) {
+  globalCapture.__btSqlCaptureStore = new AsyncLocalStorage<CapturedQuery[]>();
+}
+const captureStore = globalCapture.__btSqlCaptureStore;
 
 /**
  * Drizzle logger that records statements into the active capture scope.
