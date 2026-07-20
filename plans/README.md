@@ -116,7 +116,7 @@ the breaking window.
 | [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop, opt-in double-sided cell-oriented HTTP write proxy, **joined-table editing** (`resolveCellWriteTarget`; related-row writes proven in browser + integration test), dogfood on the direct path (custom route deleted) | 053, 054 | DONE — executor-run, advisor-reviewed (APPROVED), merged into `editable-cells` at `ec60f80` |
 | [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
 | [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
-| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049, **059** | TODO (reconciled 2026-07-18; **2026-07-20: refresh against `plans/design/ui-modules.md` before executing — `ExportButton` rides 059's `toolbarExtra` slot and ships as an `export` module; `TableConfig.exportOptions` is removed by 057, reintroduce only what the module needs as module-local props**) |
+| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049, **059** | TODO (reconciled 2026-07-18; **2026-07-20: refresh against `plans/design/ui-modules.md` (created by 059 Step 1) before executing — `ExportButton` rides 059's `toolbarExtra` slot and ships as an `export` module; `TableConfig.exportOptions` is removed by 057, reintroduce only what the module needs as module-local props**) |
 | 008 | Prisma adapter spike (read path) | — | **SUPERSEDED** by [061](061-prisma-adapter-full-parity.md) (2026-07-20 maintainer directive: full parity, not a spike; 008's research is inlined there) |
 
 ### Wave D — maintainer-requested (planned 2026-07-20 at `27c59b9`)
@@ -195,7 +195,8 @@ Notes for the record (all acceptable, none require action):
   060 both extend the instance fetch path in `packages/core/src/factory.ts`
   — land in either order, rebase the second. **050 executes only after 059**
   (slot seam + module packaging) and after refreshing its plan text against
-  `plans/design/ui-modules.md`. 049 remains independent (core-tier hooks);
+  `plans/design/ui-modules.md` (created by 059 Step 1 — a forward deliverable,
+  not an existing prerequisite). 049 remains independent (core-tier hooks);
   its vocabulary rule — core tier = "plugins", copied-UI tier = "modules" —
   is defined in 059.
 - **Wave E ordering**: 061 is phased and mergeable per phase; its Phase 1

@@ -78,6 +78,34 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
    *
    * If both `filter` and `filterSql` are provided, `filterSql` takes precedence.
    *
+   * ## The returned SQL must be self-contained
+   *
+   * The condition is applied as an opaque predicate: the query planner cannot
+   * introspect it, so it does NOT contribute to JOIN planning. Referencing a
+   * related table's column directly produces SQL whose `FROM` clause lacks that
+   * table, and the query fails:
+   *
+   * ```typescript
+   * // BROKEN -- `profiles` is never joined, so this emits
+   * // `select … from "users" where "profiles"."github" is not null`
+   * filterSql: () => sql`${profiles.github} is not null`
+   * ```
+   *
+   * Reference only the primary table, or pull the related table into the
+   * condition's own scope with a correlated subquery:
+   *
+   * ```typescript
+   * // WORKS -- `profiles` lives in the subquery's own FROM clause
+   * filterSql: () => sql`exists (
+   *   select 1 from ${profiles}
+   *   where ${profiles.userId} = ${users.id} and ${profiles.github} is not null
+   * )`
+   * ```
+   *
+   * (Filtering by a plain relation path -- `profile.github` -- needs none of
+   * this; the adapter plans that JOIN itself. `filterSql` is for expressions
+   * the column layer cannot express.)
+   *
    * @example
    * ```typescript
    * filterSql: async (filter, context) => {

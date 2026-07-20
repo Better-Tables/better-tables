@@ -1258,6 +1258,12 @@ describe.skipIf(!process.env.POSTGRES_TEST_URL)(
         // unnoticed. An unsupported operator is DROPPED, not thrown -- see
         // filter-handler.buildLeafCondition. The drop now warns, because
         // dropping a leaf widens the result set.
+        // Compare against the UNFILTERED baseline. Asserting only that rows came
+        // back would also pass if the operator had been translated into some
+        // narrower filter -- the assertion has to pin that the leaf was dropped
+        // entirely, which is precisely the widening that makes the drop worth
+        // warning about.
+        const baseline = await adapter.fetchData({ filters: [] });
         const result = await adapter.fetchData({
           filters: [
             {
@@ -1268,7 +1274,9 @@ describe.skipIf(!process.env.POSTGRES_TEST_URL)(
             },
           ] as unknown as FilterState[],
         });
-        expect(Array.isArray(result.data)).toBe(true);
+
+        expect(result.total).toBe(baseline.total);
+        expect(result.data.length).toBe(baseline.data.length);
       });
 
       it('should throw error for invalid filter values', async () => {
