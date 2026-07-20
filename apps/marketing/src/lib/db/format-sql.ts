@@ -13,6 +13,11 @@ function renderParam(param: unknown): string {
   return `'${String(param).replaceAll("'", "''")}'`;
 }
 
+/**
+ * Inline bound values for display.
+ * - SQLite / `?` placeholders: sequential, left-to-right
+ * - Postgres / `$1` placeholders: 1-based indexes into `params`
+ */
 function substituteParams(sql: string, params: unknown[]): string {
   let paramIndex = 0;
   let inStringLiteral = false;
@@ -36,6 +41,20 @@ function substituteParams(sql: string, params: unknown[]): string {
     if (!inStringLiteral && character === '?') {
       result += renderParam(params[paramIndex++]);
       continue;
+    }
+
+    // Postgres: `$1`, `$2`, … (and `$10` before a trailing digit is consumed fully)
+    if (!inStringLiteral && character === '$') {
+      let end = index + 1;
+      while (end < sql.length && sql[end]! >= '0' && sql[end]! <= '9') {
+        end++;
+      }
+      if (end > index + 1) {
+        const ordinal = Number(sql.slice(index + 1, end));
+        result += renderParam(params[ordinal - 1]);
+        index = end - 1;
+        continue;
+      }
     }
 
     result += character;
@@ -68,12 +87,13 @@ function wrapSelectList(line: string, width = 76): string {
 
 /**
  * Format a captured drizzle statement for display: break major clauses onto
- * their own lines, wrap long select lists, then substitute `?` placeholders
- * with their bound values. Display-only — never fed back to a database.
+ * their own lines, wrap long select lists, then substitute `?` / `$N`
+ * placeholders with their bound values. Display-only — never fed back to a
+ * database.
  */
 export function formatSqlForDisplay({ query, params }: CapturedQuery): string {
-  // Placeholders are still `?` at this point, so no user-provided value can
-  // smuggle a keyword into the clause split.
+  // Placeholders are still unbound at this point, so no user-provided value
+  // can smuggle a keyword into the clause split.
   let sql = query
     .trim()
     .replace(CLAUSE_PATTERN, (_m, kw: string) => `\n${kw.toLowerCase().replace(/\s+/g, ' ')} `);
