@@ -7,7 +7,7 @@ import type {
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
 import { type CapturedQuery, withSqlCapture } from '@/lib/db/sql-capture';
 import { getTables } from '@/lib/demo/users/adapter';
-import { type UserRow, usersTable } from '@/lib/demo/users/columns';
+import { allUserColumnIds, type UserRow, usersTable } from '@/lib/demo/users/columns';
 
 export interface FetchUsersParams {
   page?: number;
@@ -56,19 +56,9 @@ export async function fetchUsers({
         // `columns` drives which relations are SELECTed and embedded in the
         // result rows (plan 030, finding 10), and column visibility is
         // client-side, so hidden-but-toggleable columns need their data too.
-        // (profile.hasBio and roleTags are computed client-side from these.)
-        columns: [
-          'name',
-          'email',
-          'age',
-          'role',
-          'status',
-          'createdAt',
-          'profile.bio',
-          'profile.website',
-          'profile.location',
-          'profile.github',
-        ],
+        // Includes `id` / `profile.id` for cell-edit row addressing.
+        // (hasBio / roleTags are computed client-side from these.)
+        columns: [...allUserColumnIds],
       })
     );
 

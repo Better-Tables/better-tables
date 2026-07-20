@@ -46,7 +46,9 @@ function substituteParams(sql: string, params: unknown[]): string {
     // Postgres: `$1`, `$2`, … (and `$10` before a trailing digit is consumed fully)
     if (!inStringLiteral && character === '$') {
       let end = index + 1;
-      while (end < sql.length && sql[end]! >= '0' && sql[end]! <= '9') {
+      while (end < sql.length) {
+        const digit = sql.charCodeAt(end);
+        if (digit < 48 || digit > 57) break;
         end++;
       }
       if (end > index + 1) {

@@ -1,12 +1,18 @@
 'use client';
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
+import { httpAdapter } from '@better-tables/core';
 import { BetterTable, useTableUrlSync } from '@better-tables/ui';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { userActions } from '@/lib/actions/user-actions';
 import { saveUserCell } from '@/lib/actions/user-cell-actions';
-import { defaultVisibleColumns, type UserRow, userColumns } from '@/lib/demo/users/columns';
+import {
+  defaultVisibleColumns,
+  type UserRow,
+  userColumns,
+  usersTable,
+} from '@/lib/demo/users/columns';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'users-table';
@@ -41,6 +47,10 @@ export function UsersTableClient({
     urlAdapter
   );
 
+  // Client proxy for `resolveCellWriteTarget` on `profile.*` columns.
+  // Table reads stay RSC (`fetchUsers`); saves stay on `saveUserCell`.
+  const adapter = useMemo(() => httpAdapter<UserRow>({ url: '/api/tables/users' }), []);
+
   // The homepage table is server-driven (data arrives as props via the URL),
   // so bulk actions must refresh the route to show their effect.
   const actions = useMemo(
@@ -60,6 +70,8 @@ export function UsersTableClient({
     <BetterTable
       id={TABLE_ID}
       name="Users"
+      table={usersTable}
+      adapter={adapter}
       columns={userColumns}
       actions={actions}
       data={data}

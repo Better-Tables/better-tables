@@ -32,8 +32,7 @@ describe('formatSqlForDisplay', () => {
   it('substitutes Postgres $N placeholders with bound values', () => {
     expect(
       formatSqlForDisplay({
-        query:
-          'select "users"."name" from "users" "users" where "users"."role" = $1 limit $2',
+        query: 'select "users"."name" from "users" "users" where "users"."role" = $1 limit $2',
         params: ['admin', 10],
       })
     ).toBe(

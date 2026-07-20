@@ -607,6 +607,10 @@ describe.skipIf(!process.env.POSTGRES_TEST_URL)(
         const johnUser = (result.data as UserWithRelations[]).find((u) => u.name === 'John Doe');
         expect((johnUser as UserWithRelations).profile).toBeDefined();
         expect((johnUser as UserWithRelations).profile?.bio).toBe('Software developer');
+        // Relational `columns` selection must still return PKs so cell edits /
+        // row identity work when the caller omits `id` / `profile.id`.
+        expect((johnUser as UserWithRelations).id).toBeDefined();
+        expect((johnUser as UserWithRelations).profile?.id).toBeDefined();
       });
 
       it('should fetch data with one-to-many relationships', async () => {

@@ -99,6 +99,12 @@ export async function getTables(): Promise<UsersTables> {
   return tables;
 }
 
+/** Underlying drizzle adapter — used by `/api/tables/users` for resolveCellWriteTarget. */
+export async function getUsersDatabaseAdapter(): Promise<UsersAdapter> {
+  const { adapter } = await ensureResolved();
+  return adapter;
+}
+
 /**
  * Reset is SQLite-only. Closes the in-memory DB so the next request re-seeds.
  * No-op-safe to call after checking supportsReset.

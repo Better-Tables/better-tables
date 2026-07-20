@@ -311,10 +311,21 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
         }
       }
 
+      // Row identity is required for cell edits / selection even when `columns`
+      // omits the PK (manual-join path already does this in buildColumnSelections).
+      const primaryPk = this.primaryKeyMap[primaryTable];
+      if (primaryPk) {
+        primaryTableColumns.add(primaryPk.columnName);
+      }
+
       // Build with object for each relationship
       for (const [alias, fields] of relationshipColumns) {
         const relationship = this.relationshipManager.getRelationshipByAlias(primaryTable, alias);
         if (relationship) {
+          const relatedPk = this.primaryKeyMap[relationship.to];
+          if (relatedPk) {
+            fields.add(relatedPk.columnName);
+          }
           // Build columns object for this relationship
           const relationshipColumnsObj: Record<string, boolean> = {};
           for (const field of fields) {
