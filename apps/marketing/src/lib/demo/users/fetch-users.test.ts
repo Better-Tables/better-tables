@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { FetchDataResult } from '@better-tables/core';
 
 const fetchDataMock = mock(
@@ -41,6 +41,10 @@ mock.module('@/lib/demo/users/columns', () => ({
 }));
 
 const { fetchUsers } = await import('./fetch-users');
+
+afterAll(() => {
+  mock.restore();
+});
 
 describe('fetchUsers', () => {
   beforeEach(() => {

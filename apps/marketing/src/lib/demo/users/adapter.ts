@@ -45,8 +45,14 @@ async function resolveBackend(): Promise<ResolvedBackend> {
       const { db } = await getPostgresDatabase();
       const adapter = buildPostgresAdapter(db);
       return { dialect: 'postgres', adapter, tables: buildUsersTables(adapter) };
-    } catch {
-      // Fall through to SQLite — getPostgresDatabase already logged once.
+    } catch (error) {
+      // Connection failures already warn inside getPostgresDatabase; still log
+      // here so adapter/tables construction bugs are not a silent SQLite fallback.
+      // biome-ignore lint/suspicious/noConsole: demo bootstrap diagnostic
+      console.warn(
+        '[demo/users] Postgres backend unavailable; using SQLite fallback.',
+        error instanceof Error ? error.message : error
+      );
     }
   }
 

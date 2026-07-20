@@ -4,6 +4,7 @@ import { SqlReadout } from '@/components/home/sql-readout';
 import { UsersTableClient } from '@/components/home/users-table-client';
 import { SectionRow } from '@/components/site/section-row';
 import { getUsersBackendMeta } from '@/lib/demo/users/adapter';
+import { dialectMeta } from '@/lib/demo/users/dialect';
 import { fetchUsers } from '@/lib/demo/users/fetch-users';
 
 interface LiveDemoProps {
@@ -29,8 +30,15 @@ export async function LiveDemo({ searchParams }: LiveDemoProps) {
   const { page, limit, filters: filterNode, sorting } = tableParams;
   const initialFilters = isFilterGroupNode(filterNode) ? flattenFilterNode(filterNode) : filterNode;
 
-  const [meta, { result, queries, error }] = await Promise.all([
-    getUsersBackendMeta(),
+  // Soft-fail meta init the same way fetchUsers soft-fails, so a total backend
+  // outage shows the inline alert instead of throwing the RSC.
+  const [metaOutcome, { result, queries, error: fetchError }] = await Promise.all([
+    getUsersBackendMeta()
+      .then((meta) => ({ meta, error: null as string | null }))
+      .catch((error: unknown) => ({
+        meta: dialectMeta('sqlite'),
+        error: error instanceof Error ? error.message : 'Failed to initialize demo backend',
+      })),
     fetchUsers({
       page,
       limit,
@@ -38,6 +46,9 @@ export async function LiveDemo({ searchParams }: LiveDemoProps) {
       sorting,
     }),
   ]);
+
+  const meta = metaOutcome.meta;
+  const error = fetchError ?? metaOutcome.error;
 
   if (error) {
     // biome-ignore lint/suspicious/noConsole: server-side demo log

@@ -16,7 +16,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     title: 'Users directory',
     demonstrates:
       'Cross-table filtering, bulk actions, and the live SQL readout — on the homepage against Postgres when DATABASE_URL is set (SQLite fallback otherwise).',
-    dataset: '~1M users · Postgres (or SQLite)',
+    dataset: '~1M · Postgres / 5k · SQLite',
     href: '/#demo',
     anchor: true,
     chips: ['drizzle · postgres', 'profile.* dot-paths', 'bulk actions', 'generated sql'],

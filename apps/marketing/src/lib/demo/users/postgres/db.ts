@@ -38,7 +38,8 @@ type PostgresBundle = {
 
 let bundle: PostgresBundle | null = null;
 let initPromise: Promise<void> | null = null;
-let loggedFallbackHint = false;
+/** Bumped on close so an in-flight init that finishes later discards its pool. */
+let connectionGeneration = 0;
 
 export function getPostgresDatabaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL?.trim();
@@ -69,21 +70,26 @@ export async function getPostgresDatabase(): Promise<PostgresBundle> {
   }
 
   if (!initPromise) {
+    const generation = connectionGeneration;
     initPromise = initPostgres(url)
-      .then((next) => {
+      .then(async (next) => {
+        // Closed while connecting — discard the pool so it cannot leak.
+        if (generation !== connectionGeneration) {
+          await next.client.end({ timeout: 5 });
+          return;
+        }
         bundle = next;
       })
       .catch((error) => {
         initPromise = null;
         bundle = null;
-        if (!loggedFallbackHint) {
-          loggedFallbackHint = true;
-          // biome-ignore lint/suspicious/noConsole: demo bootstrap diagnostic
-          console.warn(
-            '[demo/users/postgres] DATABASE_URL connection failed; homepage will use SQLite fallback.',
-            error instanceof Error ? error.message : error
-          );
-        }
+        // Log every failed attempt (retries clear initPromise) so intermittent
+        // DATABASE_URL issues stay visible in server logs.
+        // biome-ignore lint/suspicious/noConsole: demo bootstrap diagnostic
+        console.warn(
+          '[demo/users/postgres] DATABASE_URL connection failed; homepage will use SQLite fallback.',
+          error instanceof Error ? error.message : error
+        );
         throw error;
       });
   }
@@ -97,6 +103,15 @@ export async function getPostgresDatabase(): Promise<PostgresBundle> {
 
 /** Close the pool (tests / hot reset). Does not drop remote data. */
 export async function closePostgresDatabase() {
+  connectionGeneration += 1;
+  const pending = initPromise;
+  if (pending) {
+    try {
+      await pending;
+    } catch {
+      // Init failed — nothing to close beyond clearing state below.
+    }
+  }
   if (bundle?.client) {
     await bundle.client.end({ timeout: 5 });
   }

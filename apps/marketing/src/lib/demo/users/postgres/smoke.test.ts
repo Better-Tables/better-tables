@@ -35,8 +35,11 @@ describe.skipIf(!hasUrl)('postgres users smoke (DATABASE_URL)', () => {
         })
       );
 
+      // Assert adapter/pagination/capture behavior — not a fixed Neon row count
+      // (remote seed size can change without the code under test being wrong).
       expect(result.data.length).toBeGreaterThan(0);
-      expect(result.total).toBeGreaterThan(1000);
+      expect(result.data.length).toBeLessThanOrEqual(5);
+      expect(result.total).toBeGreaterThanOrEqual(result.data.length);
       expect(queries.length).toBeGreaterThan(0);
       expect(queries.some((q) => /select/i.test(q.query))).toBe(true);
     },

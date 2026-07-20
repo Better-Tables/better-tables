@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 const getUsersDialectMock = mock(async (): Promise<'postgres' | 'sqlite'> => 'sqlite');
 const getUsersBackendMetaMock = mock(
@@ -41,6 +41,10 @@ mock.module('@/lib/demo/users/mutations', () => ({
 
 // Import after mock.module so the route binds to the stubs.
 const { DELETE, PATCH, POST } = await import('./route');
+
+afterAll(() => {
+  mock.restore();
+});
 
 function jsonRequest(url: string, init?: RequestInit): NextRequest {
   return new Request(url, init) as import('next/server').NextRequest;
