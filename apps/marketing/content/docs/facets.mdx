@@ -1,0 +1,68 @@
+---
+title: Facets
+description: Faceted value counts and range facets with useFacets, FacetedFilterSidebar, and the adapter facet contract.
+---
+
+Facets show live counts next to filter options ("Open (34)") and min/max ranges for numeric columns, computed by the adapter with the current filters applied. Self-exclusion is built in: a column's own filter never narrows its own facet, so picking "Open" doesn't collapse the status facet to one entry.
+
+## Client wiring
+
+`useFacets` fetches counts and ranges; `FacetedFilterSidebar` renders them (both copied by `init`):
+
+```tsx
+'use client';
+
+import { FacetedFilterSidebar } from '@/components/better-tables-ui/filters/faceted-filter-sidebar';
+import { useFacets } from '@/hooks/use-facets';
+
+export function TicketsWithFacets({ adapter, columns }) {
+  const [filters, setFilters] = useState<FilterState[]>([]);
+
+  const { facets, ranges, loading, error, refetch } = useFacets({
+    adapter,
+    columnIds: ['status', 'priority'],       // checkbox facets via adapter.getFacetedValues
+    rangeColumnIds: ['reopenCount'],         // [min, max] via adapter.getMinMaxValues
+    filters,                                  // pass the FULL filter state, unmodified
+  });
+
+  return (
+    <div className="flex gap-4">
+      <FacetedFilterSidebar
+        columns={columns}
+        columnIds={['status', 'priority']}
+        rangeColumnIds={['reopenCount']}
+        facets={facets}
+        ranges={ranges}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
+      {/* table filtered by the same `filters` state */}
+    </div>
+  );
+}
+```
+
+`UseFacetsOptions`: `adapter`, `columnIds`, `rangeColumnIds`, `filters`, `enabled`. Results: `facets` (`columnId → [{ value, count }]`), `ranges` (`columnId → [min, max]`), `loading`, `error`, `refetch()`. Array literals for `columnIds` are fine on every render — the hook interns them by content.
+
+Do **not** pre-filter the `filters` you pass per column — self-exclusion is the adapter's job, and pre-filtering fights it.
+
+## Adapter contract
+
+Facets ride on two adapter methods, both implemented by the Drizzle adapter and proxied by the HTTP adapter:
+
+```ts
+adapter.getFacetedValues(columnId, { filters, limit, signal }); // Map<string, number>
+adapter.getMinMaxValues(columnId, { filters, signal });          // [min, max]
+```
+
+`FacetQueryParams`: `filters` (flat array or `FilterGroupNode` tree), `signal` (abort), and `limit` — cap on distinct values, ordered by count descending (default `100`; `null` disables the cap).
+
+`fetchData` can also return counts inline via its `faceted` result field (`Record<columnId, Map<value, count>>`) — over HTTP, Maps travel as `[value, count][]` and are rebuilt client-side (see [HTTP adapter](/docs/adapters/http)).
+
+## Live example
+
+<Cards>
+  <Card title="Facets example" href="/examples/facets" description="Facet sidebar with self-exclusion and counts." />
+</Cards>
+
+Source: `apps/marketing/src/components/sections/facets-sidebar.tsx`.

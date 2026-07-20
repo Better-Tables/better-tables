@@ -1,0 +1,97 @@
+---
+title: Drizzle Adapter
+description: Schema introspection, JOINs from relationship paths, filters, facets, factory options, and performance tuning.
+---
+
+`@better-tables/adapters-drizzle` turns `defineTable` columns + filter/sort/page state into Drizzle queries.
+
+```ts
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { betterTables, defineTable } from '@better-tables/core';
+
+export const tables = betterTables({
+  database: drizzleAdapter(db),
+});
+
+export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+  columns: [
+    t.text('subject').filterable().sortable(),
+    t.text('customer.company').displayName('Customer').filterable(),
+    t.option('status').filterable(),
+  ],
+}));
+```
+
+## Factory options (complete)
+
+`drizzleAdapter(db, factoryOptions?)` auto-detects the schema, driver, and relations from your Drizzle instance; every option is an override:
+
+| `factoryOptions` field | Purpose |
+|---|---|
+| `schema` | Override the auto-detected schema |
+| `driver` | Override the auto-detected driver |
+| `relations` | Override or provide Drizzle relations |
+| `relationships` | Manual `RelationshipMap` — see below |
+| `autoDetectRelationships` | Auto-detect from FK metadata (default `true`) |
+| `meta` | Override adapter metadata |
+| `options` | `DrizzleAdapterOptions` — behavior tuning, next table |
+
+| `options` field | Purpose |
+|---|---|
+| `defaultPrimaryTable` | Table for reads when a call provides neither `columns` nor `primaryTable` (required for that case on multi-table schemas — the adapter throws a `SchemaError` instead of guessing) |
+| `defaultMutationTable` | Table for writes on multi-table schemas |
+| `cache` | Query result caching: `{ enabled, ttl, maxSize? }` (LRU, default max 500 entries) |
+| `optimization` | `{ maxJoins?, enableBatching?, batchSize? }` |
+| `batching` | Large-array filter handling: `{ batchSize? (50), maxBatchesPerGroup? (200), enableNestedGrouping? (true) }` |
+| `logging` | `{ enabled, level: 'debug' \| 'info' \| 'warn' \| 'error', logQueries? }` |
+| `performance` | `{ trackTiming?, maxQueryTime? }` — warn on slow queries |
+
+## Relationship paths
+
+Dot paths in column ids (`customer.company`, `customer.plan`) drive automatic JOINs from Drizzle relations / FK metadata. Filter and sort on those paths the same way as own-table columns.
+
+When auto-detection doesn't capture a relationship (or you need to override one), provide a manual `RelationshipMap` keyed by column id:
+
+```ts
+const adapter = drizzleAdapter(db, {
+  relationships: {
+    'preferences.theme': {
+      from: 'users',
+      to: 'user_preferences',
+      foreignKey: 'userId',   // FK field in the target table
+      localKey: 'id',         // key field in the source table
+      cardinality: 'one',     // 'one' | 'many'
+      nullable: true,
+      joinType: 'left',       // 'left' | 'inner'
+      isArray: false,         // true for array-FK relationships
+    },
+  },
+});
+```
+
+Array foreign keys (Postgres arrays, MySQL/SQLite JSON arrays) are detected automatically and can be forced with `isArray: true`. Deeper patterns — junction tables, aggregates, subqueries — are covered with worked examples in the package's [advanced usage notes](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/docs/ADVANCED_USAGE.md) (some samples still show the legacy builder API; the concepts apply unchanged).
+
+Try it live: [/examples/relationship-filtering](/examples/relationship-filtering).
+
+## Facets
+
+`getFacetedValues` / `getMinMaxValues` / `fetchData({ faceted })` power filter option counts and range facets, with self-exclusion handled by the adapter. See the [Facets guide](/docs/facets) and [/examples/facets](/examples/facets).
+
+## Databases
+
+Postgres, MySQL, and SQLite are supported. Peer dependencies are your driver's (`postgres`, `mysql2`, `better-sqlite3`) plus `drizzle-orm`. Integration tests for MySQL/Postgres live under `packages/adapters/drizzle/tests` (optional `.env.local`).
+
+## Performance tuning
+
+- **Caching**: `options.cache` memoizes query results with TTL + LRU eviction — effective for facet counts on hot tables.
+- **Join budget**: `options.optimization.maxJoins` caps join fan-out from deep relationship usage.
+- **Large IN-lists**: `options.batching` splits very large array filter values into batched OR groups instead of one giant `IN (...)`.
+- **Diagnostics**: `options.logging.logQueries` + `options.performance.trackTiming` / `maxQueryTime` surface slow queries during development.
+
+## Cell writes
+
+When your app uses adapter-level `updateRecord`, the Drizzle adapter resolves write targets (including related rows) through `resolveCellWriteTarget`. Prefer monolith `tables.cellEditAction` when you can — see [Inline editing](/docs/inline-editing).
+
+## Package docs
+
+npm README: `packages/adapters/drizzle/README.md`. Building your own adapter instead? Start at [Custom adapters](/docs/adapters/custom).

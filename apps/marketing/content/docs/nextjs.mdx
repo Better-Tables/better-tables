@@ -1,0 +1,72 @@
+---
+title: Next.js Integration
+description: Server fetch, lazy DB init for builds, UI copy, and client URL sync.
+---
+
+<Steps>
+<Step>
+
+### Define tables with lazy DB access
+
+Native drivers like `better-sqlite3` must not run during `next build`. Use a lazy getter — see `apps/marketing/src/lib/demo/support/db.ts`.
+
+```ts
+export async function getSupportTables() {
+  const db = await getDb(); // lazy singleton
+  return betterTables({ database: drizzleAdapter(db) });
+}
+```
+
+</Step>
+<Step>
+
+### Server-fetch with `tables.fetchData`
+
+```tsx
+export default async function TicketsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const sp = await searchParams;
+  const tables = await getSupportTables();
+  const result = await tables.fetchData(ticketsTable, {
+    pagination: { page: Number(sp.page ?? 1), limit: 10 },
+  });
+
+  return <TicketsTableClient rows={result.data} total={result.total} />;
+}
+```
+
+</Step>
+<Step>
+
+### Copy UI into the app
+
+```bash
+bunx better-tables init
+```
+
+Pass `columns={table.columns}` (or `table={def}`) to `<BetterTable />`.
+
+</Step>
+<Step>
+
+### Client URL sync
+
+Use `useNextjsUrlAdapter()` with `useTableUrlSync` — see [URL State](/docs/url-state).
+
+</Step>
+</Steps>
+
+## HTTP adapter for client components
+
+When the adapter cannot run in the browser (native SQLite, secrets), mount `createAdapterRouteHandler` and use `httpAdapter` on the client. See [HTTP adapter](/docs/adapters/http).
+
+## Live demos
+
+<Cards>
+  <Card title="Examples hub" href="/examples" description="All marketing dogfood tables." />
+  <Card title="Relationship filtering" href="/examples/relationship-filtering" />
+  <Card title="Query groups" href="/examples/query-groups" />
+</Cards>

@@ -1,0 +1,114 @@
+---
+title: Filtering
+description: Typed FilterState objects, the full operator reference by column type, per-column filter config, and AND/OR query groups.
+---
+
+Filters are typed `FilterState` objects (or nested `FilterGroupNode` trees for AND/OR). The UI reads column metadata from `defineTable()`; the adapter translates filters to SQL.
+
+```ts
+import type { FilterState } from '@better-tables/core';
+
+const filters: FilterState[] = [
+  { columnId: 'status', type: 'option', operator: 'is', values: ['open'] },
+  { columnId: 'customer.company', type: 'text', operator: 'contains', values: ['Acme'] },
+];
+
+await tables.fetchData(ticketsTable, { filters });
+```
+
+A bare `FilterState[]` means **implicit AND**. Relationship paths in `columnId` (like `customer.company`) trigger JOIN generation in the Drizzle adapter.
+
+Each filter's `operator` field is type-narrowed per column type — passing a number operator to a text column is a compile error.
+
+## Operator reference
+
+Wrong-type operators are compile errors, so this table is the complete legal set. `isNull` / `isNotNull` are available on every type; operators marked *(no value)* take an empty `values` array.
+
+| Column type | Operators |
+|---|---|
+| `text` | `contains`, `equals`, `startsWith`, `endsWith`, `isEmpty` *(no value)*, `isNotEmpty` *(no value)* |
+| `number` | `equals`, `notEquals`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `between` *(2 values)*, `notBetween` *(2 values)* |
+| `date` | `is`, `isNot`, `before`, `after`, `between` *(2 values)*, `notBetween` *(2 values)*, `isToday`, `isYesterday`, `isThisWeek`, `isThisMonth`, `isThisYear` *(relative ones take no value)* |
+| `option` | `is`, `isNot`, `isAnyOf`, `isNoneOf` |
+| `multiOption` | `includes`, `excludes`, `includesAny`, `includesAll`, `excludesAny`, `excludesAll` |
+| `boolean` | `isTrue`, `isFalse` *(no value)* |
+| `json` | `contains`, `equals`, `isEmpty`, `isNotEmpty` |
+
+Source of truth: `packages/core/src/types/filter-operators.ts` — labels, value arity, and per-type unions are all derived from it.
+
+## Per-column filter config
+
+Builders accept a `FilterConfig` to constrain or tune the filter UI and adapter behavior:
+
+```ts
+t.number('reopenCount')
+  .filterable()
+  .numberOperators(['between', 'greaterThan']) // restrict the operator menu
+  .range(0, 50);                               // min/max for the input
+
+t.text('subject').searchable({ debounce: 500, includeNull: true });
+```
+
+| `FilterConfig` field | Purpose |
+|---|---|
+| `operators` | Allow-list of operators offered in the UI (defaults to the full set for the type) |
+| `options` | Choices for `option` / `multiOption` filters (schema enums fill this automatically — see [Auto columns](/docs/columns/auto-columns)); each option takes `value`, `label`, and optional `color` / `icon` / `count` |
+| `min` / `max` | Bounds for number inputs |
+| `debounce` | Text input debounce in ms (default 300) |
+| `includeNull` | Also match null/undefined values |
+| `validation` | `(value) => boolean \| string` — reject or message invalid filter input |
+| `includeTime` | Date filters: include the time component |
+| `format` | Date filters: display format |
+| `customComponent` | Replace the filter input with your own component |
+
+Note that `.searchable()` on a text column is filter sugar: it enables the full set of text operators plus debounce/null handling. It does not add the column to a separate global search — see the operator table above for what it unlocks.
+
+## Query groups (AND / OR)
+
+For OR and nesting, pass a `FilterGroupNode` tree instead of a flat array. Core canonicalizes a bare array to an AND group before dispatch, so adapters handle one shape:
+
+```ts
+await tables.fetchData(ticketsTable, {
+  filters: {
+    kind: 'group',
+    logic: 'or',
+    children: [
+      { columnId: 'status', type: 'option', operator: 'is', values: ['open'] },
+      {
+        kind: 'group',
+        logic: 'and',
+        children: [
+          { columnId: 'status', type: 'option', operator: 'is', values: ['resolved'] },
+          { columnId: 'reopenCount', type: 'number', operator: 'greaterThan', values: [2] },
+        ],
+      },
+    ],
+  },
+});
+```
+
+Nested groups survive URL sharing (see [URL State](/docs/url-state)) and render as an editable tree in the filter UI:
+
+<Cards>
+  <Card title="Query groups example" href="/examples/query-groups" description="AND/OR filter trees with URL share." />
+  <Card title="Relationship filtering" href="/examples/relationship-filtering" description="Dot-path joins like customer.plan." />
+  <Card title="Facets" href="/examples/facets" description="Facet sidebar with self-exclusion." />
+</Cards>
+
+## Filter bar grouping
+
+The filter dropdown groups columns automatically (dates together, statuses together, …). Tune it with `autoGroupFilters` on `<BetterTable>`:
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={data}
+  autoGroupFilters={{ groupLabels: { dates: 'Timeline' } }}
+/>
+```
+
+`AutoGroupConfig` accepts `enabled`, `autoGroup`, `customGroups` (explicit `FilterGroup[]` definitions), and `groupLabels`. Pass `groups` directly for fully manual grouping.
+
+## Client managers
+
+`FilterManager` and `TableStateManager` in `@better-tables/core` power the UI store. Pair with [URL state](/docs/url-state) so filters survive refresh and share.

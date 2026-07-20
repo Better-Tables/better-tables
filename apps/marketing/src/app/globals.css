@@ -382,3 +382,18 @@
     font-weight: 450;
   }
 }
+
+/* Unlayered override for @tailwindcss/typography.
+   The plugin adds decorative backticks via ::before/::after with a
+   :not(:where([class~=not-prose]…)) selector — match that specificity
+   (and use !important) so Fumadocs/MDX <code> chips don't show `quotes`. */
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
+  content: none !important;
+}
+
+/* Docs tables: give cells (and code chips) room from the grid lines. */
+.prose :where(table) :where(th, td) {
+  padding-block: 0.7rem;
+  padding-inline: 1rem;
+}

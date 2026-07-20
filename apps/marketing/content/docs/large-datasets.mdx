@@ -1,0 +1,43 @@
+---
+title: Large Datasets
+description: Row virtualization with the virtualized prop, and how it combines with server pagination.
+---
+
+Two tools keep big tables fast, and they compose:
+
+1. **Server pagination** — fetch one page at a time (`tables.fetchData({ pagination })`); the default.
+2. **Row virtualization** — render only the rows in view from a large `data` array.
+
+## The `virtualized` prop
+
+`true` uses the defaults; pass an object to tune. Everything else — filtering, sorting, selection, column visibility/reordering, URL sync — behaves identically; virtualization is purely a rendering detail, not a separate component or data path.
+
+```tsx
+<BetterTable table={ticketsTable} data={allTickets} virtualized />
+
+<BetterTable
+  table={ticketsTable}
+  data={allTickets}
+  virtualized={{ height: 640, rowHeight: 56, overscan: 10 }}
+/>
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `height` | `480` | Scroll viewport height in px |
+| `rowHeight` | `52` | Row height in px (estimate for dynamic rows) |
+| `overscan` | `5` | Extra rows rendered above/below the viewport |
+
+## Choosing a strategy
+
+| Rows | Strategy |
+|---|---|
+| Hundreds | Plain pagination — nothing extra needed |
+| Thousands–tens of thousands | One large fetch + `virtualized`, usually with `features={{ pagination: false }}` since windowing already handles arbitrarily many rows |
+| More than fits in memory | Server pagination stays on; virtualize within the page if pages are large |
+
+The [/examples/big-board](/examples/big-board) demo renders ~12k rows this way — virtualization plus filters, sorting, and URL sync.
+
+## Related hooks
+
+The copied UI includes `use-virtualization.ts` and `use-virtualized-table-data.ts`, which power `<VirtualizedTable>` internally — you own the source if you need custom windowing behavior.

@@ -1,0 +1,23 @@
+---
+title: Adapters
+description: How Better Tables talks to databases and HTTP backends.
+---
+
+Adapters implement the core contract: describe schema, fetch filtered/sorted/paginated rows, facets, and optional writes.
+
+<Cards>
+  <Card title="Drizzle" href="/docs/adapters/drizzle" description="First-party ORM adapter for Postgres, MySQL, and SQLite." />
+  <Card title="HTTP" href="/docs/adapters/http" description="Browser-safe client + Next.js route handler for server-only adapters." />
+  <Card title="Custom" href="/docs/adapters/custom" description="Implement the TableAdapter contract with the ORM-agnostic toolkit." />
+</Cards>
+
+```ts
+import { betterTables } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+
+export const tables = betterTables({
+  database: drizzleAdapter(db),
+});
+```
+
+For building a custom ORM adapter, start from the [Custom adapters guide](/docs/adapters/custom) and `@better-tables/adapters-toolkit`.

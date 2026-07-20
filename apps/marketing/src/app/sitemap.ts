@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
 import { getBlogPostSummaries } from '@/lib/blog';
+import { source } from '@/lib/source';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const headersList = await headers();
@@ -15,7 +16,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/examples/query-groups',
     '/examples/big-board',
     '/examples/facets',
-    '/docs',
     '/blog',
   ].map((route) => ({
     url: `${base}${route}`,
@@ -28,5 +28,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(post.publishedAt),
   }));
 
-  return [...staticRoutes, ...blogRoutes];
+  const docsRoutes = source.getPages().map((page) => ({
+    url: `${base}${page.url}`,
+    lastModified: page.data.lastModified ?? new Date(),
+  }));
+
+  return [...staticRoutes, ...blogRoutes, ...docsRoutes];
 }

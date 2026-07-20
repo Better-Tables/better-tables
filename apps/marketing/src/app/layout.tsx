@@ -1,9 +1,8 @@
+import { RootProvider } from 'fumadocs-ui/provider/next';
 import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Mono, IBM_Plex_Sans, Schibsted_Grotesk } from 'next/font/google';
-import { SiteFooter } from '@/components/site/site-footer';
-import { SiteHeader } from '@/components/site/site-header';
+import { SiteShell } from '@/components/site/site-shell';
 import { TailwindIndicator } from '@/components/tailwind-indicator';
-import { ThemeProvider } from '@/components/theme-provider';
 import { cn, constructMetadata } from '@/lib/utils';
 import './globals.css';
 
@@ -45,15 +44,17 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${plexSans.variable} ${plexMono.variable} ${schibsted.variable}`}
     >
-      <body className={cn('min-h-screen bg-background antialiased font-sans')}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          <div className="site-frame">
-            <SiteHeader />
-            <div className="flex-1">{children}</div>
-            <SiteFooter />
-          </div>
+      <body className={cn('flex min-h-screen flex-col bg-background antialiased font-sans')}>
+        <RootProvider
+          theme={{
+            attribute: 'class',
+            defaultTheme: 'light',
+            enableSystem: false,
+          }}
+        >
+          <SiteShell>{children}</SiteShell>
           <TailwindIndicator />
-        </ThemeProvider>
+        </RootProvider>
       </body>
     </html>
   );

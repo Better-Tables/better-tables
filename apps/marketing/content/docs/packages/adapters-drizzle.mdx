@@ -1,0 +1,42 @@
+---
+title: "@better-tables/adapters-drizzle"
+description: Drizzle ORM adapter for Postgres, MySQL, and SQLite.
+---
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bun add @better-tables/adapters-drizzle drizzle-orm
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @better-tables/adapters-drizzle drizzle-orm
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @better-tables/adapters-drizzle drizzle-orm
+```
+
+</Tab>
+</Tabs>
+
+`drizzle-orm` and your driver (`better-sqlite3`, `postgres`, `mysql2`) are peer dependencies — install the ones you use.
+
+## Capabilities
+
+- Schema, driver, and relationship auto-detection from your Drizzle instance
+- Automatic JOINs from relationship dot-paths (`customer.company`), including array foreign keys
+- Filters (full operator set incl. AND/OR trees), sorting, pagination, global counts
+- Facets: `getFacetedValues` / `getMinMaxValues` with self-exclusion
+- Schema introspection (`describeColumns`) for [auto columns](/docs/columns/auto-columns)
+- Cell writes via `updateRecord` + `resolveCellWriteTarget` for [inline editing](/docs/inline-editing)
+- Tuning: query caching, join budget, large-IN batching, query logging, timing warnings
+
+Full guide with every factory option: [Drizzle adapter](/docs/adapters/drizzle).

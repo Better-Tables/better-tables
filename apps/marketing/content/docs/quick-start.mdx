@@ -1,0 +1,169 @@
+---
+title: Quick Start
+description: Go from empty project to a typed, filterable table in a few steps.
+---
+
+<Steps>
+<Step>
+
+### Install packages
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bun add @better-tables/core @better-tables/adapters-drizzle drizzle-orm
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @better-tables/core @better-tables/adapters-drizzle drizzle-orm
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @better-tables/core @better-tables/adapters-drizzle drizzle-orm
+```
+
+</Tab>
+</Tabs>
+
+For the React UI, copy components into your app (they are not published on npm; requires a [shadcn setup](/docs/ui-and-cli#prerequisites)):
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bunx better-tables init
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npx better-tables init
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm dlx better-tables init
+```
+
+</Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Create the table factory
+
+Wire your Drizzle database through `drizzleAdapter`, then call `betterTables()`:
+
+```ts
+// lib/tables.ts
+import { betterTables, defineTable } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { db } from './db';
+
+export const tables = betterTables({
+  database: drizzleAdapter(db),
+  defaults: { pageSize: 20 },
+});
+```
+
+</Step>
+<Step>
+
+### Define a table
+
+```ts
+export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+  columns: [
+    t.text('subject').searchable().filterable().sortable(),
+    t.option('status')
+      .options([
+        { value: 'open', label: 'Open' },
+        { value: 'resolved', label: 'Resolved' },
+      ])
+      .filterable()
+      .sortable(),
+    t.text('customer.company').displayName('Customer').searchable(),
+    t.date('createdAt').displayName('Opened').sortable(),
+  ],
+}));
+
+export type TicketRow = typeof ticketsTable.$infer.Row;
+```
+
+Relationship paths like `customer.company` tell the Drizzle adapter to JOIN automatically.
+
+</Step>
+<Step>
+
+### Fetch on the server
+
+```ts
+const result = await tables.fetchData(ticketsTable, {
+  pagination: { page: 1, limit: 20 },
+  sorting: [{ columnId: 'createdAt', direction: 'desc' }],
+});
+```
+
+</Step>
+<Step>
+
+### Render with Better Table UI
+
+`init` copied the component into your app — import it from the local path and hand it the columns, rows, and total:
+
+```tsx
+// app/tickets/tickets-table.tsx
+'use client';
+
+import { BetterTable } from '@/components/better-tables-ui/table/table';
+import { ticketsTable, type TicketRow } from '@/lib/tables';
+
+export function TicketsTable({ rows, total }: { rows: TicketRow[]; total: number }) {
+  return (
+    <BetterTable
+      id="tickets"
+      columns={ticketsTable.columns}
+      data={rows}
+      totalCount={total}
+    />
+  );
+}
+```
+
+```tsx
+// app/tickets/page.tsx (server component)
+import { tables, ticketsTable } from '@/lib/tables';
+import { TicketsTable } from './tickets-table';
+
+export default async function TicketsPage() {
+  const result = await tables.fetchData(ticketsTable, {
+    pagination: { page: 1, limit: 20 },
+  });
+
+  return <TicketsTable rows={result.data} total={result.total} />;
+}
+```
+
+That renders a filterable, sortable, paginated table. For wiring page changes back to the server, URL state, and editing, continue below.
+
+</Step>
+</Steps>
+
+## Next
+
+- [BetterTable props](/docs/better-table) — every prop on the component
+- [Columns](/docs/columns) — path builders, modifiers, computed fields
+- [Filtering](/docs/filtering) — operator reference and AND/OR groups
+- [URL State](/docs/url-state) — shareable filter/sort/page links
+- [Next.js Integration](/docs/nextjs) — lazy DB init, server fetch patterns

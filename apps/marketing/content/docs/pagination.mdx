@@ -1,0 +1,37 @@
+---
+title: Pagination
+description: 1-based page and limit, defaults from betterTables(), and the pagination controls.
+---
+
+Pagination uses `{ page, limit }` (1-based page). Defaults come from `betterTables({ defaults: { pageSize: 20 } })`.
+
+```ts
+const result = await tables.fetchData(ticketsTable, {
+  pagination: { page: 2, limit: 10 },
+});
+```
+
+`result.data` is the page of rows; `result.total` is the filtered count for page controls.
+
+## The pagination controls
+
+`<BetterTable>` renders page navigation plus a page-size selector (10 / 20 / 50 / 100 by default). Feed it the filtered total and react to changes with the controlled callbacks:
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={rows}
+  totalCount={total}
+  initialPagination={{ page: 1, limit: 20 }}
+  onPageChange={(page) => refetch({ page })}
+  onPageSizeChange={(pageSize) => refetch({ page: 1, limit: pageSize })}
+/>
+```
+
+Without `totalCount` the component estimates from the loaded data, so always pass `result.total` when paginating on the server.
+
+The selector options and layout live in the copied `table-pagination.tsx` — `<TablePagination>` takes `currentPage`, `totalPages`, `onPageChange`, `pageSize`, `onPageSizeChange`, `totalItems`, `pageSizeOptions`, `showPageSizeSelector`, `showPageInfo`, and `className`. You own that file; change the defaults there or render it yourself.
+
+Pagination state can be synced to the URL (`pagination` flag) — see [URL State](/docs/url-state).
+
+For very large boards, pair server pagination with client virtualization — see [Large datasets](/docs/large-datasets) and [/examples/big-board](/examples/big-board).

@@ -1,0 +1,71 @@
+---
+title: Selection & Actions
+description: Row selection with checkboxes, and bulk actions that operate on the selected set.
+---
+
+Row selection adds a checkbox column (with select-all in the header) and tracks selected row ids. Enable it explicitly, or implicitly by passing `actions` — the checkbox column appears whenever `actions` is non-empty or `features.rowSelection` is `true`.
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={data}
+  features={{ rowSelection: true }}
+  initialSelectedRows={new Set(['42'])}
+  onSelectionChange={(selected) => console.log([...selected])}
+/>
+```
+
+Row identity comes from `rowConfig.getId(row)` when provided, falling back to the row's `id` field — set `getId` whenever your rows have a different key.
+
+## Bulk actions
+
+`actions` is a `TableAction[]`; the actions toolbar renders above the table and invokes handlers with the current selection:
+
+```tsx
+import { Archive, Trash2 } from 'lucide-react';
+
+<BetterTable
+  columns={columns}
+  data={data}
+  actions={[
+    {
+      id: 'archive',
+      label: 'Archive',
+      icon: Archive,
+      handler: async (selectedIds, selectedData) => {
+        await archiveTickets(selectedIds);
+      },
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      variant: 'destructive',
+      confirmationDialog: {
+        title: 'Delete tickets?',
+        description: 'This cannot be undone.',
+        confirmLabel: 'Delete',
+      },
+      handler: async (selectedIds) => deleteTickets(selectedIds),
+    },
+  ]}
+/>
+```
+
+## TableAction (complete)
+
+| Field | Purpose |
+|---|---|
+| `id` | Unique action identifier |
+| `label` | Button label |
+| `icon` | Icon component (optional) |
+| `variant` | Button visual variant: `'default' \| 'destructive' \| 'secondary'` |
+| `handler(selectedIds, selectedData?)` | The work — sync or async |
+| `confirmationDialog` | `{ title, description, confirmLabel?, cancelLabel?, destructive? }` — confirm before running |
+| `isVisible(selectedIds, selectedData?)` | Hide the action for some selections |
+| `isEnabled(selectedIds, selectedData?)` | Disable (but show) the action |
+| `meta` | Arbitrary metadata passthrough |
+
+After a handler resolves, refetch your data — the table doesn't mutate rows itself. Selection state can also be seeded with `initialSelectedRows` and observed via `onSelectionChange` (see the [props reference](/docs/better-table)).
+
+The core `ActionsConfig` type (`showSelectedCount`, toast options) is contract-only — the copied toolbar doesn't read it yet; edit `actions-toolbar.tsx` directly for that kind of customization.

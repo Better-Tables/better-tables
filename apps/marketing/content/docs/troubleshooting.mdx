@@ -1,0 +1,49 @@
+---
+title: Troubleshooting
+description: Common failures — build-time DB crashes, init prerequisites, read-only cells, HTTP 403s, and multi-table SchemaErrors.
+---
+
+## `next build` crashes loading the database
+
+Native drivers like `better-sqlite3` must not run at build/import time. Initialize the DB behind a lazy getter and call it per request:
+
+```ts
+export async function getSupportTables() {
+  const db = await getDb(); // lazy singleton
+  return betterTables({ database: drizzleAdapter(db) });
+}
+```
+
+See [Next.js Integration](/docs/nextjs) and the reference implementation in `apps/marketing/src/lib/demo/support/db.ts`.
+
+## `better-tables init` exits immediately
+
+`init` requires a working shadcn setup (`components.json`). It will print remediation steps; set up shadcn first, then re-run. It also checks for `@better-tables/core` and `@better-tables/adapters-drizzle` and offers to install them. Flags: `--skip-shadcn`, `-y`, `--components-path`, `--cwd` — see [UI & CLI](/docs/ui-and-cli).
+
+## An editable cell renders read-only
+
+Save resolution walks a fixed order (see [Inline editing](/docs/inline-editing#save-resolution)) and falls back to read-only, logging **one dev `console.warn` per column** explaining which condition failed. Check, in order: `editing={false}` on the table, missing/false `editable` config (`when(row)` returning false), and — for the adapter path — `adapter.meta.features.update`, an `updateRecord` implementation, a resolvable write target, and a row id (`rowConfig.getId` or an `id` field).
+
+## `cellEdit` returns 403 over HTTP
+
+Writes are double opt-in: the route handler needs `writes` config **and** the client needs `httpAdapter({ url, writes: true })`. Without both, the server answers 403 by design. See [HTTP adapter](/docs/adapters/http#writes-opt-in).
+
+## `SchemaError` on reads with a multi-table schema
+
+When a call provides neither `columns` nor `primaryTable`, the adapter throws instead of guessing the table. Pass `primaryTable` per call, or set `options.defaultPrimaryTable` (reads) / `options.defaultMutationTable` (writes) on `drizzleAdapter` — see [Drizzle adapter](/docs/adapters/drizzle#factory-options-complete).
+
+## Facet counts look wrong after filtering
+
+Pass your **full, unmodified** filter state to `useFacets` / `getFacetedValues`. Self-exclusion (a column's own filter not narrowing its own facet) is the adapter's responsibility — pre-filtering per column fights it. See [Facets](/docs/facets).
+
+## Filter options never load for an option column
+
+Option choices resolve in order: declared `.options()` → schema enum (via `resolveTableColumns`, needs `adapter` on `<BetterTable>` with `describeColumns` support) → lazy `adapter.getFilterOptions(columnId)` on first open. If all three are missing, the dropdown has nothing to show. An adapter without `describeColumns` also degrades auto columns to the declared list with a dev warning — see [Auto columns](/docs/columns/auto-columns).
+
+## Pagination shows the wrong total
+
+Always pass `totalCount={result.total}` with server pagination — without it the component estimates from the loaded rows. See [Pagination](/docs/pagination).
+
+## Maps arrive as arrays over HTTP
+
+That's the wire format: `getFacetedValues` and `fetchData.faceted` travel as `[value, count][]` and the `httpAdapter` client rebuilds `Map`s. Only raw `fetch` callers need to handle the arrays themselves — see [HTTP adapter](/docs/adapters/http#wire-contract).

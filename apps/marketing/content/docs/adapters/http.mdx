@@ -1,0 +1,86 @@
+---
+title: HTTP Adapter
+description: Pair httpAdapter with createAdapterRouteHandler for browser ↔ server adapter calls.
+---
+
+Pair a browser-safe `httpAdapter` client with a server `createAdapterRouteHandler` so client components can call a server-only adapter (for example Drizzle wrapping `better-sqlite3`) without hand-rolling fetch plumbing.
+
+## Safe Next.js App Router mount
+
+```ts
+// app/api/tables/tickets/route.ts
+import { createAdapterRouteHandler } from '@better-tables/core';
+import { getTicketsAdapter } from '@/lib/tickets';
+
+export const POST = createAdapterRouteHandler(() => getTicketsAdapter(), {
+  authorize: async (request) => {
+    // return false → 403; or return a custom Response (e.g. 401)
+    return true;
+  },
+  constrainRequest: (body) =>
+    body.method === 'fetchData'
+      ? { ...body, params: { ...body.params, primaryTable: 'tickets' } }
+      : body,
+  onError: (error) => console.error('[api/tables/tickets]', error),
+});
+```
+
+```ts
+// client
+import { httpAdapter } from '@better-tables/core';
+
+const adapter = httpAdapter({ url: '/api/tables/tickets' });
+```
+
+<Callout type="warn" title="Do not expose the full schema unauthenticated">
+A bare `createAdapterRouteHandler(adapter)` exposes the entire read surface of the adapter's schema. Always pin `primaryTable` (and usually add `authorize`) for multi-table adapters.
+</Callout>
+
+## Wire contract
+
+| Concern | Behavior |
+|---|---|
+| Maps | `getFacetedValues` and `fetchData.faceted` travel as `[value, count][]`; the client rebuilds `Map`s |
+| Dates | JSON serializes `Date` values as ISO strings; server emitters parse ISO |
+| AbortSignal | Never serialized; client uses it to cancel `fetch` |
+| Mutations | Not proxied by default — `cellEdit` requires double opt-in (below) |
+
+## Writes (opt-in)
+
+<Callout type="info">
+Only for genuinely separated frontend/backend deployments. In a monolith, use `tables.cellEditAction(def)` through your framework's server boundary instead.
+</Callout>
+
+Writes are **disabled by default** and require opting in on **both** sides:
+
+```ts
+// server
+export const POST = createAdapterRouteHandler(() => getTicketsAdapter(), {
+  authorize: async (request) => isAllowedToEdit(request),
+  writes: { columns: ['subject', 'status', 'customer.company'] },
+});
+
+// client
+const adapter = httpAdapter({ url: '/api/tables/tickets', writes: true });
+```
+
+Rules:
+
+- **Double opt-in** — without handler `writes`, `cellEdit` → 403; without client `writes: true`, the client stays read-only
+- **Fail closed** — server re-resolves column → table/field via schema introspection and coerces values
+- **`{ columns }` narrowing is recommended** — `writes: true` alone allows any schema-writable column
+- **`authorize` runs before the write**
+
+## Status semantics
+
+| Situation | HTTP | Envelope |
+|---|---|---|
+| Success | 200 | `{ ok: true, result }` |
+| Malformed / authorize false | 400 / 403 | `{ ok: false, error, kind: 'bad_request' }` |
+| `cellEdit` with writes disabled | 403 | `{ ok: false, error, kind: 'forbidden' }` |
+| Unknown/unwritable column | 400 | `{ ok: false, error, kind: 'bad_request' }` |
+| Adapter / DB throw | 500 | `{ ok: false, error: 'Adapter request failed.', kind: 'server_error' }` |
+
+Server error messages are generic on purpose — use `onError` for the real exception. Do not echo SQL fragments to clients.
+
+Demo route: `apps/marketing/src/app/api/tables/tickets/route.ts`.

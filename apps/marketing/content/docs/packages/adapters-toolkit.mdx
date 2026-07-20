@@ -1,0 +1,34 @@
+---
+title: "@better-tables/adapters-toolkit"
+description: ORM-agnostic primitives for writing custom Better Tables adapters.
+---
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bun add @better-tables/adapters-toolkit
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @better-tables/adapters-toolkit
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @better-tables/adapters-toolkit
+```
+
+</Tab>
+</Tabs>
+
+Shared, ORM-agnostic primitives for building adapters: filter-operator routing (`FilterRouter` / `PredicateEmitter`), flat-to-nested data transformation (`DataTransformer`), primary-table resolution (`PrimaryTableResolver`), relationship-path aliasing, schema-introspection ports, and safe SQL identifier escaping.
+
+Use it when implementing a new adapter (Prisma, Kysely, raw SQL, …) instead of forking the Drizzle adapter — `@better-tables/adapters-drizzle` itself composes these primitives.
+
+Full walkthrough of the contract and every export: [Custom adapters](/docs/adapters/custom).
