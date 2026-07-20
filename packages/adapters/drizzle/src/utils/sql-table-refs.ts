@@ -79,6 +79,12 @@ function walk(node: unknown, refs: SqlTableRefs, depth: number): void {
  * so a fragment written entirely with raw identifier strings contributes
  * nothing (and correctly so: nothing in it can bind to Drizzle's join
  * planner either).
+ *
+ * Scope semantics are PER CALL: `fromTableNames` marks a table as
+ * self-scoped for everything passed in this invocation. Callers deciding
+ * join exemption per fragment (join planning does — one fragment's
+ * correlated subquery must not exempt another fragment's bare column
+ * reference) must call this once per fragment rather than batching.
  */
 export function collectSqlTableRefs(nodes: readonly unknown[]): SqlTableRefs {
   const refs: SqlTableRefs = {

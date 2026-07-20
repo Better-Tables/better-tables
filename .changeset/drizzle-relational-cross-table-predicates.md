@@ -20,9 +20,11 @@ table (e.g. `` sql`${profiles.github} is not null` `` on a `users` table):
 
 Rules: a table interpolated as a whole `Table` chunk (a correlated subquery
 like `` sql`exists (select 1 from ${profiles} where …)` ``) supplies its own
-FROM scope and is never force-joined; an already-joined relation is reused, not
-double-joined; a column reference to a table with no direct relationship throws
-a descriptive error instead of emitting broken SQL.
+FROM scope and is never force-joined — tracked PER FRAGMENT, so one computed
+field's subquery cannot suppress the outer JOIN another field's bare reference
+needs; an already-joined relation is reused, not double-joined; a column
+reference to a table with no direct relationship throws a descriptive error
+instead of emitting broken SQL.
 
 Also fixed on the sorting side: sorting by a `sortSql`-backed computed field
 that was not simultaneously requested as a column threw a `RelationshipError`

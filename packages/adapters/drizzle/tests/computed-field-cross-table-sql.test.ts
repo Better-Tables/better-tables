@@ -160,6 +160,39 @@ describe('computed-field SQL referencing related tables (e2e through fetchData)'
       expect(first.profile?.bio).toBeDefined();
     });
 
+    it('plans the JOIN when one field references a table bare and ANOTHER scopes the same table in a subquery', async () => {
+      // FROM-scope exemption must be per fragment: hasBioSub's `${profiles}`
+      // Table chunk exempts profiles for ITS OWN fragment only. hasBio's bare
+      // column reference still needs the outer JOIN — an aggregate exemption
+      // across fragments would emit `"profiles"."bio"` with no join and fail.
+      const adapter = createAdapter({
+        users: [
+          {
+            field: 'hasBio',
+            compute: () => null,
+            filterSql: () => sql`${schema.profiles.bio} is not null`,
+          },
+          {
+            field: 'hasBioSub',
+            compute: () => null,
+            filterSql: () =>
+              sql`exists (select 1 from ${schema.profiles} where ${schema.profiles.userId} = ${schema.users.id} and ${schema.profiles.bio} is not null)`,
+          },
+        ],
+      });
+
+      const result = await adapter.fetchData({
+        columns: ['id', 'name'],
+        filters: [
+          { columnId: 'hasBio', type: 'text', operator: 'contains', values: ['x'] },
+          { columnId: 'hasBioSub', type: 'text', operator: 'contains', values: ['x'] },
+        ] as unknown as FilterState[],
+      });
+
+      expect(result.total).toBe(2);
+      expect(result.data).toHaveLength(2);
+    });
+
     it('fails fast with guidance when the referenced table has no relationship', async () => {
       const adapter = createAdapter({
         users: [

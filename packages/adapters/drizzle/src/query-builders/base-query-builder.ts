@@ -1260,8 +1260,21 @@ export abstract class BaseQueryBuilder {
       return;
     }
 
-    const refs = collectSqlTableRefs(fragments);
-    if (refs.columnTableNames.size === 0) {
+    // FROM scope is tracked PER FRAGMENT, not across the batch: one computed
+    // field's correlated subquery (`exists (select 1 from ${profiles} …)`)
+    // must not suppress the outer JOIN that a DIFFERENT field's bare column
+    // reference (`${profiles.bio} is not null`) still needs. A table is
+    // join-exempt only for the fragment that interpolated it as a Table chunk.
+    const tablesNeedingJoin = new Set<string>();
+    for (const fragment of fragments) {
+      const refs = collectSqlTableRefs([fragment]);
+      for (const sqlName of refs.columnTableNames) {
+        if (!refs.fromTableNames.has(sqlName)) {
+          tablesNeedingJoin.add(sqlName);
+        }
+      }
+    }
+    if (tablesNeedingJoin.size === 0) {
       return;
     }
 
@@ -1274,11 +1287,7 @@ export abstract class BaseQueryBuilder {
 
     const relationships = this.relationshipManager.getRelationships();
 
-    for (const sqlName of refs.columnTableNames) {
-      if (refs.fromTableNames.has(sqlName)) {
-        continue; // Correlated subquery brings its own FROM scope.
-      }
-
+    for (const sqlName of tablesNeedingJoin) {
       const schemaKey = schemaKeyBySqlName.get(sqlName);
       if (schemaKey === primaryTable) {
         continue;
