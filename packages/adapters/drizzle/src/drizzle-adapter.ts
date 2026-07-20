@@ -672,13 +672,29 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         }
       }
 
+      // A sort naming a registered computed field WITHOUT sortSql has nothing
+      // to ORDER BY in SQL, and must not leak into join planning as if it were
+      // a relational column path (resolveColumnPath would throw on it). Drop
+      // it loudly — value-free, mirroring the dropped-filter warning.
+      const sortingForQuery = (params.sorting || []).filter((sort) => {
+        const computedField = tableComputedFields.find((cf) => cf.field === sort.columnId);
+        if (computedField && !computedField.sortSql) {
+          // biome-ignore lint/suspicious/noConsole: intentional warning for a dropped computed-field sort
+          console.warn(
+            `[better-tables] Dropped sort on computed field "${sort.columnId}": it has no sortSql, so it cannot be sorted in SQL. Provide sortSql on the computed field to make it sortable.`
+          );
+          return false;
+        }
+        return true;
+      });
+
       // Build queries - pass primaryTable to query builder
       // Include columns that computed fields require (e.g., roles column for enum array filtering)
       // Pass additional SQL conditions from computed field filterSql (applied before pagination)
       const queryParams: Parameters<typeof this.queryBuilder.buildCompleteQuery>[0] = {
         columns: finalColumns,
         filters: processedFilters,
-        sorting: params.sorting || [],
+        sorting: sortingForQuery,
         pagination: params.pagination || { page: 1, limit: 10 },
         primaryTable,
       };
@@ -1528,8 +1544,15 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     const primaryTable = this.resolvePrimaryTableForRead(params.columns, params.primaryTable);
 
     // Filter out computed fields from columns and sorts before building query context
-    // Computed fields are handled separately and shouldn't be resolved as column paths
-    const computedFieldNames = params.computedFields || [];
+    // Computed fields are handled separately and shouldn't be resolved as column paths.
+    // Union the REGISTERED fields with the requested list: `params.computedFields`
+    // only names fields requested via `columns`, so a sort-only computed field
+    // (e.g. sortSql-backed sorting with the field not displayed) would otherwise
+    // leak into resolveColumnPath here and throw on a perfectly valid fetch.
+    const registeredComputedFields = (this.computedFields[primaryTable] || []).map(
+      (field) => field.field
+    );
+    const computedFieldNames = [...(params.computedFields || []), ...registeredComputedFields];
     const columnsForContext = (params.columns || []).filter(
       (col) => !computedFieldNames.includes(col)
     );

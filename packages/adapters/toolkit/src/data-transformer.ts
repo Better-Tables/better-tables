@@ -851,23 +851,39 @@ export class DataTransformer<TTable = unknown> {
       ? columnId.split('.')[0] || ''
       : columnPath.table || '';
 
-    // Find the first record with data for this relationship
-    // Use generateAlias utility to construct the correct alias based on relationship path
-    const testKey = generateAlias(relationshipPath, columnPath.field);
-    const relatedRecord = records.find(
-      (record) => record[testKey] !== null && record[testKey] !== undefined
+    const relatedTableSchema = this.schema[realTableName];
+    const relatedColumns = relatedTableSchema ? this.getColumnNamesCached(relatedTableSchema) : [];
+
+    // Decide whether the related row EXISTS.
+    //
+    // This must not hinge on one arbitrary column. `processColumn` is invoked
+    // once per relationship with `cols[0]` (see the second pass in
+    // `buildNestedRecord`), so keying presence off `columnPath.field` made
+    // whichever related column the caller happened to list first a sentinel:
+    // when that column was NULL for a row, the ENTIRE related object was
+    // discarded and every other related column silently rendered blank, even
+    // though the join had returned data for them.
+    //
+    // Prefer the related table's primary key -- the same signal
+    // `processOneToManyColumn` uses -- since a PK is never NULL for a row that
+    // exists. Fall back to "any related column carries a value" when the PK was
+    // not selected, so presence never depends on a single nullable column.
+    const primaryKeyName = relatedTableSchema
+      ? this.getPrimaryKeyNameCached(relatedTableSchema)
+      : undefined;
+    const pkFlatKey = primaryKeyName ? generateAlias(relationshipPath, primaryKeyName) : undefined;
+    const presenceKeys =
+      pkFlatKey && records.some((record) => record[pkFlatKey] !== undefined)
+        ? [pkFlatKey]
+        : relatedColumns.map((col) => generateAlias(relationshipPath, col));
+
+    const relatedRecord = records.find((record) =>
+      presenceKeys.some((key) => record[key] !== null && record[key] !== undefined)
     );
 
     if (relatedRecord) {
       // Build nested object for the related table
       const relatedData: Record<string, unknown> = {};
-
-      // Extract only columns that are present in the record (requested columns)
-      // Instead of extracting all columns, only extract what's actually in the record
-      const relatedTableSchema = this.schema[realTableName];
-      const relatedColumns = relatedTableSchema
-        ? this.getColumnNamesCached(relatedTableSchema)
-        : [];
 
       for (const col of relatedColumns) {
         const flatKey = generateAlias(relationshipPath, col);

@@ -213,13 +213,58 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
   }
 
   /**
+   * True when a WHERE/ORDER BY predicate cannot be scoped to the primary table.
+   *
+   * Drizzle's relational `findMany({ where })` only scopes predicates to the
+   * primary table — a condition built on `profiles.github` is rewritten as
+   * `"users"."github"`, which fails at runtime. Manual joins apply the same
+   * SQL against the joined alias correctly.
+   *
+   * Two sources of such predicates:
+   *
+   * 1. Filters/sorts naming a related column, visible via `context`.
+   * 2. `additionalConditions` — raw SQL from a computed field's `filterSql`
+   *    (`DrizzleAdapter.fetchData`). These never pass through
+   *    `buildQueryContext`, so `context` cannot see them, and the SQL is opaque:
+   *    there is no way to tell whether it references a joined table. Treat ANY
+   *    such condition as cross-table. Joins are also no-ops on the relational
+   *    path, so a `filterSql` naming a joined table would have nothing to bind
+   *    to even if the rewrite were correct.
+   */
+  private hasCrossTablePredicates(
+    context: QueryContext | undefined,
+    primaryTable: string,
+    additionalConditions?: (SQL | SQLWrapper)[]
+  ): boolean {
+    // Opaque SQL — cannot be introspected, so never risk the relational path.
+    if (additionalConditions && additionalConditions.length > 0) {
+      return true;
+    }
+
+    if (!context) return false;
+
+    for (const columnId of context.filters) {
+      if (this.relationshipManager.resolveColumnPath(columnId, primaryTable).isNested) {
+        return true;
+      }
+    }
+    for (const columnId of context.sorts) {
+      if (this.relationshipManager.resolveColumnPath(columnId, primaryTable).isNested) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Build relational query using Drizzle's relational query API
    * This returns nested objects instead of flattened fields
    */
   private buildRelationalQuery(
     primaryTable: string,
     columns?: string[],
-    context?: QueryContext
+    context?: QueryContext,
+    additionalConditions?: (SQL | SQLWrapper)[]
   ): {
     query: PostgresQueryBuilderWithJoins;
     columnMetadata: {
@@ -228,10 +273,20 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     };
     isNested: boolean; // Flag to indicate data is already nested
   } | null {
-    // Check if db.query is available (requires schema with relations passed to drizzle())
+    // Capability check first (requires schema with relations passed to drizzle()).
+    // This must precede the cross-table guard: on a db built without relations
+    // there is no relational path to decline, and `resolveColumnPath` can throw
+    // for an unvalidated context — which would turn a previously-silent fallback
+    // into an exception for external callers of this public builder.
     const dbWithQuery = this.db as unknown as { query?: Record<string, unknown> };
     if (!dbWithQuery.query || !dbWithQuery.query[primaryTable]) {
       return null; // Relational query API not available, fall back to manual joins
+    }
+
+    // Related-table WHERE/ORDER BY cannot ride on the relational API (see
+    // hasCrossTablePredicates). Selecting nested columns alone is fine.
+    if (this.hasCrossTablePredicates(context, primaryTable, additionalConditions)) {
+      return null;
     }
 
     const tableQuery = dbWithQuery.query[primaryTable] as {
@@ -425,7 +480,8 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     context: QueryContext,
     primaryTable: string,
     columns?: string[],
-    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>,
+    additionalConditions?: (SQL | SQLWrapper)[]
   ): ReturnType<BaseQueryBuilder['buildSelectQuery']> {
     const primaryTableSchema = this.schema[primaryTable];
     if (!primaryTableSchema) {
@@ -443,7 +499,7 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     // But skip if we have computed fields that need SQL expressions
     const relationalQuery = hasComputedFieldsForSorting
       ? null
-      : this.buildRelationalQuery(primaryTable, columns, context);
+      : this.buildRelationalQuery(primaryTable, columns, context, additionalConditions);
     if (relationalQuery) {
       return {
         query: relationalQuery.query,

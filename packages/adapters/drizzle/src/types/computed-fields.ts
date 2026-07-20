@@ -78,6 +78,39 @@ export interface ComputedFieldConfig<TData = Record<string, unknown>> {
    *
    * If both `filter` and `filterSql` are provided, `filterSql` takes precedence.
    *
+   * ## Referencing related tables
+   *
+   * The SQL text is opaque, but the `Column`/`Table` entities interpolated
+   * into it are not — the adapter walks the fragment's query chunks and plans
+   * JOINs for what it finds, so a related-column reference works like any
+   * other cross-table filter:
+   *
+   * ```typescript
+   * // `profiles` has a direct relationship to the primary table: the adapter
+   * // LEFT JOINs it automatically, in the data, count, and fan-out queries.
+   * filterSql: () => sql`${profiles.github} is not null`
+   * ```
+   *
+   * A correlated subquery also works — interpolating the table itself
+   * (`${profiles}`) marks the fragment as supplying its own FROM scope, so no
+   * outer JOIN is added (important for one-to-many relations, where a forced
+   * LEFT JOIN would multiply rows the subquery never asked for):
+   *
+   * ```typescript
+   * filterSql: () => sql`exists (
+   *   select 1 from ${profiles}
+   *   where ${profiles.userId} = ${users.id} and ${profiles.github} is not null
+   * )`
+   * ```
+   *
+   * Two constraints remain: only interpolated Drizzle entities are visible
+   * (a table named via a raw string contributes nothing to join planning),
+   * and a column reference to a table with no DIRECT relationship to the
+   * primary table throws a descriptive error — use a correlated subquery
+   * there. (Filtering by a plain relation path — `profile.github` — needs
+   * none of this; `filterSql` is for expressions the column layer cannot
+   * express.)
+   *
    * @example
    * ```typescript
    * filterSql: async (filter, context) => {

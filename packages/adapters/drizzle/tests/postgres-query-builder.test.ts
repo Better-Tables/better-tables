@@ -7,7 +7,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import type { SQL } from 'drizzle-orm';
+import { type SQL, sql } from 'drizzle-orm';
 import { pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { PostgresQueryBuilder } from '../src/query-builders/postgres-query-builder';
@@ -772,13 +772,10 @@ describe('PostgresQueryBuilder', () => {
         // The where should be an and() combination, not just the last condition
       });
 
-      it('should include relationships from context.joinPaths in relational query', () => {
+      it('should fallback to manual joins when filters reference related columns', () => {
         const mockQueryApi = {
-          findMany: async (_options?: {
-            with?: Record<string, unknown>;
-            columns?: Record<string, boolean>;
-          }) => {
-            return [];
+          findMany: async () => {
+            throw new Error('relational path must not run for cross-table filters');
           },
         };
 
@@ -787,6 +784,7 @@ describe('PostgresQueryBuilder', () => {
             from: () => ({
               where: () => ({}),
               leftJoin: () => ({}),
+              innerJoin: () => ({}),
               execute: async () => [],
             }),
           }),
@@ -801,20 +799,139 @@ describe('PostgresQueryBuilder', () => {
           relationshipManager
         );
 
-        // Create context with joinPaths (simulating filter on related table)
+        // Filtering on a related column cannot use findMany({ where }) —
+        // Drizzle rewrites related columns onto the primary table
+        // (e.g. `"users"."bio"`), so we fall back to manual joins.
         const context = relationshipManager.buildQueryContext(
           {
-            columns: ['name', 'email'],
+            columns: ['name', 'email', 'profile.bio'],
             filters: [{ columnId: 'profile.bio' }],
           },
           'users'
         );
 
-        const result = builder.buildSelectQuery(context, 'users', ['name', 'email']);
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email', 'profile.bio']);
 
-        // Should use relational query and include profile relationship from joinPaths
+        expect(result.isNested).toBe(false);
         expect(result.query).toBeDefined();
-        // The relational query should include profile in the with object
+      });
+
+      it('should fallback to manual joins when sorts reference related columns', () => {
+        const mockQueryApi = {
+          findMany: async () => {
+            throw new Error('relational path must not run for cross-table sorts');
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              innerJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext(
+          {
+            columns: ['name', 'profile.bio'],
+            sorts: [{ columnId: 'profile.bio' }],
+          },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'profile.bio']);
+
+        expect(result.isNested).toBe(false);
+      });
+
+      // A computed field's `filterSql` reaches the query builder as raw SQL in
+      // `additionalConditions`, never through `buildQueryContext` — so `context`
+      // cannot see it and the SQL itself is opaque. If it references a joined
+      // table, the relational API rewrites it onto the primary table exactly
+      // like a related-column filter does. Any such condition must decline the
+      // relational path.
+      it('should fallback to manual joins when additionalConditions are present', () => {
+        const mockQueryApi = {
+          findMany: async () => {
+            throw new Error('relational path must not run with additionalConditions');
+          },
+        };
+
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              innerJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: mockQueryApi,
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        // No related columns anywhere — only the opaque SQL condition, which is
+        // what the pre-fix guard was blind to.
+        const context = relationshipManager.buildQueryContext(
+          { columns: ['name', 'email'] },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'email'], undefined, [
+          sql`${schema.profiles.bio} is not null`,
+        ]);
+
+        expect(result.isNested).toBe(false);
+      });
+
+      it('should still use the relational path when no additionalConditions are present', () => {
+        const dbWithQuery = {
+          select: () => ({
+            from: () => ({
+              where: () => ({}),
+              leftJoin: () => ({}),
+              innerJoin: () => ({}),
+              execute: async () => [],
+            }),
+          }),
+          query: {
+            users: { findMany: async () => [] },
+          },
+        } as unknown as PostgresJsDatabase<typeof schema>;
+
+        const builder = new PostgresQueryBuilder(
+          dbWithQuery as unknown as PostgresJsDatabase<typeof schema>,
+          schema,
+          relationshipManager
+        );
+
+        const context = relationshipManager.buildQueryContext(
+          { columns: ['name', 'profile.bio'] },
+          'users'
+        );
+
+        const result = builder.buildSelectQuery(context, 'users', ['name', 'profile.bio']);
+
+        expect(result.isNested).toBe(true);
       });
     });
 

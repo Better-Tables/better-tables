@@ -325,9 +325,18 @@ export class FilterHandler {
    * this from {@link handleCrossTableFilters}'s loop body so both the flat
    * path and {@link buildTreeCondition}'s recursive walk share one leaf
    * contract). Returns `undefined` to mean "skip this leaf" — either because
-   * core/adapter validation rejects it (silently, to tolerate partial filter
-   * states from the UI) or because {@link buildFilterCondition} itself found
-   * no condition to build (e.g. empty values).
+   * core/adapter validation rejects it or because {@link buildFilterCondition}
+   * itself found no condition to build (e.g. empty values).
+   *
+   * Two distinct reasons a leaf is skipped, deliberately treated differently:
+   *
+   * - **Incomplete values** for an operator this adapter DOES support (the user
+   *   picked a column but has not finished typing). Skipped silently — this is
+   *   normal mid-edit UI state and warning on it would fire on every keystroke.
+   * - **An operator that is not valid for the filter's type.** Also skipped
+   *   (plan 038 keeps partial URL/UI state fetchable) but WARNS, because
+   *   dropping a leaf widens the result set: under implicit-AND the query then
+   *   returns more rows than the caller asked for.
    *
    * @throws {Error} Wraps any resolution/build error with the offending
    *   `columnId`, surfacing it instead of silently swallowing it.
@@ -373,12 +382,24 @@ export class FilterHandler {
             // Skip invalid filters silently - this allows for partial filter states in UI
             return undefined;
           }
-        } else if (typeof validationResult === 'string') {
-          // Operator is not supported by adapter or validation failed
-          // We skip these silently to allow for partial states
-          return undefined;
         } else {
-          // Skip invalid filters silently for value validation errors
+          // The operator is not valid for this filter's type (unknown operator,
+          // or one this adapter does not advertise for the type).
+          //
+          // This is NOT a partial UI state -- it is a malformed filter, and
+          // dropping it WIDENS the result set: under implicit-AND a dropped
+          // leaf returns MORE rows than asked for, so a scoping filter that is
+          // silently discarded reads as "no restriction". Dropping stays the
+          // behavior (plan 038: partial URL/UI filter state must still fetch),
+          // but it must never be silent.
+          //
+          // Value-free by convention -- never log `filter.values`, matching
+          // `normalizeFilterNode` / `deserializeFiltersFromURL`.
+          // biome-ignore lint/suspicious/noConsole: intentional warning for a dropped filter that widens results
+          console.warn(
+            `[better-tables] Dropped filter on "${filter.columnId}": operator "${filter.operator}" is not valid for type "${filter.type ?? 'unknown'}". ` +
+              'The query will run WITHOUT this filter and may return more rows than intended.'
+          );
           return undefined;
         }
       }
