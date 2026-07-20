@@ -7,7 +7,7 @@ starting, honor its STOP conditions, and update your status row when done
 line — detailed execution history lives in each plan file and in git history.
 
 Layout: **maintainer policies** → **current status** → **outstanding work**
-(the full 033–052 plan roster, execution order, runbook, maintainer
+(the 033–060 plan roster, execution order, runbook, maintainer
 decisions) → **operational notes** → **done archive** → **considered and
 rejected / deferred**.
 
@@ -28,8 +28,13 @@ wave are in "Deferred by decision" at the bottom.
   exception: URL wire-format READ compatibility (old `c:` payloads still
   parse) is kept — bookmarked URLs aren't API consumers. If any plan text
   still contains softer compat language, this policy wins.
-- **PRISMA HOLD (2026-07-13)**: no Prisma implementation until everything
-  else is done; Drizzle abstraction/provider-readiness proceeds.
+- **PRISMA DIRECTION (2026-07-20, replaces the 2026-07-13 PRISMA HOLD)**:
+  the Prisma plan is now the COMPLETE Drizzle-parity adapter —
+  plan [061](061-prisma-adapter-full-parity.md) (supersedes the 008 spike).
+  Kysely follows on the same conformance suite
+  ([062](062-kysely-adapter.md)). Execution scheduling stays with the
+  maintainer via this ledger; the old "nothing until everything else is
+  done" gate no longer applies.
 
 ---
 
@@ -54,6 +59,16 @@ wave are in "Deferred by decision" at the bottom.
   decisions collected and folded in. It heads Wave C.
 - **0.6 remains SHIPPABLE**; Wave A landed the pre-publish obligations
   (033 infra truth, 035 HTTP wire hardening, 040 facet top-100, 047 writes).
+- **2026-07-20 (at `27c59b9`, branch `docs-overhaul-and-cli-init-fix`,
+  [PR #88](https://github.com/Better-Tables/better-tables/pull/88))**: docs
+  handbook overhaul shipped; legacy column-factory entry points REMOVED
+  (release-policy removal — `defineColumns` kept as the standalone-columns
+  utility); **`memoryAdapter` landed in core** (closes the deferred DIR-05
+  in spirit — core-hosted rather than toolkit-native); homepage demo ported
+  to flagship `defineTable` path builders. **Wave D planned (056–060)**:
+  maintainer-requested plans for the typecheck race, dead reserved contract
+  surface, global search, UI modules (actions extracted, opt-in), and
+  filterable/sortable derived aggregate columns.
 
 ---
 
@@ -101,8 +116,33 @@ the breaking window.
 | [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop, opt-in double-sided cell-oriented HTTP write proxy, **joined-table editing** (`resolveCellWriteTarget`; related-row writes proven in browser + integration test), dogfood on the direct path (custom route deleted) | 053, 054 | DONE — executor-run, advisor-reviewed (APPROVED), merged into `editable-cells` at `ec60f80` |
 | [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
 | [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
-| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049 | TODO (reconciled 2026-07-18 — export seams moved by 044; line refs refreshed) |
-| 008 | Prisma adapter spike (read path) | 007 (done) + lift of the PRISMA HOLD | **ON HOLD** (maintainer) |
+| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049, **059** | TODO (reconciled 2026-07-18; **2026-07-20: refresh against `plans/design/ui-modules.md` before executing — `ExportButton` rides 059's `toolbarExtra` slot and ships as an `export` module; `TableConfig.exportOptions` is removed by 057, reintroduce only what the module needs as module-local props**) |
+| 008 | Prisma adapter spike (read path) | — | **SUPERSEDED** by [061](061-prisma-adapter-full-parity.md) (2026-07-20 maintainer directive: full parity, not a spike; 008's research is inlined there) |
+
+### Wave D — maintainer-requested (planned 2026-07-20 at `27c59b9`)
+
+Written on maintainer request ("plans for each unimplemented contract, the
+typecheck race, filterable computed/aggregate columns, and the plugin
+rethink — action builder should be a plugin, not default-included").
+
+| Plan | What | Depends on | Status |
+|------|------|------------|--------|
+| [056](056-toolkit-typecheck-ordering.md) | Deterministic root typecheck: `typecheck` gains `dependsOn: ["build", "^build"]` (same-package build/typecheck race — tsdown cleans `dist/` mid-`tsc`) | none | TODO |
+| [057](057-contract-surface-truth.md) | Remove dead reserved surface: `TableConfig.defaultFilters/actionsConfig/exportOptions/theme/loadingState` + `TableFeatures.bulkActions/export/columnResizing/virtualScrolling/realTimeUpdates/rowExpansion` (0.6 removal policy; adapter contract untouched — `exportData`/`subscribe` are real) | none (coordinates with 050/058/059) | TODO |
+| [058](058-global-search.md) | Global search as filter sugar: `buildSearchFilterGroup` OR-group over `.searchable()` columns, table-scoped `search` param (adapter-level field removed), `SearchInput` + URL sync — zero adapter changes | none | TODO |
+| [059](059-ui-modules-and-actions-extraction.md) | **UI modules tier** (`better-tables add <module>`, module-shaped CLI manifest, `slots` seam in `table.tsx`) + actions toolbar extracted as the first opt-in module (maintainer decision: not default-included) | none; validates slot vs 050's ExportButton | TODO |
+| [060](060-derived-aggregate-columns.md) | Server-derived aggregate columns: `t.count('posts')` renders/filters/sorts via correlated subqueries lowered into the drizzle computed-fields engine (tree-walk substitution closes 051 item 5 for specs); memoryAdapter nested-array aggregates; honest `filterable/sortable: false` defaults for `t.computed` | none (rebase order with 058 in `factory.ts`) | TODO |
+
+### Wave E — adapter expansion (planned 2026-07-20 at `27c59b9`)
+
+Maintainer directive: Prisma at full Drizzle parity (not the 008 spike),
+then Kysely. Both ride a shared adapter conformance suite so "parity" is
+executable, not aspirational.
+
+| Plan | What | Depends on | Status |
+|------|------|------------|--------|
+| [061](061-prisma-adapter-full-parity.md) | **Prisma adapter, full parity** (supersedes 008): Phase 1 extracts an adapter conformance suite (memory+drizzle prove it), then emitter → reads/trees → filter-aware facets → DMMF `describeColumns` + typed factory → writes/`resolveCellWriteTarget`/events/export (lifts `export-format` to toolkit) → aggregates (sort-only; Prisma can't WHERE-by-count — capability-declared) → docs/CI/publish | none hard; Phase 7 gated on 060 | TODO |
+| [062](062-kysely-adapter.md) | **Kysely adapter**: SQL-native composition (emitter + JOINs + `DataTransformer` + alias utils — the toolkit's other stress direction), runtime `db.introspection` for `describeColumns`, explicit `relationships` config for dot-paths, full writes/events/export, FULL aggregate parity (render+filter+sort) | 061 Phases 1+6; aggregates gated on 060 | TODO |
 
 ### Reconcile audit (2026-07-18, at `7b58ed8`)
 
@@ -148,6 +188,26 @@ Notes for the record (all acceptable, none require action):
   future `beforeSave`/`afterSave` hooks without rework.
 - Within Wave A, 034/035/036/040/046/047 touch largely disjoint files and can
   run in parallel worktrees; 033 first is safest (test-cache correctness).
+- **Wave D ordering**: 056 any time (one-line turbo change — do it first for
+  a stable gate). 057 before or parallel with 058/059 (disjoint fields;
+  057 deliberately does NOT touch `FetchDataParams.search` — 058 owns it —
+  and does not touch `actions`/`TableAction` — 059 owns packaging). 058 and
+  060 both extend the instance fetch path in `packages/core/src/factory.ts`
+  — land in either order, rebase the second. **050 executes only after 059**
+  (slot seam + module packaging) and after refreshing its plan text against
+  `plans/design/ui-modules.md`. 049 remains independent (core-tier hooks);
+  its vocabulary rule — core tier = "plugins", copied-UI tier = "modules" —
+  is defined in 059.
+- **Wave E ordering**: 061 is phased and mergeable per phase; its Phase 1
+  (conformance suite over memory+drizzle) is valuable standalone and is a
+  prerequisite for 062 (along with Phase 6's export-format lift). 057/058
+  first SHRINK the contract 061 must implement — schedule them ahead when
+  possible. 060 gates 061 Phase 7 / 062 Step 6 (aggregates); both plans
+  skip that phase cleanly if 060 hasn't landed. Note the capability
+  asymmetry 061 surfaces: Prisma can sort-by-relation-count but not
+  filter-by-count, while Kysely (and Drizzle) do all three — 060's design
+  step weighs per-operation capability granularity for exactly this
+  reason.
 
 ### Maintainer decisions folded into the wave (collected 2026-07-17)
 
@@ -332,11 +392,41 @@ hygiene · bun isolated-linker flaky typecheck (bunfig hoisted pin).
 
 ## Deferred by decision (maintainer chose not to plan this wave — revisit on request)
 
-- **DIR-05 in-memory adapter** (toolkit-native second adapter): grounded and
-  valuable (backs UI tests/demos, de-risks Prisma), but not selected for this
-  wave. Plan 043 uses `bun:sqlite` + Drizzle for its integration test instead;
-  if that proves the toolkit ports are ORM-neutral, the in-memory adapter is
-  the natural next spike.
+- **DIR-05 in-memory adapter** — **LANDED 2026-07-20** (not as originally
+  scoped): `memoryAdapter(rows)` ships from `@better-tables/core`
+  (`packages/core/src/adapters/memory-adapter.ts`) rather than as a
+  toolkit-native adapter — full filter/sort/pagination/facets/describeColumns
+  over arrays. The toolkit-port-validation goal transfers to the (still held)
+  Prisma spike. Plan 060 extends it with nested-array aggregates.
+- **Column resizing** (`features.columnResizing`): flag removed by 057 (was
+  contract-only, no implementation). Reintroduce flag + feature together via
+  a future plan when prioritized.
+- **Row expansion** (`features.rowExpansion`): same disposition as resizing —
+  removed by 057; feature plan on request.
+- **Realtime UI** (`features.realTimeUpdates`): the UI flag is removed by 057,
+  but the ADAPTER half is real — drizzle implements `subscribe` and emits
+  insert/update/delete on mutations (`drizzle-adapter.ts:1337`, emits at
+  `:1161/:1196/:1227/:1259/:1290`). A future realtime capability ships as a
+  059-style module (+ possibly a 049 plugin) riding `subscribe`.
+- **Facets on derived columns** (count range slider via `getMinMaxValues`):
+  explicitly deferred out of plan 060 — natural fast-follow once 060 lands.
+- **Other ORM/data-client adapters** (2026-07-20 survey, on the "any other
+  ORM?" question — revisit on demand; each would ride 061's conformance
+  suite):
+  - **TypeORM / Sequelize**: DECLINED for now — large but legacy/declining
+    installed bases, decorator/legacy APIs make introspection awkward, and
+    their users are Prisma/Drizzle migration candidates anyway.
+  - **MikroORM**: DECLINED — capable but small audience relative to build
+    cost; its users can follow the Kysely template if demand appears.
+  - **Supabase** (`supabase-js`/PostgREST): the strongest NEXT candidate —
+    huge app-dev audience, filter language maps well
+    (`ilike`/`in`/`gte`), auth/RLS story composes with the HTTP adapter's
+    allow-list model. Needs its own design pass (no JOIN aliasing;
+    embedded-resource selects instead) — plan on request after 062.
+  - **MongoDB (mongoose)**: DEFERRED — document model changes relation
+    semantics (embedded arrays vs FK paths); memoryAdapter's nested-array
+    aggregate semantics (060) are the closest precedent. Post-1.0
+    question.
 - **DIR-03 saved/named views** (`savedFilters()` plugin over the existing
   FilterState serialization): deferred until the plugin seam (049) and a
   second real plugin exist to validate the storage-port shape. The design is
