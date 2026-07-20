@@ -5,9 +5,9 @@ import type {
   SortingState,
 } from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
-import { getTables } from '@/lib/adapter';
-import { type UserRow, usersTable } from '@/lib/columns/user-columns';
 import { type CapturedQuery, withSqlCapture } from '@/lib/db/sql-capture';
+import { getTables } from '@/lib/demo/users/adapter';
+import { type UserRow, usersTable } from '@/lib/demo/users/columns';
 
 export interface FetchUsersParams {
   page?: number;
@@ -31,6 +31,10 @@ function flattenFilters(filters?: FilterState[] | FilterGroupNode): FilterState[
   return filters;
 }
 
+/**
+ * Homepage users read path — RSC calls this (not `/api/users`).
+ * Runs `tables.fetchData(usersTable)` against the active dialect (Postgres or SQLite).
+ */
 export async function fetchUsers({
   page = 1,
   limit = 10,

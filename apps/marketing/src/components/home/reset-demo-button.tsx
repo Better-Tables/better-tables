@@ -5,10 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-/** Re-seeds the shared in-memory demo database. */
-export function ResetDemoButton() {
+interface ResetDemoButtonProps {
+  /** Hidden when the homepage is on Postgres (cannot reseed Neon from the site). */
+  supportsReset?: boolean;
+}
+
+/** Re-seeds the shared in-memory SQLite demo database. */
+export function ResetDemoButton({ supportsReset = true }: ResetDemoButtonProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+
+  if (!supportsReset) {
+    return null;
+  }
 
   const reset = async () => {
     setBusy(true);

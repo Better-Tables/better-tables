@@ -1,10 +1,8 @@
 import { defineTable } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
-// Type-only import: `UsersTables` carries the Drizzle schema types, so every
-// path below (own columns AND relation paths like `profile.bio`) is
-// autocompleted and type-checked — a typo is a compile error. No runtime
-// adapter is touched here; the curried `defineTable` form is RSC-safe.
-import type { UsersTables } from '../adapter';
+// Type-only import: `UsersTables` carries the Postgres Drizzle schema types
+// (flagship path). SQLite fallback mirrors the same column/relation names.
+import type { UsersTables } from './adapter';
 
 const roleColors: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-800',

@@ -3,7 +3,8 @@ import { ResetDemoButton } from '@/components/home/reset-demo-button';
 import { SqlReadout } from '@/components/home/sql-readout';
 import { UsersTableClient } from '@/components/home/users-table-client';
 import { SectionRow } from '@/components/site/section-row';
-import { fetchUsers } from '@/lib/demo/fetch-users';
+import { getUsersBackendMeta } from '@/lib/demo/users/adapter';
+import { fetchUsers } from '@/lib/demo/users/fetch-users';
 
 interface LiveDemoProps {
   searchParams: Promise<{
@@ -14,6 +15,10 @@ interface LiveDemoProps {
   }>;
 }
 
+/**
+ * Homepage flagship demo: server-fetch via `tables.fetchData` (not `/api/users`).
+ * URL state drives this RSC; the client table receives rows as props.
+ */
 export async function LiveDemo({ searchParams }: LiveDemoProps) {
   const params = await searchParams;
   const tableParams = parseTableSearchParams(params, {
@@ -24,12 +29,15 @@ export async function LiveDemo({ searchParams }: LiveDemoProps) {
   const { page, limit, filters: filterNode, sorting } = tableParams;
   const initialFilters = isFilterGroupNode(filterNode) ? flattenFilterNode(filterNode) : filterNode;
 
-  const { result, queries, error } = await fetchUsers({
-    page,
-    limit,
-    filters: filterNode,
-    sorting,
-  });
+  const [meta, { result, queries, error }] = await Promise.all([
+    getUsersBackendMeta(),
+    fetchUsers({
+      page,
+      limit,
+      filters: filterNode,
+      sorting,
+    }),
+  ]);
 
   if (error) {
     // biome-ignore lint/suspicious/noConsole: server-side demo log
@@ -41,15 +49,16 @@ export async function LiveDemo({ searchParams }: LiveDemoProps) {
       index="01"
       label="live demo"
       id="demo"
-      title="5,000 rows. Zero mocks."
+      title={meta.title}
       description={
         <>
-          A seeded SQLite database runs inside this page&apos;s server. Filter by joined profile
-          fields, stack sorts, select rows — and watch the readout below show the exact SQL the
-          adapter generates for every interaction.
+          {meta.description}{' '}
+          <span className="font-mono text-[12px] tracking-wide text-muted-foreground">
+            ({meta.dialectLabel})
+          </span>
         </>
       }
-      aside={<ResetDemoButton />}
+      aside={<ResetDemoButton supportsReset={meta.supportsReset} />}
     >
       {error ? (
         <div

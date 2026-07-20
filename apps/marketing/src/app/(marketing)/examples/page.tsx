@@ -7,7 +7,7 @@ import { constructMetadata } from '@/lib/utils';
 export const metadata = constructMetadata({
   title: 'Examples',
   description:
-    'Five live Better Tables examples: cross-table filtering, query groups, 12,000 virtualized rows, facets, and a live SQL readout — all querying a real SQLite database.',
+    'Five live Better Tables examples across backends: homepage users on Postgres (Neon) or SQLite fallback, plus ticket demos on in-memory SQLite — facets, query groups, virtualization, and a live SQL readout.',
 });
 
 export default function ExamplesIndexPage() {
@@ -22,9 +22,10 @@ export default function ExamplesIndexPage() {
           Every example is running.
         </h1>
         <p className="mt-4 text-[15.5px] leading-relaxed text-muted-foreground">
-          These pages query a real SQLite database seeded inside this site&apos;s server — the same
-          code paths you&apos;d ship, not recordings. Filter something, watch the URL carry your
-          state, then read the source.
+          Each example picks its own backend — the homepage users directory prefers Neon Postgres
+          when <code className="font-mono text-[13px]">DATABASE_URL</code> is set, and the ticket
+          demos use an in-memory SQLite seed. Same adapter contract, different dialects. Filter
+          something, watch the URL carry your state, then read the source.
         </p>
       </div>
 
@@ -70,7 +71,16 @@ export default function ExamplesIndexPage() {
       </div>
 
       <p className="mt-6 flex flex-wrap items-center gap-1.5 font-mono text-[11.5px] tracking-wide text-muted-foreground">
-        The shared data layer lives in{' '}
+        Users backend:{' '}
+        <a
+          href={`${siteConfig.sourceBase.replace('/blob/', '/tree/')}/src/lib/demo/users`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-ledger transition-colors hover:text-ledger-strong"
+        >
+          src/lib/demo/users <ArrowUpRightIcon className="size-3" />
+        </a>
+        · Tickets:{' '}
         <a
           href={`${siteConfig.sourceBase.replace('/blob/', '/tree/')}/src/lib/demo/support`}
           target="_blank"
@@ -79,7 +89,6 @@ export default function ExamplesIndexPage() {
         >
           src/lib/demo/support <ArrowUpRightIcon className="size-3" />
         </a>
-        — schema, seed, columns, and server actions.
       </p>
     </div>
   );

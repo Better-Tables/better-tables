@@ -19,27 +19,23 @@ const withSqlCaptureMock = mock(async <T>(fn: () => Promise<T>) => {
 
 const getTablesMock = mock(async () => ({ fetchData: fetchDataMock }));
 
-mock.module('@/lib/adapter', () => ({
+mock.module('@/lib/demo/users/adapter', () => ({
   getTables: getTablesMock,
-  getAdapter: mock(async () => ({})),
-  // Preserved for sibling suites that import the real adapter surface.
   resetAdapterCaches: () => {},
+  getUsersDialect: mock(async () => 'sqlite'),
+  getUsersBackendMeta: mock(async () => ({ supportsReset: true })),
+  resetUsersDatabase: mock(async () => {}),
+  resetUsersBackendForTests: mock(async () => {}),
 }));
 
 mock.module('@/lib/db/sql-capture', () => ({
   withSqlCapture: withSqlCaptureMock,
-  // Keep the real export name so sibling tests that import db/index still link.
   sqlCaptureLogger: { logQuery() {} },
 }));
 
-// `mock.module` is process-wide, not file-scoped: a bare `{ usersTable }`
-// stub would replace this module's ENTIRE surface for every suite that runs
-// afterwards (user-columns.test.ts then sees no `userColumns` export). Spread
-// the real module and override only the table definition this suite stubs —
-// same reasoning as the two mocks above.
-const actualUserColumns = await import('@/lib/columns/user-columns');
+const actualUserColumns = await import('@/lib/demo/users/columns');
 
-mock.module('@/lib/columns/user-columns', () => ({
+mock.module('@/lib/demo/users/columns', () => ({
   ...actualUserColumns,
   usersTable: { id: 'users' },
 }));

@@ -13,7 +13,7 @@ here.
 | `@better-tables/cli` | `packages/cli` | npm (public) | `better-tables init` — copies `ui`'s components into a consumer project. |
 | `@better-tables/adapters-drizzle` | `packages/adapters/drizzle` | npm (public) | Drizzle ORM adapter: schema introspection, JOIN/filter/pagination query generation for Postgres/MySQL/SQLite. |
 | `@better-tables/adapters-toolkit` | `packages/adapters/toolkit` | npm (public) | ORM-agnostic adapter toolkit: shared primitives (data transform, primary-table resolution, schema/SQL utils) for building adapters. |
-| `@better-tables/site` | `apps/marketing` | private | Public site: marketing, examples, and docs (in-memory SQLite demo + seed). |
+| `@better-tables/site` | `apps/marketing` | private | Public site: marketing, examples, and docs (homepage users: Postgres when `DATABASE_URL` is set, else SQLite; ticket examples: in-memory SQLite). |
 
 ## Data flow (one-liner)
 
@@ -46,9 +46,10 @@ response, with URL state sync.
 
 ## Env vars
 
-Nothing is required by default. See root `.env.example` (pointer only) and
-`packages/adapters/drizzle/.env.example` (the only real env vars in the repo,
-for optional MySQL/Postgres integration tests).
+Nothing is required by default. Optional: `apps/marketing/.env` may set
+`DATABASE_URL` so the homepage users demo hits Neon Postgres (falls back to
+in-memory SQLite when unset). See root `.env.example` and
+`packages/adapters/drizzle/.env.example` (MySQL/Postgres integration tests).
 
 ## Published vs. private
 

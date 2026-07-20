@@ -1,8 +1,8 @@
 'use server';
 
 import type { CellEditActionInput, CellEditActionResult } from '@better-tables/core';
-import { getTables } from '@/lib/adapter';
-import { usersTable } from '@/lib/columns/user-columns';
+import { getTables } from '@/lib/demo/users/adapter';
+import { usersTable } from '@/lib/demo/users/columns';
 
 /**
  * Save path for the homepage demo's editable cells — the same one-liner the

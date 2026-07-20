@@ -13,7 +13,7 @@ const nextConfig = {
   images: {
     remotePatterns: [{ hostname: 'localhost' }],
   },
-  serverExternalPackages: ['oxc-transform', 'typescript', 'twoslash'],
+  serverExternalPackages: ['oxc-transform', 'typescript', 'twoslash', 'postgres', 'better-sqlite3'],
   // Turbopack (Next 16 default) auto-transpiles workspace packages from source,
   // which breaks each package's internal `@/*` path aliases. Resolve to dist instead.
   turbopack: {

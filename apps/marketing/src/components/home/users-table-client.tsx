@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { userActions } from '@/lib/actions/user-actions';
 import { saveUserCell } from '@/lib/actions/user-cell-actions';
-import { defaultVisibleColumns, type UserRow, userColumns } from '@/lib/columns/user-columns';
+import { defaultVisibleColumns, type UserRow, userColumns } from '@/lib/demo/users/columns';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'users-table';
