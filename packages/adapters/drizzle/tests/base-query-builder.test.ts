@@ -940,4 +940,113 @@ describe('BaseQueryBuilder', () => {
       }
     });
   });
+
+  describe('planJoinsForOpaqueSqlConditions (tests join planning for computed-field SQL)', () => {
+    // The method is protected; unit tests reach it via a structural cast. The
+    // same behavior is exercised end to end through fetchData in
+    // computed-field-cross-table-sql.test.ts — these tests pin the context
+    // mutation itself: which joinPaths entries appear, keyed by which alias.
+    type PlannerAccess = {
+      planJoinsForOpaqueSqlConditions: (
+        context: ReturnType<RelationshipManager['buildQueryContext']>,
+        primaryTable: string,
+        additionalConditions?: unknown[],
+        computedFields?: Record<string, unknown>
+      ) => void;
+    };
+
+    function freshContext() {
+      return relationshipManager.buildQueryContext({ columns: ['name'] }, 'users');
+    }
+
+    function plan(
+      context: ReturnType<RelationshipManager['buildQueryContext']>,
+      additionalConditions?: unknown[],
+      computedFields?: Record<string, unknown>
+    ) {
+      (queryBuilder as unknown as PlannerAccess).planJoinsForOpaqueSqlConditions(
+        context,
+        'users',
+        additionalConditions,
+        computedFields
+      );
+    }
+
+    it('adds a joinPaths entry, keyed by the relation ALIAS, for a bare column reference', () => {
+      const context = freshContext();
+      expect(context.joinPaths.size).toBe(0);
+
+      plan(context, [sql`${schema.profiles.bio} is not null`]);
+
+      // Keyed by the alias ('profile'), not the table name, so downstream
+      // consumers (optimizeJoinOrder, auto-embed) stay on the regular path.
+      expect(context.joinPaths.has('profile')).toBe(true);
+      expect(context.joinPaths.get('profile')?.[0]?.to).toBe('profiles');
+      expect(context.requiredTables.has('profile')).toBe(true);
+    });
+
+    it('does not add a join for a table the fragment interpolates as a Table chunk', () => {
+      const context = freshContext();
+
+      plan(context, [
+        sql`exists (select 1 from ${schema.profiles} where ${schema.profiles.userId} = ${schema.users.id})`,
+      ]);
+
+      expect(context.joinPaths.size).toBe(0);
+    });
+
+    it('tracks FROM-scope exemption PER FRAGMENT, not across the batch', () => {
+      const context = freshContext();
+
+      // Fragment A scopes profiles itself; fragment B references it bare.
+      // B still needs the outer JOIN — A's Table chunk must not exempt it.
+      plan(context, [
+        sql`exists (select 1 from ${schema.profiles} where ${schema.profiles.userId} = ${schema.users.id})`,
+        sql`${schema.profiles.bio} is not null`,
+      ]);
+
+      expect(context.joinPaths.has('profile')).toBe(true);
+    });
+
+    it('does not double-plan a relation the context already joins', () => {
+      const context = relationshipManager.buildQueryContext(
+        { columns: ['name', 'profile.bio'] },
+        'users'
+      );
+      const before = context.joinPaths.size;
+      expect(context.joinPaths.has('profile')).toBe(true);
+
+      plan(context, [sql`${schema.profiles.bio} is not null`]);
+
+      expect(context.joinPaths.size).toBe(before);
+    });
+
+    it('plans joins for computed-field sortSql expressions too', () => {
+      const context = freshContext();
+
+      plan(context, undefined, {
+        profileBio: { __resolvedSortSql: sql`coalesce(${schema.profiles.bio}, '')` },
+      });
+
+      expect(context.joinPaths.has('profile')).toBe(true);
+    });
+
+    it('throws a descriptive QueryError for a table with no direct relationship', () => {
+      const context = freshContext();
+
+      // `surveys` is in the schema but unrelated to `users`.
+      expect(() => plan(context, [sql`${schema.surveys.status} = 'published'`])).toThrow(
+        /no direct relationship/
+      );
+    });
+
+    it('is a no-op with no fragments or no column references', () => {
+      const context = freshContext();
+
+      plan(context, []);
+      plan(context, [sql`1 = 1`]);
+
+      expect(context.joinPaths.size).toBe(0);
+    });
+  });
 });
