@@ -167,6 +167,21 @@ export interface SQLiteQueryBuilderWithJoins extends QueryBuilderWithJoins {
   groupBy(...columns: (AnyColumnType | SQL | SQLWrapper)[]): SQLiteQueryBuilderWithJoins;
 }
 
+/**
+ * Computed/virtual field configurations keyed by table.
+ *
+ * Shared between {@link DrizzleAdapterConfig} (the `new DrizzleAdapter(...)`
+ * constructor) and {@link DrizzleAdapterFactoryOptions} (the `drizzleAdapter()`
+ * factory) so both entry points accept the identical shape.
+ */
+export type ComputedFieldsConfig<TSchema> = {
+  [K in keyof FilterTablesFromSchema<TSchema>]?: K extends string
+    ? FilterTablesFromSchema<TSchema>[K] extends AnyTableType
+      ? ComputedFieldConfig<InferSelectModel<FilterTablesFromSchema<TSchema>[K]>>[]
+      : never
+    : never;
+};
+
 export interface DrizzleAdapterConfig<
   TSchema extends Record<string, unknown>,
   TDriver extends DatabaseDriver,
@@ -190,13 +205,7 @@ export interface DrizzleAdapterConfig<
   relationships?: RelationshipMap;
 
   /** Computed/virtual fields that don't exist in the database schema */
-  computedFields?: {
-    [K in keyof FilterTablesFromSchema<TSchema>]?: K extends string
-      ? FilterTablesFromSchema<TSchema>[K] extends AnyTableType
-        ? ComputedFieldConfig<InferSelectModel<FilterTablesFromSchema<TSchema>[K]>>[]
-        : never
-      : never;
-  };
+  computedFields?: ComputedFieldsConfig<TSchema>;
 
   /** Adapter options */
   options?: DrizzleAdapterOptions;
@@ -331,8 +340,21 @@ export interface DrizzleAdapterFactoryOptions<
   /** Whether to auto-detect relationships (default: true) */
   autoDetectRelationships?: boolean;
 
+  /**
+   * Computed/virtual fields that don't exist in the database schema.
+   * Same shape as {@link DrizzleAdapterConfig.computedFields} — the factory
+   * used to silently drop this, forcing consumers onto the class constructor.
+   */
+  computedFields?: ComputedFieldsConfig<TSchema>;
+
   /** Adapter options */
   options?: DrizzleAdapterOptions;
+
+  /**
+   * Filter handler hooks for customizing filter behavior.
+   * Same as {@link DrizzleAdapterConfig.hooks} — previously factory-dropped.
+   */
+  hooks?: FilterHandlerHooks;
 
   /** Adapter metadata */
   meta?: Partial<AdapterMeta>;

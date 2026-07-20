@@ -31,6 +31,7 @@ import {
   countDistinct,
   desc,
   eq,
+  getTableName,
   inArray,
   isNotNull,
   max,
@@ -62,6 +63,7 @@ import {
   getForeignKeyColumns,
   getPrimaryKeyColumns,
 } from '../utils/drizzle-schema-utils';
+import { collectSqlTableRefs } from '../utils/sql-table-refs';
 
 /**
  * Minimal structural view of a Drizzle database's `select().from()` entry
@@ -1217,6 +1219,119 @@ export abstract class BaseQueryBuilder {
   }
 
   /**
+   * Plan JOINs for tables referenced inside opaque SQL predicates.
+   *
+   * Computed-field `filterSql` conditions (delivered via
+   * `additionalConditions`) and pre-resolved `sortSql` expressions never pass
+   * through `buildQueryContext` — they are raw `SQL` fragments. Their text is
+   * opaque, but the `Column`/`Table` entities interpolated into them survive
+   * as typed query chunks, so the tables they touch are recoverable. Without
+   * this, a predicate referencing a related table is emitted against a FROM
+   * clause that never joined it, and the query fails at the database.
+   *
+   * Rules, in order:
+   * - A table interpolated as a whole `Table` chunk supplies its own FROM
+   *   scope (a correlated subquery) — never force-join it; a LEFT JOIN on a
+   *   one-to-many relation would multiply rows the subquery never asked for.
+   * - A table referenced only through `Column` chunks binds to the outer
+   *   query, so it must be joined. The joinPaths entry is keyed by the
+   *   relation ALIAS (found by scanning the relationship map for a direct
+   *   relationship targeting that table), which keeps every downstream
+   *   consumer — `optimizeJoinOrder`, `computeAutoEmbedColumns`, the
+   *   transform — on the exact code path a regular cross-table filter uses.
+   * - A referenced table that is already joined (any planned path targets
+   *   it) is skipped, so this never double-joins.
+   * - A referenced table with no direct relationship cannot be joined
+   *   predictably: fail fast with guidance instead of emitting broken SQL.
+   */
+  protected planJoinsForOpaqueSqlConditions(
+    context: QueryContext,
+    primaryTable: string,
+    additionalConditions?: (SQL | SQLWrapper)[],
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
+  ): void {
+    const fragments: unknown[] = [...(additionalConditions ?? [])];
+    if (computedFields) {
+      for (const field of Object.values(computedFields)) {
+        fragments.push(field.__resolvedSortSql);
+      }
+    }
+    if (fragments.length === 0) {
+      return;
+    }
+
+    const refs = collectSqlTableRefs(fragments);
+    if (refs.columnTableNames.size === 0) {
+      return;
+    }
+
+    // SQL table name -> schema key (they can differ, e.g. a table declared
+    // as pgTable('user_profiles', …) living under the schema key `profiles`).
+    const schemaKeyBySqlName = new Map<string, string>();
+    for (const [key, table] of Object.entries(this.schema)) {
+      schemaKeyBySqlName.set(getTableName(table), key);
+    }
+
+    const relationships = this.relationshipManager.getRelationships();
+
+    for (const sqlName of refs.columnTableNames) {
+      if (refs.fromTableNames.has(sqlName)) {
+        continue; // Correlated subquery brings its own FROM scope.
+      }
+
+      const schemaKey = schemaKeyBySqlName.get(sqlName);
+      if (schemaKey === primaryTable) {
+        continue;
+      }
+      if (!schemaKey) {
+        throw new QueryError(
+          `Computed-field SQL references table "${sqlName}", which is not part of this adapter's schema. ` +
+            'Add the table to the schema, or scope the reference inside a correlated subquery ' +
+            '(e.g. EXISTS (SELECT 1 FROM <table> WHERE …)) so it does not depend on the outer query.',
+          { referencedTable: sqlName, primaryTable }
+        );
+      }
+
+      const alreadyJoined = [...context.joinPaths.values()].some((path) =>
+        path.some((relationship) => relationship.to === schemaKey)
+      );
+      if (alreadyJoined) {
+        continue;
+      }
+
+      // Find the direct relationship's alias so the joinPaths key matches
+      // what a regular `alias.column` filter would have produced.
+      let alias: string | null = null;
+      let relationshipPath: RelationshipPath | null = null;
+      const prefix = `${primaryTable}.`;
+      for (const [key, relationship] of Object.entries(relationships)) {
+        if (
+          key.startsWith(prefix) &&
+          relationship.from === primaryTable &&
+          relationship.to === schemaKey
+        ) {
+          alias = key.slice(prefix.length);
+          relationshipPath = relationship;
+          break;
+        }
+      }
+
+      if (!alias || !relationshipPath) {
+        throw new QueryError(
+          `Computed-field SQL references table "${sqlName}", but no direct relationship from ` +
+            `"${primaryTable}" to it is defined, so the JOIN cannot be planned. ` +
+            'Define the relationship (Drizzle relations / manual relationships), or scope the reference ' +
+            'inside a correlated subquery (e.g. EXISTS (SELECT 1 FROM <table> WHERE …)).',
+          { referencedTable: sqlName, primaryTable }
+        );
+      }
+
+      context.requiredTables.add(alias);
+      context.joinPaths.set(alias, [relationshipPath]);
+    }
+  }
+
+  /**
    * Build complete query with all parameters
    */
   buildCompleteQuery(params: {
@@ -1265,6 +1380,18 @@ export abstract class BaseQueryBuilder {
         sorts: sortsForContext,
       },
       params.primaryTable
+    );
+
+    // Opaque computed-field SQL (filterSql via additionalConditions, resolved
+    // sortSql) is invisible to buildQueryContext — recover its table
+    // references from the SQL chunks and plan the same JOINs a regular
+    // cross-table filter would get, so the data, count, and fan-out queries
+    // all carry the table the predicate binds to.
+    this.planJoinsForOpaqueSqlConditions(
+      context,
+      params.primaryTable,
+      params.additionalConditions,
+      params.computedFields
     );
 
     // Auto-embed (finding 10): fold in synthetic columns for any relation

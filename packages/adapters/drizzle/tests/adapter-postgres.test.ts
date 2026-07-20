@@ -1239,6 +1239,56 @@ describe.skipIf(!process.env.POSTGRES_TEST_URL)(
     // Consider adding a validation mode: strict for API calls, lenient for URL state.
     //
     // Related: packages/adapters/drizzle/src/filter-handler.ts:672-710 (commit 3f04f60)
+    describe('Computed-field filterSql with the relational query API available', () => {
+      it('filters on a related table end to end (the reported homepage failure)', async () => {
+        // The suite's shared db is created WITHOUT `{ schema }`, so `db.query`
+        // does not exist and Drizzle's relational path never runs. The
+        // reported production failure required it present: the relational
+        // path rewrote `profiles.bio` onto `users`. Reproduce that config —
+        // a relational db on the same connection — and verify the adapter
+        // declines the relational path AND plans the profiles JOIN for the
+        // opaque predicate.
+        const relationalDb = drizzlePostgres(client, {
+          schema: {
+            ...testSchema,
+            usersRelations: testRelations.users,
+            profilesRelations: testRelations.profiles,
+            postsRelations: testRelations.posts,
+            commentsRelations: testRelations.comments,
+          },
+        });
+
+        const relationalAdapter = new DrizzleAdapter<typeof testSchema, 'postgres'>({
+          db: relationalDb as unknown as DrizzleDatabase<'postgres'>,
+          schema: testSchema,
+          driver: 'postgres',
+          autoDetectRelationships: true,
+          relations: testRelations,
+          options: { defaultPrimaryTable: 'users' },
+          computedFields: {
+            users: [
+              {
+                field: 'hasBio',
+                compute: () => null,
+                filterSql: () => sql`${testSchema.profiles.bio} is not null`,
+              },
+            ],
+          },
+        });
+
+        const result = await relationalAdapter.fetchData({
+          columns: ['id', 'name'],
+          filters: [
+            { columnId: 'hasBio', type: 'text', operator: 'contains', values: ['x'] },
+          ] as unknown as FilterState[],
+        });
+
+        // Users 1 and 2 have profiles with a bio; user 3 has none.
+        expect(result.total).toBe(2);
+        expect(result.data).toHaveLength(2);
+      });
+    });
+
     describe.skip('Error Handling (mirror of the reconciled SQLite suite — unskip after verifying against a live DB; see plan 033)', () => {
       it('should handle invalid column references', async () => {
         await expect(

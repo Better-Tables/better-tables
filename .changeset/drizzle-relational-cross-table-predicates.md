@@ -2,30 +2,34 @@
 '@better-tables/adapters-drizzle': patch
 ---
 
-Route computed-field `filterSql` off the Postgres relational query path
+Make computed-field `filterSql`/`sortSql` work across related tables
 
-Drizzle's relational query API (`db.query.<table>.findMany({ where })`) scopes
-predicates to the primary table, so a condition built on a related table's
-column is emitted against the wrong table — `profiles.github` becomes
-`"users"."github"` and the query fails at runtime. Filters and sorts naming a
-related column already fell back to manual joins; computed-field `filterSql`
-conditions did not.
+Two layers were broken for a computed-field SQL fragment referencing a related
+table (e.g. `` sql`${profiles.github} is not null` `` on a `users` table):
 
-Those conditions reach the query builder as raw SQL in `additionalConditions`,
-never passing through `buildQueryContext`, so the existing guard could not see
-them — and the SQL is opaque, so there is no way to tell whether it references a
-joined table. Any `additionalConditions` now declines the relational path. This
-only affected PostgreSQL: MySQL and SQLite always use manual joins.
+1. **Postgres relational path.** Drizzle's `db.query.<table>.findMany({ where })`
+   scopes predicates to the primary table, so the condition was emitted against
+   the wrong table (`"users"."github"`). Opaque conditions now always decline
+   the relational path. Postgres-only; MySQL/SQLite always use manual joins.
+2. **Join planning.** On the manual-join path the fragment's text is opaque, so
+   no JOIN was planned for the tables it touches and the query failed with the
+   referenced table missing from FROM. The adapter now walks the fragment's
+   query chunks — the interpolated `Column`/`Table` entities survive — and
+   plans the same JOIN a regular cross-table filter gets, in the data, count,
+   and fan-out pagination queries alike.
 
-Scope: this makes the manual-join path the one that runs, which is a
-prerequisite for a `filterSql` predicate to be emitted against the correct
-table. It does **not** make an arbitrary related-table reference work — opaque
-SQL contributes nothing to JOIN planning, so a bare `sql\`${profiles.github} is
-not null\`` still fails when nothing else pulls `profiles` into the query (it
-failed before this change too, just with a different error). `filterSql` must be
-self-contained: reference the primary table, or use a correlated subquery. The
-`filterSql` JSDoc now documents this with a working `EXISTS` example.
+Rules: a table interpolated as a whole `Table` chunk (a correlated subquery
+like `` sql`exists (select 1 from ${profiles} where …)` ``) supplies its own
+FROM scope and is never force-joined; an already-joined relation is reused, not
+double-joined; a column reference to a table with no direct relationship throws
+a descriptive error instead of emitting broken SQL.
 
-Also moves the guard below the `db.query` capability check, so a database built
-without relations keeps its previous silent fallback instead of surfacing a
-`RelationshipError` from an unvalidated context.
+Also fixed on the sorting side: sorting by a `sortSql`-backed computed field
+that was not simultaneously requested as a column threw a `RelationshipError`
+from join-count metadata, and sorting by a computed field with no `sortSql`
+threw instead of degrading — it is now dropped with a `[better-tables]` warning
+(there is nothing to ORDER BY in SQL), matching the dropped-filter convention.
+
+All of it is covered end to end through `fetchData` by an ungated SQLite suite
+(`computed-field-cross-table-sql.test.ts`) and a Postgres integration mirror of
+the originally reported failure, each verified to fail without its fix.

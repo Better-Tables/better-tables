@@ -166,11 +166,19 @@ export function drizzleAdapter<TDB>(
     ? { ...configWithRelations, relationships: factoryOptions.relationships }
     : configWithRelations;
 
+  // Passthrough parity with the DrizzleAdapter constructor: these used to be
+  // silently dropped, so `drizzleAdapter(db, { computedFields })` produced an
+  // adapter with no computed fields and no error.
+  const configWithComputedFields = factoryOptions?.computedFields
+    ? { ...configWithRelationships, computedFields: factoryOptions.computedFields }
+    : configWithRelationships;
+
+  const finalConfig = factoryOptions?.hooks
+    ? { ...configWithComputedFields, hooks: factoryOptions.hooks }
+    : configWithComputedFields;
+
   return new DrizzleAdapter<ExtractSchemaFromDB<TDB>, ExtractDriverFromDB<TDB>>(
-    configWithRelationships as DrizzleAdapterConfig<
-      ExtractSchemaFromDB<TDB>,
-      ExtractDriverFromDB<TDB>
-    >
+    finalConfig as DrizzleAdapterConfig<ExtractSchemaFromDB<TDB>, ExtractDriverFromDB<TDB>>
   );
 }
 
@@ -236,8 +244,17 @@ export function createDrizzleAdapter<
     ? { ...configWithRelations, relationships: factoryOptions.relationships }
     : configWithRelations;
 
+  // Passthrough parity with the DrizzleAdapter constructor (see drizzleAdapter).
+  const configWithComputedFields = factoryOptions.computedFields
+    ? { ...configWithRelationships, computedFields: factoryOptions.computedFields }
+    : configWithRelationships;
+
+  const finalConfig = factoryOptions.hooks
+    ? { ...configWithComputedFields, hooks: factoryOptions.hooks }
+    : configWithComputedFields;
+
   // Complex generic inference requires boundary assertion
   return new DrizzleAdapter<FilterTablesFromSchema<TSchema>, TDriver>(
-    configWithRelationships as DrizzleAdapterConfig<FilterTablesFromSchema<TSchema>, TDriver>
+    finalConfig as DrizzleAdapterConfig<FilterTablesFromSchema<TSchema>, TDriver>
   );
 }
