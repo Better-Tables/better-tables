@@ -11,15 +11,15 @@ description: Copy React table components into your app with better-tables init.
 
 1. Verifies shadcn is configured (exits with remediation steps if not)
 2. Installs the shadcn primitives the table needs (badge, button, dialog, …) via the shadcn CLI
-3. Checks that `@better-tables/core` and `@better-tables/adapters-drizzle` are installed, offering to add them
+3. Checks that `@better-tables/core`, `@better-tables/adapters-drizzle`, and the UI runtime deps (`zustand`, `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/modifiers`, `@dnd-kit/utilities`) are installed, offering to add them
 4. Copies the Better Tables source into your project
 
 ## Init
 
 ```bash
-bunx better-tables init
+bunx @better-tables/cli init
 # or
-npx better-tables init
+npx @better-tables/cli init
 ```
 
 | Flag | Effect |
@@ -51,10 +51,10 @@ import { BetterTable } from '@/components/better-tables-ui/table/table';
 ## Docs command
 
 ```bash
-bunx better-tables docs          # this site
-bunx better-tables docs core     # /docs/packages/core
-bunx better-tables docs drizzle  # /docs/adapters/drizzle
-bunx better-tables docs ui       # /docs/packages/ui
+bunx @better-tables/cli docs          # this site
+bunx @better-tables/cli docs core     # /docs/packages/core
+bunx @better-tables/cli docs drizzle  # /docs/adapters/drizzle
+bunx @better-tables/cli docs ui       # /docs/packages/ui
 ```
 
 ## URL sync hook

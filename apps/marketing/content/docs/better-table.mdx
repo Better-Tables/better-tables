@@ -9,7 +9,7 @@ description: Complete reference for every prop on the copied <BetterTable /> com
 import { BetterTable } from '@/components/better-tables-ui/table/table';
 ```
 
-One of `id` / `table` and the `data` array are the only requirements; everything else layers on.
+Pass `data` plus either a `table` definition (supplies identity and columns) or both `id` and `columns`. `id` alone is not enough — the component throws without columns.
 
 ## Identity & columns
 
@@ -36,7 +36,7 @@ One of `id` / `table` and the `data` array are the only requirements; everything
 
 | Prop | Type |
 |---|---|
-| `initialFilters` | `FilterState[]` |
+| `initialFilters` | `FilterState[] \| FilterGroupNode` |
 | `initialSorting` | `SortingState` |
 | `initialPagination` | `PaginationState` |
 | `initialSelectedRows` | `Set<string>` |
@@ -61,7 +61,7 @@ Typical server-driven wiring: react to the callbacks, refetch via `tables.fetchD
 
 | Prop | Notes |
 |---|---|
-| `autoShowFilteredColumns` | Auto-reveal a column while it has an active filter; re-hide on removal unless in `defaultVisibleColumns` (default `false`) |
+| `autoShowFilteredColumns` | Auto-reveal a column while it has an active filter; re-hide on removal unless in `defaultVisibleColumns` (default `true`) |
 | `isFilterProtected(filter)` | Return `true` to lock a filter — shown with a lock icon, not removable |
 | `groups` | Manual filter-dropdown grouping (`FilterGroup[]`) |
 | `autoGroupFilters` | Automatic grouping config — see [Filtering](/docs/filtering#filter-bar-grouping) |

@@ -42,7 +42,7 @@ export function TicketsWithFacets({ adapter, columns }) {
 }
 ```
 
-`UseFacetsOptions`: `adapter`, `columnIds`, `rangeColumnIds`, `filters`, `enabled`. Results: `facets` (`columnId → [{ value, count }]`), `ranges` (`columnId → [min, max]`), `loading`, `error`, `refetch()`. Array literals for `columnIds` are fine on every render — the hook interns them by content.
+`UseFacetsOptions`: `adapter`, `columnIds`, `rangeColumnIds`, `filters`, `enabled`. Results: `facets` (`columnId → [{ value, count }]`), `ranges` (`columnId → [min, max]`), `loading`, `error`, `refetch()`. Array literals for `columnIds` are fine on every render — the hook interns them with `JSON.stringify` so IDs that contain spaces cannot collide.
 
 Do **not** pre-filter the `filters` you pass per column — self-exclusion is the adapter's job, and pre-filtering fights it.
 

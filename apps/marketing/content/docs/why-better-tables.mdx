@@ -9,7 +9,7 @@ Data tables have two halves: the **server half** (turn filter/sort/page state in
 defineTable() columns  →  adapter generates queries  →  UI renders + syncs state
 ```
 
-Define `t.text('customer.company').filterable()` once and you get the JOIN, the typed filter state, the filter UI, and the URL serialization — with the column's value type flowing through `$infer` end to end.
+Define `t.text('customer.company').filterable()` once and you get the JOIN plus a filterable column in the UI. Wire shareable URL state separately via `urlSync` / `useTableUrlSync` (see [URL State](/docs/url-state)). `$infer.Row` / `$infer.ColumnId` are typed today; `$infer.FilterState` is still reserved (`unknown`) for a future typed filter registry.
 
 ## Compared to headless table libraries (TanStack Table)
 
@@ -23,7 +23,7 @@ The hand-rolled version of this stack is boilerplate with sharp edges: operator-
 
 ## You own the UI
 
-`@better-tables/ui` is deliberately **not** an npm dependency — `better-tables init` copies the source (shadcn-style) into your repo. Restyle it, rewrite a component, or delete what you don't use; upgrades are diffs you apply on your terms, not breaking releases. See [UI & CLI](/docs/ui-and-cli).
+`@better-tables/ui` is deliberately **not** an npm dependency — `bunx @better-tables/cli init` copies the source (shadcn-style) into your repo. Restyle it, rewrite a component, or delete what you don't use; upgrades are diffs you apply on your terms, not breaking releases. See [UI & CLI](/docs/ui-and-cli).
 
 ## When Better Tables is the wrong tool
 

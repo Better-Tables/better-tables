@@ -45,9 +45,9 @@ export interface FetchDataParams {
    * A bare `FilterState[]` means **implicit AND** (the ergonomic default for
    * the overwhelmingly common "a few ANDed filters" case). A
    * {@link FilterGroupNode} is how a caller expresses OR or nesting (design
-   * `plans/design/core-contract-v2.md` §1.1). Core canonicalizes a bare
-   * array to `{ kind: 'group', logic: 'and', children: [...] }` before
-   * dispatch so adapters only ever have to handle one shape.
+   * `plans/design/core-contract-v2.md` §1.1). Core does **not** wrap a bare
+   * array before dispatch — adapters must accept both the flat array
+   * (implicit AND) and a {@link FilterGroupNode} tree.
    */
   filters?: FilterState[] | FilterGroupNode;
 

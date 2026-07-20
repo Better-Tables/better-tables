@@ -5,7 +5,10 @@
 @import "fumadocs-ui/css/preset.css";
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 @source "../../../../node_modules/fumadocs-ui/dist/**/*.js";
-@plugin "@tailwindcss/typography";
+/* Use a non-`prose` class so this does not override Fumadocs MDX typography. */
+@plugin "@tailwindcss/typography" {
+  className: blog-prose;
+}
 
 @custom-variant dark (&:is(.dark *));
 

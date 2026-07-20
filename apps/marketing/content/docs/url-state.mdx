@@ -3,7 +3,7 @@ title: URL State
 description: Framework-agnostic sync of filters, pagination, sorting, column visibility, and column order to query parameters.
 ---
 
-Sync table state to query parameters via a framework-agnostic adapter. Filters use a compressed wire format (`c:` prefix); see `serializeFiltersToURL` / `deserializeFiltersFromURL` in `@better-tables/core` (or `serializeTableStateToUrl` / `deserializeTableStateFromUrl` for the full state in one call).
+Sync table state to query parameters via a framework-agnostic adapter. Filters write a compressed group-aware wire format (`c2:` prefix); legacy `c:` payloads still deserialize as a flat `FilterState[]`. See `serializeFiltersToURL` / `deserializeFiltersFromURL` in `@better-tables/core` (or `serializeTableStateToUrl` / `deserializeTableStateFromUrl` for the full state in one call).
 
 ## Adapter interface
 
@@ -146,7 +146,7 @@ const urlAdapter = createVanillaUrlAdapter();
 
 | Flag | URL params | Notes |
 |---|---|---|
-| `filters` | compressed `c:`-prefixed param | Includes AND/OR query groups — trees survive share links |
+| `filters` | compressed `c2:`-prefixed param (legacy `c:` still reads) | Includes AND/OR query groups — trees survive share links |
 | `pagination` | page / page size | 1-based page |
 | `sorting` | multi-column sort descriptors | |
 | `columnVisibility` | shown/hidden column ids | Pairs with `.hideable()` columns |
@@ -156,10 +156,10 @@ Enable only what should be shareable — anything not synced stays client-local 
 
 ## URL parameter format
 
-Simple values (`page`, `limit`) are plain strings; complex state (`filters`, `sorting`, `columnVisibility`, `columnOrder`) is lz-string–compressed and prefixed with `c:` to stay short and URL-safe:
+Simple values (`page`, `limit`) are plain strings; complex state is lz-string–compressed. Filters use the `c2:` prefix (group-aware); other fields use `c:`:
 
 ```
-/users?page=2&limit=20&filters=c:...&sorting=c:...
+/users?page=2&limit=20&filters=c2:...&sorting=c:...
 ```
 
 ## SSR: hydrate initial state from the URL

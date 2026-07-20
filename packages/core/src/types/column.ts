@@ -147,7 +147,9 @@ export interface EditableConfig<TData = unknown, TValue = unknown> {
   /**
    * Data field written by the adapter save path. Defaults to the column id
    * when it contains no dot; REQUIRED for adapter-saves on columns whose id
-   * is not the storage field. Dot-path ids are callback-only (v1).
+   * is not the storage field. Relationship (dot-path) ids resolve via
+   * `resolveCellWriteTarget` / `saveAction`; unresolvable paths fall back
+   * to callback-only or read-only.
    */
   field?: string;
   /** Text editor renders a textarea instead of a single-line input. */

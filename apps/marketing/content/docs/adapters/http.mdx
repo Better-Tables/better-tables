@@ -7,20 +7,54 @@ Pair a browser-safe `httpAdapter` client with a server `createAdapterRouteHandle
 
 ## Safe Next.js App Router mount
 
+Pin table-scoped methods **and** allow-list every column id referenced by facet/filter reads. `authorize: () => true` alone is not safe on a multi-table schema — `getFacetedValues` / `getFilterOptions` / `getMinMaxValues` resolve tables from `columnId`, not from a `primaryTable` pin on `fetchData`.
+
 ```ts
 // app/api/tables/tickets/route.ts
 import { createAdapterRouteHandler } from '@better-tables/core';
 import { getTicketsAdapter } from '@/lib/tickets';
 
+const ALLOWED_COLUMNS = new Set([
+  'subject',
+  'status',
+  'customer.company',
+  'createdAt',
+  // …every column id this endpoint may read
+]);
+
+function collectColumnIds(body: { method: string; params?: { filters?: { columnId: string }[]; sorting?: { columnId: string }[]; columns?: string[] }; columnId?: string }): string[] {
+  if (body.method === 'fetchData') {
+    const ids: string[] = [];
+    for (const f of body.params?.filters ?? []) ids.push(f.columnId);
+    for (const s of body.params?.sorting ?? []) ids.push(s.columnId);
+    if (body.params?.columns) ids.push(...body.params.columns);
+    return ids;
+  }
+  if (body.method === 'describeColumns') return [];
+  if (body.columnId) return [body.columnId];
+  return [];
+}
+
 export const POST = createAdapterRouteHandler(() => getTicketsAdapter(), {
-  authorize: async (request) => {
-    // return false → 403; or return a custom Response (e.g. 401)
+  authorize: async (_request, body) => {
+    const ids = collectColumnIds(body);
+    if (!ids.every((id) => ALLOWED_COLUMNS.has(id))) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Column not allowed on this endpoint.', kind: 'bad_request' }),
+        { status: 403, headers: { 'content-type': 'application/json' } }
+      );
+    }
     return true;
   },
-  constrainRequest: (body) =>
-    body.method === 'fetchData'
-      ? { ...body, params: { ...body.params, primaryTable: 'tickets' } }
-      : body,
+  constrainRequest: (body) => {
+    if (body.method === 'fetchData') {
+      return { ...body, params: { ...body.params, primaryTable: 'tickets' } };
+    }
+    if (body.method === 'describeColumns' || body.method === 'resolveCellWriteTarget') {
+      return { ...body, table: 'tickets' };
+    }
+    return body;
+  },
   onError: (error) => console.error('[api/tables/tickets]', error),
 });
 ```
@@ -33,8 +67,10 @@ const adapter = httpAdapter({ url: '/api/tables/tickets' });
 ```
 
 <Callout type="warn" title="Do not expose the full schema unauthenticated">
-A bare `createAdapterRouteHandler(adapter)` exposes the entire read surface of the adapter's schema. Always pin `primaryTable` (and usually add `authorize`) for multi-table adapters.
+A bare `createAdapterRouteHandler(adapter)` exposes the entire read surface (`fetchData`, facets, filter options, min/max, schema/write-target metadata). Always allow-list column ids on **every** method, pin `primaryTable` / `table` where the protocol supports it, and add real `authorize` for multi-table adapters.
 </Callout>
+
+Reference guard used by the marketing demo: `apps/marketing/src/lib/demo/support/tickets-adapter-guard.ts`.
 
 ## Wire contract
 

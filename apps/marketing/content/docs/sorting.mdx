@@ -37,6 +37,6 @@ When driving state yourself with `SortingManager` / `TableStateManager`, the ful
 | `maxSortColumns` | Cap on simultaneously sorted columns |
 | `defaultSort` | `SortingParams[]` applied on initialization |
 | `resetOnClick` | Clicking a header clears other sorts |
-| `comparator` | Custom `(a, b, columnId, direction) => number` for client-side ordering |
+| `comparator` | **Unwired / reserved** — typed on `SortingConfig` but neither `SortingManager` nor `<BetterTable>` invokes it; sorting is server/adapter-driven today |
 
 Initial state for the component goes through `initialSorting` — see the [BetterTable props reference](/docs/better-table).

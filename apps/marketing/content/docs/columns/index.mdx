@@ -66,8 +66,8 @@ export const usersTable = tables.define('users', (t) => ({
 
 | Type | Modifiers |
 |---|---|
-| `t.text` | `.searchable({ debounce?, includeNull?, validation? })` — enables the full text-operator filter with debounce/null handling (this is filter sugar, not a separate global search); `.textOperators([...])`; `.asUrl()`; `.asEmail()`; `.asPhone()`; `.truncate(length?)`; `.transform('uppercase' \| 'lowercase' \| 'capitalize')` |
-| `t.number` | `.range(min, max, { step? })`; `.currency({ currency?, locale?, minimumFractionDigits?, … })`; `.percentage(options?)`; `.precision(digits)`; `.compact()`; `.format(fn)`; `.numberOperators([...])` |
+| `t.text` | `.searchable({ debounce?, includeNull?, validation? })` — enables common text operators (`contains`…`isNotEmpty`) with debounce/null handling (not `isNull`/`isNotNull`; this is filter sugar, not a separate global search); `.textOperators([...])`; `.asUrl()`; `.asEmail()`; `.asPhone()`; `.truncate(length?)`; `.transform('uppercase' \| 'lowercase' \| 'capitalize')` |
+| `t.number` | `.range(min, max, { step? })`; `.currency({ currency?, locale?, minimumFractionDigits?, … })`; `.percentage(options?)`; `.precision(digits)`; `.compact()`; `.format({ locale?, minimumFractionDigits?, … })`; `.numberOperators([...])` |
 | `t.date` | `.format(pattern)`; `.dateOnly()`; `.dateTime({ timeZone?, … })`; `.timeOnly()`; `.relative()`; `.chronological()`; `.dateRange()`; `.dateOperators([...])` |
 | `t.option` | `.options([...])` (schema enums fill this automatically — see [Auto columns](/docs/columns/auto-columns)); `.optionOperators([...])`; `.showBadges(options?)` |
 | `t.multiOption` | `.options([...])`; `.multiOptionOperators([...])`; `.displayFormat({...})`; `.showBadges(options?)`; `.validate({...})` |

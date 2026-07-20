@@ -25,7 +25,7 @@ where "customers"."company" like '%acme%'
 order by "tickets"."created_at" desc
 limit 10 offset 0`;
 
-const INIT_SNIPPET = `$ npx better-tables@latest init
+const INIT_SNIPPET = `$ npx @better-tables/cli@latest init
 # detects your shadcn/ui setup
 # installs core + the drizzle adapter
 # copies table + filter source into

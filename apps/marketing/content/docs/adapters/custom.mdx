@@ -34,7 +34,7 @@ import type { TableAdapter } from '@better-tables/core';
 
 `AdapterFeatures` flags: `create`, `read`, `update`, `delete`, `bulkOperations`, `realTimeUpdates`, `export`, `transactions`. The UI checks these before offering behavior — `features.update: false` renders adapter-saved editable cells read-only.
 
-`fetchData` params to honor: `pagination` (1-based), `sorting[]`, `filters` (always canonicalized to a single `FilterGroupNode` AND-group before dispatch — handle the tree, and you get flat arrays for free), `columns`, `primaryTable`, `params`, `signal`. The `search` param is declared on the contract but not yet consumed by first-party callers.
+`fetchData` params to honor: `pagination` (1-based), `sorting[]`, `filters` (`FilterState[]` = implicit AND, **or** a `FilterGroupNode` tree — core does not canonicalize before dispatch; support both), `columns`, `primaryTable`, `params`, `signal`. The `search` param is declared on the contract but not yet consumed by first-party callers.
 
 ## What the toolkit provides
 
@@ -57,8 +57,8 @@ bun add @better-tables/adapters-toolkit
 
 ## Suggested shape
 
-1. Implement `SchemaIntrospectionPort` and `RelationshipManagerPort` for your ORM (the only backend-specific code).
-2. Build `fetchData`: resolve the primary table (`PrimaryTableResolver`), emit predicates per filter via `FilterRouter`, apply sorting/pagination, and nest results with `DataTransformer`.
+1. Implement the ORM-specific ports: `SchemaIntrospectionPort`, `RelationshipManagerPort`, and a `PredicateEmitter<TColumn, TPredicate>` for your backend's predicate type (Drizzle's reference is `DrizzlePredicateEmitter`).
+2. Build `fetchData`: resolve the primary table (`PrimaryTableResolver`), construct `new FilterRouter(emitter)`, route filters through it, apply sorting/pagination, and nest results with `DataTransformer`. Accept both flat `FilterState[]` and `FilterGroupNode` inputs.
 3. Add facets: `getFacetedValues` / `getMinMaxValues` are grouped-count / min-max variants of the same query pipeline — remember self-exclusion.
 4. Fill in `meta.features` honestly; add mutations and `describeColumns` last.
 

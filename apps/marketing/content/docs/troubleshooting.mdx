@@ -5,12 +5,20 @@ description: Common failures — build-time DB crashes, init prerequisites, read
 
 ## `next build` crashes loading the database
 
-Native drivers like `better-sqlite3` must not run at build/import time. Initialize the DB behind a lazy getter and call it per request:
+Native drivers like `better-sqlite3` must not run at build/import time. Initialize the DB behind a lazy singleton and call it per request:
 
 ```ts
-export async function getSupportTables() {
-  const db = await getDb(); // lazy singleton
+let tablesPromise: Promise<SupportTables> | null = null;
+
+async function initSupportTables() {
+  // open driver + create drizzle instance here (not at module scope)
+  const db = drizzle(/* … */);
   return betterTables({ database: drizzleAdapter(db) });
+}
+
+export function getSupportTables() {
+  tablesPromise ??= initSupportTables();
+  return tablesPromise;
 }
 ```
 
@@ -18,7 +26,7 @@ See [Next.js Integration](/docs/nextjs) and the reference implementation in `app
 
 ## `better-tables init` exits immediately
 
-`init` requires a working shadcn setup (`components.json`). It will print remediation steps; set up shadcn first, then re-run. It also checks for `@better-tables/core` and `@better-tables/adapters-drizzle` and offers to install them. Flags: `--skip-shadcn`, `-y`, `--components-path`, `--cwd` — see [UI & CLI](/docs/ui-and-cli).
+`init` requires a working shadcn setup (`components.json`). It will print remediation steps; set up shadcn first, then re-run. It also checks for `@better-tables/core`, `@better-tables/adapters-drizzle`, and UI runtime deps (`zustand`, `@dnd-kit/*`) and offers to install them. Invoke as `bunx @better-tables/cli init`. Flags: `--skip-shadcn`, `-y`, `--components-path`, `--cwd` — see [UI & CLI](/docs/ui-and-cli).
 
 ## An editable cell renders read-only
 
@@ -30,7 +38,9 @@ Writes are double opt-in: the route handler needs `writes` config **and** the cl
 
 ## `SchemaError` on reads with a multi-table schema
 
-When a call provides neither `columns` nor `primaryTable`, the adapter throws instead of guessing the table. Pass `primaryTable` per call, or set `options.defaultPrimaryTable` (reads) / `options.defaultMutationTable` (writes) on `drizzleAdapter` — see [Drizzle adapter](/docs/adapters/drizzle#factory-options-complete).
+For `fetchData` / `describeColumns`, when a call provides neither `columns` nor `primaryTable`, the adapter throws instead of guessing the table. Pass `primaryTable` (or `table`) on those calls, or set `options.defaultPrimaryTable` (reads) / `options.defaultMutationTable` (writes) on `drizzleAdapter` — see [Drizzle adapter](/docs/adapters/drizzle#factory-options-complete).
+
+Facet methods (`getFacetedValues`, `getFilterOptions`, `getMinMaxValues`) have **no** per-call `primaryTable` — they resolve the table from the column id. Keep facet column ids unambiguous on multi-table schemas, or expose a table-scoped adapter / HTTP allow-list (see [HTTP adapter](/docs/adapters/http)).
 
 ## Facet counts look wrong after filtering
 
@@ -42,7 +52,7 @@ Option choices resolve in order: declared `.options()` → schema enum (via `res
 
 ## Pagination shows the wrong total
 
-Always pass `totalCount={result.total}` with server pagination — without it the component estimates from the loaded rows. See [Pagination](/docs/pagination).
+Always pass `totalCount={result.total}` with server pagination — without it `totalItems` falls back to `pagination.totalPages * pagination.limit`. See [Pagination](/docs/pagination).
 
 ## Maps arrive as arrays over HTTP
 

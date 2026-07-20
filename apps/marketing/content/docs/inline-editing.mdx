@@ -17,7 +17,7 @@ t.number('reopenCount').editable({ field: 'reopenCount' }) // field override whe
 | `EditableConfig` field | Purpose |
 |---|---|
 | `when(row)` | Per-row gate — return `false` to render that row's cell read-only |
-| `field` | Storage field written by the adapter save path (defaults to the column id; required when the id is not the storage key; dot-path ids are callback-only) |
+| `field` | Storage field written by the adapter save path (defaults to the column id; required when the id is not the storage key). Relationship paths like `customer.company` save through `saveAction` or an adapter that implements `resolveCellWriteTarget` — see [Joined-table editing](#joined-table-editing) below. Unsupported / unresolvable paths fall back to callback-only or read-only |
 | `multiline` | Text editor renders a textarea instead of a single-line input |
 | `placeholder` | Placeholder for empty text/number editors |
 | `editRenderer(props)` | Custom editor (and the only editor for `custom` columns) — receives `value`, `row`, `column`, `commit(value)`, `cancel()`; the table still owns save/validation/rollback |

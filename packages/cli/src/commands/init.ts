@@ -119,7 +119,17 @@ export function initCommand(): Command {
     }
     console.log(pc.green('✓ shadcn/ui configuration found (components.json)\n'));
     // Step 3: Check for required dependencies
-    const requiredPackages = ['@better-tables/core', '@better-tables/adapters-drizzle'];
+    // Core + adapter for data; zustand / @dnd-kit are direct imports in the
+    // copied UI source (not transitive under pnpm strict installs).
+    const requiredPackages = [
+      '@better-tables/core',
+      '@better-tables/adapters-drizzle',
+      'zustand',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/modifiers',
+      '@dnd-kit/utilities',
+    ];
     const missingPackages: string[] = [];
     for (const pkg of requiredPackages) {
       if (!isPackageInstalled(cwd, pkg)) {

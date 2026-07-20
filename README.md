@@ -77,7 +77,7 @@ bun add @better-tables/adapters-drizzle
 The UI components aren't published to npm — they're copied directly into your project with the CLI (shadcn-style), so you own and can customize the source:
 
 ```bash
-bunx better-tables init
+bunx @better-tables/cli init
 ```
 
 `init` requires an existing [shadcn/ui](https://ui.shadcn.com) setup (`components.json`) and copies the table/filter components, hooks, and stores into your project (default: `components/better-tables-ui/`), rewriting imports to match your project's aliases. See [`@better-tables/cli`](packages/cli/README.md) for options.

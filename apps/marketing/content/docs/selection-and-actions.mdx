@@ -7,6 +7,7 @@ Row selection adds a checkbox column (with select-all in the header) and tracks 
 
 ```tsx
 <BetterTable
+  id="tickets"
   columns={columns}
   data={data}
   features={{ rowSelection: true }}
@@ -25,6 +26,7 @@ Row identity comes from `rowConfig.getId(row)` when provided, falling back to th
 import { Archive, Trash2 } from 'lucide-react';
 
 <BetterTable
+  id="tickets"
   columns={columns}
   data={data}
   actions={[

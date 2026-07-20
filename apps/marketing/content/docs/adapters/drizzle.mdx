@@ -41,10 +41,10 @@ export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
 | `defaultPrimaryTable` | Table for reads when a call provides neither `columns` nor `primaryTable` (required for that case on multi-table schemas — the adapter throws a `SchemaError` instead of guessing) |
 | `defaultMutationTable` | Table for writes on multi-table schemas |
 | `cache` | Query result caching: `{ enabled, ttl, maxSize? }` (LRU, default max 500 entries) |
-| `optimization` | `{ maxJoins?, enableBatching?, batchSize? }` |
-| `batching` | Large-array filter handling: `{ batchSize? (50), maxBatchesPerGroup? (200), enableNestedGrouping? (true) }` |
-| `logging` | `{ enabled, level: 'debug' \| 'info' \| 'warn' \| 'error', logQueries? }` |
-| `performance` | `{ trackTiming?, maxQueryTime? }` — warn on slow queries |
+| `optimization` | **Reserved / unimplemented** — typed only; join caps and related knobs are not wired at runtime |
+| `batching` | **Reserved / unimplemented** — typed only; the emitter uses fixed batch constants (`batchSize` 50, `maxBatchesPerGroup` 200) |
+| `logging` | **Reserved / unimplemented** — typed only; no query logging today |
+| `performance` | **Reserved / unimplemented** — typed only; no slow-query warnings today |
 
 ## Relationship paths
 
@@ -69,7 +69,7 @@ const adapter = drizzleAdapter(db, {
 });
 ```
 
-Array foreign keys (Postgres arrays, MySQL/SQLite JSON arrays) are detected automatically and can be forced with `isArray: true`. Deeper patterns — junction tables, aggregates, subqueries — are covered with worked examples in the package's [advanced usage notes](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/docs/ADVANCED_USAGE.md) (some samples still show the legacy builder API; the concepts apply unchanged).
+PostgreSQL `.array()` foreign keys (with `.references()`) are detected automatically. MySQL `json()` / SQLite text-or-JSON array FKs are **not** auto-detected — provide a manual `RelationshipMap` entry with `isArray: true`. Deeper patterns — junction tables, aggregates, subqueries — are covered with worked examples in the package's [advanced usage notes](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/docs/ADVANCED_USAGE.md) (some samples still show the legacy builder API; the concepts apply unchanged).
 
 Try it live: [/examples/relationship-filtering](/examples/relationship-filtering).
 
@@ -84,9 +84,7 @@ Postgres, MySQL, and SQLite are supported. Peer dependencies are your driver's (
 ## Performance tuning
 
 - **Caching**: `options.cache` memoizes query results with TTL + LRU eviction — effective for facet counts on hot tables.
-- **Join budget**: `options.optimization.maxJoins` caps join fan-out from deep relationship usage.
-- **Large IN-lists**: `options.batching` splits very large array filter values into batched OR groups instead of one giant `IN (...)`.
-- **Diagnostics**: `options.logging.logQueries` + `options.performance.trackTiming` / `maxQueryTime` surface slow queries during development.
+- **Reserved options**: `optimization`, `batching`, `logging`, and `performance` appear in the type surface but are not applied at runtime yet. Large-array filters already use fixed internal batching; do not expect configuring those fields to change behavior.
 
 ## Cell writes
 

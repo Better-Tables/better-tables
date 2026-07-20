@@ -38,52 +38,76 @@ For the React UI, copy components into your app (they are not published on npm; 
 <Tab value="bun">
 
 ```bash
-bunx better-tables init
+bunx @better-tables/cli init
 ```
 
 </Tab>
 <Tab value="npm">
 
 ```bash
-npx better-tables init
+npx @better-tables/cli init
 ```
 
 </Tab>
 <Tab value="pnpm">
 
 ```bash
-pnpm dlx better-tables init
+pnpm dlx @better-tables/cli init
 ```
 
 </Tab>
 </Tabs>
 
+`init` also checks for UI runtime deps (`zustand`, `@dnd-kit/*`) used by the copied source — see [UI & CLI](/docs/ui-and-cli).
+
 </Step>
 <Step>
 
-### Create the table factory
+### Create a lazy table factory (server-only)
 
-Wire your Drizzle database through `drizzleAdapter`, then call `betterTables()`:
+Native drivers like `better-sqlite3` must not run during `next build`. Keep the adapter behind an async getter — do **not** construct `db` / `drizzleAdapter(db)` at module scope:
 
 ```ts
-// lib/tables.ts
-import { betterTables, defineTable } from '@better-tables/core';
+// lib/tables.ts — server-only; never import from client components
+import { betterTables } from '@better-tables/core';
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
-import { db } from './db';
 
-export const tables = betterTables({
-  database: drizzleAdapter(db),
-  defaults: { pageSize: 20 },
-});
+let tablesPromise: ReturnType<typeof buildTables> | null = null;
+
+async function getDb() {
+  // open your driver / create the drizzle instance here (lazy)
+  // ...
+  return db;
+}
+
+async function buildTables() {
+  const db = await getDb();
+  return betterTables({
+    database: drizzleAdapter(db),
+  });
+}
+
+export function getTables() {
+  tablesPromise ??= buildTables();
+  return tablesPromise;
+}
+
+export type Tables = Awaited<ReturnType<typeof getTables>>;
 ```
 
 </Step>
 <Step>
 
-### Define a table
+### Define a table (client-safe module)
+
+Keep `defineTable` in a separate file from the DB factory so client components never pull in the adapter:
 
 ```ts
-export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+// lib/tickets-table.ts — safe to import from client components
+import { defineTable } from '@better-tables/core';
+import type { Tables } from './tables';
+
+export const ticketsTable = defineTable<Tables>()('tickets', (t) => ({
   columns: [
     t.text('subject').searchable().filterable().sortable(),
     t.option('status')
@@ -109,6 +133,7 @@ Relationship paths like `customer.company` tell the Drizzle adapter to JOIN auto
 ### Fetch on the server
 
 ```ts
+const tables = await getTables();
 const result = await tables.fetchData(ticketsTable, {
   pagination: { page: 1, limit: 20 },
   sorting: [{ columnId: 'createdAt', direction: 'desc' }],
@@ -120,14 +145,14 @@ const result = await tables.fetchData(ticketsTable, {
 
 ### Render with Better Table UI
 
-`init` copied the component into your app — import it from the local path and hand it the columns, rows, and total:
+This mounts the first page of rows. Filter / sort / page controls update client state until you wire a [server refetch](/docs/nextjs) or [URL sync](/docs/url-state) — pass `initialPagination` so the UI page size matches the fetch:
 
 ```tsx
 // app/tickets/tickets-table.tsx
 'use client';
 
 import { BetterTable } from '@/components/better-tables-ui/table/table';
-import { ticketsTable, type TicketRow } from '@/lib/tables';
+import { ticketsTable, type TicketRow } from '@/lib/tickets-table';
 
 export function TicketsTable({ rows, total }: { rows: TicketRow[]; total: number }) {
   return (
@@ -136,6 +161,13 @@ export function TicketsTable({ rows, total }: { rows: TicketRow[]; total: number
       columns={ticketsTable.columns}
       data={rows}
       totalCount={total}
+      initialPagination={{
+        page: 1,
+        limit: 20,
+        totalPages: Math.max(1, Math.ceil(total / 20)),
+        hasNext: total > 20,
+        hasPrev: false,
+      }}
     />
   );
 }
@@ -143,10 +175,12 @@ export function TicketsTable({ rows, total }: { rows: TicketRow[]; total: number
 
 ```tsx
 // app/tickets/page.tsx (server component)
-import { tables, ticketsTable } from '@/lib/tables';
+import { getTables } from '@/lib/tables';
+import { ticketsTable } from '@/lib/tickets-table';
 import { TicketsTable } from './tickets-table';
 
 export default async function TicketsPage() {
+  const tables = await getTables();
   const result = await tables.fetchData(ticketsTable, {
     pagination: { page: 1, limit: 20 },
   });
@@ -154,8 +188,6 @@ export default async function TicketsPage() {
   return <TicketsTable rows={result.data} total={result.total} />;
 }
 ```
-
-That renders a filterable, sortable, paginated table. For wiring page changes back to the server, URL state, and editing, continue below.
 
 </Step>
 </Steps>
@@ -166,4 +198,4 @@ That renders a filterable, sortable, paginated table. For wiring page changes ba
 - [Columns](/docs/columns) — path builders, modifiers, computed fields
 - [Filtering](/docs/filtering) — operator reference and AND/OR groups
 - [URL State](/docs/url-state) — shareable filter/sort/page links
-- [Next.js Integration](/docs/nextjs) — lazy DB init, server fetch patterns
+- [Next.js Integration](/docs/nextjs) — lazy DB init, server refetch from `searchParams`

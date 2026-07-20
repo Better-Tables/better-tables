@@ -25,7 +25,7 @@ Two tools keep big tables fast, and they compose:
 | Option | Default | Meaning |
 |---|---|---|
 | `height` | `480` | Scroll viewport height in px |
-| `rowHeight` | `52` | Row height in px (estimate for dynamic rows) |
+| `rowHeight` | `52` | Fixed row height in px — `<BetterTable virtualized>` does not measure dynamic rows. For variable-height rows, use the lower-level `VirtualizedTable` path with `dynamicRowHeight` |
 | `overscan` | `5` | Extra rows rendered above/below the viewport |
 
 ## Choosing a strategy

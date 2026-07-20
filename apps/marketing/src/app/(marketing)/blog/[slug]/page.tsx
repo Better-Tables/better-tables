@@ -87,7 +87,7 @@ export default async function Page(props: { params: Promise<{ slug: string }> })
         </header>
 
         <article
-          className="prose prose-neutral max-w-none prose-headings:font-display prose-headings:tracking-tight prose-a:text-ledger prose-a:decoration-ledger/40 prose-strong:font-semibold prose-code:before:content-none prose-code:after:content-none"
+          className="blog-prose blog-prose-neutral max-w-none blog-prose-headings:font-display blog-prose-headings:tracking-tight blog-prose-a:text-ledger blog-prose-a:decoration-ledger/40 blog-prose-strong:font-semibold blog-prose-code:before:content-none blog-prose-code:after:content-none"
           dangerouslySetInnerHTML={{ __html: post.source }}
         />
       </div>

@@ -51,7 +51,7 @@ t.text('subject').searchable({ debounce: 500, includeNull: true });
 
 | `FilterConfig` field | Purpose |
 |---|---|
-| `operators` | Allow-list of operators offered in the UI (defaults to the full set for the type) |
+| `operators` | Optional UI allow-list. When omitted, the operator menu uses `getOperatorsForType(type)` (includes `isNull` / `isNotNull`). Restrict with `.textOperators()` / `.numberOperators()` / etc. |
 | `options` | Choices for `option` / `multiOption` filters (schema enums fill this automatically — see [Auto columns](/docs/columns/auto-columns)); each option takes `value`, `label`, and optional `color` / `icon` / `count` |
 | `min` / `max` | Bounds for number inputs |
 | `debounce` | Text input debounce in ms (default 300) |
@@ -61,11 +61,11 @@ t.text('subject').searchable({ debounce: 500, includeNull: true });
 | `format` | Date filters: display format |
 | `customComponent` | Replace the filter input with your own component |
 
-Note that `.searchable()` on a text column is filter sugar: it enables the full set of text operators plus debounce/null handling. It does not add the column to a separate global search — see the operator table above for what it unlocks.
+Note that `.searchable()` on a text column is filter sugar: it enables the common text operators (`contains`, `equals`, `startsWith`, `endsWith`, `isEmpty`, `isNotEmpty`) plus debounce / `includeNull`. It does **not** add `isNull` / `isNotNull`, and it does not add the column to a separate global search.
 
 ## Query groups (AND / OR)
 
-For OR and nesting, pass a `FilterGroupNode` tree instead of a flat array. Core canonicalizes a bare array to an AND group before dispatch, so adapters handle one shape:
+For OR and nesting, pass a `FilterGroupNode` tree instead of a flat array. A bare `FilterState[]` means implicit AND. Core does **not** wrap arrays into a group before dispatch — adapters must accept both shapes:
 
 ```ts
 await tables.fetchData(ticketsTable, {
@@ -87,7 +87,7 @@ await tables.fetchData(ticketsTable, {
 });
 ```
 
-Nested groups survive URL sharing (see [URL State](/docs/url-state)) and render as an editable tree in the filter UI:
+Nested groups round-trip through URL sync and programmatic `setFilterNode` (see [URL State](/docs/url-state)). The filter bar stays a flat implicit-AND chip list — visual AND/OR tree editing is not shipped yet:
 
 <Cards>
   <Card title="Query groups example" href="/examples/query-groups" description="AND/OR filter trees with URL share." />
@@ -101,6 +101,7 @@ The filter dropdown groups columns automatically (dates together, statuses toget
 
 ```tsx
 <BetterTable
+  id="tickets"
   columns={columns}
   data={data}
   autoGroupFilters={{ groupLabels: { dates: 'Timeline' } }}

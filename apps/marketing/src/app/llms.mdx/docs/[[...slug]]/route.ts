@@ -3,7 +3,7 @@ import { getLLMText, getPageMarkdownUrl, source } from '@/lib/source';
 
 export const revalidate = false;
 
-function resolvePageSlug(slug: string[] | undefined): string[] | undefined {
+export function resolvePageSlug(slug: string[] | undefined): string[] | undefined {
   if (!slug?.length) return slug;
   const last = slug[slug.length - 1];
   // Internal SSG paths end with content.md; rewrite targets omit that suffix.

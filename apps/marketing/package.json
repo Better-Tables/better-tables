@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Better Tables marketing site with live interactive demo",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "next dev --turbo -p 3000",
     "dev:preview": "next dev --turbo",

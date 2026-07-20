@@ -119,10 +119,12 @@ LEFT JOIN users ON EXISTS (
 
 ### Automatic Detection
 
-The adapter automatically detects array foreign keys by:
-1. Identifying array columns (PostgreSQL `.array()`, MySQL/SQLite JSON columns)
+The adapter automatically detects **PostgreSQL** array foreign keys by:
+1. Identifying array columns (PostgreSQL `.array()` / `dataType === 'array'`)
 2. Checking for foreign key references in the column metadata
 3. **Converting database table names to schema keys** - The adapter automatically converts database table names (e.g., `'users'`) to their corresponding schema keys (e.g., `'usersTable'`) for internal consistency
+
+MySQL `json()` / SQLite text-or-JSON array FKs are **not** auto-detected — provide a manual `RelationshipMap` entry with `isArray: true`.
 4. Creating relationship paths with `isArray: true` flag
 5. Generating pluralized alias names (e.g., `organizerId` → `organizers`)
 

@@ -173,4 +173,21 @@ describe('useFacets (plan 032 step 4, finding 7)', () => {
     expect(facetCalls.length).toBe(0);
     expect(rangeCalls.length).toBe(0);
   });
+
+  it('distinguishes column id lists that would collide under space-joining', async () => {
+    const { adapter, facetCalls } = createDeferredFetchAdapter();
+
+    const { rerender } = renderHook(
+      ({ columnIds }: { columnIds: string[] }) => useFacets({ adapter, columnIds, filters: [] }),
+      { initialProps: { columnIds: ['foo', 'bar baz'] } }
+    );
+
+    await waitFor(() => expect(facetCalls.length).toBe(2));
+    expect(facetCalls.map((c) => c.columnId).sort()).toEqual(['bar baz', 'foo']);
+
+    rerender({ columnIds: ['foo bar', 'baz'] });
+
+    await waitFor(() => expect(facetCalls.length).toBe(4));
+    expect(facetCalls.slice(2).map((c) => c.columnId).sort()).toEqual(['baz', 'foo bar']);
+  });
 });

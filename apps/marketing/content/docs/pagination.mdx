@@ -1,9 +1,9 @@
 ---
 title: Pagination
-description: 1-based page and limit, defaults from betterTables(), and the pagination controls.
+description: 1-based page and limit, passing limit / initialPagination, and the pagination controls.
 ---
 
-Pagination uses `{ page, limit }` (1-based page). Defaults come from `betterTables({ defaults: { pageSize: 20 } })`.
+Pagination uses `{ page, limit }` (1-based page). When `limit` is omitted, adapters and `<BetterTable>` default to **10**. `betterTables({ defaults: { pageSize } })` stores a preferred size on the factory but does **not** apply it to `fetchData` or the UI yet — pass `pagination.limit` / `initialPagination` explicitly.
 
 ```ts
 const result = await tables.fetchData(ticketsTable, {
@@ -19,6 +19,7 @@ const result = await tables.fetchData(ticketsTable, {
 
 ```tsx
 <BetterTable
+  id="tickets"
   columns={columns}
   data={rows}
   totalCount={total}
@@ -28,7 +29,7 @@ const result = await tables.fetchData(ticketsTable, {
 />
 ```
 
-Without `totalCount` the component estimates from the loaded data, so always pass `result.total` when paginating on the server.
+Without `totalCount`, `totalItems` falls back to `pagination.totalPages * pagination.limit` (often misleading on first paint). Always pass `result.total` when paginating on the server.
 
 The selector options and layout live in the copied `table-pagination.tsx` — `<TablePagination>` takes `currentPage`, `totalPages`, `onPageChange`, `pageSize`, `onPageSizeChange`, `totalItems`, `pageSizeOptions`, `showPageSizeSelector`, `showPageInfo`, and `className`. You own that file; change the defaults there or render it yourself.
 

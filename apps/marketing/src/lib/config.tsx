@@ -5,7 +5,7 @@ export const siteConfig = {
     'Define columns once in TypeScript. Better Tables compiles filtering, sorting, pagination, and cell edits into real queries against Postgres, MySQL, or SQLite — and the UI is shadcn-style source you own.',
   cta: 'Browse examples',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  installCommand: 'npx better-tables@latest init',
+  installCommand: 'npx @better-tables/cli@latest init',
   keywords: [
     'Better Tables',
     'React table library',

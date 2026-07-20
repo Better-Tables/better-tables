@@ -11,9 +11,17 @@ description: Server fetch, lazy DB init for builds, UI copy, and client URL sync
 Native drivers like `better-sqlite3` must not run during `next build`. Use a lazy getter — see `apps/marketing/src/lib/demo/support/db.ts`.
 
 ```ts
-export async function getSupportTables() {
-  const db = await getDb(); // lazy singleton
+let tablesPromise: Promise<SupportTables> | null = null;
+
+async function initSupportTables() {
+  // open driver + create drizzle instance here (not at module scope)
+  const db = drizzle(/* … */);
   return betterTables({ database: drizzleAdapter(db) });
+}
+
+export function getSupportTables() {
+  tablesPromise ??= initSupportTables();
+  return tablesPromise;
 }
 ```
 
@@ -22,16 +30,25 @@ export async function getSupportTables() {
 
 ### Server-fetch with `tables.fetchData`
 
+Next.js may expose a repeated query param as `string[]`. Normalize before `Number(...)` so malformed URLs do not send `NaN` to the adapter (or use `deserializeTableStateFromUrl` from [URL State](/docs/url-state)):
+
 ```tsx
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string | string[] }>;
 }) {
   const sp = await searchParams;
+  const pageRaw = Number(firstParam(sp.page) ?? 1);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+
   const tables = await getSupportTables();
   const result = await tables.fetchData(ticketsTable, {
-    pagination: { page: Number(sp.page ?? 1), limit: 10 },
+    pagination: { page, limit: 10 },
   });
 
   return <TicketsTableClient rows={result.data} total={result.total} />;
@@ -44,7 +61,7 @@ export default async function TicketsPage({
 ### Copy UI into the app
 
 ```bash
-bunx better-tables init
+bunx @better-tables/cli init
 ```
 
 Pass `columns={table.columns}` (or `table={def}`) to `<BetterTable />`.

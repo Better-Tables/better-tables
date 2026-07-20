@@ -1,6 +1,5 @@
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
-import lastModified from 'fumadocs-mdx/plugins/last-modified';
 
 export const docs = defineDocs({
   dir: 'content/docs',
@@ -15,8 +14,10 @@ export const docs = defineDocs({
   },
 });
 
+// Omit fumadocs-mdx `lastModified()` — it shells out to git per page and
+// needs a full (non-shallow) clone. Shallow CI/Vercel checkouts yield wrong
+// or empty dates; sitemap/docs already fall back when `lastModified` is absent.
 export default defineConfig({
-  plugins: [lastModified()],
   mdxOptions: {
     // default Fumadocs MDX presets (rehype code, GFM, etc.)
   },

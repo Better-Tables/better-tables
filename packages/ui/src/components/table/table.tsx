@@ -5,6 +5,7 @@ import {
   type ColumnDefinition,
   type ColumnVisibility,
   destroyTableStore,
+  type FilterGroupNode,
   type FilterState,
   getFormatterForType,
   getOrCreateTableStore,
@@ -164,8 +165,8 @@ export interface BetterTableProps<TData = unknown>
   /** Total number of items (for pagination) */
   totalCount?: number;
 
-  /** Initial filter state (only used on mount) */
-  initialFilters?: FilterState[];
+  /** Initial filter state (only used on mount). Flat arrays are implicit AND; trees are `FilterGroupNode`. */
+  initialFilters?: FilterState[] | FilterGroupNode;
 
   /** Initial sorting state (only used on mount) */
   initialSorting?: SortingState;
@@ -223,7 +224,7 @@ export interface BetterTableProps<TData = unknown>
   /** Automatically show/hide columns based on active filters.
    * When a filter is applied to a column, that column becomes visible.
    * When the filter is removed, the column is hidden if it's not in defaultVisibleColumns.
-   * @default false
+   * @default true
    */
   autoShowFilteredColumns?: boolean;
 
