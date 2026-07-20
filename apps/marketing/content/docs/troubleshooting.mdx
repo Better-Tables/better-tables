@@ -38,7 +38,7 @@ Writes are double opt-in: the route handler needs `writes` config **and** the cl
 
 ## `SchemaError` on reads with a multi-table schema
 
-For `fetchData` / `describeColumns`, when a call provides neither `columns` nor `primaryTable`, the adapter throws instead of guessing the table. Pass `primaryTable` (or `table`) on those calls, or set `options.defaultPrimaryTable` (reads) / `options.defaultMutationTable` (writes) on `drizzleAdapter` — see [Drizzle adapter](/docs/adapters/drizzle#factory-options-complete).
+For `fetchData` / `describeColumns`, when a call provides neither `columns` nor `primaryTable`, the adapter throws instead of guessing the table. Name the table on each call — `fetchData({ primaryTable: 'users' })` in the params, `describeColumns('users')` as the positional argument — or set `options.defaultPrimaryTable` (reads) / `options.defaultMutationTable` (writes) on `drizzleAdapter` — see [Drizzle adapter](/docs/adapters/drizzle#factory-options-complete).
 
 Facet methods (`getFacetedValues`, `getFilterOptions`, `getMinMaxValues`) have **no** per-call `primaryTable` — they resolve the table from the column id. Keep facet column ids unambiguous on multi-table schemas, or expose a table-scoped adapter / HTTP allow-list (see [HTTP adapter](/docs/adapters/http)).
 

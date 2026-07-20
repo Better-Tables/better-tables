@@ -54,6 +54,11 @@ import {
   TextColumnBuilder,
 } from '@better-tables/core';
 
+interface Ticket {
+  subject: string;
+  reopenCount: number;
+}
+
 const columns = defineColumns<Ticket>()([
   new TextColumnBuilder<Ticket>().id('subject').displayName('Subject')
     .accessor((t) => t.subject).searchable().build(),

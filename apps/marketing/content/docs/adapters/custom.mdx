@@ -7,7 +7,7 @@ An adapter is anything that implements the `TableAdapter` contract from `@better
 
 ## Memory adapter
 
-Core ships one adapter of its own: `memoryAdapter(rows)`, the full pipeline over a plain array — every filter operator, AND/OR trees, sorting, pagination, facets with self-exclusion, schema inference for [auto columns](/docs/columns/auto-columns), and in-place cell edits. Use it for client-only tables, playgrounds, tests, and as a small readable reference for the contract below.
+Core ships one adapter of its own: `memoryAdapter(rows)`, the full pipeline over a plain array — every filter operator for the built-in column types, AND/OR trees, sorting, pagination, facets with self-exclusion, schema inference for [auto columns](/docs/columns/auto-columns), and in-place cell edits. `custom` columns are the one exception: their operators are user-defined, so there's no generic way to evaluate them in memory — only the universal `isNull` / `isNotNull` are supported there. Use it for client-only tables, playgrounds, tests, and as a small readable reference for the contract below.
 
 ```ts
 import { betterTables, memoryAdapter } from '@better-tables/core';

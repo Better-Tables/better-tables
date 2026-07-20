@@ -3,7 +3,7 @@ title: Pagination
 description: 1-based page and limit, passing limit / initialPagination, and the pagination controls.
 ---
 
-Pagination uses `{ page, limit }` (1-based page). When `limit` is omitted, adapters and `<BetterTable>` default to **10**. `betterTables({ defaults: { pageSize } })` stores a preferred size on the factory but does **not** apply it to `fetchData` or the UI yet — pass `pagination.limit` / `initialPagination` explicitly.
+Pagination uses `{ page, limit }` (1-based page). When `limit` is omitted, the Drizzle adapter and `<BetterTable>` default to **10** — custom adapters define their own fallback. `betterTables({ defaults: { pageSize } })` stores a preferred size on the factory but does **not** apply it to `fetchData` or the UI yet — pass `pagination.limit` / `initialPagination` explicitly.
 
 ```ts
 const result = await tables.fetchData(ticketsTable, {

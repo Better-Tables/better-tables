@@ -30,7 +30,7 @@ export function getSupportTables() {
 
 ### Server-fetch with `tables.fetchData`
 
-Next.js may expose a repeated query param as `string[]`. Normalize before `Number(...)` so malformed URLs do not send `NaN` to the adapter (or use `deserializeTableStateFromUrl` from [URL State](/docs/url-state)):
+Next.js may expose a repeated query param as `string[]`. Normalize before `Number(...)` so malformed URLs (`?page=abc`, `?page=1.25`) do not send `NaN` or fractional pages to the adapter (or use `deserializeTableStateFromUrl` from [URL State](/docs/url-state)):
 
 ```tsx
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -42,9 +42,13 @@ export default async function TicketsPage({
 }: {
   searchParams: Promise<{ page?: string | string[] }>;
 }) {
+  // Force request-time rendering (`connection()` from 'next/server') so
+  // `next build` never prerenders the page and opens the native driver.
+  await connection();
+
   const sp = await searchParams;
   const pageRaw = Number(firstParam(sp.page) ?? 1);
-  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+  const page = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1;
 
   const tables = await getSupportTables();
   const result = await tables.fetchData(ticketsTable, {

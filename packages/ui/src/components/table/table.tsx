@@ -10,6 +10,7 @@ import {
   getFormatterForType,
   getOrCreateTableStore,
   getTableStore,
+  isFilterGroupNode,
   type PaginationState,
   resolveTableColumns,
   type SortingState,
@@ -165,7 +166,20 @@ export interface BetterTableProps<TData = unknown>
   /** Total number of items (for pagination) */
   totalCount?: number;
 
-  /** Initial filter state (only used on mount). Flat arrays are implicit AND; trees are `FilterGroupNode`. */
+  /**
+   * Initial filter state (only used on mount). A flat `FilterState[]` is
+   * implicit AND; a `FilterGroupNode` seeds the initial query with its full
+   * AND/OR tree.
+   *
+   * Limitation: the built-in filter bar edits filters as a FLAT leaf list.
+   * When a tree was seeded, the first filter-bar edit (add/update/remove a
+   * chip) calls the store's flat `setFilters` and REPLACES the tree with a
+   * flat implicit-AND array of its leaves — the AND/OR structure is dropped
+   * and the query semantics change (a one-time dev-only `console.warn`
+   * fires when this happens). For tree-preserving updates, write through
+   * `getTableStore(id).getState().setFilterNode()` (or the manager's
+   * `setFilterNode`), or hydrate via URL sync — both keep the tree intact.
+   */
   initialFilters?: FilterState[] | FilterGroupNode;
 
   /** Initial sorting state (only used on mount) */
@@ -951,12 +965,32 @@ function BetterTableInner<TData = unknown>({
     return rowConfig?.getId || defaultGetRowId;
   }, [rowConfig?.getId]);
 
-  // Handle filter changes - just update store
+  // Handle filter changes - just update store.
+  //
+  // The filter bar edits the FLAT leaf view, and the store's `setFilters`
+  // REPLACES the whole stored value — so when a `FilterGroupNode` tree was
+  // seeded (via `initialFilters` or URL sync), the first flat edit collapses
+  // it to an implicit-AND array of its leaves. That is the documented
+  // limitation on `initialFilters`; warn once in dev so the semantics change
+  // isn't silent. Tree-preserving updates go through `setFilterNode` instead.
+  const warnedFilterTreeReplacedRef = useRef(false);
   const handleFiltersChange = useCallback(
     (newFilters: FilterState[]) => {
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        !warnedFilterTreeReplacedRef.current &&
+        isFilterGroupNode(store.getState().manager.getFilterNode())
+      ) {
+        warnedFilterTreeReplacedRef.current = true;
+        console.warn(
+          `[better-tables] table "${id}": a filter bar edit replaced the FilterGroupNode ` +
+            'filter tree with a flat implicit-AND filter list, dropping its AND/OR ' +
+            'structure. Use the store/manager setFilterNode() for tree-preserving updates.'
+        );
+      }
       setFilters(newFilters);
     },
-    [setFilters]
+    [setFilters, store, id]
   );
 
   // Handle sorting changes - use store's toggleSort

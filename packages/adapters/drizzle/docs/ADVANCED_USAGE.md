@@ -3,10 +3,11 @@
 > **Canonical docs:** [better-tables.com/docs/adapters/drizzle](https://better-tables.com/docs/adapters/drizzle)
 > (source: `apps/marketing/content/docs/adapters/drizzle.mdx`). Prefer that
 > page for current `betterTables` / `defineTable` examples. Some sections
-> below still show a **removed** pre-0.6 builder API (`createColumnBuilder`,
-> `new DrizzleAdapter({...})`) — the relationship/query *concepts* apply
-> unchanged, but translate the syntax to `defineTable` + `drizzleAdapter(db,
-> factoryOptions)` before copying anything.
+> below still show the **removed** pre-0.6 column-builder API
+> (`createColumnBuilder` and friends) — the relationship/query *concepts*
+> apply unchanged, but translate those samples to `defineTable` before
+> copying anything. The `new DrizzleAdapter({...})` constructor shown below
+> still works; `drizzleAdapter(db, factoryOptions)` is the preferred form.
 
 This guide covers advanced features and patterns for the Drizzle adapter.
 
@@ -70,14 +71,29 @@ MySQL doesn't have native arrays, but you can use JSON columns:
 
 ```typescript
 import { mysqlTable, json, varchar } from 'drizzle-orm/mysql-core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
 const events = mysqlTable('events', {
   id: varchar('id', { length: 36 }).primaryKey(),
   title: varchar('title', { length: 255 }).notNull(),
-  organizerId: json('organizer_id'), // JSON array: ["uuid1", "uuid2"]
+  organizerId: json('organizer_id'), // JSON array: ["uuid1", "uuid2"] of users.id values
 });
 
-// Works the same way - adapter detects JSON array with FK references
+// JSON array FKs are NOT auto-detected on MySQL (see "Automatic Detection"
+// below) — declare the relationship explicitly with `isArray: true`:
+const adapter = drizzleAdapter(db, {
+  relationships: {
+    'organizers.name': {
+      from: 'events',          // source table (holds the JSON array column)
+      to: 'users',             // target table
+      foreignKey: 'id',        // key field on the target table (users.id)
+      localKey: 'organizerId', // JSON array column on the source table
+      cardinality: 'many',
+      isArray: true,
+    },
+  },
+});
+
 const result = await adapter.fetchData({
   columns: ['title', 'organizers.name'],
 });
@@ -97,14 +113,29 @@ SQLite also uses JSON columns for arrays:
 
 ```typescript
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 
 const events = sqliteTable('events', {
   id: integer('id').primaryKey(),
   title: text('title').notNull(),
-  organizerId: text('organizer_id'), // JSON array: "[1, 2, 3]"
+  organizerId: text('organizer_id'), // JSON array: "[1, 2, 3]" of users.id values
 });
 
-// Same API, different database
+// As on MySQL, JSON array FKs stored in text columns are NOT auto-detected —
+// declare the relationship explicitly with `isArray: true`:
+const adapter = drizzleAdapter(db, {
+  relationships: {
+    'organizers.name': {
+      from: 'events',          // source table (holds the JSON array column)
+      to: 'users',             // target table
+      foreignKey: 'id',        // key field on the target table (users.id)
+      localKey: 'organizerId', // JSON array column on the source table
+      cardinality: 'many',
+      isArray: true,
+    },
+  },
+});
+
 const result = await adapter.fetchData({
   columns: ['title', 'organizers.name'],
 });
@@ -125,10 +156,10 @@ The adapter automatically detects **PostgreSQL** array foreign keys by:
 1. Identifying array columns (PostgreSQL `.array()` / `dataType === 'array'`)
 2. Checking for foreign key references in the column metadata
 3. **Converting database table names to schema keys** - The adapter automatically converts database table names (e.g., `'users'`) to their corresponding schema keys (e.g., `'usersTable'`) for internal consistency
-
-MySQL `json()` / SQLite text-or-JSON array FKs are **not** auto-detected — provide a manual `RelationshipMap` entry with `isArray: true`.
 4. Creating relationship paths with `isArray: true` flag
 5. Generating pluralized alias names (e.g., `organizerId` → `organizers`)
+
+MySQL `json()` / SQLite text-or-JSON array FKs are **not** auto-detected — provide a manual `RelationshipMap` entry with `isArray: true`, as shown in the MySQL and SQLite examples above. Note that passing `relationships` to `drizzleAdapter` disables auto-detection of other relationships unless you also set `autoDetectRelationships: true`.
 
 **Important**: The adapter internally stores and resolves relationships using **schema keys** (e.g., `usersTable`, `eventsTable`) rather than raw database table names (e.g., `users`, `events`). This ensures consistency with Drizzle's schema object structure. The adapter automatically handles conversion from database table names to schema keys, supporting both naming conventions:
 - Schema keys different from DB names: `{ usersTable: usersTable }` where DB name is `'users'` → finds `'usersTable'`

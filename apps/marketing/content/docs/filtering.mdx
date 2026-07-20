@@ -51,7 +51,7 @@ t.text('subject').searchable({ debounce: 500, includeNull: true });
 
 | `FilterConfig` field | Purpose |
 |---|---|
-| `operators` | Optional UI allow-list. When omitted, the operator menu uses `getOperatorsForType(type)` (includes `isNull` / `isNotNull`). Restrict with `.textOperators()` / `.numberOperators()` / etc. |
+| `operators` | Optional UI allow-list. When omitted, built-in column types get the full `getOperatorsForType(type)` menu (includes `isNull` / `isNotNull`); `custom` columns have an empty registry entry, so they get no operators unless you set `operators` explicitly. Restrict with `.textOperators()` / `.numberOperators()` / etc. |
 | `options` | Choices for `option` / `multiOption` filters (schema enums fill this automatically — see [Auto columns](/docs/columns/auto-columns)); each option takes `value`, `label`, and optional `color` / `icon` / `count` |
 | `min` / `max` | Bounds for number inputs |
 | `debounce` | Text input debounce in ms (default 300) |

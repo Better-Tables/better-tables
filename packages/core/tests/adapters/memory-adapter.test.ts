@@ -185,6 +185,80 @@ describe('memoryAdapter', () => {
       expect(nulls.data.map((r) => r.id).sort()).toEqual(['1', '4']);
     });
 
+    it('evaluates currency and percentage columns as numbers', async () => {
+      const adapter = memoryAdapter(makeRows());
+      const currency = await adapter.fetchData({
+        filters: [
+          leaf({
+            columnId: 'reopenCount',
+            type: 'currency',
+            operator: 'greaterThan',
+            values: [1],
+          }),
+        ],
+      });
+      expect(currency.data.map((r) => r.id).sort()).toEqual(['1', '3']);
+
+      const percentage = await adapter.fetchData({
+        filters: [
+          leaf({
+            columnId: 'reopenCount',
+            type: 'percentage',
+            operator: 'between',
+            values: [1, 2],
+          }),
+        ],
+      });
+      expect(percentage.data.map((r) => r.id).sort()).toEqual(['1', '4']);
+    });
+
+    it('uses a Sunday-start week for isThisWeek, matching SQL adapters', async () => {
+      // Anchored to the real clock so no date mocking is needed. Asserting
+      // BOTH that this week's Sunday matches and the Saturday before it does
+      // not fails under a Monday-start implementation on every weekday:
+      // mid-week Monday-start excludes the Sunday, and on a Sunday it wrongly
+      // includes the preceding Saturday.
+      const now = new Date();
+      const sundayOfThisWeek = new Date(now);
+      sundayOfThisWeek.setDate(now.getDate() - now.getDay());
+      sundayOfThisWeek.setHours(12, 0, 0, 0);
+      const saturdayBefore = new Date(sundayOfThisWeek.getTime() - 24 * 60 * 60 * 1000);
+
+      const adapter = memoryAdapter([
+        { id: 'sunday-of-this-week', at: sundayOfThisWeek },
+        { id: 'saturday-before', at: saturdayBefore },
+      ]);
+
+      const result = await adapter.fetchData({
+        filters: [leaf({ columnId: 'at', type: 'date', operator: 'isThisWeek' })],
+      });
+      expect(result.data.map((r) => r.id)).toEqual(['sunday-of-this-week']);
+    });
+
+    it('warns once and matches nothing for unevaluatable custom operators', async () => {
+      const adapter = memoryAdapter(makeRows());
+      const warnings: string[] = [];
+      const originalWarn = console.warn;
+      console.warn = (message: string) => warnings.push(String(message));
+      try {
+        const result = await adapter.fetchData({
+          filters: [leaf({ columnId: 'subject', type: 'custom', operator: 'equals' })],
+        });
+        expect(result.data).toHaveLength(0);
+        expect(warnings.some((w) => w.includes('cannot evaluate operator'))).toBe(true);
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
+
+    it('still evaluates the universal null operators on custom columns', async () => {
+      const adapter = memoryAdapter(makeRows());
+      const result = await adapter.fetchData({
+        filters: [leaf({ columnId: 'notes', type: 'custom', operator: 'isNotNull' })],
+      });
+      expect(result.data.map((r) => r.id).sort()).toEqual(['2', '3']);
+    });
+
     it('sorts multi-column with nulls last', async () => {
       const adapter = memoryAdapter(makeRows());
       const result = await adapter.fetchData({

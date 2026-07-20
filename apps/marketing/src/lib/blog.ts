@@ -49,7 +49,7 @@ export async function markdownToHTML(markdown: string) {
     .use(remarkRehype)
     .use(rehypePrettyCode, {
       // https://rehype-pretty.pages.dev/#usage — single theme; the vessel
-      // (.prose pre) paints the site's code-island background.
+      // (.blog-prose pre) paints the site's code-island background.
       theme: 'everforest-dark',
       keepBackground: false,
     })

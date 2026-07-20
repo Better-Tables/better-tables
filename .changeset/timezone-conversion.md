@@ -23,5 +23,4 @@ any date column using one of these three methods **without an explicit
 to rendering in UTC. Columns that already passed an explicit `timeZone` will
 simply start converting correctly instead of being silently ignored.
 `.dateOnly()` and `.relative()` don't set a default `timeZone` and are
-unaffected unless you explicitly configured one. See `the 0.6 migration notes (file since removed)` for the
-full note.
+unaffected unless you explicitly configured one.

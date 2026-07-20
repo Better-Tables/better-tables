@@ -5,8 +5,28 @@ import { postsRelations, profilesRelations, schema, usersRelations } from './sch
 import { seedDatabase } from './seed';
 import { sqlCaptureLogger } from './sql-capture';
 
+// Relations spread under their OWN export names. Spreading a
+// TABLE-NAME-KEYED relations map here instead (`{ users: usersRelations }`)
+// would silently overwrite every real table object with its same-named
+// `Relations` object -- object spread, later keys win (plan 030, finding 11).
+const buildDrizzle = (sqlite: Database.Database) =>
+  drizzle(sqlite, {
+    schema: { ...schema, usersRelations, profilesRelations, postsRelations },
+    // Feeds the homepage's live "generated SQL" readout; no-op outside a
+    // withSqlCapture scope.
+    logger: sqlCaptureLogger,
+  });
+
+/**
+ * Schema-typed Drizzle instance for the homepage demo. Deriving the type
+ * from `buildDrizzle` (instead of `ReturnType<typeof drizzle>`) keeps the
+ * schema + relations generics, which is what lets `defineTable<UsersTables>()`
+ * path builders autocomplete and type-check column paths like `profile.bio`.
+ */
+export type DemoDb = ReturnType<typeof buildDrizzle>;
+
 type DatabaseBundle = {
-  db: ReturnType<typeof drizzle>;
+  db: DemoDb;
   sqlite: Database.Database;
 };
 
@@ -22,16 +42,7 @@ async function initDatabase(): Promise<DatabaseBundle> {
   // Enable foreign keys
   sqlite.exec('PRAGMA foreign_keys = ON;');
 
-  // Relations spread under their OWN export names. Spreading a
-  // TABLE-NAME-KEYED relations map here instead (`{ users: usersRelations }`)
-  // would silently overwrite every real table object with its same-named
-  // `Relations` object -- object spread, later keys win (plan 030, finding 11).
-  const db = drizzle(sqlite, {
-    schema: { ...schema, usersRelations, profilesRelations, postsRelations },
-    // Feeds the homepage's live "generated SQL" readout; no-op outside a
-    // withSqlCapture scope.
-    logger: sqlCaptureLogger,
-  });
+  const db = buildDrizzle(sqlite);
 
   // Create tables
   await db.run(sql`CREATE TABLE users (

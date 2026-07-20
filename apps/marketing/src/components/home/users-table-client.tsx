@@ -6,14 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { userActions } from '@/lib/actions/user-actions';
 import { saveUserCell } from '@/lib/actions/user-cell-actions';
-import { defaultVisibleColumns, userColumns } from '@/lib/columns/user-columns';
-import type { UserWithRelations } from '@/lib/db/schema';
+import { defaultVisibleColumns, type UserRow, userColumns } from '@/lib/columns/user-columns';
 import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 
 const TABLE_ID = 'users-table';
 
 interface UsersTableClientProps {
-  data: UserWithRelations[];
+  data: UserRow[];
   totalCount: number;
   initialPagination: PaginationState;
   initialSorting: SortingState;

@@ -69,15 +69,17 @@ Native drivers like `better-sqlite3` must not run during `next build`. Keep the 
 
 ```ts
 // lib/tables.ts — server-only; never import from client components
-import { betterTables } from '@better-tables/core';
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { betterTables } from '@better-tables/core';
+import Database from 'better-sqlite3'; // swap for your driver
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from './schema'; // your Drizzle schema
 
 let tablesPromise: ReturnType<typeof buildTables> | null = null;
 
 async function getDb() {
-  // open your driver / create the drizzle instance here (lazy)
-  // ...
-  return db;
+  // your drizzle setup — open the driver inside the getter, not at module scope
+  return drizzle(new Database('app.db'), { schema });
 }
 
 async function buildTables() {
@@ -133,6 +135,10 @@ Relationship paths like `customer.company` tell the Drizzle adapter to JOIN auto
 ### Fetch on the server
 
 ```ts
+// In your server component — force request-time rendering first, so
+// `next build` never prerenders the page and opens the native driver:
+await connection(); // from 'next/server'
+
 const tables = await getTables();
 const result = await tables.fetchData(ticketsTable, {
   pagination: { page: 1, limit: 20 },
@@ -175,11 +181,15 @@ export function TicketsTable({ rows, total }: { rows: TicketRow[]; total: number
 
 ```tsx
 // app/tickets/page.tsx (server component)
+import { connection } from 'next/server';
 import { getTables } from '@/lib/tables';
 import { ticketsTable } from '@/lib/tickets-table';
 import { TicketsTable } from './tickets-table';
 
 export default async function TicketsPage() {
+  // Force request-time rendering so `next build` never opens the native driver.
+  await connection();
+
   const tables = await getTables();
   const result = await tables.fetchData(ticketsTable, {
     pagination: { page: 1, limit: 20 },

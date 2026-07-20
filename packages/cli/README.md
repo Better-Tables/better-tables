@@ -71,14 +71,15 @@ npm install -g @better-tables/cli
 The `init` command helps you set up Better Tables in your project:
 
 1. **Validates shadcn setup** - Checks for `components.json` configuration
-2. **Installs missing shadcn components** - Automatically installs 21 required UI components
-3. **Copies Better Tables files** - Copies table, filter, hook, store, and utility files to your project
-4. **Transforms imports** - Updates import paths to match your project's alias configuration
+2. **Checks required dependencies** - Detects missing runtime packages and offers to install them with your package manager
+3. **Installs missing shadcn components** - Automatically installs 21 required UI components
+4. **Copies Better Tables files** - Copies table, filter, hook, store, and utility files to your project
+5. **Transforms imports** - Updates import paths to match your project's alias configuration
 
 ### Prerequisites
 
 - Your project must have shadcn/ui initialized (`npx shadcn@latest init`)
-- Node.js 18+ is required
+- Node.js `>=20.19.0` is required (see the `engines` field in `package.json`)
 
 ### What Gets Copied
 
@@ -97,10 +98,15 @@ All import paths are automatically transformed to match your `components.json` a
 
 After running `init`, you'll need to:
 
-1. Install peer dependencies:
+1. Install the required runtime dependencies. The `init` command detects which of
+   these are missing and offers to install them for you; if you skipped that
+   step, install them manually:
    ```bash
-   npm install @better-tables/core zustand @dnd-kit/core @dnd-kit/sortable
+   npm install @better-tables/core @better-tables/adapters-drizzle zustand @dnd-kit/core @dnd-kit/sortable @dnd-kit/modifiers @dnd-kit/utilities
    ```
+   The copied UI source imports all of these directly, so under pnpm's strict
+   dependency resolution they must be direct dependencies of your project —
+   don't rely on them being hoisted or available transitively.
 
 2. Import and use BetterTable:
    ```tsx

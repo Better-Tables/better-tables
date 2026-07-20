@@ -23,7 +23,13 @@ import type {
   TableAdapter,
 } from '../types/adapter';
 import type { ColumnType } from '../types/column';
-import type { FilterGroupNode, FilterNode, FilterOption, FilterState } from '../types/filter';
+import type {
+  FilterGroupNode,
+  FilterNode,
+  FilterOperator,
+  FilterOption,
+  FilterState,
+} from '../types/filter';
 import { FILTER_OPERATORS, getDefaultOperatorsForType } from '../types/filter-operators';
 import type { SortingParams } from '../types/sorting';
 
@@ -45,6 +51,9 @@ export interface MemoryAdapterOptions<TData> {
 }
 
 const DEFAULT_FACET_LIMIT = 100;
+
+/** Available on every column type — evaluated before the per-type switch. */
+const UNIVERSAL_NULL_OPERATORS: FilterOperator[] = ['isNull', 'isNotNull'];
 
 /** Resolve a column id to a per-row value getter (dot-paths walk objects). */
 function accessorFor(columnId: string): (row: unknown) => unknown {
@@ -87,9 +96,10 @@ function relativePeriod(operator: string, now: Date): [number, number] {
     case 'isYesterday':
       return [today - dayMs, today];
     case 'isThisWeek': {
-      // Monday-start week.
-      const weekday = (now.getDay() + 6) % 7;
-      const start = today - weekday * dayMs;
+      // Sunday-start week, matching the toolkit's `computeDatePeriodRange`
+      // (`now.getDate() - now.getDay()`) so a filter returns the same rows
+      // whether it runs here or through a SQL adapter.
+      const start = today - now.getDay() * dayMs;
       return [start, start + 7 * dayMs];
     }
     case 'isThisMonth': {
@@ -105,6 +115,22 @@ function relativePeriod(operator: string, now: Date): [number, number] {
     default:
       return [Number.NaN, Number.NaN];
   }
+}
+
+/** One dev warning per (type, operator) pair — see the `default` branch below. */
+const warnedUnevaluatable = new Set<string>();
+
+function warnUnevaluatable(type: string, operator: string): void {
+  if (process.env.NODE_ENV === 'production') return;
+  const key = `${type}:${operator}`;
+  if (warnedUnevaluatable.has(key)) return;
+  warnedUnevaluatable.add(key);
+  // biome-ignore lint/suspicious/noConsole: dev-only diagnostic, matches core's other adapter warns
+  console.warn(
+    `[better-tables] memoryAdapter cannot evaluate operator '${operator}' on a '${type}' column ` +
+      `— those rows will not match. Custom columns support only 'isNull' / 'isNotNull'; ` +
+      `filter on a built-in column type, or use a database adapter.`
+  );
 }
 
 function jsonIsEmpty(value: unknown): boolean {
@@ -150,7 +176,11 @@ function matchesLeaf(filter: FilterState, raw: unknown): boolean {
           return false;
       }
     }
-    case 'number': {
+    // `currency` / `percentage` are number columns with display formatting —
+    // they share NUMBER_OPERATORS, so they must evaluate identically here.
+    case 'number':
+    case 'currency':
+    case 'percentage': {
       const value = Number(raw);
       if (Number.isNaN(value)) return false;
       const [a, b] = [Number(values[0]), Number(values[1])];
@@ -274,6 +304,11 @@ function matchesLeaf(filter: FilterState, raw: unknown): boolean {
       }
     }
     default:
+      // `custom` columns land here: their operators are user-defined, so there
+      // is no generic semantics to apply. Only the universal `isNull` /
+      // `isNotNull` (handled above) work — warn instead of silently matching
+      // nothing, which reads as "the filter is broken".
+      warnUnevaluatable(filter.type, operator);
       return false;
   }
 }
@@ -565,12 +600,16 @@ export function memoryAdapter<TData>(
         transactions: false,
       },
       supportedColumnTypes: Object.keys(FILTER_OPERATORS) as ColumnType[],
+      // Built-in types get their full operator set. `custom` columns carry
+      // user-defined operators this adapter has no semantics for, so it
+      // advertises only the universal null operators — the ones it can
+      // actually evaluate (anything else warns and matches nothing).
       supportedOperators: Object.fromEntries(
         (Object.keys(FILTER_OPERATORS) as ColumnType[]).map((type) => [
           type,
-          getDefaultOperatorsForType(type),
+          type === 'custom' ? UNIVERSAL_NULL_OPERATORS : getDefaultOperatorsForType(type),
         ])
-      ) as Record<ColumnType, ReturnType<typeof getDefaultOperatorsForType>>,
+      ) as Record<ColumnType, FilterOperator[]>,
       supportsFilterGroups: true,
     },
   };

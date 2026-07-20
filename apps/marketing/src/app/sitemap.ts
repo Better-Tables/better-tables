@@ -28,12 +28,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(post.publishedAt),
   }));
 
-  const docsRoutes = source.getPages().map((page) => ({
-    url: `${base}${page.url}`,
+  const docsRoutes = source.getPages().map((page) => {
     // Optional for the same reason as in docs/[[...slug]]/page.tsx: the
-    // git-based lastModified() transformer is off in source.config.ts.
-    lastModified: (page.data as { lastModified?: Date }).lastModified ?? new Date(),
-  }));
+    // git-based lastModified() transformer is off in source.config.ts. Omit
+    // the field when unknown — stamping `new Date()` would mark every docs
+    // page as freshly modified on each build and mislead crawlers.
+    const lastModified = (page.data as { lastModified?: Date }).lastModified;
+    return {
+      url: `${base}${page.url}`,
+      ...(lastModified ? { lastModified } : {}),
+    };
+  });
 
   return [...staticRoutes, ...blogRoutes, ...docsRoutes];
 }

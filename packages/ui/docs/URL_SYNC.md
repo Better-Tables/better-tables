@@ -3,9 +3,11 @@
 > **Canonical docs:** [better-tables.com/docs/url-state](https://better-tables.com/docs/url-state)
 > (source: `apps/marketing/content/docs/url-state.mdx`). The full teaching —
 > adapter interface, framework adapters (Next.js, React Router, vanilla),
-> `UrlSyncConfig` flags, the `c:` compressed parameter format, and SSR
-> hydration via `deserializeTableStateFromUrl` — lives there. This file is
-> only a pointer for readers browsing the repo.
+> `UrlSyncConfig` flags, the compressed parameter formats (group-aware `c2:`
+> for filters, with legacy `c:` payloads still read; `c:` for sorting /
+> columnVisibility / columnOrder), and SSR hydration via
+> `deserializeTableStateFromUrl` — lives there. This file is only a pointer
+> for readers browsing the repo.
 
 Quick orientation for contributors:
 
