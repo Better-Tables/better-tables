@@ -9,6 +9,8 @@ Pair a browser-safe `httpAdapter` client with a server `createAdapterRouteHandle
 
 Pin table-scoped methods **and** allow-list every column id referenced by facet/filter reads. `authorize: () => true` alone is not safe on a multi-table schema — `getFacetedValues` / `getFilterOptions` / `getMinMaxValues` resolve tables from `columnId`, not from a `primaryTable` pin on `fetchData`. And validating the facet `columnId` alone is not enough either: facet requests also carry the **active filters** in `params.filters`, so an allow-listed facet target combined with a filter on an off-limits column would leak that column's contents through the counts. Validate every filter leaf — `filters` can be a flat `FilterState[]` or a nested `FilterGroupNode` tree — on every method that carries filters.
 
+Write the guard defensively, too: body validation checks the shape envelope, not that `params` is present, so a malformed `fetchData` body reaches `authorize`. Dereference optionally and return `false` on shapes you cannot read — a throw inside `authorize` is caught as a `server_error` and answered 500, when a malformed request should be a client error.
+
 ```ts
 // app/api/tables/tickets/route.ts
 import {
@@ -40,10 +42,12 @@ function collectFilterColumnIds(filters?: FilterState[] | FilterGroupNode): stri
 function collectColumnIds(body: AdapterRequestBody): string[] {
   switch (body.method) {
     case 'fetchData':
+      // Optional access throughout: the handler validates the shape envelope
+      // only, so `params` can be absent here. A throw would surface as a 500.
       return [
-        ...collectFilterColumnIds(body.params.filters),
-        ...(body.params.sorting ?? []).map((sort) => sort.columnId),
-        ...(body.params.columns ?? []),
+        ...collectFilterColumnIds(body.params?.filters),
+        ...(body.params?.sorting ?? []).map((sort) => sort.columnId),
+        ...(body.params?.columns ?? []),
       ];
     case 'getFilterOptions':
     case 'getFacetedValues':
@@ -61,6 +65,10 @@ function collectColumnIds(body: AdapterRequestBody): string[] {
 
 export const POST = createAdapterRouteHandler(() => getTicketsAdapter(), {
   authorize: async (_request, body) => {
+    // Fail closed on shapes the handler accepts but this guard cannot read:
+    // `{ method: 'fetchData' }` with no `params` passes body validation.
+    if (body.method === 'fetchData' && !body.params) return false;
+
     const ids = collectColumnIds(body);
     if (!ids.every((id) => ALLOWED_COLUMNS.has(id))) {
       return new Response(

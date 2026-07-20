@@ -121,7 +121,9 @@ function relativePeriod(operator: string, now: Date): [number, number] {
 const warnedUnevaluatable = new Set<string>();
 
 function warnUnevaluatable(type: string, operator: string): void {
-  if (process.env.NODE_ENV === 'production') return;
+  // `typeof process` guard: core runs in browsers, where a bare `process`
+  // dereference throws ReferenceError. Matches factory.ts / cell-edit-core.ts.
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') return;
   const key = `${type}:${operator}`;
   if (warnedUnevaluatable.has(key)) return;
   warnedUnevaluatable.add(key);

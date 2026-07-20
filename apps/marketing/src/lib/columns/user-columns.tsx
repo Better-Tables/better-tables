@@ -79,11 +79,16 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
         </Badge>
       )),
 
-    // Derived display values: computed client-side from the fetched row, so
-    // they carry no filter/sort (there is no DB column behind them).
+    // Derived display values: computed client-side from the fetched row.
+    // Builders default to filterable/sortable, so both must be turned OFF
+    // explicitly — there is no DB column behind these ids, and letting the
+    // controls through would send `hasBio` / `roleTags` to the query builder
+    // as if they were storage fields.
     t
       .computed('hasBio', (row) => Boolean(row.profile?.bio))
       .displayName('Has Bio')
+      .filterable(false)
+      .sortable(false)
       .cellRenderer(({ value }) => (
         <Badge variant={value ? 'secondary' : 'outline'} className="text-xs">
           {value ? 'Yes' : 'No'}
@@ -93,6 +98,8 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
     t
       .computed('roleTags', (row) => [row.role])
       .displayName('Role Tags')
+      .filterable(false)
+      .sortable(false)
       .cellRenderer(({ value }) => (
         <div className="flex flex-wrap gap-1">
           {(value as string[]).map((tag) => (
@@ -112,6 +119,9 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
       .searchable({ includeNull: true })
       .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
       .filterable()
+      // `profiles.bio` is a nullable column; without this the edit pipeline
+      // rejects clearing the cell with "This field is required."
+      .nullable()
       .editable(),
 
     t
@@ -140,6 +150,8 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
       .displayName('Location')
       .searchable({ includeNull: true })
       .filterable()
+      // Nullable column — see `profile.bio` above.
+      .nullable()
       .editable(),
 
     t

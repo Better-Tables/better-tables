@@ -33,6 +33,8 @@ export function getSupportTables() {
 Next.js may expose a repeated query param as `string[]`. Normalize before `Number(...)` so malformed URLs (`?page=abc`, `?page=1.25`) do not send `NaN` or fractional pages to the adapter (or use `deserializeTableStateFromUrl` from [URL State](/docs/url-state)):
 
 ```tsx
+import { connection } from 'next/server';
+
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }

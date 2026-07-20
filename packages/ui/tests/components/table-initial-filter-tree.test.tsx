@@ -138,4 +138,77 @@ describe('BetterTable initialFilters tree collapse', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('warns when "Clear all" discards a seeded tree (it bypasses the flat edit path)', () => {
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const id = `${TABLE_ID}-reset`;
+      render(
+        <BetterTable
+          id={id}
+          columns={columns}
+          data={rows}
+          virtualized={false}
+          initialFilters={{ kind: 'group', logic: 'or', children: [nameLeaf, statusLeaf] }}
+        />
+      );
+
+      const store = getTableStore(id);
+      if (!store) throw new Error('Expected table store');
+
+      // Clear all routes through `onReset` -> manager.reset(), NOT through
+      // handleFiltersChange — the path that used to drop the tree silently.
+      fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
+
+      expect(isFilterGroupNode(store.getState().manager.getFilterNode())).toBe(false);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain('Clear all');
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain(id);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('re-arms the one-time warning when the table id changes', () => {
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const tree: FilterGroupNode = {
+        kind: 'group',
+        logic: 'or',
+        children: [nameLeaf, statusLeaf],
+      };
+      const first = `${TABLE_ID}-rearm-a`;
+      const second = `${TABLE_ID}-rearm-b`;
+
+      const { rerender } = render(
+        <BetterTable
+          id={first}
+          columns={columns}
+          data={rows}
+          virtualized={false}
+          initialFilters={tree}
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: /remove name filter/i }));
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      // Same component instance, new table id => new store and new seeded
+      // tree. A bare boolean latch would swallow this second warning.
+      rerender(
+        <BetterTable
+          id={second}
+          columns={columns}
+          data={rows}
+          virtualized={false}
+          initialFilters={tree}
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: /remove name filter/i }));
+
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(String(warnSpy.mock.calls[1]?.[0])).toContain(second);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });

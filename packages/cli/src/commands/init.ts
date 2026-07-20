@@ -119,11 +119,15 @@ export function initCommand(): Command {
     }
     console.log(pc.green('✓ shadcn/ui configuration found (components.json)\n'));
     // Step 3: Check for required dependencies
-    // Core + adapter for data; zustand / @dnd-kit are direct imports in the
-    // copied UI source (not transitive under pnpm strict installs).
+    //
+    // Only what the copied source actually imports: core, plus zustand /
+    // @dnd-kit (direct imports in the copied UI, not transitive under pnpm
+    // strict installs). Database adapters are deliberately NOT required —
+    // nothing in packages/ui imports one, and core ships `memoryAdapter`, so
+    // client-only and custom-adapter projects must not inherit
+    // @better-tables/adapters-drizzle and its driver peer deps.
     const requiredPackages = [
       '@better-tables/core',
-      '@better-tables/adapters-drizzle',
       'zustand',
       '@dnd-kit/core',
       '@dnd-kit/sortable',
@@ -287,6 +291,13 @@ export function initCommand(): Command {
     console.log(
       pc.cyan(
         `     import { BetterTable } from '${aliasPrefix}components/${componentsPath}/table/table';`
+      )
+    );
+    console.log(pc.dim('\n  2. Pick a data source:'));
+    console.log(
+      pc.dim(
+        "     • memoryAdapter from '@better-tables/core' — arrays, no install needed\n" +
+          '     • a database adapter, e.g. @better-tables/adapters-drizzle (install separately)'
       )
     );
     console.log('');

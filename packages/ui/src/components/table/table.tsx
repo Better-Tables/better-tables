@@ -965,6 +965,29 @@ function BetterTableInner<TData = unknown>({
     return rowConfig?.getId || defaultGetRowId;
   }, [rowConfig?.getId]);
 
+  // One-time dev diagnostic shared by every path that can destroy a seeded
+  // `FilterGroupNode` tree (see `handleFiltersChange` and `handleReset`).
+  //
+  // Keyed by the table `id` rather than a bare boolean: an instance re-pointed
+  // at a different `id` gets a different store/tree, so a boolean latch would
+  // silently suppress the new table's first tree-dropping edit. Storing the id
+  // we warned for re-arms the diagnostic whenever `id` changes.
+  //
+  // Callers pass the full message body and must call this BEFORE mutating the
+  // store — the check reads the CURRENT filter node, which is only still a
+  // group node until the mutation lands.
+  const warnedFilterTreeIdRef = useRef<string | null>(null);
+  const warnFilterTreeDropped = useCallback(
+    (message: string) => {
+      if (process.env.NODE_ENV === 'production') return;
+      if (warnedFilterTreeIdRef.current === id) return;
+      if (!isFilterGroupNode(store.getState().manager.getFilterNode())) return;
+      warnedFilterTreeIdRef.current = id;
+      console.warn(`[better-tables] table "${id}": ${message}`);
+    },
+    [id, store]
+  );
+
   // Handle filter changes - just update store.
   //
   // The filter bar edits the FLAT leaf view, and the store's `setFilters`
@@ -973,24 +996,16 @@ function BetterTableInner<TData = unknown>({
   // it to an implicit-AND array of its leaves. That is the documented
   // limitation on `initialFilters`; warn once in dev so the semantics change
   // isn't silent. Tree-preserving updates go through `setFilterNode` instead.
-  const warnedFilterTreeReplacedRef = useRef(false);
   const handleFiltersChange = useCallback(
     (newFilters: FilterState[]) => {
-      if (
-        process.env.NODE_ENV !== 'production' &&
-        !warnedFilterTreeReplacedRef.current &&
-        isFilterGroupNode(store.getState().manager.getFilterNode())
-      ) {
-        warnedFilterTreeReplacedRef.current = true;
-        console.warn(
-          `[better-tables] table "${id}": a filter bar edit replaced the FilterGroupNode ` +
-            'filter tree with a flat implicit-AND filter list, dropping its AND/OR ' +
-            'structure. Use the store/manager setFilterNode() for tree-preserving updates.'
-        );
-      }
+      warnFilterTreeDropped(
+        'a filter bar edit replaced the FilterGroupNode filter tree with a flat ' +
+          'implicit-AND filter list, dropping its AND/OR structure. Use the ' +
+          'store/manager setFilterNode() for tree-preserving updates.'
+      );
       setFilters(newFilters);
     },
-    [setFilters, store, id]
+    [setFilters, warnFilterTreeDropped]
   );
 
   // Handle sorting changes - use store's toggleSort
@@ -1076,11 +1091,23 @@ function BetterTableInner<TData = unknown>({
     clearFilters();
   }, [clearFilters]);
 
-  // Reset all table state handler
+  // Reset all table state handler.
+  //
+  // This is the filter bar's "Clear all" target (`<FilterBar onReset>` is
+  // always supplied below, so clear-all never falls through to the bar's
+  // `onFiltersChange` path). It calls the manager's `reset()` directly, which
+  // means it bypasses `handleFiltersChange` — hence the explicit diagnostic
+  // here: without it, clear-all would discard a seeded `FilterGroupNode` tree
+  // silently. Warn BEFORE `reset()`, while the tree is still readable.
   const handleReset = useCallback(() => {
+    warnFilterTreeDropped(
+      'a filter bar "Clear all" reset discarded the seeded FilterGroupNode filter ' +
+        'tree along with the rest of the table state. Re-seed it with the ' +
+        'store/manager setFilterNode() if the tree must survive a reset.'
+    );
     const state = store.getState();
     state.reset();
-  }, [store]);
+  }, [store, warnFilterTreeDropped]);
 
   // Check if context menu is enabled
   const contextMenuEnabled = headerContextMenu?.enabled ?? false;

@@ -102,11 +102,19 @@ After running `init`, you'll need to:
    these are missing and offers to install them for you; if you skipped that
    step, install them manually:
    ```bash
-   npm install @better-tables/core @better-tables/adapters-drizzle zustand @dnd-kit/core @dnd-kit/sortable @dnd-kit/modifiers @dnd-kit/utilities
+   npm install @better-tables/core zustand @dnd-kit/core @dnd-kit/sortable @dnd-kit/modifiers @dnd-kit/utilities
    ```
    The copied UI source imports all of these directly, so under pnpm's strict
    dependency resolution they must be direct dependencies of your project —
    don't rely on them being hoisted or available transitively.
+
+   A database adapter is **optional** and installed separately — nothing in the
+   copied UI imports one. Use `memoryAdapter` from `@better-tables/core` for
+   arrays (client-only tables, playgrounds, tests), or add an adapter for your
+   database:
+   ```bash
+   npm install @better-tables/adapters-drizzle drizzle-orm
+   ```
 
 2. Import and use BetterTable:
    ```tsx

@@ -32,7 +32,15 @@ mock.module('@/lib/db/sql-capture', () => ({
   sqlCaptureLogger: { logQuery() {} },
 }));
 
+// `mock.module` is process-wide, not file-scoped: a bare `{ usersTable }`
+// stub would replace this module's ENTIRE surface for every suite that runs
+// afterwards (user-columns.test.ts then sees no `userColumns` export). Spread
+// the real module and override only the table definition this suite stubs —
+// same reasoning as the two mocks above.
+const actualUserColumns = await import('@/lib/columns/user-columns');
+
 mock.module('@/lib/columns/user-columns', () => ({
+  ...actualUserColumns,
   usersTable: { id: 'users' },
 }));
 
