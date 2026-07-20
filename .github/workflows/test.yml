@@ -73,7 +73,7 @@ jobs:
         run: bun run build --filter=@better-tables/core
 
       - name: Upload Core build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: core-dist
           path: packages/core/dist
