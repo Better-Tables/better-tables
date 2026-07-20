@@ -12,6 +12,7 @@ here.
 | `@better-tables/ui` | `packages/ui` | **private** — distributed via CLI copy, not npm | React table/filter components (shadcn-style), hooks, stores. |
 | `@better-tables/cli` | `packages/cli` | npm (public) | `better-tables init` — copies `ui`'s components into a consumer project. |
 | `@better-tables/adapters-drizzle` | `packages/adapters/drizzle` | npm (public) | Drizzle ORM adapter: schema introspection, JOIN/filter/pagination query generation for Postgres/MySQL/SQLite. |
+| `@better-tables/adapters-toolkit` | `packages/adapters/toolkit` | npm (public) | ORM-agnostic adapter toolkit: shared primitives (data transform, primary-table resolution, schema/SQL utils) for building adapters. |
 | `@better-tables/site` | `apps/marketing` | private | Public site: marketing, examples, and docs (in-memory SQLite demo + seed). |
 
 ## Data flow (one-liner)
@@ -52,17 +53,16 @@ for optional MySQL/Postgres integration tests).
 ## Published vs. private
 
 - **Published to npm**: `@better-tables/core`, `@better-tables/cli`,
-  `@better-tables/adapters-drizzle`.
+  `@better-tables/adapters-drizzle`, `@better-tables/adapters-toolkit`.
 - **Private** (`"private": true`): `@better-tables/ui` (copied via the CLI,
   not installed from npm — do not remove `private` without re-reading
   plan 009 Step 3's reasoning), `apps/marketing`.
 
-## Deferred packaging work (plan 007 / plan 009)
+## Deferred packaging work (plan 009)
 
-- `packages/adapters/drizzle/package.json` dependency classes
-  (`drizzle-orm`/`better-sqlite3` should move out of `dependencies`) and its
-  `sideEffects` field are deferred until plan 007 (adapter toolkit
-  extraction) lands, to avoid merge conflicts. See `plans/009-dx-hygiene-sweep.md`.
+- Plan 007 (adapter toolkit extraction) landed: `packages/adapters/toolkit`
+  exists, `drizzle-orm`/`better-sqlite3`/drivers are `peerDependencies` of the
+  Drizzle adapter, and its `sideEffects: false` is set.
 - `packages/ui` builds with tsdown **`unbundle: true`** (ESM file-to-file) so
   per-file `'use client'` directives survive. Do not reintroduce a global
   `"use client"` banner or a single bundled UI entry without re-checking
@@ -73,8 +73,22 @@ for optional MySQL/Postgres integration tests).
 
 ## Deep dives
 
-For architecture, the column-builder API, filtering/sorting/pagination
-internals, URL state sync, and Next.js integration details, see `wiki.md`
-by heading: "Architecture Overview", "Column Definition (Builder API)",
-"Advanced Filtering System", "Sorting", "Pagination", "URL State
-Management", "Next.js Integration".
+Canonical docs: `apps/marketing/content/docs/` served at `/docs` on
+`@better-tables/site`. `wiki.md` is a short path map for agents.
+
+| Topic | Docs path |
+|---|---|
+| Architecture | `/docs/architecture` |
+| Columns | `/docs/columns` |
+| Filtering (operator reference) | `/docs/filtering` |
+| Sorting | `/docs/sorting` |
+| Pagination | `/docs/pagination` |
+| Facets | `/docs/facets` |
+| Selection & actions | `/docs/selection-and-actions` |
+| Inline editing | `/docs/inline-editing` |
+| Large datasets | `/docs/large-datasets` |
+| URL state | `/docs/url-state` |
+| Next.js | `/docs/nextjs` |
+| BetterTable props | `/docs/better-table` |
+| Custom adapters | `/docs/adapters/custom` |
+| Troubleshooting | `/docs/troubleshooting` |

@@ -1,0 +1,31 @@
+---
+title: Auto Columns
+description: Infer columns from adapter schema introspection with explicit overrides.
+---
+
+The adapter already knows every column's name, type, nullability, and enum values (`adapter.describeColumns`, implemented by the Drizzle adapter and proxied by `httpAdapter`). Two forms consume it:
+
+```ts
+// Fully inferred: zero column boilerplate.
+export const usersTable = tables.define('users');
+// or: defineTable<typeof tables>()('users')
+
+// Inferred base + explicit overrides — explicit wins by id:
+export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+  columns: [...t.auto(), t.text('subject').editable()],
+}));
+```
+
+## Resolution rules
+
+Resolution is **lazy, at mount**: `<BetterTable table={def} adapter={adapter} />` calls core's `resolveTableColumns(def, adapter)` before creating the table store. The curried `defineTable` form stays runtime-adapter-free and RSC-safe.
+
+- **Explicit wins by id**; order is explicit first, then inferred in stable schema order.
+- **Enrichment is independent of `t.auto()`**: an explicit `t.option('status')` with no `.options()` gets choices from the schema enum. Declared config always wins; enrichment only fills gaps. A declared type contradicting the schema type logs a dev warn.
+- **`t.auto()`'s only job is column-set inclusion** ("and the rest of the table's columns"). Auto-inclusion is never the default — declaring a subset is deliberate.
+- **Inferred columns are read-only** (`sortable` / `filterable` / `hideable`, never `editable`) until explicitly overridden.
+- Fully-declared tables skip resolution entirely. An adapter without `describeColumns` degrades to the declared list with a dev warn. Own-table columns only — relations stay explicit.
+
+## Reference
+
+See `apps/marketing/src/lib/demo/support/columns.tsx` and `packages/core/src/builders/path-builders.ts`.

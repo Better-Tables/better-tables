@@ -1011,8 +1011,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Resolve the primary table for a READ entry point (fetchData,
    * getFilterOptions, getFacetedValues, getMinMaxValues, getJoinCount).
    *
-   * Mirrors {@link resolveMutationTable}'s throw precedent (MIGRATION.md
-   * §7) for reads: when the schema has more than one table and neither
+   * Mirrors {@link resolveMutationTable}'s throw precedent for reads: when the schema has more than one table and neither
    * `columns`, a per-call `primaryTable`, nor `options.defaultPrimaryTable`
    * disambiguates which table to query, silently assuming "the first
    * table" would return plausible-but-wrong rows (plan 029 finding 9).
@@ -1428,7 +1427,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       const computedField = tableComputedFields.find((cf) => cf.field === child.columnId);
       if (computedField?.filter || computedField?.filterSql) {
         throw new QueryError(
-          `Computed-field filters inside a FilterGroupNode are not supported yet (columnId: "${child.columnId}"). Use a flat FilterState[] (implicit AND) for computed-field filters, or flatten the tree at the call site. See MIGRATION.md "Known gaps".`,
+          `Computed-field filters inside a FilterGroupNode are not supported yet (columnId: "${child.columnId}"). Use a flat FilterState[] (implicit AND) for computed-field filters, or flatten the tree at the call site.`,
           { columnId: child.columnId, field: computedField.field }
         );
       }

@@ -1,14 +1,35 @@
 import { drizzleAdapter } from '@better-tables/adapters-drizzle';
 import { betterTables } from '@better-tables/core';
-import { getDatabase } from './db';
+import { type DemoDb, getDatabase } from './db';
 
-type AdapterInstance = ReturnType<typeof drizzleAdapter>;
-type TablesInstance = ReturnType<typeof betterTables>;
+/**
+ * Typed build functions, split out so their RETURN TYPES can be captured at
+ * module scope. `UsersTables` is what `defineTable<UsersTables>()` needs to
+ * type every column path (own columns AND relation paths like
+ * `profile.bio`) from the Drizzle schema — the runtime instances stay lazy
+ * behind the async getters below.
+ */
+function buildUsersAdapter(db: DemoDb) {
+  // The demo schema has three tables (users, profiles, posts); this adapter
+  // only ever serves the users table. `defaultPrimaryTable` names it so a
+  // parameterless read resolves unambiguously instead of throwing the
+  // multi-table SchemaError (plan 030, finding 9).
+  return drizzleAdapter(db, {
+    options: { defaultPrimaryTable: 'users' },
+  });
+}
 
-let adapterInstance: AdapterInstance | null = null;
+function buildUsersTables(adapter: UsersAdapter) {
+  return betterTables({ database: adapter });
+}
+
+export type UsersAdapter = ReturnType<typeof buildUsersAdapter>;
+export type UsersTables = ReturnType<typeof buildUsersTables>;
+
+let adapterInstance: UsersAdapter | null = null;
 let adapterPromise: Promise<void> | null = null;
 
-let tablesInstance: TablesInstance | null = null;
+let tablesInstance: UsersTables | null = null;
 let tablesPromise: Promise<void> | null = null;
 
 /**
@@ -25,17 +46,11 @@ export function resetAdapterCaches() {
   tablesPromise = null;
 }
 
-export async function getAdapter(): Promise<AdapterInstance> {
+export async function getAdapter(): Promise<UsersAdapter> {
   if (!adapterPromise) {
     adapterPromise = getDatabase()
       .then(({ db }) => {
-        // The demo schema has three tables (users, profiles, posts); this adapter
-        // only ever serves the users table. `defaultPrimaryTable` names it so a
-        // parameterless read resolves unambiguously instead of throwing the
-        // multi-table SchemaError (plan 030, finding 9).
-        adapterInstance = drizzleAdapter(db, {
-          options: { defaultPrimaryTable: 'users' },
-        });
+        adapterInstance = buildUsersAdapter(db);
       })
       .catch((error) => {
         adapterPromise = null;
@@ -56,11 +71,11 @@ export async function getAdapter(): Promise<AdapterInstance> {
  * injects `primaryTable` and returns rows typed as the table's own row --
  * no cast (findings 9 + 16).
  */
-export async function getTables(): Promise<TablesInstance> {
+export async function getTables(): Promise<UsersTables> {
   if (!tablesPromise) {
     tablesPromise = getAdapter()
       .then((adapter) => {
-        tablesInstance = betterTables({ database: adapter });
+        tablesInstance = buildUsersTables(adapter);
       })
       .catch((error) => {
         tablesPromise = null;

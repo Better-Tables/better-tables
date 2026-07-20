@@ -1,0 +1,46 @@
+---
+title: "@better-tables/core"
+description: Column builders, managers, HTTP adapter helpers, and adapter contracts.
+---
+
+Public npm package. No React, no database driver.
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bun add @better-tables/core
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @better-tables/core
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @better-tables/core
+```
+
+</Tab>
+</Tabs>
+
+## Exports by area
+
+| Area | Exports |
+|---|---|
+| Factory | `betterTables`, `defineTable` — the flagship entry points ([Quick Start](/docs/quick-start)) |
+| Path builders | The `t` callback surface: `t.text` / `t.number` / `t.date` / `t.option` / `t.multiOption` / `t.boolean` / `t.computed` / `t.custom` / `t.auto` ([Columns](/docs/columns)) |
+| Column resolution | `resolveTableColumns` — auto-column resolution at mount ([Auto columns](/docs/columns/auto-columns)) |
+| Editing | `cellEditAction` on the factory, `ValidationRule`, `EditableConfig` ([Inline editing](/docs/inline-editing)) |
+| Managers | `TableStateManager`, `FilterManager`, `PaginationManager`, `SortingManager`, `SelectionManager`, `VirtualizationManager` |
+| Stores & URL | `getTableStore`, `UrlSyncAdapter`, `UrlSyncConfig`, `serializeFiltersToURL` / `deserializeFiltersFromURL`, `serializeTableStateToUrl` / `deserializeTableStateFromUrl` ([URL State](/docs/url-state)) |
+| HTTP transport | `httpAdapter`, `createAdapterRouteHandler` ([HTTP adapter](/docs/adapters/http)) |
+| Adapter contract | `TableAdapter`, `FetchDataParams`, `FetchDataResult`, `FacetQueryParams`, `AdapterFeatures`, `InferredColumnSpec` ([Custom adapters](/docs/adapters/custom)) |
+| Memory adapter | `memoryAdapter(rows, options?)` — the full pipeline over an in-memory array ([Custom adapters](/docs/adapters/custom#memory-adapter)) |
+| Standalone columns | `defineTableRow`, `defineColumns`, and the builder classes (`TextColumnBuilder`, …) for hand-built columns ([Columns](/docs/columns#standalone-columns-no-schema)) |
+| Filter types | `FilterState`, `FilterGroupNode`, `FilterOperator` + per-type operator unions, `FilterConfig` ([Filtering](/docs/filtering)) |

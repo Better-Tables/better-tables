@@ -1,0 +1,206 @@
+---
+title: URL State
+description: Framework-agnostic sync of filters, pagination, sorting, column visibility, and column order to query parameters.
+---
+
+Sync table state to query parameters via a framework-agnostic adapter. Filters write a compressed group-aware wire format (`c2:` prefix); legacy `c:` payloads still deserialize as a flat `FilterState[]`. See `serializeFiltersToURL` / `deserializeFiltersFromURL` in `@better-tables/core` (or `serializeTableStateToUrl` / `deserializeTableStateFromUrl` for the full state in one call).
+
+## Adapter interface
+
+The adapter type lives in `@better-tables/core`:
+
+```ts
+import type { UrlSyncAdapter } from '@better-tables/core';
+
+interface UrlSyncAdapter {
+  getParam: (key: string) => string | null;
+  setParams: (updates: Record<string, string | null>) => void;
+}
+```
+
+## Next.js App Router adapter
+
+```ts
+// lib/nextjs-url-adapter.ts
+'use client';
+
+import type { UrlSyncAdapter } from '@better-tables/core';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+export function useNextjsUrlAdapter(): UrlSyncAdapter {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  return {
+    getParam: (key: string) => searchParams.get(key),
+    setParams: (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams);
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      }
+
+      router.push(`?${params.toString()}`, { scroll: false });
+    },
+  };
+}
+```
+
+## Wiring it up
+
+Components and hooks are copied into your app by `better-tables init` — import them from your local paths (defaults shown; adjust to your `--components-path` and aliases). Inside this repo's own demos you'll see `from '@better-tables/ui'` instead; that workspace package is not published, so as a consumer you always import the copied files.
+
+The simplest wiring is the `urlSync` prop — `<BetterTable>` runs the sync internally:
+
+```tsx
+'use client';
+
+import { BetterTable } from '@/components/better-tables-ui/table/table';
+import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
+
+export function MyTable({ data }) {
+  const urlAdapter = useNextjsUrlAdapter();
+
+  return (
+    <BetterTable
+      id="my-table"
+      columns={columns}
+      data={data}
+      urlSync={{
+        adapter: urlAdapter,
+        config: { filters: true, pagination: true, sorting: true },
+      }}
+    />
+  );
+}
+```
+
+Or call the hook yourself (equivalent, useful when the table id is shared with other state consumers):
+
+```tsx
+'use client';
+
+import { BetterTable } from '@/components/better-tables-ui/table/table';
+import { useTableUrlSync } from '@/hooks/use-table-url-sync';
+import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
+
+export function MyTable({ data }) {
+  const urlAdapter = useNextjsUrlAdapter();
+
+  useTableUrlSync(
+    'my-table',
+    { filters: true, pagination: true, sorting: true },
+    urlAdapter
+  );
+
+  return <BetterTable id="my-table" columns={columns} data={data} />;
+}
+```
+
+## Other frameworks
+
+The adapter is two functions, so any router works. React Router v6:
+
+```ts
+// lib/react-router-url-adapter.ts
+import type { UrlSyncAdapter } from '@better-tables/core';
+import { useSearchParams } from 'react-router-dom';
+
+export function useReactRouterAdapter(): UrlSyncAdapter {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  return {
+    getParam: (key: string) => searchParams.get(key),
+    setParams: (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams);
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      }
+
+      setSearchParams(params, { replace: true });
+    },
+  };
+}
+```
+
+TanStack Router and Remix follow the same shape against their own search-param hooks. For plain React (no router), the copied hooks file exports a ready-made adapter over the History API:
+
+```ts
+import { createVanillaUrlAdapter } from '@/hooks/use-table-url-sync';
+
+const urlAdapter = createVanillaUrlAdapter();
+```
+
+## What can be synced
+
+`UrlSyncConfig` is five independent flags:
+
+| Flag | URL params | Notes |
+|---|---|---|
+| `filters` | compressed `c2:`-prefixed param (legacy `c:` still reads) | Includes AND/OR query groups — trees survive share links |
+| `pagination` | page / page size | 1-based page |
+| `sorting` | multi-column sort descriptors | |
+| `columnVisibility` | shown/hidden column ids | Pairs with `.hideable()` columns |
+| `columnOrder` | column order | Pairs with drag-and-drop column reordering |
+
+Enable only what should be shareable — anything not synced stays client-local state.
+
+## URL parameter format
+
+Simple values (`page`, `limit`) are plain strings; complex state is lz-string–compressed. Filters use the `c2:` prefix (group-aware); other fields use `c:`:
+
+```
+/users?page=2&limit=20&filters=c2:...&sorting=c:...
+```
+
+## SSR: hydrate initial state from the URL
+
+On the server, parse the same params with `deserializeTableStateFromUrl` (handles decompression) and fetch the right page before render:
+
+```tsx
+// app/users/page.tsx (Next.js App Router)
+import { deserializeTableStateFromUrl } from '@better-tables/core';
+
+export default async function UsersPage({ searchParams }) {
+  const params = await searchParams;
+
+  const tableState = deserializeTableStateFromUrl({
+    filters: params.filters ?? undefined,
+    page: params.page ?? undefined,
+    limit: params.limit ?? undefined,
+    sorting: params.sorting ?? undefined,
+  });
+
+  const page = tableState.pagination?.page ?? 1;
+  const limit = tableState.pagination?.limit ?? 10;
+
+  const result = await tables.fetchData(usersTable, {
+    pagination: { page, limit },
+    filters: tableState.filters ?? [],
+    sorting: tableState.sorting ?? [],
+  });
+
+  return (
+    <UsersTableClient
+      data={result.data}
+      totalCount={result.total}
+      initialPagination={{ page, limit }}
+      initialFilters={tableState.filters ?? []}
+      initialSorting={tableState.sorting ?? []}
+    />
+  );
+}
+```
+
+The client then mounts with matching state and `useTableUrlSync` keeps it in sync from there.
+
+Reference implementation: `apps/marketing/src/lib/nextjs-url-adapter.ts`. Package notes: `packages/ui/docs/URL_SYNC.md` (canonical teaching is this page).

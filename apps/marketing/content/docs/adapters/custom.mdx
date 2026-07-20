@@ -1,0 +1,83 @@
+---
+title: Custom Adapters
+description: Implement the TableAdapter contract for any backend, with the ORM-agnostic toolkit doing the heavy lifting.
+---
+
+An adapter is anything that implements the `TableAdapter` contract from `@better-tables/core`. The Drizzle adapter is the first-party reference; `@better-tables/adapters-toolkit` packages its ORM-agnostic machinery so a Prisma/Kysely/raw-SQL adapter composes primitives instead of re-implementing them.
+
+## Memory adapter
+
+Core ships one adapter of its own: `memoryAdapter(rows)`, the full pipeline over a plain array — every filter operator for the built-in column types, AND/OR trees, sorting, pagination, facets with self-exclusion, schema inference for [auto columns](/docs/columns/auto-columns), and in-place cell edits. `custom` columns are the one exception: their operators are user-defined, so there's no generic way to evaluate them in memory — only the universal `isNull` / `isNotNull` are supported there. Use it for client-only tables, playgrounds, tests, and as a small readable reference for the contract below.
+
+```ts
+import { betterTables, memoryAdapter } from '@better-tables/core';
+
+const tables = betterTables({ database: memoryAdapter(tickets) });
+const ticketsTable = tables.define('memory'); // auto columns inferred from the data
+
+const result = await tables.fetchData(ticketsTable, {
+  filters: [{ columnId: 'status', type: 'option', operator: 'is', values: ['open'] }],
+  pagination: { page: 1, limit: 20 },
+});
+```
+
+Options: `getRowId` (row identity for edits; defaults to the `id` field), `tableName`, and `enumInferenceLimit` (distinct-string ceiling for inferring `option` columns; default 12, `0` disables). Scope: own-table columns only — dot-path ids walk nested objects, but there's no relationship model or JOIN semantics; use a database adapter for relational data.
+
+## The contract
+
+```ts
+import type { TableAdapter } from '@better-tables/core';
+```
+
+**Required** — every adapter implements these four methods plus `meta`:
+
+| Member | Purpose |
+|---|---|
+| `fetchData(params)` | Filtered/sorted/paginated rows → `{ data, total, pagination, faceted?, meta? }` |
+| `getFilterOptions(columnId, params?)` | Distinct choices for option filters → `FilterOption[]` |
+| `getFacetedValues(columnId, params?)` | Value counts → `Map<string, number>` (self-exclusion is YOUR job: a column's own filter must not narrow its own facet) |
+| `getMinMaxValues(columnId, params?)` | `[min, max]` for range facets |
+| `meta` | `AdapterMeta` — name, version, and the `features` flags below |
+
+**Optional** — declare only what you support; `features` must match:
+
+| Member | Enables |
+|---|---|
+| `describeColumns(table?)` | [Auto columns](/docs/columns/auto-columns): name/type/nullability/enums/writability per column (`InferredColumnSpec[]`) |
+| `resolveCellWriteTarget(columnId, table?)` | Inline editing on relationship paths — maps a column id to `{ table, field, relatedIdPath, single, writable }` |
+| `createRecord` / `updateRecord` / `deleteRecord` | Mutations (`updateRecord` powers adapter-path [inline editing](/docs/inline-editing)) |
+| `bulkUpdate` / `bulkDelete` | Bulk mutations |
+| `exportData(params)` | Export (`csv` / `json` / `excel`) |
+| `subscribe(callback)` | Real-time data events |
+
+`AdapterFeatures` flags: `create`, `read`, `update`, `delete`, `bulkOperations`, `realTimeUpdates`, `export`, `transactions`. The UI checks these before offering behavior — `features.update: false` renders adapter-saved editable cells read-only.
+
+`fetchData` params to honor: `pagination` (1-based), `sorting[]`, `filters` (`FilterState[]` = implicit AND, **or** a `FilterGroupNode` tree — core does not canonicalize before dispatch; support both), `columns`, `primaryTable`, `params`, `signal`. The `search` param is declared on the contract but not yet consumed by first-party callers.
+
+## What the toolkit provides
+
+```bash
+bun add @better-tables/adapters-toolkit
+```
+
+| Export | Job |
+|---|---|
+| `FilterRouter` + `PredicateEmitter` | Classifies every filter operator and routes it to small per-kind emit callbacks you implement for your backend; includes `computeDatePeriodRange` for `isToday`/`isThisWeek`/… and `FilterRouterError` |
+| `DataTransformer` | Flat JOINed rows → nested objects (`customer.company` → `row.customer.company`) |
+| `PrimaryTableResolver` | Infers the primary table from column ids / heuristics (`RelationshipMapLike`) |
+| `SchemaIntrospectionPort` / `RelationshipManagerPort` | The two ORM-specific interfaces you implement; everything else composes against them |
+| `RelationshipMap` / `RelationshipPath` / `ColumnPath` / `AggregateColumn` / `PrimaryKeyInfo` / `ColumnInfoLike` | Shared types for relationship-path resolution |
+| `getPrimaryKeyInfo` / `getPrimaryKeyMap` | Primary-key introspection helpers |
+| `generateAlias` / `generatePathAlias` / `generatePathKey` | Stable JOIN alias generation for relationship paths |
+| `escapeSqlIdentifier` / `quoteIdentifier` | Safe SQL identifier handling |
+| `calculateLevenshteinDistance` | "Did you mean …?" suggestions in `SchemaError`s |
+| `SchemaError` | The error type to throw for unknown tables/columns |
+
+## Suggested shape
+
+1. Implement the ORM-specific ports: `SchemaIntrospectionPort`, `RelationshipManagerPort`, and a `PredicateEmitter<TColumn, TPredicate>` for your backend's predicate type (Drizzle's reference is `DrizzlePredicateEmitter`).
+2. Build `fetchData`: resolve the primary table (`PrimaryTableResolver`), construct `new FilterRouter(emitter)`, route filters through it, apply sorting/pagination, and nest results with `DataTransformer`. Accept both flat `FilterState[]` and `FilterGroupNode` inputs.
+3. Add facets: `getFacetedValues` / `getMinMaxValues` are grouped-count / min-max variants of the same query pipeline — remember self-exclusion.
+4. Fill in `meta.features` honestly; add mutations and `describeColumns` last.
+
+Study `packages/adapters/drizzle` side by side — it composes exactly these primitives, and its test suites (`packages/adapters/drizzle/tests`) show the expected behavior per contract method, including the HTTP wire cases in [HTTP adapter](/docs/adapters/http).

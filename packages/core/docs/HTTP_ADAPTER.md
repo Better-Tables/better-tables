@@ -1,5 +1,9 @@
 # HTTP adapter
 
+> **Canonical docs:** [better-tables.com/docs/adapters/http](https://better-tables.com/docs/adapters/http)
+> (source: `apps/marketing/content/docs/adapters/http.mdx`). This file is a
+> package-local mirror for readers browsing the repo.
+
 Pair a browser-safe `httpAdapter` client with a server
 `createAdapterRouteHandler` so client components can call a server-only
 adapter (e.g. Drizzle wrapping `better-sqlite3`) without hand-rolling fetch

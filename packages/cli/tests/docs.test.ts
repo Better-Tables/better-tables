@@ -52,7 +52,7 @@ describe('docs command', () => {
     }
 
     expect(openMock).toHaveBeenCalledTimes(1);
-    expect(openMock).toHaveBeenCalledWith('https://github.com/Better-Tables/better-tables#readme');
+    expect(openMock).toHaveBeenCalledWith('https://better-tables.com/docs');
     expect(consoleLogSpy).toHaveBeenCalledWith('Opening main documentation...');
   });
 
@@ -66,9 +66,7 @@ describe('docs command', () => {
     }
 
     expect(openMock).toHaveBeenCalledTimes(1);
-    expect(openMock).toHaveBeenCalledWith(
-      'https://github.com/Better-Tables/better-tables/tree/main/packages/core#readme'
-    );
+    expect(openMock).toHaveBeenCalledWith('https://better-tables.com/docs/packages/core');
     expect(consoleLogSpy).toHaveBeenCalledWith('Opening core documentation...');
   });
 
@@ -82,9 +80,7 @@ describe('docs command', () => {
     }
 
     expect(openMock).toHaveBeenCalledTimes(1);
-    expect(openMock).toHaveBeenCalledWith(
-      'https://github.com/Better-Tables/better-tables/tree/main/packages/ui#readme'
-    );
+    expect(openMock).toHaveBeenCalledWith('https://better-tables.com/docs/packages/ui');
     expect(consoleLogSpy).toHaveBeenCalledWith('Opening ui documentation...');
   });
 
@@ -98,9 +94,7 @@ describe('docs command', () => {
     }
 
     expect(openMock).toHaveBeenCalledTimes(1);
-    expect(openMock).toHaveBeenCalledWith(
-      'https://github.com/Better-Tables/better-tables/tree/main/packages/adapters/drizzle#readme'
-    );
+    expect(openMock).toHaveBeenCalledWith('https://better-tables.com/docs/adapters/drizzle');
     expect(consoleLogSpy).toHaveBeenCalledWith('Opening drizzle documentation...');
   });
 
@@ -114,9 +108,7 @@ describe('docs command', () => {
     }
 
     expect(openMock).toHaveBeenCalledTimes(1);
-    expect(openMock).toHaveBeenCalledWith(
-      'https://github.com/Better-Tables/better-tables/tree/main/packages/core#readme'
-    );
+    expect(openMock).toHaveBeenCalledWith('https://better-tables.com/docs/packages/core');
   });
 
   it('should handle unknown doc types and exit with error', async () => {

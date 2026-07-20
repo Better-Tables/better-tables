@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { createColumnBuilder } from '../../src/builders/column-factory';
 import { buildPathAccessor, createPathColumnFactory } from '../../src/builders/path-builders';
 import { betterTables, defineTable } from '../../src/factory';
 import { humanize, lastPathSegment } from '../../src/lib/format-utils';
 import type { SchemaAwareAdapter } from '../../src/types/paths';
+import { createColumnBuilder } from '../helpers/column-builders';
 
 /**
  * Acceptance tests for plan 018 Step 3/4: the `t.*()` path-typed column

@@ -1,0 +1,218 @@
+---
+title: Quick Start
+description: Go from empty project to a typed, filterable table in a few steps.
+---
+
+<Steps>
+<Step>
+
+### Install packages
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bun add @better-tables/core @better-tables/adapters-drizzle drizzle-orm better-sqlite3
+bun add -d @types/better-sqlite3
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @better-tables/core @better-tables/adapters-drizzle drizzle-orm better-sqlite3
+npm install -D @types/better-sqlite3
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @better-tables/core @better-tables/adapters-drizzle drizzle-orm better-sqlite3
+pnpm add -D @types/better-sqlite3
+```
+
+</Tab>
+</Tabs>
+
+`better-sqlite3` is the driver used by the examples on this page — swap it (and its types) for `pg`, `mysql2`, or whatever your database needs.
+
+For the React UI, copy components into your app (they are not published on npm; requires a [shadcn setup](/docs/ui-and-cli#prerequisites)):
+
+<Tabs items={['bun', 'npm', 'pnpm']}>
+<Tab value="bun">
+
+```bash
+bunx @better-tables/cli init
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npx @better-tables/cli init
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm dlx @better-tables/cli init
+```
+
+</Tab>
+</Tabs>
+
+`init` also checks for UI runtime deps (`zustand`, `@dnd-kit/*`) used by the copied source — see [UI & CLI](/docs/ui-and-cli).
+
+</Step>
+<Step>
+
+### Create a lazy table factory (server-only)
+
+Native drivers like `better-sqlite3` must not run during `next build`. Keep the adapter behind an async getter — do **not** construct `db` / `drizzleAdapter(db)` at module scope:
+
+```ts
+// lib/tables.ts — server-only; never import from client components
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+import { betterTables } from '@better-tables/core';
+import Database from 'better-sqlite3'; // swap for your driver
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from './schema'; // your Drizzle schema
+
+let tablesPromise: ReturnType<typeof buildTables> | null = null;
+
+async function getDb() {
+  // your drizzle setup — open the driver inside the getter, not at module scope
+  return drizzle(new Database('app.db'), { schema });
+}
+
+async function buildTables() {
+  const db = await getDb();
+  return betterTables({
+    database: drizzleAdapter(db),
+  });
+}
+
+export function getTables() {
+  tablesPromise ??= buildTables();
+  return tablesPromise;
+}
+
+export type Tables = Awaited<ReturnType<typeof getTables>>;
+```
+
+</Step>
+<Step>
+
+### Define a table (client-safe module)
+
+Keep `defineTable` in a separate file from the DB factory so client components never pull in the adapter:
+
+```ts
+// lib/tickets-table.ts — safe to import from client components
+import { defineTable } from '@better-tables/core';
+import type { Tables } from './tables';
+
+export const ticketsTable = defineTable<Tables>()('tickets', (t) => ({
+  columns: [
+    t.text('subject').searchable().filterable().sortable(),
+    t.option('status')
+      .options([
+        { value: 'open', label: 'Open' },
+        { value: 'resolved', label: 'Resolved' },
+      ])
+      .filterable()
+      .sortable(),
+    t.text('customer.company').displayName('Customer').searchable(),
+    t.date('createdAt').displayName('Opened').sortable(),
+  ],
+}));
+
+export type TicketRow = typeof ticketsTable.$infer.Row;
+```
+
+Relationship paths like `customer.company` tell the Drizzle adapter to JOIN automatically.
+
+</Step>
+<Step>
+
+### Fetch on the server
+
+```ts
+import { connection } from 'next/server';
+
+// In your server component — force request-time rendering first, so
+// `next build` never prerenders the page and opens the native driver:
+await connection();
+
+const tables = await getTables();
+const result = await tables.fetchData(ticketsTable, {
+  pagination: { page: 1, limit: 20 },
+  sorting: [{ columnId: 'createdAt', direction: 'desc' }],
+});
+```
+
+</Step>
+<Step>
+
+### Render with Better Table UI
+
+This mounts the first page of rows. Filter / sort / page controls update client state until you wire a [server refetch](/docs/nextjs) or [URL sync](/docs/url-state) — pass `initialPagination` so the UI page size matches the fetch:
+
+```tsx
+// app/tickets/tickets-table.tsx
+'use client';
+
+import { BetterTable } from '@/components/better-tables-ui/table/table';
+import { ticketsTable, type TicketRow } from '@/lib/tickets-table';
+
+export function TicketsTable({ rows, total }: { rows: TicketRow[]; total: number }) {
+  return (
+    <BetterTable
+      id="tickets"
+      columns={ticketsTable.columns}
+      data={rows}
+      totalCount={total}
+      initialPagination={{
+        page: 1,
+        limit: 20,
+        totalPages: Math.max(1, Math.ceil(total / 20)),
+        hasNext: total > 20,
+        hasPrev: false,
+      }}
+    />
+  );
+}
+```
+
+```tsx
+// app/tickets/page.tsx (server component)
+import { connection } from 'next/server';
+import { getTables } from '@/lib/tables';
+import { ticketsTable } from '@/lib/tickets-table';
+import { TicketsTable } from './tickets-table';
+
+export default async function TicketsPage() {
+  // Force request-time rendering so `next build` never opens the native driver.
+  await connection();
+
+  const tables = await getTables();
+  const result = await tables.fetchData(ticketsTable, {
+    pagination: { page: 1, limit: 20 },
+  });
+
+  return <TicketsTable rows={result.data} total={result.total} />;
+}
+```
+
+</Step>
+</Steps>
+
+## Next
+
+- [BetterTable props](/docs/better-table) — every prop on the component
+- [Columns](/docs/columns) — path builders, modifiers, computed fields
+- [Filtering](/docs/filtering) — operator reference and AND/OR groups
+- [URL State](/docs/url-state) — shareable filter/sort/page links
+- [Next.js Integration](/docs/nextjs) — lazy DB init, server refetch from `searchParams`

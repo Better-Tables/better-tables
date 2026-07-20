@@ -90,8 +90,13 @@ export async function readUiSourceFile(filePath: string): Promise<string> {
 }
 
 /**
- * Known list of files to copy from the UI package
- * This is a static list to avoid needing to fetch directory listings from GitHub
+ * Known list of files to copy from the bundled UI source.
+ *
+ * Must mirror `packages/ui/src` exactly (minus the exclusions below) —
+ * `tests/ui-source-manifest.test.ts` fails the build on any drift in either
+ * direction. Intentionally NOT copied: the package barrel (`index.ts`),
+ * `styles/` (a reference theme; consumers own their Tailwind setup), and
+ * `components/ui/` (shadcn primitives installed via the shadcn CLI).
  */
 const UI_SOURCE_FILES = {
   components: {
@@ -117,10 +122,12 @@ const UI_SOURCE_FILES = {
     ],
     filters: [
       'active-filters.tsx',
+      'faceted-filter-sidebar.tsx',
       'filter-bar.tsx',
       'filter-button.tsx',
       'filter-dropdown.tsx',
       'filter-operator-select.tsx',
+      'filter-type-styles.ts',
       'filter-value-input.tsx',
       'include-unknown-control.tsx',
       'index.ts',
@@ -137,24 +144,31 @@ const UI_SOURCE_FILES = {
     'use-column-options.tsx',
     'use-debounce.ts',
     'use-editable-cells.ts',
+    'use-facets.ts',
     'use-filter-validation.ts',
-    'use-has-primary-touch.tsx',
     'use-keyboard-navigation.ts',
     'use-table-data.ts',
     'use-table-store.ts',
+    'use-table-url-sync.ts',
     'use-virtualization.ts',
+    'use-virtualized-table-data.ts',
   ],
-  lib: [
-    'date-presets.ts',
-    'date-utils.ts',
-    'filter-value-utils.ts',
-    'format-utils.ts',
-    'number-format-utils.ts',
-    'utils.ts',
-  ],
-  stores: ['table-registry.ts', 'table-store.ts', 'url-sync-adapter.ts'],
-  utils: ['index.ts', 'server-url-params.ts', 'state-change-detection.ts', 'url-serialization.ts'],
+  lib: ['utils.ts'],
 } as const;
+
+/**
+ * Source paths (relative to the bundled UI root) of every file `init` copies.
+ *
+ * @internal Exported for tests only.
+ */
+export function getUiSourceFilePaths(): string[] {
+  return [
+    ...UI_SOURCE_FILES.components.table.map((file) => `components/table/${file}`),
+    ...UI_SOURCE_FILES.components.filters.map((file) => `components/filters/${file}`),
+    ...UI_SOURCE_FILES.hooks.map((file) => `hooks/${file}`),
+    ...UI_SOURCE_FILES.lib.map((file) => `lib/${file}`),
+  ];
+}
 
 /**
  * Generate file mappings for all Better Tables files
@@ -195,22 +209,6 @@ export function generateFileMappings(
       sourcePath: `lib/${file}`,
       destPath: join(resolvedPaths.lib, file),
       category: 'lib',
-    });
-  }
-  // Stores
-  for (const file of UI_SOURCE_FILES.stores) {
-    mappings.push({
-      sourcePath: `stores/${file}`,
-      destPath: join(componentsBasePath, 'stores', file),
-      category: 'stores',
-    });
-  }
-  // Utils
-  for (const file of UI_SOURCE_FILES.utils) {
-    mappings.push({
-      sourcePath: `utils/${file}`,
-      destPath: join(resolvedPaths.lib, 'utils', file),
-      category: 'utils',
     });
   }
   return mappings;
@@ -258,16 +256,6 @@ export function transformImports(
   transformed = transformed.replace(
     /from ['"]\.\.\/\.\.\/hooks\/([^'"]+)['"]/g,
     `from '${hooksAlias}/$1'`
-  );
-  // Stores - use componentsOutputPath
-  const storesAlias = `${aliasPrefix}components/${componentsOutputPath}/stores`;
-  transformed = transformed.replace(
-    /from ['"]\.\.\/stores\/([^'"]+)['"]/g,
-    `from '${storesAlias}/$1'`
-  );
-  transformed = transformed.replace(
-    /from ['"]\.\.\/\.\.\/stores\/([^'"]+)['"]/g,
-    `from '${storesAlias}/$1'`
   );
   // Filters (relative within components) - use componentsOutputPath
   const filtersAlias = `${aliasPrefix}components/${componentsOutputPath}/filters`;

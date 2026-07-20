@@ -1,0 +1,125 @@
+---
+title: Column Definition
+description: defineTable path builders, modifiers, computed columns, and type inference.
+---
+
+0.6 columns are defined per table with `defineTable<typeof tables>()('tableName', (t) => ({ columns: [...] }))`. Path methods (`t.text('customer.company')`) derive accessors and display names from the schema catalog the adapter carries via `$types`.
+
+```ts
+export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+  columns: [
+    t.text('subject').searchable().filterable().sortable(),
+    t.number('reopenCount').displayName('Reopens').filterable().sortable(),
+    t.option('status')
+      .options([
+        { value: 'open', label: 'Open' },
+        { value: 'resolved', label: 'Resolved' },
+      ])
+      .filterable()
+      .sortable(),
+    t.text('customer.company').displayName('Customer').searchable({ includeNull: true }),
+    t.date('createdAt').displayName('Opened').dateTime({ timeZone: 'America/New_York' }),
+    t.computed('summary', (row) => `${row.subject} (${row.status})`).displayName('Summary'),
+  ],
+}));
+
+export type TicketRow = typeof ticketsTable.$infer.Row;
+export const ticketColumns = ticketsTable.columns;
+```
+
+## Method form
+
+You can also define via the factory:
+
+```ts
+export const usersTable = tables.define('users', (t) => ({
+  columns: [t.text('email').searchable()],
+}));
+```
+
+## Escape hatches
+
+- `t.computed(id, accessor)` — derived display values
+- `t.custom()` — full fluent builder when you need total control
+
+## Standalone columns (no schema)
+
+When there is no adapter schema to derive from — arbitrary row shapes, hand-tuned accessors — build columns directly with the builder classes and collect them with `defineColumns`; `defineTableRow<Row>()` turns them into a table definition the factory and `<BetterTable table={…}>` accept:
+
+```ts
+import {
+  defineColumns,
+  defineTableRow,
+  NumberColumnBuilder,
+  TextColumnBuilder,
+} from '@better-tables/core';
+
+interface Ticket {
+  subject: string;
+  reopenCount: number;
+}
+
+const columns = defineColumns<Ticket>()([
+  new TextColumnBuilder<Ticket>().id('subject').displayName('Subject')
+    .accessor((t) => t.subject).searchable().build(),
+  new NumberColumnBuilder<Ticket>().id('reopenCount').displayName('Reopens')
+    .accessor((t) => t.reopenCount).filterable().build(),
+]);
+
+export const ticketsTable = defineTableRow<Ticket>()('tickets', () => ({ columns }));
+```
+
+`defineColumns` exists because a heterogeneous array of differently-typed columns isn't directly assignable to the table boundary — it type-checks each column against its own value type, then erases to the boundary shape in one audited place. Pair with [`memoryAdapter`](/docs/adapters/custom#memory-adapter) to run the full pipeline over in-memory rows.
+
+## Modifiers on every column type
+
+| Modifier | Purpose |
+|---|---|
+| `.displayName(label)` | Header / filter label |
+| `.icon(component)` | Icon shown next to the header and in filter menus |
+| `.filterable(true?, filterConfig?)` | Enable filter UI + adapter filter — see [Filtering](/docs/filtering) |
+| `.sortable()` | Enable sorting |
+| `.editable(config?)` | Inline cell editing (see [Inline editing](/docs/inline-editing)) |
+| `.validation(rules)` | Rules checked before any cell edit saves |
+| `.hideable()` | Allow hiding via the column visibility menu |
+| `.defaultVisible(false)` | Start hidden (user can reveal when `.hideable()`) |
+| `.width(px, min?, max?)` / `.minWidth()` / `.maxWidth()` | Column sizing |
+| `.resizable()` | Drag-resize handle |
+| `.align('left' \| 'center' \| 'right')` | Cell alignment |
+| `.cellRenderer(fn)` / `.headerRenderer(fn)` | Custom React rendering |
+| `.nullable()` / `.normalizeEmptyToNull()` | Null semantics for filters and edits |
+| `.meta(record)` | Arbitrary metadata passthrough |
+
+## Per-type modifiers (complete)
+
+| Type | Modifiers |
+|---|---|
+| `t.text` | `.searchable({ debounce?, includeNull?, validation? })` — enables common text operators (`contains`…`isNotEmpty`) with debounce/null handling (not `isNull`/`isNotNull`; this is filter sugar, not a separate global search); `.textOperators([...])`; `.asUrl()`; `.asEmail()`; `.asPhone()`; `.truncate(length?)`; `.transform('uppercase' \| 'lowercase' \| 'capitalize')` |
+| `t.number` | `.range(min, max, { step? })`; `.currency({ currency?, locale?, minimumFractionDigits?, … })`; `.percentage(options?)`; `.precision(digits)`; `.compact()`; `.format({ locale?, minimumFractionDigits?, … })`; `.numberOperators([...])` |
+| `t.date` | `.format(pattern)`; `.dateOnly()`; `.dateTime({ timeZone?, … })`; `.timeOnly()`; `.relative()`; `.chronological()`; `.dateRange()`; `.dateOperators([...])` |
+| `t.option` | `.options([...])` (schema enums fill this automatically — see [Auto columns](/docs/columns/auto-columns)); `.optionOperators([...])`; `.showBadges(options?)` |
+| `t.multiOption` | `.options([...])`; `.multiOptionOperators([...])`; `.displayFormat({...})`; `.showBadges(options?)`; `.validate({...})` |
+| `t.boolean` | `.booleanOperators([...])`; `.booleanFilter(options?)`; `.displayFormat(options?)`; `.yesNo()`; `.activeInactive()`; `.enabledDisabled()`; `.checkbox()`; `.switch()`; `.iconDisplay(options?)` |
+
+Option entries (`FilterOption`) accept `value`, `label`, and optional `color`, `icon`, and `count`.
+
+## Column visibility and ordering
+
+Users can hide `.hideable()` columns from the column visibility menu (on by default; disable with `features={{ columnVisibility: false }}`). Header drag-and-drop reordering is opt-in via `features={{ columnReordering: true }}`. Control the initial state from `<BetterTable>`:
+
+```tsx
+<BetterTable
+  columns={columns}
+  data={data}
+  features={{ columnReordering: true }}
+  defaultVisibleColumns={['subject', 'status', 'createdAt']}
+  initialColumnVisibility={{ reopenCount: false }}
+/>
+```
+
+Both visibility and order can be synced to the URL (`columnVisibility` / `columnOrder` flags) so shared links reproduce the exact view — see [URL State](/docs/url-state).
+
+## Next
+
+- [Auto columns](/docs/columns/auto-columns) — schema-driven inference
+- [Filtering](/docs/filtering) — operator reference and per-column filter config

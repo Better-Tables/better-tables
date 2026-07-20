@@ -119,7 +119,21 @@ export function initCommand(): Command {
     }
     console.log(pc.green('✓ shadcn/ui configuration found (components.json)\n'));
     // Step 3: Check for required dependencies
-    const requiredPackages = ['@better-tables/core', '@better-tables/adapters-drizzle'];
+    //
+    // Only what the copied source actually imports: core, plus zustand /
+    // @dnd-kit (direct imports in the copied UI, not transitive under pnpm
+    // strict installs). Database adapters are deliberately NOT required —
+    // nothing in packages/ui imports one, and core ships `memoryAdapter`, so
+    // client-only and custom-adapter projects must not inherit
+    // @better-tables/adapters-drizzle and its driver peer deps.
+    const requiredPackages = [
+      '@better-tables/core',
+      'zustand',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/modifiers',
+      '@dnd-kit/utilities',
+    ];
     const missingPackages: string[] = [];
     for (const pkg of requiredPackages) {
       if (!isPackageInstalled(cwd, pkg)) {
@@ -213,7 +227,6 @@ export function initCommand(): Command {
     }
     // Step 6: Copy Better Tables files
     console.log(pc.bold('Copying Better Tables files...\n'));
-    console.log(pc.dim('Downloading files from GitHub...\n'));
     const componentsBasePath = join(resolvedPaths.components, componentsPath);
     let shouldCopy = true;
     if (!skipPrompts) {
@@ -221,9 +234,7 @@ export function initCommand(): Command {
       console.log(pc.dim(`  • ${componentsBasePath}/table/`));
       console.log(pc.dim(`  • ${componentsBasePath}/filters/`));
       console.log(pc.dim(`  • ${resolvedPaths.hooks}/`));
-      console.log(pc.dim(`  • ${resolvedPaths.lib}/`));
-      console.log(pc.dim(`  • ${componentsBasePath}/stores/`));
-      console.log(pc.dim(`  • ${resolvedPaths.lib}/utils/\n`));
+      console.log(pc.dim(`  • ${resolvedPaths.lib}/\n`));
       shouldCopy = await confirm('Proceed with copying files?', true);
     }
     if (!shouldCopy) {
@@ -240,7 +251,9 @@ export function initCommand(): Command {
       console.error(
         pc.red(`✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`)
       );
-      console.error(pc.dim('  Check your network connection and GitHub access, then try again.'));
+      console.error(
+        pc.dim('  The bundled UI source may be corrupted — reinstall @better-tables/cli.')
+      );
       process.exit(1);
     }
     // Summary
@@ -278,6 +291,13 @@ export function initCommand(): Command {
     console.log(
       pc.cyan(
         `     import { BetterTable } from '${aliasPrefix}components/${componentsPath}/table/table';`
+      )
+    );
+    console.log(pc.dim('\n  2. Pick a data source:'));
+    console.log(
+      pc.dim(
+        "     • memoryAdapter from '@better-tables/core' — arrays, no install needed\n" +
+          '     • a database adapter, e.g. @better-tables/adapters-drizzle (install separately)'
       )
     );
     console.log('');

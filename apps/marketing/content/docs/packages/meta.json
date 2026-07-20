@@ -1,0 +1,4 @@
+{
+  "title": "Packages",
+  "pages": ["index", "core", "adapters-drizzle", "adapters-toolkit", "ui", "cli"]
+}

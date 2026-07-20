@@ -1,5 +1,5 @@
 /**
- * Compile-checked (and, where cheap, executing) examples for `MIGRATION.md`
+ * Compile-checked (and, where cheap, executing) examples for the removed migration guide (now plain API-boundary invariants)
  * §7 and §12 (plans 019, 030) -- the Drizzle-specific guide sections that
  * need real adapter/driver types `@better-tables/core`'s own examples file
  * (`packages/core/tests/types/migration-guide-examples.test.ts`) doesn't
@@ -59,7 +59,7 @@ function buildSingleTableAdapter(
   return new DrizzleAdapter(config);
 }
 
-describe('MIGRATION.md §7 — defaultMutationTable is required for multi-table mutations', () => {
+describe('API boundary §7 — defaultMutationTable is required for multi-table mutations', () => {
   let db: BunSQLiteDatabase;
   let sqlite: Database;
 
@@ -74,21 +74,21 @@ describe('MIGRATION.md §7 — defaultMutationTable is required for multi-table 
     closeDatabase(sqlite);
   });
 
-  it('0.6: a multi-table schema with no defaultMutationTable throws a SchemaError naming the fix', async () => {
-    // 0.6 - equivalent to `drizzleAdapter(db)` with schema: { users, profiles }
+  it('current: a multi-table schema with no defaultMutationTable throws a SchemaError naming the fix', async () => {
+    // current - equivalent to `drizzleAdapter(db)` with schema: { users, profiles }
     const adapter = buildAdapter(db);
 
     await expect(
-      adapter.updateRecord('1', { bio: 'new bio' }) // 0.6
+      adapter.updateRecord('1', { bio: 'new bio' }) // current
     ).rejects.toThrow(SchemaError);
     await expect(adapter.updateRecord('1', { bio: 'new bio' })).rejects.toThrow(
       /defaultMutationTable/
     );
   });
 
-  it('0.6: configuring defaultMutationTable lets mutations target the right table', async () => {
-    // 0.6 - equivalent to `drizzleAdapter(db, { options: { defaultMutationTable: 'profiles' } })`
-    const adapter = buildAdapter(db, 'profiles'); // 0.6
+  it('current: configuring defaultMutationTable lets mutations target the right table', async () => {
+    // current - equivalent to `drizzleAdapter(db, { options: { defaultMutationTable: 'profiles' } })`
+    const adapter = buildAdapter(db, 'profiles'); // current
 
     // Seed a user + profile directly via the raw db (once defaultMutationTable
     // is configured, EVERY adapter mutation targets 'profiles' -- so seeding
@@ -97,7 +97,7 @@ describe('MIGRATION.md §7 — defaultMutationTable is required for multi-table 
     await db.insert(users).values({ id: 500, name: 'Ada', email: 'ada@example.com' });
     await db.insert(profiles).values({ id: 500, userId: 500, bio: 'old bio' });
 
-    const updated = await adapter.updateRecord('500', { bio: 'new bio' }); // 0.6
+    const updated = await adapter.updateRecord('500', { bio: 'new bio' }); // current
     expect(updated).toBeDefined();
 
     const rows = await db.select().from(profiles).all();
@@ -105,14 +105,14 @@ describe('MIGRATION.md §7 — defaultMutationTable is required for multi-table 
     expect(row?.bio).toBe('new bio');
   });
 
-  it('0.6: an unresolvable defaultMutationTable (not in schema) throws a SchemaError listing available tables', async () => {
-    const adapter = buildAdapter(db, 'widgets'); // 0.6 - 'widgets' is not in the schema
+  it('current: an unresolvable defaultMutationTable (not in schema) throws a SchemaError listing available tables', async () => {
+    const adapter = buildAdapter(db, 'widgets'); // current - 'widgets' is not in the schema
 
     await expect(adapter.updateRecord('1', { bio: 'x' })).rejects.toThrow(SchemaError);
   });
 
-  it('0.6: a single-table schema needs no defaultMutationTable configuration', async () => {
-    const adapter = buildSingleTableAdapter(db); // 0.6 - no `options` needed
+  it('current: a single-table schema needs no defaultMutationTable configuration', async () => {
+    const adapter = buildSingleTableAdapter(db); // current - no `options` needed
 
     const created = await adapter.createRecord({ id: 900, name: 'Solo', email: 's@example.com' });
     expect(created).toBeDefined();
@@ -129,7 +129,7 @@ describe('MIGRATION.md §7 — defaultMutationTable is required for multi-table 
   });
 });
 
-describe('MIGRATION.md §12 (Drizzle portion) — multi-table read throw + defaultPrimaryTable', () => {
+describe('API boundary §12 (Drizzle portion) — multi-table read throw + defaultPrimaryTable', () => {
   let db: BunSQLiteDatabase;
   let sqlite: Database;
 
@@ -157,23 +157,23 @@ describe('MIGRATION.md §12 (Drizzle portion) — multi-table read throw + defau
     return new DrizzleAdapter(config);
   }
 
-  it('0.6: a multi-table schema with no columns/primaryTable throws a SchemaError naming the fix', async () => {
-    // 0.6 - equivalent to `drizzleAdapter(db).fetchData({ pagination: ... })`
+  it('current: a multi-table schema with no columns/primaryTable throws a SchemaError naming the fix', async () => {
+    // current - equivalent to `drizzleAdapter(db).fetchData({ pagination: ... })`
     const adapter = buildReadAdapter();
 
     await expect(
-      adapter.fetchData({ pagination: { page: 1, limit: 10 } }) // 0.6
+      adapter.fetchData({ pagination: { page: 1, limit: 10 } }) // current
     ).rejects.toThrow(SchemaError);
     await expect(adapter.fetchData({ pagination: { page: 1, limit: 10 } })).rejects.toThrow(
       /'primaryTable'.*'defaultPrimaryTable'/
     );
   });
 
-  it('0.6: configuring defaultPrimaryTable lets reads with no columns/primaryTable target the right table', async () => {
-    // 0.6 - equivalent to `drizzleAdapter(db, { options: { defaultPrimaryTable: 'profiles' } })`
-    const adapter = buildReadAdapter('profiles'); // 0.6
+  it('current: configuring defaultPrimaryTable lets reads with no columns/primaryTable target the right table', async () => {
+    // current - equivalent to `drizzleAdapter(db, { options: { defaultPrimaryTable: 'profiles' } })`
+    const adapter = buildReadAdapter('profiles'); // current
 
-    const result = await adapter.fetchData({ pagination: { page: 1, limit: 10 } }); // 0.6
+    const result = await adapter.fetchData({ pagination: { page: 1, limit: 10 } }); // current
 
     expect(result.data.length).toBeGreaterThan(0);
     for (const row of result.data as unknown as Record<string, unknown>[]) {
@@ -181,23 +181,23 @@ describe('MIGRATION.md §12 (Drizzle portion) — multi-table read throw + defau
     }
   });
 
-  it('0.6: an explicit per-call primaryTable never throws, with or without defaultPrimaryTable', async () => {
+  it('current: an explicit per-call primaryTable never throws, with or without defaultPrimaryTable', async () => {
     const adapter = buildReadAdapter(); // no defaultPrimaryTable configured
 
-    const result = await adapter.fetchData({ primaryTable: 'profiles' }); // 0.6
+    const result = await adapter.fetchData({ primaryTable: 'profiles' }); // current
     expect(result.data.length).toBeGreaterThan(0);
   });
 
-  it('0.6: a single-table schema needs no defaultPrimaryTable configuration', async () => {
+  it('current: a single-table schema needs no defaultPrimaryTable configuration', async () => {
     const singleTableConfig: DrizzleAdapterConfig<typeof singleTableSchema, 'sqlite'> = {
       db: db as unknown as DrizzleDatabase<'sqlite'>,
       schema: singleTableSchema,
       driver: 'sqlite',
       autoDetectRelationships: false,
     };
-    const adapter = new DrizzleAdapter(singleTableConfig); // 0.6 - no `options` needed
+    const adapter = new DrizzleAdapter(singleTableConfig); // current - no `options` needed
 
-    const result = await adapter.fetchData({}); // 0.6
+    const result = await adapter.fetchData({}); // current
     expect(result.data.length).toBeGreaterThan(0);
   });
 

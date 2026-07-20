@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "marketing",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--cwd", "apps/marketing", "dev:preview"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

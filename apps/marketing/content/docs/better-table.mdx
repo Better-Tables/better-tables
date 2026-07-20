@@ -1,0 +1,121 @@
+---
+title: BetterTable Props
+description: Complete reference for every prop on the copied <BetterTable /> component.
+---
+
+`<BetterTable />` is copied into your app by `better-tables init` (see [UI & CLI](/docs/ui-and-cli)) — import it from your local path:
+
+```tsx
+import { BetterTable } from '@/components/better-tables-ui/table/table';
+```
+
+Pass `data` plus either a `table` definition (supplies identity and columns) or both `id` and `columns`. `id` alone is not enough — the component throws without columns.
+
+## Identity & columns
+
+| Prop | Type | Notes |
+|---|---|---|
+| `id` | `string` | Unique table instance id (keys the state store and URL params). Defaults to `table.tableName` when `table` is given |
+| `name` | `string` | Human-readable display name. Defaults to `table.tableName` |
+| `columns` | `ColumnDefinition[]` | Column definitions. Defaults to `table.columns` |
+| `table` | `TableDefinition` | A `defineTable()` / `tables.define()` definition — sugar for `columns`/`id`/`name` (explicit props still win). Enables [auto columns](/docs/columns/auto-columns) resolution when paired with `adapter` |
+
+## Data & fetching
+
+| Prop | Type | Notes |
+|---|---|---|
+| `data` | `TData[]` (required) | The rows to render |
+| `adapter` | `TableAdapter` | Optional — powers lazy filter options, facets, auto-column resolution, and adapter cell-edit saves |
+| `totalCount` | `number` | Filtered total for pagination — always pass `result.total` with server pagination |
+| `loading` | `boolean` | Render the loading state |
+| `error` | `Error \| null` | Render the error state |
+| `onRetry` | `() => void` | Retry button handler for the error state |
+| `emptyMessage` | `string` | Empty-state text (wins over `emptyState.description`) |
+
+## Initial state
+
+| Prop | Type |
+|---|---|
+| `initialFilters` | `FilterState[] \| FilterGroupNode` — a `FilterGroupNode` tree seeds the initial query, but the filter bar edits flat: the first user edit replaces the tree with a flat implicit-AND array (tree editing is not shipped) |
+| `initialSorting` | `SortingState` |
+| `initialPagination` | `PaginationState` |
+| `initialSelectedRows` | `Set<string>` |
+| `initialColumnVisibility` | `ColumnVisibility` |
+| `defaultVisibleColumns` | `string[]` — ids visible by default; others start hidden |
+
+## Change callbacks (controlled usage)
+
+| Prop | Fires when |
+|---|---|
+| `onFiltersChange(filters)` | Filter state changes |
+| `onSortingChange(sorting)` | Sort state changes |
+| `onPaginationChange(pagination)` | Page or page size changes |
+| `onPageChange(page)` | Page changes |
+| `onPageSizeChange(pageSize)` | Page size changes |
+| `onSelectionChange(selected)` | Row selection changes |
+| `onRowClick(row)` | A row is clicked |
+
+Typical server-driven wiring: react to the callbacks, refetch via `tables.fetchData`, pass fresh `data` + `totalCount` back in.
+
+## Filtering behavior
+
+| Prop | Notes |
+|---|---|
+| `autoShowFilteredColumns` | Auto-reveal a column while it has an active filter (default `true`). Removing the filter re-hides the column only when `defaultVisibleColumns` is provided (and the column isn't in it); without that prop, revealed columns stay visible |
+| `isFilterProtected(filter)` | Return `true` to lock a filter — shown with a lock icon, not removable |
+| `groups` | Manual filter-dropdown grouping (`FilterGroup[]`) |
+| `autoGroupFilters` | Automatic grouping config — see [Filtering](/docs/filtering#filter-bar-grouping) |
+
+## Editing
+
+| Prop | Notes |
+|---|---|
+| `editing` | `false` disables all inline editing |
+| `saveAction` | Serializable server action from `tables.cellEditAction(def)` |
+| `onCellEdit` | Full-control save callback (wins over every other save path) |
+| `onCellEditError` | Called when a save fails (after rollback) |
+
+See [Inline editing](/docs/inline-editing) for the save-resolution order.
+
+## URL sync
+
+| Prop | Notes |
+|---|---|
+| `urlSync` | `{ adapter: UrlSyncAdapter, config?: UrlSyncConfig }` — the component runs the sync internally; see [URL State](/docs/url-state) |
+
+## Rendering & layout
+
+| Prop | Notes |
+|---|---|
+| `virtualized` | `true` or `{ height?, rowHeight?, overscan? }` — see [Large datasets](/docs/large-datasets) |
+| `className` | Root class name |
+| `rowConfig` | `getId(row)` (row identity — required for selection/editing when rows have no `id` field) and `onClick(row)` are wired; the remaining `RowConfig` fields (`isSelectable`, `isExpandable`, `expandedContent`, `className`, `style`) are contract-only today — the copied `table.tsx` doesn't read them yet |
+| `emptyState` | `{ description?, icon? }` empty-state config (`emptyMessage` wins for text) |
+| `errorState` | Error-state config |
+| `actions` | Bulk actions on selected rows — see [Selection & actions](/docs/selection-and-actions) |
+
+## Feature flags
+
+`features` toggles whole subsystems:
+
+| Flag | Default | Effect |
+|---|---|---|
+| `filtering` | `true` | Filter bar + filter dropdowns |
+| `sorting` | `true` | Header sort controls |
+| `pagination` | `true` | Pagination footer |
+| `columnVisibility` | `true` | Column show/hide menu |
+| `rowSelection` | `false` | Checkbox column + selection state — see [Selection & actions](/docs/selection-and-actions) |
+| `columnReordering` | `false` | Drag-and-drop header reordering |
+| `headerContextMenu` | — | Right-click header menu |
+
+```tsx
+<BetterTable columns={columns} data={data} features={{ pagination: false, rowSelection: true }} />
+```
+
+Turning `pagination` off renders every row — pair with `virtualized` for big datasets.
+
+The `TableFeatures` type also declares `bulkActions`, `export`, `columnResizing`, `virtualScrolling`, `realTimeUpdates`, and `rowExpansion` — those flags are contract-only today; the copied component doesn't read them (bulk actions render whenever `actions` is non-empty and rows are selected, and virtualization is the `virtualized` prop).
+
+## Contract-only props
+
+Because `BetterTableProps` extends the core `TableConfig`, a few more fields typecheck but are not read by the copied component yet: `defaultFilters` (use `initialFilters`), `exportOptions`, `actionsConfig`, `theme`, and `loadingState` (use the `loading` boolean). The same goes for the `search` param on `fetchData` — declared on the adapter contract, not consumed by any first-party code. Treat all of these as reserved surface, not working features.

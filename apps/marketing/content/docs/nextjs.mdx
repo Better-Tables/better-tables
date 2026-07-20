@@ -1,0 +1,95 @@
+---
+title: Next.js Integration
+description: Server fetch, lazy DB init for builds, UI copy, and client URL sync.
+---
+
+<Steps>
+<Step>
+
+### Define tables with lazy DB access
+
+Native drivers like `better-sqlite3` must not run during `next build`. Use a lazy getter — see `apps/marketing/src/lib/demo/support/db.ts`.
+
+```ts
+let tablesPromise: Promise<SupportTables> | null = null;
+
+async function initSupportTables() {
+  // open driver + create drizzle instance here (not at module scope)
+  const db = drizzle(/* … */);
+  return betterTables({ database: drizzleAdapter(db) });
+}
+
+export function getSupportTables() {
+  tablesPromise ??= initSupportTables();
+  return tablesPromise;
+}
+```
+
+</Step>
+<Step>
+
+### Server-fetch with `tables.fetchData`
+
+Next.js may expose a repeated query param as `string[]`. Normalize before `Number(...)` so malformed URLs (`?page=abc`, `?page=1.25`) do not send `NaN` or fractional pages to the adapter (or use `deserializeTableStateFromUrl` from [URL State](/docs/url-state)):
+
+```tsx
+import { connection } from 'next/server';
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function TicketsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string | string[] }>;
+}) {
+  // Force request-time rendering (`connection()` from 'next/server') so
+  // `next build` never prerenders the page and opens the native driver.
+  await connection();
+
+  const sp = await searchParams;
+  const pageRaw = Number(firstParam(sp.page) ?? 1);
+  const page = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1;
+
+  const tables = await getSupportTables();
+  const result = await tables.fetchData(ticketsTable, {
+    pagination: { page, limit: 10 },
+  });
+
+  return <TicketsTableClient rows={result.data} total={result.total} />;
+}
+```
+
+</Step>
+<Step>
+
+### Copy UI into the app
+
+```bash
+bunx @better-tables/cli init
+```
+
+Pass `columns={table.columns}` (or `table={def}`) to `<BetterTable />`.
+
+</Step>
+<Step>
+
+### Client URL sync
+
+Use `useNextjsUrlAdapter()` with `useTableUrlSync` — see [URL State](/docs/url-state).
+
+</Step>
+</Steps>
+
+## HTTP adapter for client components
+
+When the adapter cannot run in the browser (native SQLite, secrets), mount `createAdapterRouteHandler` and use `httpAdapter` on the client. See [HTTP adapter](/docs/adapters/http).
+
+## Live demos
+
+<Cards>
+  <Card title="Examples hub" href="/examples" description="All marketing dogfood tables." />
+  <Card title="Relationship filtering" href="/examples/relationship-filtering" />
+  <Card title="Query groups" href="/examples/query-groups" />
+</Cards>

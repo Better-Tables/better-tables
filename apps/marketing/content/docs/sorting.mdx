@@ -1,0 +1,42 @@
+---
+title: Sorting
+description: Multi-column sort descriptors, the multiSort UI, and SortingConfig options.
+---
+
+Sorting is `{ columnId, direction }[]` (`SortingParams[]`, direction `'asc' | 'desc'`) passed to `tables.fetchData()` or managed via `SortingManager`. Order in the array is precedence — earlier entries win ties.
+
+```ts
+await tables.fetchData(ticketsTable, {
+  sorting: [
+    { columnId: 'createdAt', direction: 'desc' },
+    { columnId: 'subject', direction: 'asc' },
+  ],
+});
+```
+
+Mark columns `.sortable()` in `defineTable` so the UI exposes sort controls and the adapter knows which fields are legal. Relationship-path columns (`customer.company`) sort through the same JOINs as filters.
+
+## Multi-column sorting in the UI
+
+Single-column sort is the default: clicking a header replaces the sort. Enable multi-sort on `<BetterTable>` to let users stack sorts and reorder precedence by dragging in the sort-order list:
+
+```tsx
+<BetterTable columns={columns} data={data} sorting={{ multiSort: true }} />
+```
+
+`multiSort` is the only `SortingConfig` field `<BetterTable>` reads — everything else about click behavior lives in the copied `table.tsx` / `sort-order-list.tsx`, which you own and can change.
+
+## SortingConfig (core managers)
+
+When driving state yourself with `SortingManager` / `TableStateManager`, the full `SortingConfig` applies:
+
+| Field | Purpose |
+|---|---|
+| `enabled` | Master switch |
+| `multiSort` | Allow more than one active sort |
+| `maxSortColumns` | Cap on simultaneously sorted columns |
+| `defaultSort` | `SortingParams[]` applied on initialization |
+| `resetOnClick` | Clicking a header clears other sorts |
+| `comparator` | **Unwired / reserved** — typed on `SortingConfig` but neither `SortingManager` nor `<BetterTable>` invokes it; sorting is server/adapter-driven today |
+
+Initial state for the component goes through `initialSorting` — see the [BetterTable props reference](/docs/better-table).

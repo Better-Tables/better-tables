@@ -6,8 +6,7 @@ import type {
 } from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
 import { getTables } from '@/lib/adapter';
-import { usersTable } from '@/lib/columns/user-columns';
-import type { UserWithRelations } from '@/lib/db/schema';
+import { type UserRow, usersTable } from '@/lib/columns/user-columns';
 import { type CapturedQuery, withSqlCapture } from '@/lib/db/sql-capture';
 
 export interface FetchUsersParams {
@@ -18,7 +17,7 @@ export interface FetchUsersParams {
 }
 
 export interface FetchUsersResult {
-  result: FetchDataResult<UserWithRelations>;
+  result: FetchDataResult<UserRow>;
   filters: FilterState[];
   sorting: SortingState;
   /** Every SQL statement the adapter generated for this fetch. */

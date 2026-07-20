@@ -1,7 +1,7 @@
 /**
  * Plan 051: computed-field filter substitution is intentionally limited to
  * flat FilterState[] inputs. Trees must fail loudly (documented in
- * MIGRATION.md "Known gaps").
+ * the changeset's known-gaps note).
  */
 import { describe, expect, it } from 'bun:test';
 import type { FilterGroupNode } from '@better-tables/core';

@@ -1,8 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "fumadocs-ui/css/shadcn.css";
+@import "fumadocs-ui/css/preset.css";
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
-@plugin "@tailwindcss/typography";
+@source "../../../../node_modules/fumadocs-ui/dist/**/*.js";
+/* Use a non-`prose` class so this does not override Fumadocs MDX typography. */
+@plugin "@tailwindcss/typography" {
+  className: blog-prose;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -348,12 +354,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Blog article code: rehype-pretty-code output styled as code islands. */
-  .prose figure[data-rehype-pretty-code-figure] {
+  /* Blog article code: rehype-pretty-code output styled as code islands.
+     Scoped to .blog-prose (the blog's typography class) — docs pages use
+     Fumadocs' own .prose styling. */
+  .blog-prose figure[data-rehype-pretty-code-figure] {
     margin-block: 1.5rem;
   }
 
-  .prose figure[data-rehype-pretty-code-figure] pre {
+  .blog-prose figure[data-rehype-pretty-code-figure] pre {
     background: var(--code);
     color: var(--code-foreground);
     border-radius: var(--radius);
@@ -363,13 +371,13 @@
     line-height: 1.65;
   }
 
-  .prose figure[data-rehype-pretty-code-figure] code {
+  .blog-prose figure[data-rehype-pretty-code-figure] code {
     font-family: var(--font-mono);
     background: transparent;
     padding: 0;
   }
 
-  .prose :not(pre) > code {
+  .blog-prose :not(pre) > code {
     font-family: var(--font-mono);
     font-size: 0.85em;
     background: var(--muted);
@@ -378,4 +386,21 @@
     padding: 0.1em 0.35em;
     font-weight: 450;
   }
+}
+
+/* Unlayered override for @tailwindcss/typography (className: blog-prose).
+   The plugin adds decorative backticks via ::before/::after with a
+   :not(:where([class~=not-blog-prose]…)) selector — match that specificity
+   (and use !important) so blog <code> chips don't show `quotes`. */
+.blog-prose
+:where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::before,
+.blog-prose
+  :where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::after {
+  content: none !important;
+}
+
+/* Docs tables: give cells (and code chips) room from the grid lines. */
+.prose :where(table) :where(th, td) {
+  padding-block: 0.7rem;
+  padding-inline: 1rem;
 }

@@ -3,12 +3,14 @@ import open from 'open';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
 
+const DOCS_ORIGIN =
+  process.env.BETTER_TABLES_DOCS_URL?.replace(/\/$/, '') || 'https://better-tables.com';
+
 const DOCS_URLS = {
-  main: 'https://github.com/Better-Tables/better-tables#readme',
-  core: 'https://github.com/Better-Tables/better-tables/tree/main/packages/core#readme',
-  ui: 'https://github.com/Better-Tables/better-tables/tree/main/packages/ui#readme',
-  drizzle:
-    'https://github.com/Better-Tables/better-tables/tree/main/packages/adapters/drizzle#readme',
+  main: `${DOCS_ORIGIN}/docs`,
+  core: `${DOCS_ORIGIN}/docs/packages/core`,
+  ui: `${DOCS_ORIGIN}/docs/packages/ui`,
+  drizzle: `${DOCS_ORIGIN}/docs/adapters/drizzle`,
 } as const;
 
 type DocType = keyof typeof DOCS_URLS;

@@ -1,0 +1,33 @@
+---
+title: Examples
+description: Live dogfood demos on this site — open them, then copy the patterns.
+---
+
+These routes run real Better Tables stacks against an in-memory SQLite demo database.
+
+<Cards>
+  <Card
+    title="Relationship filtering"
+    href="/examples/relationship-filtering"
+    description="Dot-path joins (customer.plan, customer.company) with typed filters."
+  />
+  <Card
+    title="Query groups"
+    href="/examples/query-groups"
+    description="AND/OR filter trees with shareable URL state."
+  />
+  <Card
+    title="Big board"
+    href="/examples/big-board"
+    description="~12k virtualized rows — pagination + virtualization together."
+  />
+  <Card
+    title="Facets"
+    href="/examples/facets"
+    description="Facet sidebar with self-exclusion and counts."
+  />
+</Cards>
+
+Source of truth for the demo schema/columns/fetch helpers:
+
+`apps/marketing/src/lib/demo/support/`

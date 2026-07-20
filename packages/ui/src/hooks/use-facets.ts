@@ -112,13 +112,11 @@ export function useFacets<TData = unknown>({
 
   // columnIds/rangeColumnIds are near-always inline array literals at the
   // call site (e.g. columnIds={['status', 'priority']}), which is a fresh
-  // reference every render. Intern by content (a space-joined key -- column
-  // IDs can't contain spaces, so this can't collide the way a
-  // delimiter-less join('') could) instead of requiring the caller to
-  // memoize, so fetchFacets's identity -- and the fetch effect below --
-  // doesn't change (and re-fire) on every render.
-  const columnIdsKey = columnIds.join(' ');
-  const rangeColumnIdsKey = rangeColumnIds.join(' ');
+  // reference every render. Intern by JSON content so IDs that contain
+  // spaces (or other delimiters) cannot collide — e.g. ['foo', 'bar baz']
+  // vs ['foo bar', 'baz'] — instead of requiring the caller to memoize.
+  const columnIdsKey = JSON.stringify(columnIds);
+  const rangeColumnIdsKey = JSON.stringify(rangeColumnIds);
   const stableColumnIds = useMemo(() => columnIds, [columnIdsKey]);
   const stableRangeColumnIds = useMemo(() => rangeColumnIds, [rangeColumnIdsKey]);
 

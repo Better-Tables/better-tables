@@ -1,0 +1,28 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "why-better-tables",
+    "quick-start",
+    "architecture",
+    "---Guides---",
+    "columns",
+    "filtering",
+    "sorting",
+    "pagination",
+    "facets",
+    "selection-and-actions",
+    "inline-editing",
+    "large-datasets",
+    "url-state",
+    "nextjs",
+    "---Adapters & UI---",
+    "adapters",
+    "ui-and-cli",
+    "---Reference---",
+    "better-table",
+    "packages",
+    "examples",
+    "troubleshooting"
+  ]
+}

@@ -1,0 +1,85 @@
+---
+title: Inline Editing
+description: Per-column .editable() with monolith server actions, HTTP writes, or full-control callbacks.
+---
+
+Enable per-column with `.editable()` on the builder. Double-click (or Enter on a focused cell) opens a type-appropriate editor; Enter/blur commits; Escape cancels. Option/boolean/date editors commit on selection/toggle/day pick.
+
+```ts
+t.text('subject').editable()
+t.option('status').options([...]).editable()
+t.boolean('slaBreached').editable({ when: (row) => row.status !== 'resolved' })
+t.number('reopenCount').editable({ field: 'reopenCount' }) // field override when id ≠ storage key
+```
+
+`editable()` takes `true` or an `EditableConfig` — the complete set:
+
+| `EditableConfig` field | Purpose |
+|---|---|
+| `when(row)` | Per-row gate — return `false` to render that row's cell read-only |
+| `field` | Storage field written by the adapter save path (defaults to the column id; required when the id is not the storage key; setting it on a relationship path makes the save an own-table write instead). Relationship paths like `customer.company` are not editable through `saveAction` alone — the UI needs an `adapter` with `resolveCellWriteTarget` to resolve the write target, and adapter-path saves additionally need `features.update` + `updateRecord` — see [Joined-table editing](#joined-table-editing) below. Unsupported / unresolvable paths fall back to callback-only (`onCellEdit`) or read-only |
+| `multiline` | Text editor renders a textarea instead of a single-line input |
+| `placeholder` | Placeholder for empty text/number editors |
+| `editRenderer(props)` | Custom editor (and the only editor for `custom` columns) — receives `value`, `row`, `column`, `commit(value)`, `cancel()`; the table still owns save/validation/rollback |
+
+## Validation
+
+Attach rules with `.validation(rules)` on any column — they run before every save path (callback, action, or adapter), and a failing rule blocks the save and shows the message on the cell:
+
+```ts
+t.text('subject')
+  .editable()
+  .validation([
+    {
+      id: 'subject-length',
+      validate: (value) => value.length >= 3 || 'Subject needs at least 3 characters',
+    },
+    { id: 'no-caps', validate: (value) => value !== value.toUpperCase(), message: 'No shouting' },
+  ])
+```
+
+Each `ValidationRule` is `{ id, validate, message? }`. `validate` returns `true` to pass, `false` to fail with `message`, or a string used as the error message directly.
+
+## Persistence paths
+
+Pick by deployment shape:
+
+| # | Deployment | Wiring | Notes |
+|---|---|---|---|
+| 1 | **Monolith (recommended)** — Next.js, TanStack Start | `tables.cellEditAction(def)` through the framework server boundary, passed as `saveAction` | Zero boilerplate: allow-list, coercion, and write target derive from the table definition |
+| 2 | **Split frontend/backend** | `httpAdapter({ url, writes: true })` + handler `writes` + `authorize` | Double opt-in; see [HTTP adapter](/docs/adapters/http) |
+| 3 | **Full control** | `onCellEdit` callback | You own persistence; wins over every other path |
+
+## Save resolution
+
+First match wins:
+
+| Condition | Result |
+|---|---|
+| `editing={false}` on `<BetterTable>` | read-only |
+| column has no `editable` / `when(row)` false | read-only |
+| `onCellEdit` provided | callback save |
+| `saveAction` provided | serializable action save |
+| adapter `features.update` + `updateRecord` + resolvable target + row id | adapter save |
+| otherwise | read-only (+ one dev `console.warn` per column) |
+
+## Joined-table editing
+
+A relationship-path column (`t.text('customer.company').editable()`) edits the **related** row — the write target resolves through the adapter's `resolveCellWriteTarget`. One-to-many paths are never cell-editable. Row-level authorization stays the app's concern (`authorize` / wrap the action).
+
+Optimistic updates show immediately; on failure the cell rolls back and `onCellEditError` fires. Validation rules run before any save. Edits are last-write-wins.
+
+## V1 editors
+
+text (+ email/url/phone), number (+ currency/percentage), option, boolean, date. `multiOption` / `json` stay read-only; `custom` needs `editable.editRenderer`.
+
+**Option choices** resolve as: declared `.options()` → schema enum (via `resolveTableColumns`) → lazy `adapter.getFilterOptions(columnId)` on first open.
+
+```tsx
+<BetterTable
+  table={ticketsTable}
+  data={rows}
+  adapter={adapter}
+  saveAction={saveTicketCell}
+/>
+```

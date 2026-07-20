@@ -77,14 +77,12 @@ bun add @better-tables/adapters-drizzle
 The UI components aren't published to npm — they're copied directly into your project with the CLI (shadcn-style), so you own and can customize the source:
 
 ```bash
-bunx better-tables init
+bunx @better-tables/cli init
 ```
 
 `init` requires an existing [shadcn/ui](https://ui.shadcn.com) setup (`components.json`) and copies the table/filter components, hooks, and stores into your project (default: `components/better-tables-ui/`), rewriting imports to match your project's aliases. See [`@better-tables/cli`](packages/cli/README.md) for options.
 
 ### Your First Table
-
-Upgrading from 0.5? See [MIGRATION.md](MIGRATION.md) for the flagship `betterTables()` + `defineTable()` API.
 
 ```tsx
 import { BetterTable } from '@/components/better-tables-ui/table/table';
@@ -327,15 +325,17 @@ Each package is independently versioned and can be used standalone or together.
 
 ## 📖 Documentation
 
-- **[Migrating from 0.5 to 0.6](MIGRATION.md)** - Upgrading a 0.5 app? Start here.
+**Canonical docs:** [better-tables.com/docs](https://better-tables.com/docs) (source: `apps/marketing/content/docs/`).
+
+Local preview: `cd apps/marketing && bun run dev` → http://localhost:3000/docs
+
+- **[Quick Start](https://better-tables.com/docs/quick-start)** - Install, define a table, fetch rows
 - **[@better-tables/core](packages/core/README.md)** - Core package with builders and managers
-- **[@better-tables/ui](packages/ui/README.md)** - React components and hooks
-- **[@better-tables/cli](packages/cli/README.md)** - The `init` command and its options
+- **[@better-tables/ui](packages/ui/README.md)** - React components and hooks (CLI copy)
+- **[@better-tables/cli](packages/cli/README.md)** - The `init` / `docs` commands
 - **[@better-tables/adapters-drizzle](packages/adapters/drizzle/README.md)** - Drizzle ORM adapter
-  - [Advanced Usage Guide](packages/adapters/drizzle/docs/ADVANCED_USAGE.md)
-- **[@better-tables/adapters-toolkit](packages/adapters/toolkit/README.md)** - Adapter toolkit (ORM-agnostic)
-- **[URL State Sync](packages/ui/docs/URL_SYNC.md)** - Framework-agnostic URL synchronization
-- **[Live Demo](apps/marketing)** - Marketing site with full interactive table demo (`#interactive-demo`)
+- **[Live Examples](https://better-tables.com/examples)** - Relationship filters, query groups, facets, big board
+- **AI indexes** — `/llms.txt`, `/llms-full.txt` on the site
 
 ---
 

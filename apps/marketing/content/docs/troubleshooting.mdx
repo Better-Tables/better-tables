@@ -1,0 +1,59 @@
+---
+title: Troubleshooting
+description: Common failures — build-time DB crashes, init prerequisites, read-only cells, HTTP 403s, and multi-table SchemaErrors.
+---
+
+## `next build` crashes loading the database
+
+Native drivers like `better-sqlite3` must not run at build/import time. Initialize the DB behind a lazy singleton and call it per request:
+
+```ts
+let tablesPromise: Promise<SupportTables> | null = null;
+
+async function initSupportTables() {
+  // open driver + create drizzle instance here (not at module scope)
+  const db = drizzle(/* … */);
+  return betterTables({ database: drizzleAdapter(db) });
+}
+
+export function getSupportTables() {
+  tablesPromise ??= initSupportTables();
+  return tablesPromise;
+}
+```
+
+See [Next.js Integration](/docs/nextjs) and the reference implementation in `apps/marketing/src/lib/demo/support/db.ts`.
+
+## `better-tables init` exits immediately
+
+`init` requires a working shadcn setup (`components.json`). It will print remediation steps; set up shadcn first, then re-run. It also checks for `@better-tables/core`, `@better-tables/adapters-drizzle`, and UI runtime deps (`zustand`, `@dnd-kit/*`) and offers to install them. Invoke as `bunx @better-tables/cli init`. Flags: `--skip-shadcn`, `-y`, `--components-path`, `--cwd` — see [UI & CLI](/docs/ui-and-cli).
+
+## An editable cell renders read-only
+
+Save resolution walks a fixed order (see [Inline editing](/docs/inline-editing#save-resolution)) and falls back to read-only, logging **one dev `console.warn` per column** explaining which condition failed. Check, in order: `editing={false}` on the table, missing/false `editable` config (`when(row)` returning false), and — for the adapter path — `adapter.meta.features.update`, an `updateRecord` implementation, a resolvable write target, and a row id (`rowConfig.getId` or an `id` field).
+
+## `cellEdit` returns 403 over HTTP
+
+Writes are double opt-in: the route handler needs `writes` config **and** the client needs `httpAdapter({ url, writes: true })`. Without both, the server answers 403 by design. See [HTTP adapter](/docs/adapters/http#writes-opt-in).
+
+## `SchemaError` on reads with a multi-table schema
+
+For `fetchData` / `describeColumns`, when a call provides neither `columns` nor `primaryTable`, the adapter throws instead of guessing the table. Name the table on each call — `fetchData({ primaryTable: 'users' })` in the params, `describeColumns('users')` as the positional argument — or set `options.defaultPrimaryTable` (reads) / `options.defaultMutationTable` (writes) on `drizzleAdapter` — see [Drizzle adapter](/docs/adapters/drizzle#factory-options-complete).
+
+Facet methods (`getFacetedValues`, `getFilterOptions`, `getMinMaxValues`) have **no** per-call `primaryTable` — they resolve the table from the column id. Keep facet column ids unambiguous on multi-table schemas, or expose a table-scoped adapter / HTTP allow-list (see [HTTP adapter](/docs/adapters/http)).
+
+## Facet counts look wrong after filtering
+
+Pass your **full, unmodified** filter state to `useFacets` / `getFacetedValues`. Self-exclusion (a column's own filter not narrowing its own facet) is the adapter's responsibility — pre-filtering per column fights it. See [Facets](/docs/facets).
+
+## Filter options never load for an option column
+
+Option choices resolve in order: declared `.options()` → schema enum (via `resolveTableColumns`, needs `adapter` on `<BetterTable>` with `describeColumns` support) → lazy `adapter.getFilterOptions(columnId)` on first open. If all three are missing, the dropdown has nothing to show. An adapter without `describeColumns` also degrades auto columns to the declared list with a dev warning — see [Auto columns](/docs/columns/auto-columns).
+
+## Pagination shows the wrong total
+
+Always pass `totalCount={result.total}` with server pagination — without it `totalItems` falls back to `pagination.totalPages * pagination.limit`. See [Pagination](/docs/pagination).
+
+## Maps arrive as arrays over HTTP
+
+That's the wire format: `getFacetedValues` and `fetchData.faceted` travel as `[value, count][]` and the `httpAdapter` client rebuilds `Map`s. Only raw `fetch` callers need to handle the arrays themselves — see [HTTP adapter](/docs/adapters/http#wire-contract).

@@ -1,0 +1,24 @@
+---
+title: "@better-tables/cli"
+description: better-tables init and docs commands.
+---
+
+```bash
+bunx @better-tables/cli init   # copy the UI into your project
+bunx @better-tables/cli docs   # open this site
+```
+
+The published package is `@better-tables/cli`; its binary name is `better-tables`. After a global install (`bun add -g @better-tables/cli`), you can run `better-tables init` directly.
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `init` | Verify shadcn setup, install required shadcn primitives and packages, copy the Better Tables UI source into your project |
+| `init --components-path <path>` | Output directory relative to your components dir (default `better-tables-ui`) |
+| `init -y, --yes` | Skip confirmation prompts |
+| `init --skip-shadcn` | Skip the shadcn component check/install |
+| `init --cwd <path>` | Run against a different project directory |
+| `docs [main\|core\|ui\|drizzle]` | Open the docs site (optionally a specific section) |
+
+Full walkthrough: [UI & CLI](/docs/ui-and-cli).

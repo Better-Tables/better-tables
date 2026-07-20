@@ -1,0 +1,62 @@
+---
+title: UI & CLI
+description: Copy React table components into your app with better-tables init.
+---
+
+`@better-tables/ui` is **private** — it is not installed from npm. The CLI copies shadcn-style source into your project so you can theme and extend it.
+
+## Prerequisites
+
+`init` refuses to run without a working [shadcn](https://ui.shadcn.com) setup (`components.json` in your project) — the copied components build on shadcn primitives and your Tailwind tokens. During `init` the CLI:
+
+1. Verifies shadcn is configured (exits with remediation steps if not)
+2. Installs the shadcn primitives the table needs (badge, button, dialog, …) via the shadcn CLI
+3. Checks that `@better-tables/core`, `@better-tables/adapters-drizzle`, and the UI runtime deps (`zustand`, `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/modifiers`, `@dnd-kit/utilities`) are installed, offering to add them
+4. Copies the Better Tables source into your project
+
+## Init
+
+```bash
+bunx @better-tables/cli init
+# or
+npx @better-tables/cli init
+```
+
+| Flag | Effect |
+|---|---|
+| `--components-path <path>` | Output directory relative to your shadcn components directory (default `better-tables-ui`) |
+| `-y, --yes` | Skip confirmation prompts (also skips per-file overwrite prompts) |
+| `--skip-shadcn` | Skip the shadcn component check/install |
+| `--cwd <path>` | Run against a different project directory |
+
+What lands in your project (default paths, resolved through your `components.json` aliases):
+
+- `components/better-tables-ui/table/` — table, virtualized table, pagination, column visibility/ordering, editable cells, states
+- `components/better-tables-ui/filters/` — filter bar, dropdown, active filters, faceted sidebar, per-type inputs
+- `hooks/` — `use-table-data`, `use-table-url-sync`, `use-facets`, `use-editable-cells`, virtualization hooks, …
+- `lib/` — small shared utilities
+
+Import from the copied paths — there is no `@better-tables/ui` package to import in your app:
+
+```tsx
+import { BetterTable } from '@/components/better-tables-ui/table/table';
+```
+
+## Why copy instead of npm?
+
+- You own the JSX — no fighting a black-box design system
+- Works with your existing shadcn / Tailwind tokens
+- Avoids bundling conflicts with app-local UI primitives
+
+## Docs command
+
+```bash
+bunx @better-tables/cli docs          # this site
+bunx @better-tables/cli docs core     # /docs/packages/core
+bunx @better-tables/cli docs drizzle  # /docs/adapters/drizzle
+bunx @better-tables/cli docs ui       # /docs/packages/ui
+```
+
+## URL sync hook
+
+After init, use `useTableUrlSync` from your copied hooks directory — see [URL State](/docs/url-state).

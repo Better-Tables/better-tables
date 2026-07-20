@@ -1,0 +1,45 @@
+---
+title: Architecture
+description: Layers of the Better Tables monorepo and how data moves from schema to UI.
+---
+
+Better Tables keeps database concerns, table contracts, and React rendering in separate packages so you can swap adapters and own your UI source.
+
+## Package map
+
+| Package | Role |
+|---|---|
+| `@better-tables/core` | Column builders, filter/sort/pagination managers, adapter contract types. No React, no DB driver. |
+| `@better-tables/adapters-drizzle` | Schema introspection, JOIN/filter/pagination query generation for Postgres/MySQL/SQLite. |
+| `@better-tables/adapters-toolkit` | ORM-agnostic machinery for adapter authors. |
+| `@better-tables/ui` | React table/filter components (shadcn-style). Distributed via CLI copy, not npm. |
+| `@better-tables/cli` | `better-tables init` copies UI into a consumer project. |
+
+## Data flow
+
+```
+defineTable() columns
+        ↓
+betterTables({ database: adapter })
+        ↓
+adapter.fetchData / getFacetedValues / …
+        ↓
+@better-tables/ui (copied) renders + manages client state
+        ↓
+optional URL sync (filters, sort, page)
+```
+
+## Flagship API surface
+
+Prefer these entry points everywhere:
+
+- `betterTables({ database, defaults? })` — factory for `fetchData`, `define`, cell-edit actions
+- `defineTable<typeof tables>()('name', (t) => ({ columns }))` — RSC-safe table definitions
+- `t.text` / `t.number` / `t.date` / `t.option` / … — path builders with fluent modifiers
+- `tables.fetchData(table, params)` — server/query boundary
+
+For tables without a database — playgrounds, tests, client-only arrays — `memoryAdapter(rows)` runs the same pipeline in memory, and `defineTableRow<Row>()` defines a table from hand-built columns. See [Custom adapters](/docs/adapters/custom) and [Columns](/docs/columns#standalone-columns-no-schema).
+
+## Authoritative demos
+
+Shipped examples live under `apps/marketing` — especially `src/lib/demo/support/` and the routes under [/examples](/examples). Those use the same 0.6 API this handbook teaches.

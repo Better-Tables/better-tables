@@ -1,236 +1,184 @@
-import { createColumnBuilder, defineColumns, defineTableRow } from '@better-tables/core';
+import { defineTable } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
-import type { UserWithRelations } from '../db/schema';
+// Type-only import: `UsersTables` carries the Drizzle schema types, so every
+// path below (own columns AND relation paths like `profile.bio`) is
+// autocompleted and type-checked — a typo is a compile error. No runtime
+// adapter is touched here; the curried `defineTable` form is RSC-safe.
+import type { UsersTables } from '../adapter';
 
-const cb = createColumnBuilder<UserWithRelations>();
+const roleColors: Record<string, string> = {
+  admin: 'bg-purple-100 text-purple-800',
+  editor: 'bg-blue-100 text-blue-800',
+  contributor: 'bg-green-100 text-green-800',
+  viewer: 'bg-gray-100 text-gray-800',
+};
 
-export const userColumns = defineColumns<UserWithRelations>()([
-  // Direct user columns
-  cb
-    .text()
-    .id('name')
-    .displayName('Name')
-    .accessor((user) => user.name)
-    .filterable()
-    .sortable()
-    .editable()
-    .build(),
+const statusColors: Record<string, string> = {
+  active: 'bg-green-100 text-green-800',
+  inactive: 'bg-gray-100 text-gray-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+  suspended: 'bg-red-100 text-red-800',
+};
 
-  cb
-    .text()
-    .id('email')
-    .displayName('Email')
-    .accessor((user) => user.email)
-    .filterable()
-    .sortable()
-    .editable()
-    .build(),
-
-  cb
-    .number()
-    .id('age')
-    .displayName('Age')
-    .accessorWithDefault((user) => user.age, 0)
-    .range(18, 100, { includeNull: true })
-    .filterable()
-    .sortable()
-    .editable()
-    .build(),
-
-  cb
-    .option()
-    .id('role')
-    .displayName('Role')
-    .accessor((user) => user.role)
-    .options([
-      { value: 'admin', label: 'Admin' },
-      { value: 'editor', label: 'Editor' },
-      { value: 'contributor', label: 'Contributor' },
-      { value: 'viewer', label: 'Viewer' },
-    ])
-    .filterable()
-    .sortable()
-    .editable()
-    .cellRenderer(({ value }) => {
-      const colors: Record<string, string> = {
-        admin: 'bg-purple-100 text-purple-800',
-        editor: 'bg-blue-100 text-blue-800',
-        contributor: 'bg-green-100 text-green-800',
-        viewer: 'bg-gray-100 text-gray-800',
-      };
-      return (
-        <Badge className={colors[value] || ''} variant="outline">
-          {value}
-        </Badge>
-      );
-    })
-    .build(),
-
-  cb
-    .option()
-    .id('status')
-    .displayName('Status')
-    .accessor((user) => user.status)
-    .options([
-      { value: 'active', label: 'Active' },
-      { value: 'inactive', label: 'Inactive' },
-      { value: 'pending', label: 'Pending' },
-      { value: 'suspended', label: 'Suspended' },
-    ])
-    .filterable()
-    .sortable()
-    .editable()
-    .cellRenderer(({ value }) => {
-      const colors: Record<string, string> = {
-        active: 'bg-green-100 text-green-800',
-        inactive: 'bg-gray-100 text-gray-800',
-        pending: 'bg-yellow-100 text-yellow-800',
-        suspended: 'bg-red-100 text-red-800',
-      };
-      return (
-        <Badge className={colors[value] || ''} variant="outline">
-          {value}
-        </Badge>
-      );
-    })
-    .build(),
-
-  cb
-    .boolean()
-    .id('profile.hasBio')
-    .displayName('Has Bio')
-    .accessor((user) => Boolean(user.profile?.bio))
-    .filterable()
-    .build(),
-
-  cb
-    .multiOption()
-    .id('roleTags')
-    .displayName('Role Tags')
-    .accessor((user) => [user.role])
-    .options([
-      { value: 'admin', label: 'Admin' },
-      { value: 'editor', label: 'Editor' },
-      { value: 'contributor', label: 'Contributor' },
-      { value: 'viewer', label: 'Viewer' },
-    ])
-    .filterable()
-    .cellRenderer(({ value }) => (
-      <div className="flex flex-wrap gap-1">
-        {(value as string[]).map((tag) => (
-          <Badge key={tag} variant="secondary" className="text-xs">
-            {tag}
-          </Badge>
-        ))}
-      </div>
-    ))
-    .build(),
-
-  cb
-    .date()
-    .id('createdAt')
-    .displayName('Joined')
-    .accessor((user) => user.createdAt)
-    .filterable(true) // Enable filtering for date testing
-    .sortable()
-    .editable()
-    .build(),
-
-  // One-to-one relationship (profile)
-  cb
-    .text()
-    .id('profile.bio')
-    .displayName('Bio')
-    .accessorWithDefault((user) => user.profile?.bio)
-    .searchable({ includeNull: true })
-    .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
-    .filterable()
-    .editable()
-    .build(),
-
-  cb
-    .text()
-    .id('profile.website')
-    .displayName('Website')
-    .accessorWithDefault((user) => user.profile?.website)
-    .filterable()
-    .cellRenderer(({ value }) => {
-      if (!value) return <span className="text-muted-foreground">-</span>;
-
-      // Validate URL to prevent XSS attacks
-      const url = value;
-      const isValidUrl = (url: string): boolean => {
-        try {
-          const parsedUrl = new URL(url);
-          return ['http:', 'https:', 'mailto:'].includes(parsedUrl.protocol);
-        } catch {
-          return false;
-        }
-      };
-
-      if (!isValidUrl(url)) {
-        return <span className="text-muted-foreground">{url}</span>;
-      }
-
-      return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
-        >
-          {url}
-        </a>
-      );
-    })
-    .build(),
-
-  cb
-    .text()
-    .id('profile.location')
-    .displayName('Location')
-    .accessorWithDefault((user) => user.profile?.location)
-    .searchable({ includeNull: true })
-    .filterable()
-    .editable()
-    .build(),
-
-  cb
-    .text()
-    .id('profile.github')
-    .displayName('GitHub')
-    .accessorWithDefault((user) => user.profile?.github)
-    .filterable()
-    .cellRenderer(({ value }) => {
-      if (!value) return <span className="text-muted-foreground">-</span>;
-      return (
-        <a
-          href={`https://github.com/${value}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
-        >
-          @{value}
-        </a>
-      );
-    })
-    .build(),
-
-  // Note: Computed columns are not yet supported by the adapter
-  // These would need to be implemented as virtual columns or handled differently
-]);
+// Validate URL to prevent XSS attacks
+const isValidUrl = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    return ['http:', 'https:', 'mailto:'].includes(parsedUrl.protocol);
+  } catch {
+    return false;
+  }
+};
 
 /**
- * The homepage demo's table definition. `defineTableRow<UserWithRelations>()`
- * is the explicit-row form, and the already-built `userColumns` are passed
- * straight through (the documented raw-column escape hatch) -- so
- * `tables.fetchData(usersTable, ...)` returns a typed, cast-free result and
- * injects `primaryTable` itself (findings 9 + 16), without rewriting these
- * columns onto path builders.
+ * The homepage demo's table definition — the flagship path-builder form.
+ * Own-table paths (`name`, `age`) and relation paths (`profile.bio`) derive
+ * accessors and JOINs from the schema; `.editable()` on a relation path
+ * routes cell saves to the RELATED profiles row via
+ * `resolveCellWriteTarget` (see `saveUserCell`).
  */
-export const usersTable = defineTableRow<UserWithRelations>()('users', () => ({
-  columns: userColumns,
+export const usersTable = defineTable<UsersTables>()('users', (t) => ({
+  columns: [
+    t.text('name').filterable().sortable().editable(),
+
+    t.text('email').filterable().sortable().editable(),
+
+    t.number('age').range(18, 100, { includeNull: true }).filterable().sortable().editable(),
+
+    t
+      .option('role')
+      .options([
+        { value: 'admin', label: 'Admin' },
+        { value: 'editor', label: 'Editor' },
+        { value: 'contributor', label: 'Contributor' },
+        { value: 'viewer', label: 'Viewer' },
+      ])
+      .filterable()
+      .sortable()
+      .editable()
+      .cellRenderer(({ value }) => (
+        <Badge className={roleColors[value] || ''} variant="outline">
+          {value}
+        </Badge>
+      )),
+
+    t
+      .option('status')
+      .options([
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'suspended', label: 'Suspended' },
+      ])
+      .filterable()
+      .sortable()
+      .editable()
+      .cellRenderer(({ value }) => (
+        <Badge className={statusColors[value] || ''} variant="outline">
+          {value}
+        </Badge>
+      )),
+
+    // Derived display values: computed client-side from the fetched row.
+    // Builders default to filterable/sortable, so both must be turned OFF
+    // explicitly — there is no DB column behind these ids, and letting the
+    // controls through would send `hasBio` / `roleTags` to the query builder
+    // as if they were storage fields.
+    t
+      .computed('hasBio', (row) => Boolean(row.profile?.bio))
+      .displayName('Has Bio')
+      .filterable(false)
+      .sortable(false)
+      .cellRenderer(({ value }) => (
+        <Badge variant={value ? 'secondary' : 'outline'} className="text-xs">
+          {value ? 'Yes' : 'No'}
+        </Badge>
+      )),
+
+    t
+      .computed('roleTags', (row) => [row.role])
+      .displayName('Role Tags')
+      .filterable(false)
+      .sortable(false)
+      .cellRenderer(({ value }) => (
+        <div className="flex flex-wrap gap-1">
+          {(value as string[]).map((tag) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      )),
+
+    t.date('createdAt').displayName('Joined').filterable().sortable().editable(),
+
+    // One-to-one relation paths: the adapter JOINs profiles automatically.
+    t
+      .text('profile.bio')
+      .displayName('Bio')
+      .searchable({ includeNull: true })
+      .truncate({ maxLength: 32, suffix: '...', showTooltip: true })
+      .filterable()
+      // `profiles.bio` is a nullable column; without this the edit pipeline
+      // rejects clearing the cell with "This field is required."
+      .nullable()
+      .editable(),
+
+    t
+      .text('profile.website')
+      .displayName('Website')
+      .filterable()
+      .cellRenderer(({ value }) => {
+        if (!value) return <span className="text-muted-foreground">-</span>;
+        if (!isValidUrl(value)) {
+          return <span className="text-muted-foreground">{value}</span>;
+        }
+        return (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {value}
+          </a>
+        );
+      }),
+
+    t
+      .text('profile.location')
+      .displayName('Location')
+      .searchable({ includeNull: true })
+      .filterable()
+      // Nullable column — see `profile.bio` above.
+      .nullable()
+      .editable(),
+
+    t
+      .text('profile.github')
+      .displayName('GitHub')
+      .filterable()
+      .cellRenderer(({ value }) => {
+        if (!value) return <span className="text-muted-foreground">-</span>;
+        return (
+          <a
+            href={`https://github.com/${value}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            @{value}
+          </a>
+        );
+      }),
+  ],
 }));
+
+/** Row type inferred from the table definition — includes the joined `profile`. */
+export type UserRow = typeof usersTable.$infer.Row;
+
+/** Explicit column list for `<BetterTable columns={…}>` (no adapter on the client). */
+export const userColumns = usersTable.columns;
 
 // Default visible columns for the demo
 export const defaultVisibleColumns = [
@@ -239,7 +187,7 @@ export const defaultVisibleColumns = [
   'age',
   'role',
   'status',
-  'profile.hasBio',
+  'hasBio',
   'roleTags',
   'createdAt',
   'profile.bio',

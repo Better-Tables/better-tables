@@ -1,0 +1,27 @@
+---
+title: "@better-tables/ui"
+description: React table and filter components — distributed via CLI copy.
+---
+
+**Not on npm.** Copy into your project:
+
+```bash
+bunx @better-tables/cli init
+```
+
+## What you get
+
+| Directory | Contents |
+|---|---|
+| `components/better-tables-ui/table/` | `BetterTable`, `VirtualizedTable`, `TablePagination`, column visibility toggle, column/sort order lists, editable cells, empty/error states, actions toolbar, header context menu, DnD providers |
+| `components/better-tables-ui/filters/` | Filter bar, filter dropdown, active filters, faceted filter sidebar, operator select, per-type filter inputs |
+| `hooks/` | `use-table-data`, `use-table-store`, `use-table-url-sync`, `use-facets`, `use-editable-cells`, `use-filter-validation`, `use-keyboard-navigation`, `use-virtualization`, `use-virtualized-table-data`, `use-column-options`, `use-debounce` |
+| `lib/` | `cn` utility |
+
+The copied files import `@better-tables/core` plus direct runtime deps: `zustand`, `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/modifiers`, and `@dnd-kit/utilities`. `init` offers to install those; keep them in your app `package.json`.
+
+## Learn
+
+- [UI & CLI](/docs/ui-and-cli) — prerequisites, init flags, why copy instead of npm
+- [BetterTable props](/docs/better-table) — complete component reference
+- [URL State](/docs/url-state) — sync setup

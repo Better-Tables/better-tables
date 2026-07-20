@@ -15,7 +15,8 @@
       "!!bun.lock",
       "!!.git",
       "!!.turbo",
-      "!!**/next-env.d.ts"
+      "!!**/next-env.d.ts",
+      "!!packages/cli/ui-src"
     ]
   },
   "linter": {

@@ -1,0 +1,53 @@
+---
+title: Better Tables
+description: Type-safe tables from your database schema to React UI — filtering, sorting, pagination, and URL state included.
+---
+
+Better Tables is a TypeScript monorepo for building production data tables: define columns once, let an adapter turn that into queries, and render with React components you own.
+
+<Cards>
+  <Card title="Why Better Tables" href="/docs/why-better-tables" description="What it covers end-to-end, and honest comparisons." />
+  <Card title="Quick Start" href="/docs/quick-start" description="Install core + adapter, define a table, fetch a page of rows." />
+  <Card title="Architecture" href="/docs/architecture" description="How core, adapters, UI, and the CLI fit together." />
+  <Card title="Live Examples" href="/docs/examples" description="Relationship filters, query groups, facets, and a 12k-row board." />
+  <Card title="BetterTable Props" href="/docs/better-table" description="Complete reference for the component." />
+  <Card title="Troubleshooting" href="/docs/troubleshooting" description="Common failures and their fixes." />
+</Cards>
+
+## Packages
+
+| Package | Role | Distribution |
+|---|---|---|
+| `@better-tables/core` | Column builders, managers, adapter contracts | npm |
+| `@better-tables/adapters-drizzle` | Drizzle query generation (Postgres / MySQL / SQLite) | npm |
+| `@better-tables/ui` | React table & filter components | CLI copy (private) |
+| `@better-tables/cli` | `better-tables init` — copies UI into your app | npm |
+
+**Data flow:** `defineTable()` column definitions → adapter executes queries → UI renders and manages client state, optionally synced to the URL.
+
+```ts
+import { betterTables, defineTable } from '@better-tables/core';
+import { drizzleAdapter } from '@better-tables/adapters-drizzle';
+
+export const tables = betterTables({
+  database: drizzleAdapter(db),
+  defaults: { pageSize: 20 },
+});
+
+export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+  columns: [
+    t.text('subject').searchable().filterable().sortable(),
+    t.option('status').options([{ value: 'open', label: 'Open' }]).filterable(),
+  ],
+}));
+
+const result = await tables.fetchData(ticketsTable, {
+  pagination: { page: 1, limit: 20 },
+});
+```
+
+## AI-friendly docs
+
+- Index: [`/llms.txt`](/llms.txt)
+- Full corpus: [`/llms-full.txt`](/llms-full.txt)
+- Any page as Markdown: append `.mdx` (for example [`/docs/quick-start.mdx`](/docs/quick-start.mdx))

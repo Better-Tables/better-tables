@@ -1,0 +1,41 @@
+---
+title: Why Better Tables
+description: What Better Tables covers end-to-end, how it compares to headless table libraries, and when not to use it.
+---
+
+Data tables have two halves: the **server half** (turn filter/sort/page state into correct SQL — JOINs, counts, facets) and the **client half** (render, manage state, sync the URL). Most libraries pick one half. Better Tables covers both from a single column definition:
+
+```
+defineTable() columns  →  adapter generates queries  →  UI renders + syncs state
+```
+
+Define `t.text('customer.company').filterable()` once and you get the JOIN plus a filterable column in the UI. Wire shareable URL state separately via `urlSync` / `useTableUrlSync` (see [URL State](/docs/url-state)). `$infer.Row` / `$infer.ColumnId` are typed today; `$infer.FilterState` is still reserved (`unknown`) for a future typed filter registry.
+
+## Compared to headless table libraries (TanStack Table)
+
+Headless libraries solve client-side table *rendering state* extremely well, and stay agnostic about where rows come from. That agnosticism means the server half — translating filter/sort/pagination into queries, keeping allowed fields in sync with the UI, faceted counts — stays yours to build and keep consistent.
+
+Better Tables starts from the schema instead: the column definition is shared by the query generator and the UI, so a column can't be filterable in the UI but unsupported in SQL. The trade-off is scope — Better Tables is opinionated about the stack (TypeScript, an adapter for your data layer, shadcn-style React UI) where headless libraries fit anywhere.
+
+## Compared to hand-rolling
+
+The hand-rolled version of this stack is boilerplate with sharp edges: operator-by-operator SQL translation, JOIN aliasing for relationship filters, facet counts with self-exclusion, URL round-tripping for AND/OR filter trees, and write allow-listing for inline edits. That's the exact code the core + adapter packages contain, tested (including SQL-injection and wire-format suites), so your app keeps only the interesting parts: schema, columns, and UI polish.
+
+## You own the UI
+
+`@better-tables/ui` is deliberately **not** an npm dependency — `bunx @better-tables/cli init` copies the source (shadcn-style) into your repo. Restyle it, rewrite a component, or delete what you don't use; upgrades are diffs you apply on your terms, not breaking releases. See [UI & CLI](/docs/ui-and-cli).
+
+## When Better Tables is the wrong tool
+
+- **You just need to render arrays with zero features** — a headless table library is lighter. (Though for filtered/faceted client-side tables, `memoryAdapter(rows)` runs the whole pipeline with no backend — see [Custom adapters](/docs/adapters/custom#memory-adapter).)
+- **Your data layer has no adapter** and you can't invest in one — Drizzle is first-party; anything else means implementing the [adapter contract](/docs/adapters/custom) (the toolkit does much of the work, but it's real work).
+- **You need a hosted admin panel** with auth, CRUD scaffolding, and dashboards — Better Tables is a library, not an admin framework.
+- **Pre-1.0 tolerance is zero** — the API is stabilizing around `betterTables()` / `defineTable()`; breaking changes still happen between minors.
+
+## Where to start
+
+<Cards>
+  <Card title="Quick Start" href="/docs/quick-start" description="Install, define a table, fetch a page, render." />
+  <Card title="Architecture" href="/docs/architecture" description="How core, adapters, UI, and the CLI fit together." />
+  <Card title="Live examples" href="/examples" description="Relationship filters, query groups, facets, 12k-row board." />
+</Cards>

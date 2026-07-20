@@ -16,6 +16,9 @@ _temp*
 out/
 build
 
+# Fumadocs MDX generated collections
+.source/
+
 # Production
 dist
 *.local
