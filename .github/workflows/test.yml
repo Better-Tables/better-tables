@@ -303,7 +303,7 @@ jobs:
           bun install --frozen-lockfile
 
       - name: Download Core build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: core-dist
           path: packages/core/dist
@@ -400,7 +400,7 @@ jobs:
           bun pm ls 2>/dev/null | head -20 || echo "Package list command not available"
 
       - name: Download Core build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: core-dist
           path: packages/core/dist
