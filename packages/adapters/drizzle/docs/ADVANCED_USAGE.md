@@ -1,5 +1,11 @@
 # Advanced Usage Guide
 
+> **Canonical docs (flagship API):** [better-tables.com/docs/adapters/drizzle](https://better-tables.com/docs/adapters/drizzle)
+> (source: `apps/marketing/content/docs/adapters/drizzle.mdx`). Prefer that
+> page for 0.6 `betterTables` / `defineTable` examples. Sections below may
+> still show legacy `createColumnBuilder` samples — treat those as historical
+> until cleaned up.
+
 This guide covers advanced features and patterns for the Drizzle adapter.
 
 ## Table of Contents

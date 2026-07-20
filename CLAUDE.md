@@ -73,8 +73,16 @@ for optional MySQL/Postgres integration tests).
 
 ## Deep dives
 
-For architecture, the column-builder API, filtering/sorting/pagination
-internals, URL state sync, and Next.js integration details, see `wiki.md`
-by heading: "Architecture Overview", "Column Definition (Builder API)",
-"Advanced Filtering System", "Sorting", "Pagination", "URL State
-Management", "Next.js Integration".
+Canonical docs: `apps/marketing/content/docs/` served at `/docs` on
+`@better-tables/site`. `wiki.md` is a short path map for agents.
+
+| Topic | Docs path |
+|---|---|
+| Architecture | `/docs/architecture` |
+| Columns | `/docs/columns` |
+| Filtering | `/docs/filtering` |
+| Sorting | `/docs/sorting` |
+| Pagination | `/docs/pagination` |
+| URL state | `/docs/url-state` |
+| Next.js | `/docs/nextjs` |
+| Inline editing | `/docs/inline-editing` |

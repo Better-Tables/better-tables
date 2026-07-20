@@ -1,5 +1,9 @@
 # URL Synchronization
 
+> **Canonical docs:** [better-tables.com/docs/url-state](https://better-tables.com/docs/url-state)
+> (source: `apps/marketing/content/docs/url-state.mdx`). This file is a
+> package-local mirror for readers browsing the repo.
+
 Better Tables provides framework-agnostic URL synchronization through a simple adapter interface. This allows you to sync table state (filters, pagination, sorting) with URL query parameters in any React framework.
 
 ## How It Works

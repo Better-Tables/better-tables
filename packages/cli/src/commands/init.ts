@@ -213,7 +213,6 @@ export function initCommand(): Command {
     }
     // Step 6: Copy Better Tables files
     console.log(pc.bold('Copying Better Tables files...\n'));
-    console.log(pc.dim('Downloading files from GitHub...\n'));
     const componentsBasePath = join(resolvedPaths.components, componentsPath);
     let shouldCopy = true;
     if (!skipPrompts) {
@@ -221,9 +220,7 @@ export function initCommand(): Command {
       console.log(pc.dim(`  • ${componentsBasePath}/table/`));
       console.log(pc.dim(`  • ${componentsBasePath}/filters/`));
       console.log(pc.dim(`  • ${resolvedPaths.hooks}/`));
-      console.log(pc.dim(`  • ${resolvedPaths.lib}/`));
-      console.log(pc.dim(`  • ${componentsBasePath}/stores/`));
-      console.log(pc.dim(`  • ${resolvedPaths.lib}/utils/\n`));
+      console.log(pc.dim(`  • ${resolvedPaths.lib}/\n`));
       shouldCopy = await confirm('Proceed with copying files?', true);
     }
     if (!shouldCopy) {
@@ -240,7 +237,7 @@ export function initCommand(): Command {
       console.error(
         pc.red(`✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`)
       );
-      console.error(pc.dim('  Check your network connection and GitHub access, then try again.'));
+      console.error(pc.dim('  The bundled UI source may be corrupted — reinstall @better-tables/cli.'));
       process.exit(1);
     }
     // Summary

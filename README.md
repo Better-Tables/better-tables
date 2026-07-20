@@ -327,15 +327,18 @@ Each package is independently versioned and can be used standalone or together.
 
 ## 📖 Documentation
 
+**Canonical docs:** [better-tables.com/docs](https://better-tables.com/docs) (source: `apps/marketing/content/docs/`).
+
+Local preview: `cd apps/marketing && bun run dev` → http://localhost:3000/docs
+
+- **[Quick Start](https://better-tables.com/docs/quick-start)** - Install, define a table, fetch rows
 - **[Migrating from 0.5 to 0.6](MIGRATION.md)** - Upgrading a 0.5 app? Start here.
 - **[@better-tables/core](packages/core/README.md)** - Core package with builders and managers
-- **[@better-tables/ui](packages/ui/README.md)** - React components and hooks
-- **[@better-tables/cli](packages/cli/README.md)** - The `init` command and its options
+- **[@better-tables/ui](packages/ui/README.md)** - React components and hooks (CLI copy)
+- **[@better-tables/cli](packages/cli/README.md)** - The `init` / `docs` commands
 - **[@better-tables/adapters-drizzle](packages/adapters/drizzle/README.md)** - Drizzle ORM adapter
-  - [Advanced Usage Guide](packages/adapters/drizzle/docs/ADVANCED_USAGE.md)
-- **[@better-tables/adapters-toolkit](packages/adapters/toolkit/README.md)** - Adapter toolkit (ORM-agnostic)
-- **[URL State Sync](packages/ui/docs/URL_SYNC.md)** - Framework-agnostic URL synchronization
-- **[Live Demo](apps/marketing)** - Marketing site with full interactive table demo (`#interactive-demo`)
+- **[Live Examples](https://better-tables.com/examples)** - Relationship filters, query groups, facets, big board
+- **AI indexes** — `/llms.txt`, `/llms-full.txt` on the site
 
 ---
 
