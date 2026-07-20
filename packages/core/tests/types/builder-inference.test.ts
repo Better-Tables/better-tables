@@ -1,10 +1,10 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 import { ColumnBuilder } from '../../src/builders/column-builder';
-import { createColumnBuilder } from '../../src/builders/column-factory';
 import { createPathColumnFactory } from '../../src/builders/path-builders';
 import type { ColumnDefinition, EditableConfig } from '../../src/types/column';
 // Tests may import experimental prototypes; src must not (see plan 014).
 import type { ColumnRegistry } from '../../src/types/experimental/contract-v2';
+import { createColumnBuilder } from '../helpers/column-builders';
 
 // Local fixture: a role field with a literal union, mirroring the flagship
 // example from the plan. Kept minimal on purpose.

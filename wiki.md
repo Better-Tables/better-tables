@@ -28,7 +28,6 @@ For local preview: `cd apps/marketing && bun run dev` → http://localhost:3000/
 | UI & CLI | `/docs/ui-and-cli` |
 | BetterTable props reference | `/docs/better-table` |
 | Troubleshooting | `/docs/troubleshooting` |
-| Migration (0.5 → 0.6) | `/docs/migration` + root `MIGRATION.md` |
 
 AI indexes: `/llms.txt`, `/llms-full.txt`. Per-page Markdown: append `.mdx` to any docs URL.
 

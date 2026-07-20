@@ -1,10 +1,12 @@
 # Advanced Usage Guide
 
-> **Canonical docs (flagship API):** [better-tables.com/docs/adapters/drizzle](https://better-tables.com/docs/adapters/drizzle)
+> **Canonical docs:** [better-tables.com/docs/adapters/drizzle](https://better-tables.com/docs/adapters/drizzle)
 > (source: `apps/marketing/content/docs/adapters/drizzle.mdx`). Prefer that
-> page for 0.6 `betterTables` / `defineTable` examples. Sections below may
-> still show legacy `createColumnBuilder` samples — treat those as historical
-> until cleaned up.
+> page for current `betterTables` / `defineTable` examples. Some sections
+> below still show a **removed** pre-0.6 builder API (`createColumnBuilder`,
+> `new DrizzleAdapter({...})`) — the relationship/query *concepts* apply
+> unchanged, but translate the syntax to `defineTable` + `drizzleAdapter(db,
+> factoryOptions)` before copying anything.
 
 This guide covers advanced features and patterns for the Drizzle adapter.
 

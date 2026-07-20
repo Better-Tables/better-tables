@@ -84,8 +84,6 @@ bunx @better-tables/cli init
 
 ### Your First Table
 
-Upgrading from 0.5? See [MIGRATION.md](MIGRATION.md) for the flagship `betterTables()` + `defineTable()` API.
-
 ```tsx
 import { BetterTable } from '@/components/better-tables-ui/table/table';
 import { betterTables, defineTable } from '@better-tables/core';
@@ -332,7 +330,6 @@ Each package is independently versioned and can be used standalone or together.
 Local preview: `cd apps/marketing && bun run dev` → http://localhost:3000/docs
 
 - **[Quick Start](https://better-tables.com/docs/quick-start)** - Install, define a table, fetch rows
-- **[Migrating from 0.5 to 0.6](MIGRATION.md)** - Upgrading a 0.5 app? Start here.
 - **[@better-tables/core](packages/core/README.md)** - Core package with builders and managers
 - **[@better-tables/ui](packages/ui/README.md)** - React components and hooks (CLI copy)
 - **[@better-tables/cli](packages/cli/README.md)** - The `init` / `docs` commands

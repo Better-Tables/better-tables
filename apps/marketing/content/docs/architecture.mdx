@@ -38,7 +38,7 @@ Prefer these entry points everywhere:
 - `t.text` / `t.number` / `t.date` / `t.option` / … — path builders with fluent modifiers
 - `tables.fetchData(table, params)` — server/query boundary
 
-Legacy `createColumnBuilder` / `defineColumns` still compile but are deprecated. See [Migration](/docs/migration).
+For tables without a database — playgrounds, tests, client-only arrays — `memoryAdapter(rows)` runs the same pipeline in memory, and `defineTableRow<Row>()` defines a table from hand-built columns. See [Custom adapters](/docs/adapters/custom) and [Columns](/docs/columns#standalone-columns-no-schema).
 
 ## Authoritative demos
 

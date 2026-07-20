@@ -5,6 +5,24 @@ description: Implement the TableAdapter contract for any backend, with the ORM-a
 
 An adapter is anything that implements the `TableAdapter` contract from `@better-tables/core`. The Drizzle adapter is the first-party reference; `@better-tables/adapters-toolkit` packages its ORM-agnostic machinery so a Prisma/Kysely/raw-SQL adapter composes primitives instead of re-implementing them.
 
+## Memory adapter
+
+Core ships one adapter of its own: `memoryAdapter(rows)`, the full pipeline over a plain array — every filter operator, AND/OR trees, sorting, pagination, facets with self-exclusion, schema inference for [auto columns](/docs/columns/auto-columns), and in-place cell edits. Use it for client-only tables, playgrounds, tests, and as a small readable reference for the contract below.
+
+```ts
+import { betterTables, memoryAdapter } from '@better-tables/core';
+
+const tables = betterTables({ database: memoryAdapter(tickets) });
+const ticketsTable = tables.define('memory'); // auto columns inferred from the data
+
+const result = await tables.fetchData(ticketsTable, {
+  filters: [{ columnId: 'status', type: 'option', operator: 'is', values: ['open'] }],
+  pagination: { page: 1, limit: 20 },
+});
+```
+
+Options: `getRowId` (row identity for edits; defaults to the `id` field), `tableName`, and `enumInferenceLimit` (distinct-string ceiling for inferring `option` columns; default 12, `0` disables). Scope: own-table columns only — dot-path ids walk nested objects, but there's no relationship model or JOIN semantics; use a database adapter for relational data.
+
 ## The contract
 
 ```ts

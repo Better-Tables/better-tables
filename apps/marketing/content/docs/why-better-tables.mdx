@@ -27,10 +27,10 @@ The hand-rolled version of this stack is boilerplate with sharp edges: operator-
 
 ## When Better Tables is the wrong tool
 
-- **You don't control the backend** and just need to render arrays — a headless table library is lighter.
+- **You just need to render arrays with zero features** — a headless table library is lighter. (Though for filtered/faceted client-side tables, `memoryAdapter(rows)` runs the whole pipeline with no backend — see [Custom adapters](/docs/adapters/custom#memory-adapter).)
 - **Your data layer has no adapter** and you can't invest in one — Drizzle is first-party; anything else means implementing the [adapter contract](/docs/adapters/custom) (the toolkit does much of the work, but it's real work).
 - **You need a hosted admin panel** with auth, CRUD scaffolding, and dashboards — Better Tables is a library, not an admin framework.
-- **Pre-1.0 tolerance is zero** — the API is stabilizing around `betterTables()` / `defineTable()` (see [Migration](/docs/migration)); breaking changes still happen between minors.
+- **Pre-1.0 tolerance is zero** — the API is stabilizing around `betterTables()` / `defineTable()`; breaking changes still happen between minors.
 
 ## Where to start
 

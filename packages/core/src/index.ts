@@ -12,94 +12,34 @@
  * - **Utils**: Utility functions for common operations
  *
  * @module core
- * @version 1.0.0
- * @since 1.0.0
  *
  * @example
  * ```typescript
- * import {
- *   // Column builders
- *   TextColumnBuilder,
- *   NumberColumnBuilder,
- *   DateColumnBuilder,
- *   BooleanColumnBuilder,
- *   OptionColumnBuilder,
- *   MultiOptionColumnBuilder,
- *   ColumnBuilder,
+ * import { betterTables, defineTable } from '@better-tables/core';
+ * import { drizzleAdapter } from '@better-tables/adapters-drizzle';
  *
- *   // Column factory utilities
- *   createColumnBuilder,
- *   column,
- *   typed,
- *
- *   // State managers
- *   TableStateManager,
- *   FilterManager,
- *   PaginationManager,
- *   SortingManager,
- *   SelectionManager,
- *   VirtualizationManager,
- *
- *   // Types
- *   type ColumnDefinition,
- *   type FilterState,
- *   type PaginationState,
- *   type SortingState,
- *   type SelectionState,
- *   type VirtualizationConfig,
- *   type TableConfig,
- *
- *   // Utilities
- *   deepEqual,
- *   shallowEqualArrays,
- *   serializeFiltersToURL,
- *   deserializeFiltersFromURL,
- *   // Filters-only pair above; serializeTableStateToUrl/deserializeTableStateFromUrl
- *   // below cover the FULL table state (filters + sorting + pagination +
- *   // columnVisibility + columnOrder) in one call -- prefer these two for
- *   // URL state sync unless you specifically need filters in isolation.
- *   serializeTableStateToUrl,
- *   deserializeTableStateFromUrl
- * } from '@better-tables/core';
- *
- * // Create a table with comprehensive functionality
- * const columns = [
- *   new TextColumnBuilder<User>()
- *     .id('name')
- *     .displayName('Full Name')
- *     .accessor(user => `${user.firstName} ${user.lastName}`)
- *     .sortable()
- *     .filterable()
- *     .build(),
- *
- *   new NumberColumnBuilder<User>()
- *     .id('age')
- *     .displayName('Age')
- *     .accessor(user => user.age)
- *     .range(0, 120)
- *     .build(),
- *
- *   new DateColumnBuilder<User>()
- *     .id('createdAt')
- *     .displayName('Created')
- *     .accessor(user => user.createdAt)
- *     .format('MMM dd, yyyy')
- *     .build()
- * ];
- *
- * // Initialize state management
- * const tableStateManager = new TableStateManager<User>(columns, {
- *   filters: [],
- *   pagination: { page: 1, limit: 20 },
- *   sorting: [],
- *   selectedRows: new Set()
+ * export const tables = betterTables({
+ *   database: drizzleAdapter(db),
+ *   defaults: { pageSize: 20 },
  * });
  *
- * // Subscribe to state changes
- * const unsubscribe = tableStateManager.subscribe((event) => {
- *   console.log('Table state changed:', event);
+ * export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
+ *   columns: [
+ *     t.text('subject').searchable().filterable().sortable(),
+ *     t.option('status').filterable(),
+ *     t.text('customer.company').displayName('Customer').filterable(),
+ *   ],
+ * }));
+ *
+ * const result = await tables.fetchData(ticketsTable, {
+ *   pagination: { page: 1, limit: 20 },
+ *   sorting: [{ columnId: 'createdAt', direction: 'desc' }],
  * });
  * ```
+ *
+ * For hand-built columns without a schema (client-only tables, tests), use
+ * `memoryAdapter` + `defineTableRow`, or collect direct builder-class output
+ * with `defineColumns` — see the Custom Adapters and Columns docs.
  */
 
 // Adapters (HTTP transport)

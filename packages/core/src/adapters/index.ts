@@ -19,3 +19,4 @@ export {
   handleAdapterRequest,
 } from './http-handler';
 export type { AdapterMethod, AdapterRequestBody, AdapterResponseBody } from './http-protocol';
+export { type MemoryAdapterOptions, memoryAdapter } from './memory-adapter';

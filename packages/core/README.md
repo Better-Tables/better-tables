@@ -331,7 +331,7 @@ import {
 import { betterTables, defineTable, defineTableRow, defineColumns } from '@better-tables/core';
 ```
 
-Legacy `createColumnBuilder` / `defineColumns` remain exported but are deprecated — see [MIGRATION.md](../../MIGRATION.md).
+For hand-built columns without a schema, use the builder classes (`TextColumnBuilder`, …) with `defineColumns` and `defineTableRow`, or run the whole pipeline in memory with `memoryAdapter(rows)`.
 
 #### State Managers
 
@@ -513,7 +513,6 @@ const restoredFilters = deserializeFiltersFromURL(urlParams);
 
 For detailed documentation, see:
 
-- **[MIGRATION.md](../../MIGRATION.md)** - 0.6 flagship API (`betterTables` + `defineTable`)
 - **[HTTP Adapter](./docs/HTTP_ADAPTER.md)** - Browser `httpAdapter` + server `createAdapterRouteHandler`
 - **[wiki.md](../../wiki.md)** - Lean 0.6 handbook
 - **[Drizzle adapter](../adapters/drizzle/README.md)** - Database adapter reference
@@ -576,7 +575,7 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 - **GitHub Issues** - Report bugs or request features
 - **GitHub Discussions** - Ask questions and share ideas
-- **Documentation** - See [wiki.md](../../wiki.md) and [MIGRATION.md](../../MIGRATION.md)
+- **Documentation** - See [wiki.md](../../wiki.md) and [better-tables.com/docs](https://better-tables.com/docs)
 
 ---
 

@@ -41,5 +41,6 @@ pnpm add @better-tables/core
 | Stores & URL | `getTableStore`, `UrlSyncAdapter`, `UrlSyncConfig`, `serializeFiltersToURL` / `deserializeFiltersFromURL`, `serializeTableStateToUrl` / `deserializeTableStateFromUrl` ([URL State](/docs/url-state)) |
 | HTTP transport | `httpAdapter`, `createAdapterRouteHandler` ([HTTP adapter](/docs/adapters/http)) |
 | Adapter contract | `TableAdapter`, `FetchDataParams`, `FetchDataResult`, `FacetQueryParams`, `AdapterFeatures`, `InferredColumnSpec` ([Custom adapters](/docs/adapters/custom)) |
+| Memory adapter | `memoryAdapter(rows, options?)` — the full pipeline over an in-memory array ([Custom adapters](/docs/adapters/custom#memory-adapter)) |
+| Standalone columns | `defineTableRow`, `defineColumns`, and the builder classes (`TextColumnBuilder`, …) for hand-built columns ([Columns](/docs/columns#standalone-columns-no-schema)) |
 | Filter types | `FilterState`, `FilterGroupNode`, `FilterOperator` + per-type operator unions, `FilterConfig` ([Filtering](/docs/filtering)) |
-| Legacy | `createColumnBuilder` / `defineColumns` still compile but are deprecated ([Migration](/docs/migration)) |

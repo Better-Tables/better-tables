@@ -24,18 +24,8 @@ export {
   type FilterStateForType,
 } from './build-filter';
 export { ColumnBuilder } from './column-builder';
-// Column factory and utilities
-export {
-  type ColumnFactory,
-  column,
-  createColumnBuilder,
-  createColumnBuilders,
-  createTypedColumnBuilder,
-  defineColumns,
-  quickColumn,
-  typed,
-  validateColumns,
-} from './column-factory';
+// Standalone-column utilities
+export { defineColumns, validateColumns } from './column-factory';
 export { DateColumnBuilder } from './date-column-builder';
 export { MultiOptionColumnBuilder } from './multi-option-column-builder';
 export { NumberColumnBuilder } from './number-column-builder';

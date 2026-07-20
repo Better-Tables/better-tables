@@ -22,4 +22,4 @@ Fixed four multi-table-schema correctness issues found while dogfooding the flag
 
 - **Relations clobbering tables at construction now throws, naming the key.** A relations map keyed by table name, spread OVER a tables map — `{ ...tables, ...relationsKeyedByTableName }` — silently overwrote each colliding key's real table object with a same-named `Relations` object; the table then just vanished from the adapter's schema at runtime, well after the actual mistake and with no clear signal why. `DrizzleAdapter`'s constructor now throws a `SchemaError` naming the colliding key(s) immediately. The normal, fully-supported pattern of including relations under a *different* key alongside their table (e.g. `{ users, usersRelations }`) is unaffected.
 
-See MIGRATION.md §7 (mutation throw precedent this mirrors) and §12 (the new read throw, `defaultPrimaryTable`, and auto-embed).
+See the 0.6 migration notes (file since removed) §7 (mutation throw precedent this mirrors) and §12 (the new read throw, `defaultPrimaryTable`, and auto-embed).

@@ -2,17 +2,11 @@ import { describe, expect, expectTypeOf, it } from 'bun:test';
 import {
   BooleanColumnBuilder,
   ColumnBuilder,
-  type ColumnFactory,
-  column,
-  createColumnBuilder,
-  createColumnBuilders,
   DateColumnBuilder,
   MultiOptionColumnBuilder,
   NumberColumnBuilder,
   OptionColumnBuilder,
-  quickColumn,
   TextColumnBuilder,
-  typed,
   validateColumns,
 } from '../../src/builders';
 import type { ColumnDefinition } from '../../src/types/column';
@@ -519,137 +513,15 @@ describe('Column Builder System', () => {
     });
   });
 
-  describe('Column Factory', () => {
-    it('should create a typed column factory', () => {
-      const cb = createColumnBuilder<TestUser>();
-
-      expectTypeOf(cb).toMatchTypeOf<ColumnFactory<TestUser>>();
-      expect(typeof cb.text).toBe('function');
-      expect(typeof cb.number).toBe('function');
-      expect(typeof cb.date).toBe('function');
-      expect(typeof cb.boolean).toBe('function');
-      expect(typeof cb.option).toBe('function');
-      expect(typeof cb.multiOption).toBe('function');
-    });
-
-    it('should create columns with proper types', () => {
-      const cb = createColumnBuilder<TestUser>();
-
-      const textColumn = cb
-        .text()
-        .id('name')
-        .displayName('Name')
-        .accessor((user) => user.name)
-        .build();
-
-      const numberColumn = cb
-        .number()
-        .id('age')
-        .displayName('Age')
-        .accessor((user) => user.age)
-        .build();
-
-      expect(textColumn.type).toBe('text');
-      expect(numberColumn.type).toBe('number');
-    });
-
-    it('should work with global column factory', () => {
-      const textColumn = column
-        .text()
-        .id('name')
-        .displayName('Name')
-        .accessor((data: unknown) => (data as TestUser).name)
-        .build();
-
-      expect(textColumn.type).toBe('text');
-    });
-
-    it('should work with typed alias', () => {
-      const cb = typed<TestUser>();
-
-      const column = cb
-        .text()
-        .id('name')
-        .displayName('Name')
-        .accessor((user) => user.name)
-        .build();
-
-      expect(column.type).toBe('text');
-    });
-
-    it('should create multiple typed column builders', () => {
-      interface User {
-        id: string;
-        name: string;
-      }
-
-      interface Order {
-        id: string;
-        total: number;
-      }
-
-      interface Product {
-        id: string;
-        title: string;
-        price: number;
-      }
-
-      const builders = createColumnBuilders({
-        users: {} as User,
-        orders: {} as Order,
-        products: {} as Product,
-      });
-
-      expect(typeof builders.users.text).toBe('function');
-      expect(typeof builders.orders.number).toBe('function');
-      expect(typeof builders.products.text).toBe('function');
-
-      // Test that each builder is properly typed
-      const userColumn = builders.users
-        .text()
-        .id('name')
-        .displayName('Name')
-        .accessor((user: User) => user.name)
-        .build();
-
-      const orderColumn = builders.orders
-        .number()
-        .id('total')
-        .displayName('Total')
-        .accessor((order: Order) => order.total)
-        .build();
-
-      const productColumn = builders.products
-        .text()
-        .id('title')
-        .displayName('Title')
-        .accessor((product: Product) => product.title)
-        .build();
-
-      expect(userColumn.type).toBe('text');
-      expect(orderColumn.type).toBe('number');
-      expect(productColumn.type).toBe('text');
-    });
-
-    it('should handle empty types object', () => {
-      const builders = createColumnBuilders({});
-      expect(Object.keys(builders)).toHaveLength(0);
-    });
-  });
-
   describe('Column Validation', () => {
     it('should validate column definitions', () => {
-      const cb = createColumnBuilder<TestUser>();
-
       const validColumns = [
-        cb
-          .text()
+        new TextColumnBuilder<TestUser>()
           .id('name')
           .displayName('Name')
           .accessor((user) => user.name)
           .build(),
-        cb
-          .number()
+        new NumberColumnBuilder<TestUser>()
           .id('age')
           .displayName('Age')
           .accessor((user) => user.age)
@@ -678,17 +550,13 @@ describe('Column Builder System', () => {
     });
 
     it('should detect duplicate column IDs', () => {
-      const cb = createColumnBuilder<TestUser>();
-
       const columnsWithDuplicates = [
-        cb
-          .text()
+        new TextColumnBuilder<TestUser>()
           .id('name')
           .displayName('Name')
           .accessor((user) => user.name)
           .build(),
-        cb
-          .text()
+        new TextColumnBuilder<TestUser>()
           .id('name')
           .displayName('Full Name')
           .accessor((user) => user.name)
@@ -703,38 +571,10 @@ describe('Column Builder System', () => {
     });
   });
 
-  describe('Quick Column Helper', () => {
-    it('should create a quick column with defaults', () => {
-      const column = quickColumn<TestUser, string>('name', 'Full Name', (user) => user.name);
-
-      expect(column.id).toBe('name');
-      expect(column.displayName).toBe('Full Name');
-      expect(column.type).toBe('text');
-      expect(column.sortable).toBe(true);
-      expect(column.filterable).toBe(true);
-    });
-
-    it('should create a quick column with options', () => {
-      const column = quickColumn<TestUser, number>('age', 'Age', (user) => user.age, {
-        type: 'number',
-        width: 100,
-        sortable: false,
-      });
-
-      expect(column.id).toBe('age');
-      expect(column.type).toBe('number');
-      expect(column.width).toBe(100);
-      expect(column.sortable).toBe(false);
-    });
-  });
-
   describe('Type Safety', () => {
     it('should maintain type safety with accessor functions', () => {
-      const cb = createColumnBuilder<TestUser>();
-
       // This should compile without errors
-      const column = cb
-        .text()
+      const column = new TextColumnBuilder<TestUser>()
         .id('name')
         .displayName('Name')
         .accessor((user) => user.name) // TypeScript should infer user as TestUser
@@ -761,10 +601,7 @@ describe('Column Builder System', () => {
     });
 
     it('should maintain type safety with column definitions', () => {
-      const cb = createColumnBuilder<TestUser>();
-
-      const column = cb
-        .text()
+      const column = new TextColumnBuilder<TestUser>()
         .id('name')
         .displayName('Name')
         .accessor((user) => user.name)

@@ -1,8 +1,26 @@
-import { createColumnBuilder, defineColumns, defineTableRow } from '@better-tables/core';
+import {
+  BooleanColumnBuilder,
+  DateColumnBuilder,
+  defineColumns,
+  defineTableRow,
+  MultiOptionColumnBuilder,
+  NumberColumnBuilder,
+  OptionColumnBuilder,
+  TextColumnBuilder,
+} from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
 import type { UserWithRelations } from '../db/schema';
 
-const cb = createColumnBuilder<UserWithRelations>();
+// Hand-built columns over the joined row shape (the raw-column escape hatch);
+// a local convenience over the direct builder classes.
+const cb = {
+  text: () => new TextColumnBuilder<UserWithRelations>(),
+  number: () => new NumberColumnBuilder<UserWithRelations>(),
+  date: () => new DateColumnBuilder<UserWithRelations>(),
+  boolean: () => new BooleanColumnBuilder<UserWithRelations>(),
+  option: () => new OptionColumnBuilder<UserWithRelations>(),
+  multiOption: () => new MultiOptionColumnBuilder<UserWithRelations>(),
+};
 
 export const userColumns = defineColumns<UserWithRelations>()([
   // Direct user columns

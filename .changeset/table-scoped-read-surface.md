@@ -25,4 +25,4 @@ The facet methods (`getFacetedValues`/`getMinMaxValues`/`getFilterOptions`) type
 
 `tables.database.fetchData(...)` (the raw adapter) remains fully supported — it's still the only path for queries that don't belong to one `defineTable()` result. Combined with `@better-tables/adapters-drizzle`'s new multi-table read throw (this release), the wrong-table mistake `tables.fetchData` exists to prevent becomes unreachable through the recommended surface, while `database.fetchData` fails loudly instead of silently on an ambiguous schema.
 
-See MIGRATION.md §12.
+See the 0.6 migration notes (file since removed) §12.

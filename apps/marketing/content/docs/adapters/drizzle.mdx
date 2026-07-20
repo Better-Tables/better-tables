@@ -69,7 +69,7 @@ const adapter = drizzleAdapter(db, {
 });
 ```
 
-PostgreSQL `.array()` foreign keys (with `.references()`) are detected automatically. MySQL `json()` / SQLite text-or-JSON array FKs are **not** auto-detected — provide a manual `RelationshipMap` entry with `isArray: true`. Deeper patterns — junction tables, aggregates, subqueries — are covered with worked examples in the package's [advanced usage notes](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/docs/ADVANCED_USAGE.md) (some samples still show the legacy builder API; the concepts apply unchanged).
+PostgreSQL `.array()` foreign keys (with `.references()`) are detected automatically. MySQL `json()` / SQLite text-or-JSON array FKs are **not** auto-detected — provide a manual `RelationshipMap` entry with `isArray: true`. Deeper patterns — junction tables, aggregates, subqueries — are covered with worked examples in the package's [advanced usage notes](https://github.com/Better-Tables/better-tables/blob/main/packages/adapters/drizzle/docs/ADVANCED_USAGE.md) (some samples still show a removed pre-0.6 builder API; the concepts apply unchanged, the syntax doesn't).
 
 Try it live: [/examples/relationship-filtering](/examples/relationship-filtering).
 

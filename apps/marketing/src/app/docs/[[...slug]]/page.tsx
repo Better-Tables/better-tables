@@ -21,7 +21,10 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
 
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
-  const lastModified = page.data.lastModified;
+  // `lastModified` only exists on the page type when source.config.ts enables
+  // the git-based lastModified() transformer (currently off — see the note
+  // there). Read it optionally so the badge simply hides while it's off.
+  const lastModified = (page.data as { lastModified?: Date }).lastModified;
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
