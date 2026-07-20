@@ -188,6 +188,11 @@ describe('useFacets (plan 032 step 4, finding 7)', () => {
     rerender({ columnIds: ['foo bar', 'baz'] });
 
     await waitFor(() => expect(facetCalls.length).toBe(4));
-    expect(facetCalls.slice(2).map((c) => c.columnId).sort()).toEqual(['baz', 'foo bar']);
+    expect(
+      facetCalls
+        .slice(2)
+        .map((c) => c.columnId)
+        .sort()
+    ).toEqual(['baz', 'foo bar']);
   });
 });

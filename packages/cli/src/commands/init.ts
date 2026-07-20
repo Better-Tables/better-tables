@@ -247,7 +247,9 @@ export function initCommand(): Command {
       console.error(
         pc.red(`✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`)
       );
-      console.error(pc.dim('  The bundled UI source may be corrupted — reinstall @better-tables/cli.'));
+      console.error(
+        pc.dim('  The bundled UI source may be corrupted — reinstall @better-tables/cli.')
+      );
       process.exit(1);
     }
     // Summary
