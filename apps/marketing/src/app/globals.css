@@ -392,8 +392,10 @@
    The plugin adds decorative backticks via ::before/::after with a
    :not(:where([class~=not-blog-prose]…)) selector — match that specificity
    (and use !important) so blog <code> chips don't show `quotes`. */
-.blog-prose :where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::before,
-.blog-prose :where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::after {
+.blog-prose
+:where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::before,
+.blog-prose
+  :where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::after {
   content: none !important;
 }
 

@@ -43,12 +43,7 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
 
     t.text('email').filterable().sortable().editable(),
 
-    t
-      .number('age')
-      .range(18, 100, { includeNull: true })
-      .filterable()
-      .sortable()
-      .editable(),
+    t.number('age').range(18, 100, { includeNull: true }).filterable().sortable().editable(),
 
     t
       .option('role')
