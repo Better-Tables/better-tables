@@ -1250,20 +1250,25 @@ describe.skipIf(!process.env.POSTGRES_TEST_URL)(
         ).rejects.toThrow();
       });
 
-      it('should handle invalid filter operators', async () => {
-        // adapter.fetchData throws a QueryError for unsupported operators
-        await expect(
-          adapter.fetchData({
-            filters: [
-              {
-                columnId: 'name',
-                type: 'text',
-                operator: 'invalidOp' as FilterOperator,
-                values: ['test'],
-              },
-            ] as unknown as FilterState[],
-          })
-        ).rejects.toThrow();
+      it('should fail-soft (not throw) for invalid filter operators', async () => {
+        // This expectation used to read `rejects.toThrow()`, contradicting both
+        // the ungated SQLite mirror ('should fail-soft for unsupported filter
+        // operators') and the sibling test above for text `notEquals`. It never
+        // ran (outer skipIf + this describe.skip), so the contradiction went
+        // unnoticed. An unsupported operator is DROPPED, not thrown -- see
+        // filter-handler.buildLeafCondition. The drop now warns, because
+        // dropping a leaf widens the result set.
+        const result = await adapter.fetchData({
+          filters: [
+            {
+              columnId: 'name',
+              type: 'text',
+              operator: 'invalidOp' as FilterOperator,
+              values: ['test'],
+            },
+          ] as unknown as FilterState[],
+        });
+        expect(Array.isArray(result.data)).toBe(true);
       });
 
       it('should throw error for invalid filter values', async () => {

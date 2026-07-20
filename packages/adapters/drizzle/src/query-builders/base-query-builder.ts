@@ -353,12 +353,18 @@ export abstract class BaseQueryBuilder {
    * first attempt Drizzle's relational query API (nested results) and falls
    * back to this manual-join skeleton; JSON-accessor handling is injected
    * through each dialect's `buildColumnSelections` override.
+   *
+   * `additionalConditions` is unused here (the manual-join skeleton binds them
+   * later, in `applyFilters`) but is part of the signature so the PostgreSQL
+   * override can see opaque SQL predicates it cannot introspect and decline the
+   * relational path -- see `PostgresQueryBuilder.hasCrossTablePredicates`.
    */
   buildSelectQuery(
     context: QueryContext,
     primaryTable: string,
     columns?: string[],
-    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>
+    computedFields?: Record<string, ComputedFieldWithResolvedSortSql>,
+    _additionalConditions?: (SQL | SQLWrapper)[]
   ): {
     query: QueryBuilderWithJoins;
     columnMetadata: {
@@ -937,7 +943,8 @@ export abstract class BaseQueryBuilder {
         context,
         primaryTable,
         columns,
-        computedFields
+        computedFields,
+        additionalConditions
       );
       const primaryKeyInCondition = inArray(primaryKeyInfo.column, keys);
       let phase2Query = this.applyFilters(phase2SelectResult.query, filters, primaryTable, [
@@ -1275,7 +1282,8 @@ export abstract class BaseQueryBuilder {
       context,
       params.primaryTable,
       columnsForSelect,
-      params.computedFields
+      params.computedFields,
+      params.additionalConditions
     );
     const { columnMetadata, isNested } = selectResult;
 
