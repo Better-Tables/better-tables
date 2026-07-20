@@ -1,9 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { seed } from 'drizzle-seed';
-import type { getDatabase } from './index';
+import type { getSqliteDatabase } from './db';
 import { schema } from './schema';
 
-type DatabaseType = Awaited<ReturnType<typeof getDatabase>>['db'];
+type DatabaseType = Awaited<ReturnType<typeof getSqliteDatabase>>['db'];
 
 export async function seedDatabase(db: DatabaseType) {
   // Use drizzle-seed to generate 5000 users with related profiles and posts

@@ -1,7 +1,7 @@
 /**
  * Bun cannot load `better-sqlite3`'s native binding (see fetch-tickets.test.ts).
  * Mock the driver stack and assert the in-flight promise memo: concurrent
- * `getDatabase()` calls must share one SQLite instance and one seed.
+ * `getSqliteDatabase()` calls must share one SQLite instance and one seed.
  */
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 
@@ -28,17 +28,17 @@ mock.module('./seed', () => ({
   seedDatabase,
 }));
 
-const { getDatabase, resetDatabase } = await import('./index');
+const { getSqliteDatabase, resetSqliteDatabase } = await import('./db');
 
-describe('getDatabase singleton', () => {
+describe('getSqliteDatabase singleton', () => {
   afterEach(async () => {
     sqliteInstances.length = 0;
     seedDatabase.mockClear();
-    await resetDatabase();
+    await resetSqliteDatabase();
   });
 
   it('memoizes the in-flight promise so concurrent callers share one seed', async () => {
-    const [first, second] = await Promise.all([getDatabase(), getDatabase()]);
+    const [first, second] = await Promise.all([getSqliteDatabase(), getSqliteDatabase()]);
 
     expect(first.sqlite).toBe(second.sqlite);
     expect(first.db).toBe(second.db);

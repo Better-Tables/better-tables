@@ -1,9 +1,9 @@
 import Database from 'better-sqlite3';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { sqlCaptureLogger } from '@/lib/db/sql-capture';
 import { postsRelations, profilesRelations, schema, usersRelations } from './schema';
 import { seedDatabase } from './seed';
-import { sqlCaptureLogger } from './sql-capture';
 
 // Relations spread under their OWN export names. Spreading a
 // TABLE-NAME-KEYED relations map here instead (`{ users: usersRelations }`)
@@ -18,15 +18,13 @@ const buildDrizzle = (sqlite: Database.Database) =>
   });
 
 /**
- * Schema-typed Drizzle instance for the homepage demo. Deriving the type
- * from `buildDrizzle` (instead of `ReturnType<typeof drizzle>`) keeps the
- * schema + relations generics, which is what lets `defineTable<UsersTables>()`
- * path builders autocomplete and type-check column paths like `profile.bio`.
+ * Schema-typed Drizzle instance for the SQLite homepage fallback.
+ * Deriving the type from `buildDrizzle` keeps schema + relations generics.
  */
-export type DemoDb = ReturnType<typeof buildDrizzle>;
+export type SqliteDemoDb = ReturnType<typeof buildDrizzle>;
 
 type DatabaseBundle = {
-  db: DemoDb;
+  db: SqliteDemoDb;
   sqlite: Database.Database;
 };
 
@@ -36,15 +34,11 @@ let dbInstance: DatabaseBundle | null = null;
 let initPromise: Promise<void> | null = null;
 
 async function initDatabase(): Promise<DatabaseBundle> {
-  // Create in-memory SQLite database
   const sqlite = new Database(':memory:');
-
-  // Enable foreign keys
   sqlite.exec('PRAGMA foreign_keys = ON;');
 
   const db = buildDrizzle(sqlite);
 
-  // Create tables
   await db.run(sql`CREATE TABLE users (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -78,13 +72,12 @@ async function initDatabase(): Promise<DatabaseBundle> {
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`);
 
-  // Seed the database
   await seedDatabase(db);
 
   return { db, sqlite };
 }
 
-export async function getDatabase(): Promise<DatabaseBundle> {
+export async function getSqliteDatabase(): Promise<DatabaseBundle> {
   if (!initPromise) {
     initPromise = initDatabase()
       .then((bundle) => {
@@ -98,12 +91,12 @@ export async function getDatabase(): Promise<DatabaseBundle> {
 
   await initPromise;
   if (!dbInstance) {
-    throw new Error('Database failed to initialize');
+    throw new Error('SQLite demo database failed to initialize');
   }
   return dbInstance;
 }
 
-export async function resetDatabase() {
+export async function resetSqliteDatabase() {
   if (dbInstance?.sqlite) {
     dbInstance.sqlite.close();
   }

@@ -1,10 +1,8 @@
 import { defineTable } from '@better-tables/core';
 import { Badge } from '@better-tables/ui';
-// Type-only import: `UsersTables` carries the Drizzle schema types, so every
-// path below (own columns AND relation paths like `profile.bio`) is
-// autocompleted and type-checked — a typo is a compile error. No runtime
-// adapter is touched here; the curried `defineTable` form is RSC-safe.
-import type { UsersTables } from '../adapter';
+// Type-only import: `UsersTables` carries the Postgres Drizzle schema types
+// (flagship path). SQLite fallback mirrors the same column/relation names.
+import type { UsersTables } from './adapter';
 
 const roleColors: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-800',
@@ -179,6 +177,26 @@ export type UserRow = typeof usersTable.$infer.Row;
 
 /** Explicit column list for `<BetterTable columns={…}>` (no adapter on the client). */
 export const userColumns = usersTable.columns;
+
+/**
+ * Every DB-backed field the homepage fetch / HTTP adapter allowlist covers.
+ * Includes `id` / `profile.id` so cell edits can address rows (and related
+ * profiles). Computed columns are client-only and omitted here.
+ */
+export const allUserColumnIds = [
+  'id',
+  'name',
+  'email',
+  'age',
+  'role',
+  'status',
+  'createdAt',
+  'profile.id',
+  'profile.bio',
+  'profile.website',
+  'profile.location',
+  'profile.github',
+] as const;
 
 // Default visible columns for the demo
 export const defaultVisibleColumns = [

@@ -1,137 +1,62 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { NextRequest } from 'next/server';
-import type { FetchUsersResult } from '@/lib/demo/fetch-users';
+import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-const fetchUsersMock = mock(
-  (): Promise<FetchUsersResult> =>
-    Promise.resolve({
-      result: {
-        data: [],
-        total: 0,
-        pagination: { page: 1, limit: 10, totalPages: 0, hasNext: false, hasPrev: false },
-      },
-      filters: [],
-      sorting: [],
-      queries: [],
-      error: null,
-    })
+const getUsersDialectMock = mock(async (): Promise<'postgres' | 'sqlite'> => 'sqlite');
+const getUsersBackendMetaMock = mock(
+  async (): Promise<{
+    dialect: 'postgres' | 'sqlite';
+    supportsReset: boolean;
+    dialectLabel: string;
+    datasetLabel: string;
+    title: string;
+    description: string;
+  }> => ({
+    dialect: 'sqlite',
+    supportsReset: true,
+    dialectLabel: 'SQLite · in-memory',
+    datasetLabel: '5,000 rows · SQLite',
+    title: '5,000 rows. Zero mocks.',
+    description: 'fallback',
+  })
 );
+const deleteUsersByIdsMock = mock(async (ids: string[] | number[]) => ids.length);
+const updateUsersStatusMock = mock(async (ids: string[] | number[]) => ids.length);
+const resetUsersDatabaseMock = mock(async () => {});
 
-const deleteWhereMock = mock(() => Promise.resolve());
-const deleteMock = mock(() => ({ where: deleteWhereMock }));
-const updateWhereMock = mock(() => Promise.resolve());
-const updateMock = mock(() => ({ set: () => ({ where: updateWhereMock }) }));
-const getDatabaseMock = mock(async () => ({
-  db: {
-    delete: deleteMock,
-    update: updateMock,
-  },
-}));
-const resetDatabaseMock = mock(async () => {});
-const resetAdapterCachesMock = mock(() => {});
-
-mock.module('@/lib/demo/fetch-users', () => ({
-  fetchUsers: fetchUsersMock,
+mock.module('@/lib/demo/users/adapter', () => ({
+  getUsersDialect: getUsersDialectMock,
+  getUsersBackendMeta: getUsersBackendMetaMock,
+  resetUsersDatabase: resetUsersDatabaseMock,
+  resetAdapterCaches: mock(() => {}),
+  getTables: mock(async () => ({ fetchData: mock(async () => ({})) })),
+  resetUsersBackendForTests: mock(async () => {}),
 }));
 
-mock.module('@/lib/db', () => ({
-  getDatabase: getDatabaseMock,
-  resetDatabase: resetDatabaseMock,
-}));
-
-mock.module('@/lib/adapter', () => ({
-  resetAdapterCaches: resetAdapterCachesMock,
-}));
-
-mock.module('@/lib/db/schema', () => ({
-  schema: {
-    users: { id: 'users.id', status: 'users.status' },
-    profiles: { userId: 'profiles.userId' },
-    posts: { userId: 'posts.userId' },
-  },
-}));
-
-mock.module('drizzle-orm', () => ({
-  inArray: (column: unknown, ids: unknown[]) => ({ column, ids }),
+mock.module('@/lib/demo/users/mutations', () => ({
+  deleteUsersByIds: deleteUsersByIdsMock,
+  updateUsersStatus: updateUsersStatusMock,
+  isUserStatus: (value: unknown) =>
+    typeof value === 'string' && ['active', 'inactive', 'pending', 'suspended'].includes(value),
+  USER_STATUSES: ['active', 'inactive', 'pending', 'suspended'],
 }));
 
 // Import after mock.module so the route binds to the stubs.
-const { GET, DELETE, PATCH, POST } = await import('./route');
+const { DELETE, PATCH, POST } = await import('./route');
+
+afterAll(() => {
+  mock.restore();
+});
 
 function jsonRequest(url: string, init?: RequestInit): NextRequest {
-  return new Request(url, init) as NextRequest;
+  return new Request(url, init) as import('next/server').NextRequest;
 }
 
-describe('GET /api/users', () => {
-  let consoleErrorSpy: ReturnType<typeof spyOn>;
-
-  beforeEach(() => {
-    fetchUsersMock.mockClear();
-    consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('returns 500 with a generic client message when fetchUsers fails', async () => {
-    fetchUsersMock.mockImplementationOnce(() =>
-      Promise.resolve({
-        result: {
-          data: [],
-          total: 0,
-          pagination: { page: 1, limit: 10, totalPages: 0, hasNext: false, hasPrev: false },
-        },
-        filters: [],
-        sorting: [],
-        queries: [],
-        error: 'secret sql fragment /Users/tome/.local/db',
-      })
-    );
-
-    const response = await GET(jsonRequest('http://localhost/api/users'));
-
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'Failed to load demo data.' });
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[api/users]',
-      'secret sql fragment /Users/tome/.local/db'
-    );
-  });
-
-  it('returns data payload when fetchUsers succeeds', async () => {
-    fetchUsersMock.mockImplementationOnce(() =>
-      Promise.resolve({
-        result: {
-          data: [{ id: 1, name: 'Ada' }] as FetchUsersResult['result']['data'],
-          total: 1,
-          pagination: { page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrev: false },
-          meta: { source: 'demo' },
-        },
-        filters: [],
-        sorting: [],
-        queries: [],
-        error: null,
-      })
-    );
-
-    const response = await GET(jsonRequest('http://localhost/api/users'));
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      data: [{ id: 1, name: 'Ada' }],
-      total: 1,
-      pagination: { page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrev: false },
-      meta: { source: 'demo' },
-    });
-  });
-});
+type NextRequest = import('next/server').NextRequest;
 
 describe('DELETE /api/users', () => {
   beforeEach(() => {
-    deleteMock.mockClear();
-    deleteWhereMock.mockClear();
-    getDatabaseMock.mockClear();
+    deleteUsersByIdsMock.mockClear();
+    getUsersDialectMock.mockClear();
+    getUsersDialectMock.mockImplementation(async () => 'sqlite');
   });
 
   it('rejects missing or invalid ids', async () => {
@@ -144,10 +69,10 @@ describe('DELETE /api/users', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(getDatabaseMock).not.toHaveBeenCalled();
+    expect(deleteUsersByIdsMock).not.toHaveBeenCalled();
   });
 
-  it('deletes posts, profiles, then users for valid ids', async () => {
+  it('deletes for valid sqlite numeric ids', async () => {
     const response = await DELETE(
       jsonRequest('http://localhost/api/users', {
         method: 'DELETE',
@@ -158,15 +83,32 @@ describe('DELETE /api/users', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ deleted: 2 });
-    expect(deleteMock).toHaveBeenCalledTimes(3);
+    expect(deleteUsersByIdsMock).toHaveBeenCalledWith([1, 2]);
+  });
+
+  it('deletes for valid postgres UUID ids', async () => {
+    getUsersDialectMock.mockImplementation(async () => 'postgres');
+    const ids = ['02ca4de4-fd66-43f8-4a4d-e598711078e1', '97c3254a-ddab-479c-8c48-257fc6c62147'];
+
+    const response = await DELETE(
+      jsonRequest('http://localhost/api/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ deleted: 2 });
+    expect(deleteUsersByIdsMock).toHaveBeenCalledWith(ids);
   });
 });
 
 describe('PATCH /api/users', () => {
   beforeEach(() => {
-    updateMock.mockClear();
-    updateWhereMock.mockClear();
-    getDatabaseMock.mockClear();
+    updateUsersStatusMock.mockClear();
+    getUsersDialectMock.mockClear();
+    getUsersDialectMock.mockImplementation(async () => 'sqlite');
   });
 
   it('rejects invalid status values', async () => {
@@ -179,7 +121,7 @@ describe('PATCH /api/users', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(getDatabaseMock).not.toHaveBeenCalled();
+    expect(updateUsersStatusMock).not.toHaveBeenCalled();
   });
 
   it('updates status for valid ids', async () => {
@@ -193,14 +135,22 @@ describe('PATCH /api/users', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ updated: 1 });
-    expect(updateMock).toHaveBeenCalled();
+    expect(updateUsersStatusMock).toHaveBeenCalledWith([3], 'suspended');
   });
 });
 
 describe('POST /api/users', () => {
   beforeEach(() => {
-    resetDatabaseMock.mockClear();
-    resetAdapterCachesMock.mockClear();
+    resetUsersDatabaseMock.mockClear();
+    getUsersBackendMetaMock.mockClear();
+    getUsersBackendMetaMock.mockImplementation(async () => ({
+      dialect: 'sqlite',
+      supportsReset: true,
+      dialectLabel: 'SQLite · in-memory',
+      datasetLabel: '5,000 rows · SQLite',
+      title: '5,000 rows. Zero mocks.',
+      description: 'fallback',
+    }));
   });
 
   it('rejects unsupported actions', async () => {
@@ -213,11 +163,10 @@ describe('POST /api/users', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(resetDatabaseMock).not.toHaveBeenCalled();
-    expect(resetAdapterCachesMock).not.toHaveBeenCalled();
+    expect(resetUsersDatabaseMock).not.toHaveBeenCalled();
   });
 
-  it('resets the database and clears adapter caches', async () => {
+  it('resets the sqlite fallback database', async () => {
     const response = await POST(
       jsonRequest('http://localhost/api/users', {
         method: 'POST',
@@ -228,7 +177,28 @@ describe('POST /api/users', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ reset: true });
-    expect(resetDatabaseMock).toHaveBeenCalledTimes(1);
-    expect(resetAdapterCachesMock).toHaveBeenCalledTimes(1);
+    expect(resetUsersDatabaseMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects reset when the active dialect is postgres', async () => {
+    getUsersBackendMetaMock.mockImplementation(async () => ({
+      dialect: 'postgres',
+      supportsReset: false,
+      dialectLabel: 'Postgres · Neon',
+      datasetLabel: '~1M users · Postgres',
+      title: '~1M rows. Real Postgres.',
+      description: 'neon',
+    }));
+
+    const response = await POST(
+      jsonRequest('http://localhost/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(resetUsersDatabaseMock).not.toHaveBeenCalled();
   });
 });

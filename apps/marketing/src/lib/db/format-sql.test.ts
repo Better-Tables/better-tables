@@ -28,6 +28,36 @@ describe('formatSqlForDisplay', () => {
       })
     ).toBe("select 'it''s ?' as prompt, 'bound value' as value");
   });
+
+  it('substitutes Postgres $N placeholders with bound values', () => {
+    expect(
+      formatSqlForDisplay({
+        query: 'select "users"."name" from "users" "users" where "users"."role" = $1 limit $2',
+        params: ['admin', 10],
+      })
+    ).toBe(
+      'select "users"."name"\nfrom "users" "users"\nwhere "users"."role" = \'admin\'\nlimit 10'
+    );
+  });
+
+  it('does not substitute $N inside quoted string literals', () => {
+    expect(
+      formatSqlForDisplay({
+        query: "select '$1' as prompt, $1 as value",
+        params: ['bound'],
+      })
+    ).toBe("select '$1' as prompt, 'bound' as value");
+  });
+
+  it('handles multi-digit Postgres placeholders ($10 before $1)', () => {
+    const params = Array.from({ length: 10 }, (_, i) => i + 1);
+    expect(
+      formatSqlForDisplay({
+        query: 'select $10, $1',
+        params,
+      })
+    ).toBe('select 10, 1');
+  });
 });
 
 describe('splitCapturedQueries', () => {

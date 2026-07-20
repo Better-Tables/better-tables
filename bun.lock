@@ -36,6 +36,7 @@
         "lucide-react": "catalog:",
         "next": "catalog:",
         "next-themes": "^0.4.6",
+        "postgres": "^3.4.0",
         "react": "catalog:",
         "react-dom": "catalog:",
         "rehype-pretty-code": "^0.14.1",

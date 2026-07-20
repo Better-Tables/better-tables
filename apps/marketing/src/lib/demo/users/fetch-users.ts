@@ -5,9 +5,9 @@ import type {
   SortingState,
 } from '@better-tables/core';
 import { flattenFilterNode, isFilterGroupNode } from '@better-tables/core';
-import { getTables } from '@/lib/adapter';
-import { type UserRow, usersTable } from '@/lib/columns/user-columns';
 import { type CapturedQuery, withSqlCapture } from '@/lib/db/sql-capture';
+import { getTables } from '@/lib/demo/users/adapter';
+import { allUserColumnIds, type UserRow, usersTable } from '@/lib/demo/users/columns';
 
 export interface FetchUsersParams {
   page?: number;
@@ -31,6 +31,10 @@ function flattenFilters(filters?: FilterState[] | FilterGroupNode): FilterState[
   return filters;
 }
 
+/**
+ * Homepage users read path — RSC calls this (not `/api/users`).
+ * Runs `tables.fetchData(usersTable)` against the active dialect (Postgres or SQLite).
+ */
 export async function fetchUsers({
   page = 1,
   limit = 10,
@@ -52,19 +56,9 @@ export async function fetchUsers({
         // `columns` drives which relations are SELECTed and embedded in the
         // result rows (plan 030, finding 10), and column visibility is
         // client-side, so hidden-but-toggleable columns need their data too.
-        // (profile.hasBio and roleTags are computed client-side from these.)
-        columns: [
-          'name',
-          'email',
-          'age',
-          'role',
-          'status',
-          'createdAt',
-          'profile.bio',
-          'profile.website',
-          'profile.location',
-          'profile.github',
-        ],
+        // Includes `id` / `profile.id` for cell-edit row addressing.
+        // (hasBio / roleTags are computed client-side from these.)
+        columns: [...allUserColumnIds],
       })
     );
 

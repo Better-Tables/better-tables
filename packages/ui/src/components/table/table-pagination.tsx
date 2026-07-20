@@ -79,22 +79,34 @@ export function TablePagination({
         const nextPage = pages[index + 1];
         const key = `ellipsis-${prevPage ?? 'start'}-${nextPage ?? 'end'}`;
         return (
-          <span key={key} className="px-2 py-1 text-xs text-muted-foreground">
-            ...
+          <span
+            key={key}
+            className="flex h-8 min-w-8 items-center justify-center px-1 text-xs text-muted-foreground select-none"
+            aria-hidden
+          >
+            …
           </span>
         );
       }
 
+      // Fixed w-8 squares overflow once page counts hit 4–5 digits (e.g. ~1M rows).
+      // Grow horizontally with the numeral; keep a square floor for 1–2 digit pages.
+      // Locale-format on the client only (same as page-info) to avoid SSR mismatch.
+      const label = isClient ? page.toLocaleString() : String(page);
       return (
         <Button
           key={page}
           variant={currentPage === page ? 'default' : 'outline'}
           size="sm"
           onClick={() => onPageChange(page)}
-          className="w-8 h-8 p-0 text-xs tabular-nums focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className={cn(
+            'h-8 min-w-8 shrink-0 px-2.5 py-0 font-mono text-xs tabular-nums tracking-tight',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+          )}
           aria-current={currentPage === page ? 'page' : undefined}
+          aria-label={`Page ${label}`}
         >
-          {page}
+          {label}
         </Button>
       );
     });

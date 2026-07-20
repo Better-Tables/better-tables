@@ -1,11 +1,11 @@
 import { createActionBuilder } from '@better-tables/core';
 import { Archive, Trash2 } from 'lucide-react';
-import type { UserWithRelations } from '../db/schema';
+import type { UserRow } from '@/lib/demo/users/columns';
 
 /**
  * Delete action for users
  */
-export const deleteUserAction = createActionBuilder<UserWithRelations>()
+export const deleteUserAction = createActionBuilder<UserRow>()
   .id('delete')
   .label('Delete Selected')
   .icon(Trash2)
@@ -37,7 +37,7 @@ export const deleteUserAction = createActionBuilder<UserWithRelations>()
  * Suspend action for users — sets the (real) `suspended` status so the
  * change is visible in the status column and filterable afterwards.
  */
-export const suspendUserAction = createActionBuilder<UserWithRelations>()
+export const suspendUserAction = createActionBuilder<UserRow>()
   .id('suspend')
   .label('Suspend Selected')
   .icon(Archive)

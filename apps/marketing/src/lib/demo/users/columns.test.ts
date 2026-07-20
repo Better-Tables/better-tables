@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { userColumns } from './user-columns';
+import { userColumns } from './columns';
 
 /**
  * Contract pins for the homepage demo's column definitions. Builders default
@@ -15,17 +15,12 @@ describe('homepage demo columns', () => {
     for (const id of ['hasBio', 'roleTags']) {
       const column = byId[id];
       expect(column).toBeDefined();
-      // There is no `hasBio` / `roleTags` storage field — enabling either
-      // control would send the id to the query builder as a real column.
       expect(column?.filterable).toBe(false);
       expect(column?.sortable).toBe(false);
     }
   });
 
   it('marks editable nullable relation columns as nullable', () => {
-    // `profiles.bio` / `profiles.location` are nullable in the schema; without
-    // `nullable: true` the cell-edit pipeline rejects clearing them with
-    // "This field is required."
     for (const id of ['profile.bio', 'profile.location']) {
       const column = byId[id];
       expect(column).toBeDefined();

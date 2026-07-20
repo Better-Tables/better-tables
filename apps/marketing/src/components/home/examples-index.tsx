@@ -13,7 +13,7 @@ export function ExamplesIndex() {
       label="examples"
       id="examples"
       title="Live tables, not screenshots."
-      description="Every example queries a real SQLite database seeded inside this site's server. Open one, filter it, and watch the URL carry your state."
+      description="Examples run against real databases — Postgres on the homepage when DATABASE_URL is set, in-memory SQLite for the ticket demos. Open one, filter it, and watch the URL carry your state."
       aside={
         <Link
           href="/examples"
