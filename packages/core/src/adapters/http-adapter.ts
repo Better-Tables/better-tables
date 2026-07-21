@@ -8,9 +8,12 @@
  * once, for everyone.
  */
 
+import { recordsToCsv, recordsToJson } from '../lib/export-format';
 import type {
   AdapterMeta,
   CellWriteTarget,
+  ExportParams,
+  ExportResult,
   FacetQueryParams,
   FetchDataParams,
   FetchDataResult,
@@ -18,6 +21,7 @@ import type {
   MutationOptions,
   TableAdapter,
 } from '../types/adapter';
+import { DEFAULT_EXPORT_ROW_CAP } from '../types/adapter';
 import { COLUMN_TYPES, type ColumnType } from '../types/column';
 import type { FilterOperator, FilterOption } from '../types/filter';
 import type { AdapterRequestBody, AdapterResponseBody } from './http-protocol';
@@ -42,7 +46,10 @@ function defaultHttpAdapterMeta(): AdapterMeta {
       delete: false,
       bulkOperations: false,
       realTimeUpdates: false,
-      export: false,
+      // Export is a CLIENT-side capability here: `exportData` reuses the fetch
+      // proxy to pull the (filtered) rows, then formats them in the browser
+      // (CSV/JSON) — no server export route required.
+      export: true,
       transactions: false,
     },
     supportedColumnTypes: [...ALL_COLUMN_TYPES],
@@ -245,6 +252,35 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
         return { ...result, faceted: rebuilt };
       }
       return result;
+    },
+
+    /**
+     * Export the current view as CSV/JSON. Reuses the fetch proxy to pull the
+     * (filtered, sorted) rows — bounded by `maxRows`/{@link DEFAULT_EXPORT_ROW_CAP}
+     * — then formats them client-side. Excel is not supported over HTTP.
+     */
+    async exportData(params: ExportParams): Promise<ExportResult> {
+      if (params.format === 'excel') {
+        throw new Error('Excel export is not supported over the HTTP adapter.');
+      }
+      const limit = params.maxRows ?? DEFAULT_EXPORT_ROW_CAP;
+      const fetchBody = {
+        method: 'fetchData' as const,
+        params: {
+          columns: params.columns ?? [],
+          filters: params.filters ?? [],
+          sorting: params.sorting ?? [],
+          pagination: { page: 1, limit },
+        },
+      };
+      const result = (await send(fetchBody)) as FetchDataResult<TData>;
+      const rows = result.data as Record<string, unknown>[];
+      const isJson = params.format === 'json';
+      return {
+        data: isJson ? recordsToJson(rows) : recordsToCsv(rows),
+        filename: `export.${params.format}`,
+        mimeType: isJson ? 'application/json' : 'text/csv',
+      };
     },
 
     async getFilterOptions(columnId: string, params?: FacetQueryParams): Promise<FilterOption[]> {

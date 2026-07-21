@@ -460,7 +460,7 @@ See the "How to Contribute" steps above, and open an issue first for larger chan
 ### Coming Next (v0.6+)
 
 - [ ] REST adapter
-- [ ] Export functionality (CSV, Excel)
+- [x] Export (CSV/JSON) — `ExportButton` + `useTableExport` (`export` UI module) and a `csvExport()` plugin; the adapter's `exportData` honors the current filters/sorting and is row-capped
 - [ ] Saved filter presets
 - [ ] Advanced column customization
 - [ ] Performance benchmarks and optimization

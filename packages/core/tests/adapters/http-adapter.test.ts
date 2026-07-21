@@ -676,3 +676,48 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     expect(fetchCount).toBe(2);
   });
 });
+
+describe('httpAdapter export (plan 050)', () => {
+  it('advertises export and formats CSV by reusing the fetch proxy', async () => {
+    const { adapter: server, calls } = makeServerAdapter();
+    const client = httpAdapter<{ id: number; status: string }>({
+      url: '/api/tables',
+      fetch: loopbackFetch(server),
+    });
+
+    expect(client.meta.features.export).toBe(true);
+
+    const result = await client.exportData?.({
+      format: 'csv',
+      filters: [{ columnId: 'status', type: 'option', operator: 'is', values: ['open'] }],
+      maxRows: 1000,
+    });
+
+    expect(result?.mimeType).toBe('text/csv');
+    expect(result?.filename).toBe('export.csv');
+    const csv = result?.data as string;
+    expect(csv.split('\n')[0]).toBe('id,status');
+    expect(csv).toContain('open');
+
+    // Export went over the wire as a fetchData request carrying the filters + cap.
+    const sent = calls.find((c) => c.method === 'fetchData')?.args[0] as FetchDataParams;
+    expect(sent.pagination).toEqual({ page: 1, limit: 1000 });
+    expect(sent.filters).toEqual([
+      { columnId: 'status', type: 'option', operator: 'is', values: ['open'] },
+    ]);
+  });
+
+  it('formats JSON', async () => {
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+    const result = await client.exportData?.({ format: 'json' });
+    expect(result?.mimeType).toBe('application/json');
+    expect(JSON.parse(result?.data as string)).toEqual([{ id: 1, status: 'open' }]);
+  });
+
+  it('rejects Excel (unsupported over HTTP)', async () => {
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+    await expect(client.exportData?.({ format: 'excel' })).rejects.toThrow(/excel/i);
+  });
+});

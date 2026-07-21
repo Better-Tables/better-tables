@@ -12,6 +12,7 @@
     "pagination",
     "facets",
     "selection-and-actions",
+    "export",
     "inline-editing",
     "large-datasets",
     "url-state",

@@ -21,6 +21,7 @@ import {
  */
 export const OPTIONAL_MODULE_DESCRIPTIONS: Record<Exclude<UiModuleName, 'core'>, string> = {
   actions: 'bulk-action toolbar over selected rows',
+  export: 'export the current view to CSV/JSON',
 };
 
 /**

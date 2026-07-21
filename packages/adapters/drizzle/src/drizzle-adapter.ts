@@ -67,7 +67,11 @@ import type {
   InferredColumnSpec,
   TableAdapter,
 } from '@better-tables/core';
-import { isFilterGroupNode, normalizeFilterNode } from '@better-tables/core';
+import {
+  DEFAULT_EXPORT_ROW_CAP,
+  isFilterGroupNode,
+  normalizeFilterNode,
+} from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
 import { AdapterCache } from './adapter-cache';
 import { buildAdapterMeta } from './adapter-meta';
@@ -1324,12 +1328,16 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
   async exportData(params: ExportParams): Promise<ExportResult> {
     try {
-      // Fetch all data for export
+      // Fetch the rows to export, HONORING the caller's current view: filters
+      // and sorting flow through so an export matches what the user sees. The
+      // page size is bounded (`maxRows`, default `DEFAULT_EXPORT_ROW_CAP`) so an
+      // "export all" on a large table can't pull an unbounded set into memory.
+      const limit = params.maxRows ?? DEFAULT_EXPORT_ROW_CAP;
       const fetchParams: FetchDataParams = {
         columns: params.columns || [],
-        filters: [],
-        sorting: [],
-        pagination: { page: 1, limit: Number.MAX_SAFE_INTEGER }, // Get all data
+        filters: params.filters ?? [],
+        sorting: params.sorting ?? [],
+        pagination: { page: 1, limit },
       };
 
       const result = await this.fetchData(fetchParams);

@@ -306,9 +306,32 @@ export interface ExportParams {
   ids?: string[];
   /** Whether to include column headers */
   includeHeaders?: boolean;
+  /**
+   * Filter conditions to apply — so an export reflects the CURRENT view, not
+   * the whole table. Same shape as {@link FetchDataParams.filters} (a flat
+   * `FilterState[]` is implicit AND; a {@link FilterGroupNode} nests). Omit to
+   * export unfiltered.
+   */
+  filters?: FilterState[] | FilterGroupNode;
+  /** Sort order to apply, matching the current view. */
+  sorting?: SortingParams[];
+  /**
+   * Maximum rows to export. Bounds the in-memory fetch so a large table can't
+   * OOM the export. Adapters default to a safe cap
+   * ({@link DEFAULT_EXPORT_ROW_CAP}) when omitted; pass a larger value to opt
+   * into a bigger (costlier) export.
+   */
+  maxRows?: number;
   /** Additional format-specific options */
   options?: Record<string, unknown>;
 }
+
+/**
+ * Default upper bound on rows an `exportData` implementation fetches when
+ * {@link ExportParams.maxRows} is not given. Keeps "Export all" from pulling an
+ * unbounded result set into memory; override per-call for larger exports.
+ */
+export const DEFAULT_EXPORT_ROW_CAP = 50_000;
 
 /**
  * Result from data export operation.
