@@ -78,6 +78,12 @@ export interface TableDefPlugin {
   /**
    * Runs after the adapter fetch. Return the result to use (a modified copy to
    * transform the output, or the same `ctx.result` to pass through).
+   *
+   * Rows are typed `unknown`: a plugin is registered once at the instance level
+   * (`betterTables({ plugins })`) and runs across every table, so it cannot be
+   * typed to any single table's row. A plugin that rewrites rows is trusted to
+   * return a result still compatible with the fetched table's row type — the
+   * table-scoped `tables.fetchData` re-exposes the result as that row type.
    */
   afterFetch?(
     ctx: PluginAfterFetchContext

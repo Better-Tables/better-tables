@@ -357,9 +357,18 @@ Two concrete, repo-grounded motivating examples:
 2. **Saved filter presets.** Listed on the README's roadmap (not yet
    implemented anywhere in `packages/core` as of this scan). A
    `savedFilters()` plugin would own persistence (where presets are stored)
-   and expose `tables.plugins.savedFilters.list()/.save()/.apply()`,
-   operating on the `FilterState[]` shape already defined in
-   `packages/core/src/types/filter.ts`.
+   and expose `list()/.save()/.apply()`, operating on the `FilterState[]`
+   shape already defined in `packages/core/src/types/filter.ts`.
+
+> **Access under the landed shape (plan 049):** `tables.plugins` is a plain
+> `readonly TableDefPlugin[]`, and a plugin's own methods live behind the
+> `[key: string]: unknown` escape hatch (so they read as `unknown`). So the
+> `tables.plugins.csvExport.download()` namespace access sketched above does
+> NOT work as-is — a consumer either retains the concrete plugin object
+> (`const csv = csvExport(); betterTables({ plugins: [csv] }); csv.download()`)
+> or a later plan adds a typed, name-keyed plugin registry
+> (`tables.plugin('csvExport')`). Plan 050 decides the ergonomic surface for
+> its `csvExport()`; the hook seam itself does not require one.
 
 **Trade-off:** this is explicitly a sketch, not a committed interface —
 plugins are not this design's critical path (per the plan). The risk of
