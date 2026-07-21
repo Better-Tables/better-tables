@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { commandsRegistry, type RegisteredCommandName } from './commands';
+import { addCommand } from './commands/add';
 import { docsCommand } from './commands/docs';
 import { helpCommand } from './commands/help';
 import { initCommand } from './commands/init';
@@ -26,6 +27,7 @@ program
 registerCommandFactory('help', helpCommand);
 registerCommandFactory('docs', docsCommand);
 registerCommandFactory('init', initCommand);
+registerCommandFactory('add', addCommand);
 
 // Add all registered commands to the program
 // TypeScript ensures we can only reference commands that exist in the registry

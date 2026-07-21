@@ -42,6 +42,31 @@ export const commandsRegistry = {
         description:
           'Output path for components relative to components directory (default: better-tables-ui)',
       },
+      {
+        flags: '--modules <names...>',
+        description: 'Opt-in UI modules to copy alongside core (e.g. actions)',
+      },
+    ] as const,
+  },
+  add: {
+    name: 'add',
+    description: 'Add an opt-in UI module to a Better Tables project (e.g. actions)',
+    arguments: [
+      {
+        name: 'modules',
+        description: 'One or more module names to copy (e.g. actions)',
+        required: true,
+        variadic: true,
+      },
+    ] as const,
+    options: [
+      { flags: '--cwd <path>', description: 'Working directory (default: current directory)' },
+      { flags: '-y, --yes', description: 'Skip confirmation prompts' },
+      {
+        flags: '--components-path <path>',
+        description:
+          'Output path for components relative to components directory (must match init; default: better-tables-ui)',
+      },
     ] as const,
   },
 } as const satisfies CommandRegistry;

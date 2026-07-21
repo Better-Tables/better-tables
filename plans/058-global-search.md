@@ -1,5 +1,11 @@
 # Plan 058: Ship global search as sugar over the filter pipeline
 
+> **STATUS: DEFERRED (2026-07-21, maintainer decision).** This plan is not
+> being executed this wave. It is intact and still valid — nothing here was
+> built. `FetchDataParams.search` remains declared-but-unconsumed on the
+> adapter contract. To revive: re-run the Drift check below first, then
+> proceed from Step 1. See `plans/README.md` → "Deferred by decision".
+>
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and

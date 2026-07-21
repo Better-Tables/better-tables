@@ -126,7 +126,7 @@ the breaking window.
 | [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop, opt-in double-sided cell-oriented HTTP write proxy, **joined-table editing** (`resolveCellWriteTarget`; related-row writes proven in browser + integration test), dogfood on the direct path (custom route deleted) | 053, 054 | DONE (merged to main, PR #86) |
 | [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
 | [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
-| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049, **059** | TODO (reconciled 2026-07-18; **2026-07-20: refresh against `plans/design/ui-modules.md` (created by 059 Step 1) before executing — `ExportButton` rides 059's `toolbarExtra` slot and ships as an `export` module; `TableConfig.exportOptions` is removed by 057, reintroduce only what the module needs as module-local props**) |
+| [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049, **059 (DONE)** | TODO (reconciled 2026-07-18; **2026-07-21: `plans/design/ui-modules.md` now EXISTS (059 landed) — refresh 050 against it before executing. `ExportButton` rides 059's `toolbarExtra` slot (props: `columns`/`adapter`/`filters`/`sorting`/`totalCount` — validated against 050's needs in the design record) and ships as an `export` module; `TableConfig.exportOptions` was removed by 057, reintroduce only what the module needs as module-local props**) |
 | 008 | Prisma adapter spike (read path) | — | **SUPERSEDED** by [061](061-prisma-adapter-full-parity.md) (2026-07-20 maintainer directive: full parity, not a spike; 008's research is inlined there) |
 
 ### Wave D — maintainer-requested (planned 2026-07-20 at `27c59b9`)
@@ -139,8 +139,8 @@ rethink — action builder should be a plugin, not default-included").
 |------|------|------------|--------|
 | [056](056-toolkit-typecheck-ordering.md) | Deterministic root typecheck: `typecheck` gains `dependsOn: ["build", "^build"]` (same-package build/typecheck race — tsdown cleans `dist/` mid-`tsc`), **plus a `@better-tables/site#typecheck` override of `["^build"]`** so typecheck doesn't drag in the marketing `next build` (the literal one-liner tripped STOP #2 + exposed a marketing `.source` flake — see plan's "Resolution deviation") | none | DONE (branch `claude/next-implementation-plans-q0nlfu`) |
 | [057](057-contract-surface-truth.md) | Remove dead reserved surface: `TableConfig.defaultFilters/actionsConfig/exportOptions/theme/loadingState` + `TableFeatures.bulkActions/export/columnResizing/virtualScrolling/realTimeUpdates/rowExpansion` (0.6 removal policy; adapter contract untouched — `exportData`/`subscribe` are real) | none (coordinates with 050/058/059) | DONE (branch `claude/next-implementation-plans-q0nlfu`) — also removed orphaned `ExportConfig`/`LoadingStateConfig`/`TableTheme`/`ActionsConfig` types; `@ts-expect-error` pin added; `.changeset/contract-surface-truth.md` |
-| [058](058-global-search.md) | Global search as filter sugar: `buildSearchFilterGroup` OR-group over `.searchable()` columns, table-scoped `search` param (adapter-level field removed), `SearchInput` + URL sync — zero adapter changes | none | TODO |
-| [059](059-ui-modules-and-actions-extraction.md) | **UI modules tier** (`better-tables add <module>`, module-shaped CLI manifest, `slots` seam in `table.tsx`) + actions toolbar extracted as the first opt-in module (maintainer decision: not default-included) | none; validates slot vs 050's ExportButton | TODO |
+| [058](058-global-search.md) | Global search as filter sugar: `buildSearchFilterGroup` OR-group over `.searchable()` columns, table-scoped `search` param (adapter-level field removed), `SearchInput` + URL sync — zero adapter changes | none | **DEFERRED (2026-07-21, maintainer decision)** — plan intact; see "Deferred by decision". `FetchDataParams.search` stays declared-but-unconsumed until picked up |
+| [059](059-ui-modules-and-actions-extraction.md) | **UI modules tier** (`better-tables add <module>`, module-shaped CLI manifest, `slots` seam in `table.tsx`) + actions toolbar extracted as the first opt-in module (maintainer decision: not default-included) | none; validates slot vs 050's ExportButton | DONE (2026-07-21) — `plans/design/ui-modules.md` created; `slots` prop (`actionsToolbar`/`toolbarExtra`) on `BetterTable` with one-time dev warn; `UI_MODULES` manifest + drift test (union===tree AND disjoint); `add` command + `init --modules`/core-only default; homepage dogfooded (browser-verified: "Actions (10)" via slot); docs (ui-and-cli/selection-and-actions/troubleshooting); `.changeset/ui-modules-and-actions.md` (cli minor) |
 | [060](060-derived-aggregate-columns.md) | Server-derived aggregate columns: `t.count('posts')` renders/filters/sorts via correlated subqueries lowered into the drizzle computed-fields engine (tree-walk substitution closes 051 item 5 for specs); memoryAdapter nested-array aggregates; honest `filterable/sortable: false` defaults for `t.computed` | none (rebase order with 058 in `factory.ts`) | TODO |
 
 ### Wave E — adapter expansion (planned 2026-07-20 at `27c59b9`)
@@ -201,9 +201,10 @@ Notes for the record (all acceptable, none require action):
 - **Wave D ordering**: 056 any time (one-line turbo change — do it first for
   a stable gate). 057 before or parallel with 058/059 (disjoint fields;
   057 deliberately does NOT touch `FetchDataParams.search` — 058 owns it —
-  and does not touch `actions`/`TableAction` — 059 owns packaging). 058 and
-  060 both extend the instance fetch path in `packages/core/src/factory.ts`
-  — land in either order, rebase the second. **050 executes only after 059**
+  and does not touch `actions`/`TableAction` — 059 owns packaging). **058 is
+  DEFERRED (2026-07-21)** — 060 no longer needs to rebase around it; when 058
+  is revived it rebases onto whatever `factory.ts` fetch-path shape 060 left.
+  **050 executes only after 059**
   (slot seam + module packaging) and after refreshing its plan text against
   `plans/design/ui-modules.md` (created by 059 Step 1 — a forward deliverable,
   not an existing prerequisite). 049 remains independent (core-tier hooks);
@@ -423,6 +424,13 @@ hygiene · bun isolated-linker flaky typecheck (bunfig hoisted pin).
 
 ## Deferred by decision (maintainer chose not to plan this wave — revisit on request)
 
+- **[058](058-global-search.md) global search** — DEFERRED 2026-07-21 by
+  maintainer decision. The plan is fully written and still valid (global
+  search as pure filter sugar over `.searchable()` columns; zero adapter
+  changes). Nothing was built. `FetchDataParams.search?: string` remains
+  declared-but-unconsumed on the adapter contract (057 deliberately left it
+  for 058); it stays until this plan is picked up. Revisit on request — no
+  re-planning needed, just re-run the plan's drift check first.
 - **DIR-05 in-memory adapter** — **LANDED 2026-07-20** (not as originally
   scoped): `memoryAdapter(rows)` ships from `@better-tables/core`
   (`packages/core/src/adapters/memory-adapter.ts`) rather than as a

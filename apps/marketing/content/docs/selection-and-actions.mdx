@@ -18,17 +18,27 @@ Row selection adds a checkbox column (with select-all in the header) and tracks 
 
 Row identity comes from `rowConfig.getId(row)` when provided, falling back to the row's `id` field — set `getId` whenever your rows have a different key.
 
+Plain row selection needs no module — it is part of core.
+
 ## Bulk actions
 
-`actions` is a `TableAction[]`; the actions toolbar renders above the table and invokes handlers with the current selection:
+The actions toolbar is an opt-in [module](/docs/ui-and-cli#modules). Add it once:
+
+```bash
+bunx @better-tables/cli add actions
+```
+
+Then wire it into the table's `actionsToolbar` slot. `actions` is a `TableAction[]`; the toolbar renders above the table and invokes handlers with the current selection:
 
 ```tsx
 import { Archive, Trash2 } from 'lucide-react';
+import { ActionsToolbar } from '@/components/better-tables-ui/table/actions-toolbar';
 
 <BetterTable
   id="tickets"
   columns={columns}
   data={data}
+  slots={{ actionsToolbar: ActionsToolbar }}
   actions={[
     {
       id: 'archive',

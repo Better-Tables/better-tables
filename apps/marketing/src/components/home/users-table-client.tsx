@@ -2,7 +2,7 @@
 
 import type { FilterState, PaginationState, SortingState } from '@better-tables/core';
 import { httpAdapter } from '@better-tables/core';
-import { BetterTable, useTableUrlSync } from '@better-tables/ui';
+import { ActionsToolbar, BetterTable, useTableUrlSync } from '@better-tables/ui';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { userActions } from '@/lib/actions/user-actions';
@@ -74,6 +74,10 @@ export function UsersTableClient({
       adapter={adapter}
       columns={userColumns}
       actions={actions}
+      // Actions is an opt-in UI module (plan 059) — wire its toolbar into the
+      // slot. In a CLI-copied project this is `better-tables add actions` +
+      // this same slot line.
+      slots={{ actionsToolbar: ActionsToolbar }}
       data={data}
       totalCount={totalCount}
       initialPagination={initialPagination}

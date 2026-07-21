@@ -1,10 +1,16 @@
-import { join, normalize, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { Command } from 'commander';
 import pc from 'picocolors';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
 import { getAliasPrefix, getConfig } from '../lib/config';
-import { type CopyResult, copyAllFiles } from '../lib/file-operations';
+import { type CopyResult, copyAllFiles, type UiModuleName } from '../lib/file-operations';
+import {
+  isValidRelativeSubpath,
+  printAvailableModules,
+  printCopySummary,
+  resolveModuleNames,
+} from '../lib/module-install';
 import {
   detectNextJS,
   detectPackageManager,
@@ -22,36 +28,7 @@ interface InitOptions {
   skipShadcn?: boolean;
   yes?: boolean;
   componentsPath?: string;
-}
-
-/**
- * Validate that a path is a safe relative subpath (no path traversal)
- *
- * @param path - The path to validate
- * @returns True if the path is safe, false otherwise
- */
-function isValidRelativeSubpath(path: string): boolean {
-  if (!path || path.length === 0) {
-    return false;
-  }
-  // Check for null bytes
-  if (path.includes('\0')) {
-    return false;
-  }
-  // Check for absolute paths (Unix: starts with /, Windows: starts with drive letter)
-  if (path.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(path)) {
-    return false;
-  }
-  // Normalize the path and check for path traversal sequences
-  const normalized = normalize(path);
-  // Check for any occurrence of .. (parent directory traversal)
-  if (normalized.includes('..')) {
-    return false;
-  }
-  // Check for backslashes on Windows (should use forward slashes for cross-platform compatibility)
-  // But we'll allow them since path.join handles them
-  // Ensure it's a valid relative path
-  return !normalized.startsWith('..') && normalized !== '.';
+  modules?: string[];
 }
 
 /**
@@ -101,6 +78,14 @@ export function initCommand(): Command {
       );
       process.exit(1);
     }
+    // Resolve which modules to copy: `core` always, plus any opted in via
+    // `--modules`. An unknown name reports valid names and exits non-zero.
+    const optedIn = resolveModuleNames(options.modules ?? []);
+    if (!optedIn) {
+      process.exit(1);
+      return;
+    }
+    const modulesToCopy: UiModuleName[] = ['core', ...optedIn.filter((name) => name !== 'core')];
     console.log(pc.bold('\n🚀 Better Tables Initialization\n'));
     console.log(`Working directory: ${pc.cyan(cwd)}\n`);
     // Step 1: Detect project type
@@ -244,7 +229,13 @@ export function initCommand(): Command {
     let results: CopyResult[];
     let categories: Record<string, number>;
     try {
-      const copyResult = await copyAllFiles(config, resolvedPaths, skipPrompts, componentsPath);
+      const copyResult = await copyAllFiles(
+        config,
+        resolvedPaths,
+        skipPrompts,
+        componentsPath,
+        modulesToCopy
+      );
       results = copyResult.results;
       categories = copyResult.categories;
     } catch (error) {
@@ -257,32 +248,7 @@ export function initCommand(): Command {
       process.exit(1);
     }
     // Summary
-    const successful = results.filter((r) => r.success && !r.skipped).length;
-    const skipped = results.filter((r) => r.skipped).length;
-    const failed = results.filter((r) => !r.success).length;
-    console.log(pc.bold('\n📁 Files copied:\n'));
-    console.log(pc.green(`  • ${successful} files copied successfully`));
-    if (Object.keys(categories).length === 0) {
-      console.log(pc.yellow('  ⚠️  No files were copied. This may indicate:'));
-      console.log(pc.dim('     • UI package source files not found'));
-      console.log(pc.dim('     • Path resolution issue'));
-      console.log(pc.dim('     • All files already exist\n'));
-    } else {
-      for (const [category, count] of Object.entries(categories)) {
-        console.log(`  • ${category}: ${pc.green(String(count))} files`);
-      }
-      console.log('');
-    }
-    if (skipped > 0) {
-      console.log(pc.yellow(`  • ${skipped} files skipped (already exist)`));
-    }
-    if (failed > 0) {
-      console.error(pc.red(`  • ${failed} files failed to copy`));
-      const failedResults = results.filter((r) => !r.success);
-      for (const result of failedResults) {
-        console.error(pc.dim(`    - ${result.path}: ${result.error}`));
-      }
-    }
+    const copiedOk = printCopySummary(results, categories);
     // Final message
     console.log(pc.bold(pc.green('\n✓ Better Tables initialized successfully!\n')));
     console.log(pc.dim('Next steps:'));
@@ -300,7 +266,14 @@ export function initCommand(): Command {
           '     • a database adapter, e.g. @better-tables/adapters-drizzle (install separately)'
       )
     );
+    // Discoverability: `init` copies `core` only — tell users what modules exist.
+    printAvailableModules();
     console.log('');
+    // Genuine copy failures (not skips) must not report success — exit
+    // non-zero after showing the summary + failed-file details, like `add`.
+    if (!copiedOk) {
+      process.exit(1);
+    }
   });
   return command;
 }

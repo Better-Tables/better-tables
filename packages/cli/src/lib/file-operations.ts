@@ -90,7 +90,22 @@ export async function readUiSourceFile(filePath: string): Promise<string> {
 }
 
 /**
- * Known list of files to copy from the bundled UI source.
+ * Shape of one UI **module** — a named, independently copyable group of files
+ * (plan 059). Every file under `packages/ui/src` belongs to EXACTLY ONE module
+ * (`tests/ui-source-manifest.test.ts` enforces the union AND disjointness).
+ */
+interface UiModuleFiles {
+  components?: {
+    table?: readonly string[];
+    filters?: readonly string[];
+  };
+  hooks?: readonly string[];
+  lib?: readonly string[];
+}
+
+/**
+ * The UI module manifest. `core` is the default set `init` copies; every other
+ * module is opt-in via `better-tables add <module>`.
  *
  * Must mirror `packages/ui/src` exactly (minus the exclusions below) —
  * `tests/ui-source-manifest.test.ts` fails the build on any drift in either
@@ -98,118 +113,180 @@ export async function readUiSourceFile(filePath: string): Promise<string> {
  * `styles/` (a reference theme; consumers own their Tailwind setup), and
  * `components/ui/` (shadcn primitives installed via the shadcn CLI).
  */
-const UI_SOURCE_FILES = {
-  components: {
-    table: [
-      'action-confirmation-dialog.tsx',
-      'actions-toolbar.tsx',
-      'column-order-drop-indicator.tsx',
-      'column-order-list.tsx',
-      'column-visibility-toggle.tsx',
-      'drop-indicator.tsx',
-      'editable-cell.tsx',
-      'empty-state.tsx',
-      'error-state.tsx',
+const UI_MODULES = {
+  /** The always-copied base: the table, filters, hooks, and lib utils. */
+  core: {
+    components: {
+      table: [
+        'column-order-drop-indicator.tsx',
+        'column-order-list.tsx',
+        'column-visibility-toggle.tsx',
+        'drop-indicator.tsx',
+        'editable-cell.tsx',
+        'empty-state.tsx',
+        'error-state.tsx',
+        'index.ts',
+        'sort-order-drop-indicator.tsx',
+        'sort-order-list.tsx',
+        'table-dnd-provider.tsx',
+        'table-header-context-menu.tsx',
+        'table-pagination.tsx',
+        'table-providers.tsx',
+        'table.tsx',
+        'virtualized-table.tsx',
+      ],
+      filters: [
+        'active-filters.tsx',
+        'faceted-filter-sidebar.tsx',
+        'filter-bar.tsx',
+        'filter-button.tsx',
+        'filter-dropdown.tsx',
+        'filter-operator-select.tsx',
+        'filter-type-styles.ts',
+        'filter-value-input.tsx',
+        'include-unknown-control.tsx',
+        'index.ts',
+        'inputs/boolean-filter-input.tsx',
+        'inputs/date-filter-input.tsx',
+        'inputs/multi-option-filter-input.tsx',
+        'inputs/number-filter-input.tsx',
+        'inputs/option-filter-input.tsx',
+        'inputs/text-filter-input.tsx',
+      ],
+    },
+    hooks: [
       'index.ts',
-      'sort-order-drop-indicator.tsx',
-      'sort-order-list.tsx',
-      'table-dnd-provider.tsx',
-      'table-header-context-menu.tsx',
-      'table-pagination.tsx',
-      'table-providers.tsx',
-      'table.tsx',
-      'virtualized-table.tsx',
+      'use-column-options.tsx',
+      'use-debounce.ts',
+      'use-editable-cells.ts',
+      'use-facets.ts',
+      'use-filter-validation.ts',
+      'use-keyboard-navigation.ts',
+      'use-table-data.ts',
+      'use-table-store.ts',
+      'use-table-url-sync.ts',
+      'use-virtualization.ts',
+      'use-virtualized-table-data.ts',
     ],
-    filters: [
-      'active-filters.tsx',
-      'faceted-filter-sidebar.tsx',
-      'filter-bar.tsx',
-      'filter-button.tsx',
-      'filter-dropdown.tsx',
-      'filter-operator-select.tsx',
-      'filter-type-styles.ts',
-      'filter-value-input.tsx',
-      'include-unknown-control.tsx',
-      'index.ts',
-      'inputs/boolean-filter-input.tsx',
-      'inputs/date-filter-input.tsx',
-      'inputs/multi-option-filter-input.tsx',
-      'inputs/number-filter-input.tsx',
-      'inputs/option-filter-input.tsx',
-      'inputs/text-filter-input.tsx',
-    ],
+    lib: ['utils.ts'],
   },
-  hooks: [
-    'index.ts',
-    'use-column-options.tsx',
-    'use-debounce.ts',
-    'use-editable-cells.ts',
-    'use-facets.ts',
-    'use-filter-validation.ts',
-    'use-keyboard-navigation.ts',
-    'use-table-data.ts',
-    'use-table-store.ts',
-    'use-table-url-sync.ts',
-    'use-virtualization.ts',
-    'use-virtualized-table-data.ts',
-  ],
-  lib: ['utils.ts'],
-} as const;
+  /** Bulk-action toolbar over selected rows — rides `table.tsx`'s slot seam. */
+  actions: {
+    components: {
+      table: ['action-confirmation-dialog.tsx', 'actions-toolbar.tsx'],
+    },
+  },
+} as const satisfies Record<string, UiModuleFiles>;
+
+/** A valid UI module name (`'core' | 'actions' | …`). */
+export type UiModuleName = keyof typeof UI_MODULES;
+
+/** Every module name, in declaration order (`core` first). */
+export const UI_MODULE_NAMES = Object.keys(UI_MODULES) as UiModuleName[];
+
+/** Opt-in module names (everything except the always-copied `core`). */
+export const OPTIONAL_UI_MODULE_NAMES = UI_MODULE_NAMES.filter(
+  (name) => name !== 'core'
+) as Exclude<UiModuleName, 'core'>[];
+
+/** Type guard: is `name` a real module? */
+export function isUiModuleName(name: string): name is UiModuleName {
+  return Object.hasOwn(UI_MODULES, name);
+}
+
+/** Category label + destination for a copied file, by its source subtree. */
+interface FileSlot {
+  category: string;
+  /** Destination path for `file`, given the resolved paths + components base. */
+  dest: (file: string, componentsBasePath: string, resolvedPaths: ResolvedPaths) => string;
+}
+
+const FILE_SLOTS = {
+  table: {
+    category: 'table',
+    source: (file: string) => `components/table/${file}`,
+    dest: (file, base) => join(base, 'table', file),
+  },
+  filters: {
+    category: 'filters',
+    source: (file: string) => `components/filters/${file}`,
+    dest: (file, base) => join(base, 'filters', file),
+  },
+  hooks: {
+    category: 'hooks',
+    source: (file: string) => `hooks/${file}`,
+    dest: (file, _base, paths) => join(paths.hooks, file),
+  },
+  lib: {
+    category: 'lib',
+    source: (file: string) => `lib/${file}`,
+    dest: (file, _base, paths) => join(paths.lib, file),
+  },
+} satisfies Record<string, FileSlot & { source: (file: string) => string }>;
+
+/** Yield `[slotKey, file]` for every file in one module. */
+function* iterModuleFiles(module: UiModuleFiles): Generator<[keyof typeof FILE_SLOTS, string]> {
+  for (const file of module.components?.table ?? []) yield ['table', file];
+  for (const file of module.components?.filters ?? []) yield ['filters', file];
+  for (const file of module.hooks ?? []) yield ['hooks', file];
+  for (const file of module.lib ?? []) yield ['lib', file];
+}
 
 /**
- * Source paths (relative to the bundled UI root) of every file `init` copies.
+ * Source paths (relative to the bundled UI root) of one module's files.
+ *
+ * @internal Exported for tests.
+ */
+export function getModuleSourceFilePaths(moduleName: UiModuleName): string[] {
+  const paths: string[] = [];
+  for (const [slotKey, file] of iterModuleFiles(UI_MODULES[moduleName])) {
+    paths.push(FILE_SLOTS[slotKey].source(file));
+  }
+  return paths;
+}
+
+/**
+ * Source paths of EVERY module's files (the union). The drift test pins this to
+ * the real `packages/ui/src` tree.
+ *
+ * @internal Exported for tests.
+ */
+export function getAllUiSourceFilePaths(): string[] {
+  return UI_MODULE_NAMES.flatMap((name) => getModuleSourceFilePaths(name));
+}
+
+/**
+ * Back-compat alias for the full union.
  *
  * @internal Exported for tests only.
  */
 export function getUiSourceFilePaths(): string[] {
-  return [
-    ...UI_SOURCE_FILES.components.table.map((file) => `components/table/${file}`),
-    ...UI_SOURCE_FILES.components.filters.map((file) => `components/filters/${file}`),
-    ...UI_SOURCE_FILES.hooks.map((file) => `hooks/${file}`),
-    ...UI_SOURCE_FILES.lib.map((file) => `lib/${file}`),
-  ];
+  return getAllUiSourceFilePaths();
 }
 
 /**
- * Generate file mappings for all Better Tables files
+ * Generate file mappings for the given modules (in the order provided). Unknown
+ * names are ignored here — callers validate first (see the `add`/`init`
+ * commands) so a bad name reports instead of silently copying nothing.
  */
 export function generateFileMappings(
   resolvedPaths: ResolvedPaths,
-  componentsOutputPath: string = 'better-tables-ui'
+  componentsOutputPath: string = 'better-tables-ui',
+  moduleNames: readonly UiModuleName[] = UI_MODULE_NAMES
 ): FileMapping[] {
   const mappings: FileMapping[] = [];
   const componentsBasePath = join(resolvedPaths.components, componentsOutputPath);
-  // Table components
-  for (const file of UI_SOURCE_FILES.components.table) {
-    mappings.push({
-      sourcePath: `components/table/${file}`,
-      destPath: join(componentsBasePath, 'table', file),
-      category: 'table',
-    });
-  }
-  // Filter components (including subdirectories like inputs/)
-  for (const file of UI_SOURCE_FILES.components.filters) {
-    mappings.push({
-      sourcePath: `components/filters/${file}`,
-      destPath: join(componentsBasePath, 'filters', file),
-      category: 'filters',
-    });
-  }
-  // Hooks
-  for (const file of UI_SOURCE_FILES.hooks) {
-    mappings.push({
-      sourcePath: `hooks/${file}`,
-      destPath: join(resolvedPaths.hooks, file),
-      category: 'hooks',
-    });
-  }
-  // Lib files
-  for (const file of UI_SOURCE_FILES.lib) {
-    mappings.push({
-      sourcePath: `lib/${file}`,
-      destPath: join(resolvedPaths.lib, file),
-      category: 'lib',
-    });
+  for (const moduleName of moduleNames) {
+    const module = UI_MODULES[moduleName];
+    if (!module) continue;
+    for (const [slotKey, file] of iterModuleFiles(module)) {
+      const slot = FILE_SLOTS[slotKey];
+      mappings.push({
+        sourcePath: slot.source(file),
+        destPath: slot.dest(file, componentsBasePath, resolvedPaths),
+        category: slot.category,
+      });
+    }
   }
   return mappings;
 }
@@ -362,9 +439,10 @@ export async function copyAllFiles(
   config: ShadcnConfig,
   resolvedPaths: ResolvedPaths,
   skipPrompts: boolean,
-  componentsOutputPath: string = 'better-tables-ui'
+  componentsOutputPath: string = 'better-tables-ui',
+  moduleNames: readonly UiModuleName[] = UI_MODULE_NAMES
 ): Promise<{ results: CopyResult[]; categories: Record<string, number> }> {
-  const mappings = generateFileMappings(resolvedPaths, componentsOutputPath);
+  const mappings = generateFileMappings(resolvedPaths, componentsOutputPath, moduleNames);
   const results: CopyResult[] = [];
   const categories: Record<string, number> = {};
   let conflictResolution: ConflictResolution | null = null;
