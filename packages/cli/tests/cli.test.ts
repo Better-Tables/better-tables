@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'bun:test';
 import { Command } from 'commander';
 import { commandsRegistry, type RegisteredCommandName } from '../src/commands';
+import { addCommand } from '../src/commands/add';
 import { docsCommand } from '../src/commands/docs';
 import { helpCommand } from '../src/commands/help';
 import { initCommand } from '../src/commands/init';
 import { createCommand, registerCommandFactory } from '../src/lib/command-factory';
+
+/** Register every command factory the registry declares (mirrors cli.ts). */
+function registerAllFactories(): void {
+  registerCommandFactory('help', helpCommand);
+  registerCommandFactory('docs', docsCommand);
+  registerCommandFactory('init', initCommand);
+  registerCommandFactory('add', addCommand);
+}
 
 describe('CLI', () => {
   it('should have correct name and description', () => {
@@ -20,10 +29,7 @@ describe('CLI', () => {
   });
 
   it('should register all commands from registry', () => {
-    // Register all command factories
-    registerCommandFactory('help', helpCommand);
-    registerCommandFactory('docs', docsCommand);
-    registerCommandFactory('init', initCommand);
+    registerAllFactories();
 
     const program = new Command();
     const commandNames = Object.keys(commandsRegistry) as RegisteredCommandName[];
@@ -43,9 +49,7 @@ describe('CLI', () => {
   });
 
   it('should have all commands from registry accessible', () => {
-    registerCommandFactory('help', helpCommand);
-    registerCommandFactory('docs', docsCommand);
-    registerCommandFactory('init', initCommand);
+    registerAllFactories();
 
     const program = new Command();
     const commandNames = Object.keys(commandsRegistry) as RegisteredCommandName[];
