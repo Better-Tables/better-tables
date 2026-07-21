@@ -396,6 +396,16 @@ and regression-locked — reflected in 020's row above.
   checks, and silent filter drops fixed
   ([PR #97](https://github.com/Better-Tables/better-tables/pull/97),
   2026-07-20).
+- `ff7c86f` — drizzle `onInvalidFilter: 'skip' | 'throw'` strict mode (a
+  server-side scoping filter can now raise a `QueryError` instead of silently
+  widening results when a leaf can't translate) + a CI integration-database
+  guard (`tests/ci-integration-guard.test.ts`) that fails the adapter job
+  under GitHub Actions if `POSTGRES_TEST_URL`/`MYSQL_TEST_URL` go missing
+  ([PR #98](https://github.com/Better-Tables/better-tables/pull/98),
+  2026-07-21). This guard **supersedes** the session-local
+  `ci-db-integration-guard.test.ts` added earlier on this branch (same
+  purpose, but gated on `GITHUB_ACTIONS` and trimming whitespace) — the
+  earlier file was removed on merge to avoid duplication.
 
 ### Resolved audit findings (don't re-file)
 
