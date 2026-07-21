@@ -49,6 +49,7 @@ import type {
   ComputedFieldWithResolvedSortSql,
   DatabaseDriver,
   FilterHandlerHooks,
+  InvalidFilterBehavior,
   JoinConfig,
   MySQLQueryBuilderWithJoins,
   PostgresQueryBuilderWithJoins,
@@ -229,11 +230,18 @@ export abstract class BaseQueryBuilder {
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
     databaseType: DatabaseDriver,
-    hooks?: FilterHandlerHooks
+    hooks?: FilterHandlerHooks,
+    onInvalidFilter?: InvalidFilterBehavior
   ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
-    this.filterHandler = new FilterHandler(schema, relationshipManager, databaseType, hooks);
+    this.filterHandler = new FilterHandler(
+      schema,
+      relationshipManager,
+      databaseType,
+      hooks,
+      onInvalidFilter
+    );
     // Primary keys are auto-detected from the schema
     this.primaryKeyMap = getPrimaryKeyMap(schema, {
       getColumnNames,

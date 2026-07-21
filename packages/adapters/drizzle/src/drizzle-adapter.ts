@@ -325,7 +325,13 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
   private createQueryBuilderStrategy(driver: TDriver): BaseQueryBuilder {
     const createQueryBuilder = getQueryBuilderFactory(driver);
-    return createQueryBuilder(this.db, this.schema, this.relationshipManager, this.hooks);
+    return createQueryBuilder(
+      this.db,
+      this.schema,
+      this.relationshipManager,
+      this.hooks,
+      this.options?.onInvalidFilter
+    );
   }
 
   /**
