@@ -20,6 +20,10 @@
       "dependsOn": ["build", "^build"],
       "outputs": []
     },
+    "@better-tables/site#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "lint": {
       "outputs": []
     },
