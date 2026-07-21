@@ -48,7 +48,13 @@ wave are in "Deferred by decision" at the bottom.
 - **Wave B (037–039, 041–045, 051, 052) is DONE and merged to `main`** via
   [PR #85](https://github.com/Better-Tables/better-tables/pull/85)
   (`46c9f73`, 2026-07-18). Cubic AI review completed (pass, no findings)
-  and required CI was green before merge. Wave C remains TODO.
+  and required CI was green before merge.
+- **Wave C features 053, 054, 055 are DONE and merged to `main`** via
+  [PR #86](https://github.com/Better-Tables/better-tables/pull/86)
+  (`5a7796d`, 2026-07-19) — the editable-cells train (`.editable()` inline
+  editing, schema-driven auto columns, and the zero-boilerplate direct save
+  path). The remaining Wave C work is 048/049/050. (Superseded the earlier
+  "DONE on `editable-cells`" status — that branch is now merged.)
 - **Second deep audit produced plans 033–052** (written 2026-07-17);
   maintainer decisions folded into the relevant plans — see below.
 - **Reconcile audit 2026-07-18 (at `7b58ed8`): all 17 merged plans VERIFIED
@@ -74,8 +80,10 @@ wave are in "Deferred by decision" at the bottom.
 
 ## Outstanding
 
-Wave A and Wave B are merged. Remaining: Wave C (048–050) plus the held 008.
-All 2026-07-17 audit findings are planned.
+Waves A and B are merged; Wave C's feature train (053/054/055) is merged
+(PR #86). Remaining: Wave C fast-follows (048–050), Wave D (056–060), and
+Wave E adapter expansion (061/062). 008 is superseded by 061. All
+2026-07-17 audit findings are planned.
 
 ### Wave A — pre-0.6-publish (do these before shipping 0.6)
 
@@ -111,9 +119,9 @@ the breaking window.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [053](053-editable-cells.md) | **`.editable()` inline cell editing** — builder API, per-type in-cell editors (text/number/option/boolean/date), adapter+callback save, optimistic rollback, gating matrix, integration proof, dogfood example | 047, 042 (done) | DONE on `editable-cells` |
-| [054](054-schema-driven-auto-columns.md) | **Auto columns from the schema** — `describeColumns` adapter capability (wire-proxied), `t.auto()` + no-factory `define` with explicit-wins merge, enum→option inference with humanized labels, facet-fallback dropdown options | 053 merged | DONE — executor-run in worktree, advisor-reviewed (criteria re-run, APPROVED), merged into `editable-cells` at `ec60f80` |
-| [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop, opt-in double-sided cell-oriented HTTP write proxy, **joined-table editing** (`resolveCellWriteTarget`; related-row writes proven in browser + integration test), dogfood on the direct path (custom route deleted) | 053, 054 | DONE — executor-run, advisor-reviewed (APPROVED), merged into `editable-cells` at `ec60f80` |
+| [053](053-editable-cells.md) | **`.editable()` inline cell editing** — builder API, per-type in-cell editors (text/number/option/boolean/date), adapter+callback save, optimistic rollback, gating matrix, integration proof, dogfood example | 047, 042 (done) | DONE (merged to main, PR #86) |
+| [054](054-schema-driven-auto-columns.md) | **Auto columns from the schema** — `describeColumns` adapter capability (wire-proxied), `t.auto()` + no-factory `define` with explicit-wins merge, enum→option inference with humanized labels, facet-fallback dropdown options | 053 merged | DONE (merged to main, PR #86) |
+| [055](055-direct-save-path.md) | **Zero-boilerplate saves** — `tables.cellEditAction(def)` (serializable, `'use server'`-ready; the PRIMARY monolith path), `saveAction` prop, opt-in double-sided cell-oriented HTTP write proxy, **joined-table editing** (`resolveCellWriteTarget`; related-row writes proven in browser + integration test), dogfood on the direct path (custom route deleted) | 053, 054 | DONE (merged to main, PR #86) |
 | [048](048-filter-group-builder-ui.md) | Visual filter group-builder UI (nested AND/OR) — fast-follow, contract already shipped | 015/016/017 (done) | TODO (reconciled 2026-07-18 — finding valid; see plan's reconcile note) |
 | [049](049-plugin-hook-execution.md) | Execute the plugin hook seam (`beforeFetch`/`afterFetch`), validated by one real plugin | 018 (done) | TODO (reconciled 2026-07-18 — seam still stored-only; line refs refreshed) |
 | [050](050-export-ui.md) | Export UI: `ExportButton`/`useTableExport` + `csvExport()` plugin + row-cap decision | 049, **059** | TODO (reconciled 2026-07-18; **2026-07-20: refresh against `plans/design/ui-modules.md` (created by 059 Step 1) before executing — `ExportButton` rides 059's `toolbarExtra` slot and ships as an `export` module; `TableConfig.exportOptions` is removed by 057, reintroduce only what the module needs as module-local props**) |
@@ -127,7 +135,7 @@ rethink — action builder should be a plugin, not default-included").
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [056](056-toolkit-typecheck-ordering.md) | Deterministic root typecheck: `typecheck` gains `dependsOn: ["build", "^build"]` (same-package build/typecheck race — tsdown cleans `dist/` mid-`tsc`) | none | TODO |
+| [056](056-toolkit-typecheck-ordering.md) | Deterministic root typecheck: `typecheck` gains `dependsOn: ["build", "^build"]` (same-package build/typecheck race — tsdown cleans `dist/` mid-`tsc`) | none | DONE (branch `claude/next-implementation-plans-q0nlfu`) |
 | [057](057-contract-surface-truth.md) | Remove dead reserved surface: `TableConfig.defaultFilters/actionsConfig/exportOptions/theme/loadingState` + `TableFeatures.bulkActions/export/columnResizing/virtualScrolling/realTimeUpdates/rowExpansion` (0.6 removal policy; adapter contract untouched — `exportData`/`subscribe` are real) | none (coordinates with 050/058/059) | TODO |
 | [058](058-global-search.md) | Global search as filter sugar: `buildSearchFilterGroup` OR-group over `.searchable()` columns, table-scoped `search` param (adapter-level field removed), `SearchInput` + URL sync — zero adapter changes | none | TODO |
 | [059](059-ui-modules-and-actions-extraction.md) | **UI modules tier** (`better-tables add <module>`, module-shaped CLI manifest, `slots` seam in `table.tsx`) + actions toolbar extracted as the first opt-in module (maintainer decision: not default-included) | none; validates slot vs 050's ExportButton | TODO |
@@ -378,6 +386,16 @@ and regression-locked — reflected in 020's row above.
 - `787a816` — 029-findings close: HTTP adapter (client/handler/protocol),
   virtualized `BetterTable`, usable inferred rows, UI filter-component
   rewrites. Audited by the 2026-07-17 wave (plans 034/035 target it).
+- `59716c3` — marketing site redesign around a live SQL demo and product
+  story ([PR #87](https://github.com/Better-Tables/better-tables/pull/87),
+  2026-07-19).
+- `5d92c8c` — homepage users demo prefers Neon Postgres when `DATABASE_URL`
+  is set ([PR #96](https://github.com/Better-Tables/better-tables/pull/96),
+  2026-07-20).
+- `786da01` — adapter correctness: cross-table predicates, relation-presence
+  checks, and silent filter drops fixed
+  ([PR #97](https://github.com/Better-Tables/better-tables/pull/97),
+  2026-07-20).
 
 ### Resolved audit findings (don't re-file)
 
