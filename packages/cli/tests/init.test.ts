@@ -233,6 +233,41 @@ describe('init command', () => {
     expect(output).toContain('initialized successfully');
   });
 
+  it('copies the core module only by default (excludes opt-in modules)', async () => {
+    const command = initCommand();
+    await command.parseAsync(['--yes'], { from: 'user' });
+
+    const call = (fileOperationsLib.copyAllFiles as ReturnType<typeof spyOn>).mock.calls[0];
+    // 5th arg is the module list.
+    expect(call?.[4]).toEqual(['core']);
+  });
+
+  it('opts modules in with --modules, always keeping core first', async () => {
+    const command = initCommand();
+    await command.parseAsync(['--yes', '--modules', 'actions'], { from: 'user' });
+
+    const call = (fileOperationsLib.copyAllFiles as ReturnType<typeof spyOn>).mock.calls[0];
+    expect(call?.[4]).toEqual(['core', 'actions']);
+  });
+
+  it('lists available opt-in modules in the next-steps output', async () => {
+    const command = initCommand();
+    await command.parseAsync(['--yes'], { from: 'user' });
+    const output = getLoggedOutput();
+    expect(output).toContain('better-tables add actions');
+  });
+
+  it('exits 1 and lists valid modules when --modules names an unknown module', async () => {
+    const command = initCommand();
+    try {
+      await command.parseAsync(['--yes', '--modules', 'bogus'], { from: 'user' });
+    } catch {
+      // process.exit throws in tests
+    }
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(getErrorOutput()).toContain('Unknown module');
+  });
+
   it('should print failed file details to stderr without exiting when some files fail to copy', async () => {
     (fileOperationsLib.copyAllFiles as ReturnType<typeof spyOn>).mockImplementation(() =>
       Promise.resolve({

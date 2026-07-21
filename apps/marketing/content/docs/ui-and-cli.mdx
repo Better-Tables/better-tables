@@ -42,6 +42,31 @@ Import from the copied paths — there is no `@better-tables/ui` package to impo
 import { BetterTable } from '@/components/better-tables-ui/table/table';
 ```
 
+## Modules
+
+The copied UI ships in **modules** — named groups of source files you opt into. `init` copies the **core** module (the table, filters, hooks, and utilities). Everything else is added on demand:
+
+```bash
+bunx @better-tables/cli add actions   # bulk-action toolbar over selected rows
+```
+
+`init` also accepts `--modules` to opt in at init time:
+
+```bash
+bunx @better-tables/cli init --modules actions
+```
+
+| Module | What it copies | Wire-up |
+|---|---|---|
+| `core` | Table, filters, hooks, lib (always copied by `init`) | — |
+| `actions` | `actions-toolbar.tsx`, `action-confirmation-dialog.tsx` | `slots={{ actionsToolbar: ActionsToolbar }}` — see [Selection & actions](/docs/selection-and-actions) |
+
+Modules plug into the table through the `slots` prop — an absent module is a clean no-op, so core has no dead imports. `add <module>` reuses your init-time config; pass the same `--components-path` if you changed it. An unknown module name lists the valid ones and exits non-zero.
+
+<Callout>
+**Modules vs. plugins.** These are different tiers. **Modules** are copied UI source added with `better-tables add` (this page). **Plugins** are npm-distributed data hooks passed to `betterTables({ plugins: [...] })` — no UI. Keep the words distinct.
+</Callout>
+
 ## Why copy instead of npm?
 
 - You own the JSX — no fighting a black-box design system

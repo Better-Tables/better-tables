@@ -14,6 +14,7 @@ import {
   type PaginationState,
   resolveTableColumns,
   type SortingState,
+  type TableAction,
   type TableConfig,
   type TableDefinition,
   tableNeedsColumnResolution,
@@ -46,7 +47,6 @@ import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { ActionsToolbar } from './actions-toolbar';
 import { EditableCell } from './editable-cell';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
@@ -78,6 +78,63 @@ const VIRTUAL_DEFAULT_OVERSCAN = 5;
  */
 function virtualSpacerStyle(height: number): React.CSSProperties {
   return { height, padding: 0, border: 0 };
+}
+
+/**
+ * Props the `actions` module's toolbar receives through
+ * {@link BetterTableSlots.actionsToolbar}. Rendered only when
+ * `actions.length > 0`, so `actions` is always non-empty here. The default
+ * `ActionsToolbar` component satisfies this shape unchanged.
+ */
+export interface ActionsToolbarSlotProps<TData = unknown> {
+  /** The `actions` passed to {@link BetterTableProps.actions} (non-empty). */
+  actions: TableAction<TData>[];
+  /** Ids of the currently selected rows. */
+  selectedIds: string[];
+  /** The selected rows' data, in row order. */
+  selectedData: TData[];
+  /** Called after an action's handler resolves (host may refetch/refresh). */
+  onActionMake: (actionId: string) => void;
+}
+
+/**
+ * Props the {@link BetterTableSlots.toolbarExtra} slot receives — everything an
+ * export/toolbar module needs to act on the current view. Reserved for plan
+ * 050's `ExportButton`; carries the adapter, resolved columns, and the live
+ * filter/sort state so a module can drive `adapter.exportData(...)`.
+ */
+export interface ToolbarExtraSlotProps<TData = unknown> {
+  /** Column definitions currently rendered (post auto-column resolution). */
+  columns: ColumnDefinition<TData, unknown>[];
+  /** The active adapter (may be undefined for pure `data`-driven tables). */
+  adapter?: TableConfig<TData>['adapter'];
+  /** The current filter tree (flat array or group node). */
+  filters: FilterState[] | FilterGroupNode;
+  /** The current sort state. */
+  sorting: SortingState;
+  /** Total row count if known. */
+  totalCount?: number;
+}
+
+/**
+ * Injection points for opt-in UI **modules** (the CLI-copied tier — distinct
+ * from core-tier `betterTables({ plugins })`). A module ships as copied source
+ * that the consumer wires into a slot; an absent slot is a clean no-op. See
+ * `plans/design/ui-modules.md`.
+ */
+export interface BetterTableSlots<TData = unknown> {
+  /**
+   * Installed by the `actions` module
+   * (`slots={{ actionsToolbar: ActionsToolbar }}`). Renders in the toolbar row
+   * when `actions.length > 0`. When `actions` are provided but this slot is
+   * unset, the table renders nothing here and warns once in dev.
+   */
+  actionsToolbar?: React.ComponentType<ActionsToolbarSlotProps<TData>>;
+  /**
+   * Extra toolbar controls (reserved for plan 050's `ExportButton`, shipping as
+   * the `export` module). Renders in the toolbar row when set; empty is silent.
+   */
+  toolbarExtra?: React.ComponentType<ToolbarExtraSlotProps<TData>>;
 }
 
 /**
@@ -268,6 +325,18 @@ export interface BetterTableProps<TData = unknown>
    * to render every cell read-only without changing column defs.
    */
   editing?: boolean;
+
+  /**
+   * Injection points for opt-in UI modules copied in via
+   * `better-tables add <module>`. E.g. the actions module wires
+   * `slots={{ actionsToolbar: ActionsToolbar }}`. Absent slots render nothing.
+   *
+   * `NoInfer` keeps the slot components out of `TData` inference — a slot's
+   * `ComponentType<…<TData>>` is a contravariant position that would otherwise
+   * collapse `TData` to `unknown`. `TData` is inferred from `data`/`columns`/
+   * `table`/`actions`; slots are then checked against it.
+   */
+  slots?: BetterTableSlots<NoInfer<TData>>;
 }
 
 /** Ref-latch a frequently-changing callback/value prop so a `useEffect` (or
@@ -666,6 +735,10 @@ function BetterTableInner<TData = unknown>({
   onCellEditError,
   saveAction,
   editing = true,
+
+  // UI modules (opt-in, CLI-copied) — destructured so it is not spread onto
+  // the wrapper div below via `...props`.
+  slots,
   ...props
 }: BetterTableProps<TData>) {
   // `table` (a defineTable() result) is sugar for columns={table.columns},
@@ -988,6 +1061,27 @@ function BetterTableInner<TData = unknown>({
     [id, store]
   );
 
+  // One-time dev diagnostic for the `actions` module seam: `actions` were
+  // provided (which enables row selection) but no `slots.actionsToolbar` is
+  // wired, so the bulk-actions toolbar renders nothing. Keyed by `id` (same
+  // rationale as `warnedFilterTreeIdRef`) and production-gated. Lives in an
+  // effect, not render, so it never fires a side effect during rendering.
+  const warnedMissingActionsSlotIdRef = useRef<string | null>(null);
+  const hasActions = actions.length > 0;
+  const hasActionsSlot = !!slots?.actionsToolbar;
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    if (!hasActions || hasActionsSlot) return;
+    if (warnedMissingActionsSlotIdRef.current === id) return;
+    warnedMissingActionsSlotIdRef.current = id;
+    console.warn(
+      `[better-tables] table "${id}": \`actions\` were provided but no ` +
+        '`slots.actionsToolbar` is set, so the bulk-actions toolbar will not ' +
+        'render. Install the actions module (`bunx better-tables add actions`) ' +
+        'and pass `slots={{ actionsToolbar: ActionsToolbar }}`.'
+    );
+  }, [id, hasActions, hasActionsSlot]);
+
   // Handle filter changes - just update store.
   //
   // The filter bar edits the FLAT leaf view, and the store's `setFilters`
@@ -1280,6 +1374,11 @@ function BetterTableInner<TData = unknown>({
     contextMenuEnabled &&
     (headerContextMenu?.showSortToggle || headerContextMenu?.showColumnVisibility);
 
+  // Module slots (opt-in UI tier). Capitalized locals so they render as JSX
+  // components; absent slots stay undefined and render nothing.
+  const ActionsToolbarSlot = slots?.actionsToolbar;
+  const ToolbarExtraSlot = slots?.toolbarExtra;
+
   const tableContent = (
     <div className={cn('space-y-4', className)} {...props} {...(name !== undefined && { name })}>
       {/* Always mounted so SSR/client DOM structure matches */}
@@ -1288,9 +1387,11 @@ function BetterTableInner<TData = unknown>({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Actions Toolbar - render independently of filtering */}
-        {actions.length > 0 && (
-          <ActionsToolbar
+        {/* Actions toolbar — an opt-in module rendered through the
+            `actionsToolbar` slot, independent of filtering. Absent slot with
+            `actions` present is a no-op (a one-time dev warn fires above). */}
+        {actions.length > 0 && ActionsToolbarSlot && (
+          <ActionsToolbarSlot
             actions={actions}
             selectedIds={Array.from(selectedRows)}
             selectedData={data.filter((row, index) => selectedRows.has(getRowId(row, index)))}
@@ -1298,6 +1399,18 @@ function BetterTableInner<TData = unknown>({
               // Action executed - could trigger data refresh
               // This callback can be used by parent to refetch data
             }}
+          />
+        )}
+
+        {/* Extra toolbar controls — an opt-in module (e.g. export) rendered
+            through the `toolbarExtra` slot. Empty slot renders nothing. */}
+        {ToolbarExtraSlot && (
+          <ToolbarExtraSlot
+            columns={columnsWithDefaults}
+            {...(adapter !== undefined && { adapter })}
+            filters={filters}
+            sorting={sortingState}
+            {...(totalCount !== undefined && { totalCount })}
           />
         )}
 

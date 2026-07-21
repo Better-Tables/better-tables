@@ -2,14 +2,21 @@ import { describe, expect, it } from 'bun:test';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getUiSourceFilePaths } from '../src/lib/file-operations';
+import {
+  getAllUiSourceFilePaths,
+  getModuleSourceFilePaths,
+  UI_MODULE_NAMES,
+} from '../src/lib/file-operations';
 
 /**
- * `UI_SOURCE_FILES` in src/lib/file-operations.ts is a hand-maintained
- * allow-list of everything `init` copies into a consumer project. This suite
- * pins it to the real `packages/ui/src` tree so a UI refactor (file added,
- * moved, or deleted) fails here instead of shipping an `init` that copies a
- * broken component set.
+ * `UI_MODULES` in src/lib/file-operations.ts is a hand-maintained manifest of
+ * the files each UI module copies into a consumer project (plan 059). This
+ * suite pins it to the real `packages/ui/src` tree so a UI refactor (file
+ * added, moved, or deleted) fails here instead of shipping an `init`/`add` that
+ * copies a broken component set. It enforces TWO invariants:
+ *
+ *   1. Union of all modules === the real copyable tree (both directions).
+ *   2. Modules are pairwise disjoint — every file belongs to exactly one.
  */
 
 // The workspace UI source is the source of truth. The bundled `ui-src`
@@ -19,7 +26,7 @@ const uiSrcRoot = join(fileURLToPath(import.meta.url), '..', '..', '..', 'ui', '
 
 /**
  * Files under packages/ui/src that `init` intentionally does NOT copy.
- * Keep in sync with the exclusion note on `UI_SOURCE_FILES`.
+ * Keep in sync with the exclusion note on `UI_MODULES`.
  */
 const INTENTIONALLY_NOT_COPIED = [
   // Package barrel for the (private) workspace package build — consumers
@@ -52,7 +59,7 @@ function walkFiles(dir: string, root: string, acc: string[] = []): string[] {
 }
 
 describe('UI source manifest', () => {
-  const manifestPaths = getUiSourceFilePaths();
+  const manifestPaths = getAllUiSourceFilePaths();
   const actualPaths = walkFiles(uiSrcRoot, uiSrcRoot).filter(
     (path) => !path.includes('.test.') && !isExcluded(path)
   );
@@ -67,7 +74,28 @@ describe('UI source manifest', () => {
     expect(uncovered).toEqual([]);
   });
 
-  it('has no duplicate entries', () => {
+  it('has no duplicate entries across the union', () => {
     expect(new Set(manifestPaths).size).toBe(manifestPaths.length);
+  });
+
+  it('assigns every file to exactly one module (pairwise disjoint)', () => {
+    const seen = new Map<string, string>();
+    const collisions: string[] = [];
+    for (const moduleName of UI_MODULE_NAMES) {
+      for (const path of getModuleSourceFilePaths(moduleName)) {
+        const owner = seen.get(path);
+        if (owner) {
+          collisions.push(`${path} in both "${owner}" and "${moduleName}"`);
+        } else {
+          seen.set(path, moduleName);
+        }
+      }
+    }
+    expect(collisions).toEqual([]);
+  });
+
+  it('has a non-empty core module', () => {
+    expect(UI_MODULE_NAMES).toContain('core');
+    expect(getModuleSourceFilePaths('core').length).toBeGreaterThan(0);
   });
 });

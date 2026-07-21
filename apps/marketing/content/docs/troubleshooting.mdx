@@ -28,6 +28,14 @@ See [Next.js Integration](/docs/nextjs) and the reference implementation in `app
 
 `init` requires a working shadcn setup (`components.json`). It will print remediation steps; set up shadcn first, then re-run. It also checks for `@better-tables/core`, `@better-tables/adapters-drizzle`, and UI runtime deps (`zustand`, `@dnd-kit/*`) and offers to install them. Invoke as `bunx @better-tables/cli init`. Flags: `--skip-shadcn`, `-y`, `--components-path`, `--cwd` — see [UI & CLI](/docs/ui-and-cli).
 
+## Bulk actions don't render
+
+The actions toolbar is an opt-in [module](/docs/ui-and-cli#modules). If you pass `actions` but the toolbar never appears, either the module isn't added or the slot isn't wired — the table warns once in dev:
+
+> `actions` were provided but no `slots.actionsToolbar` is set, so the bulk-actions toolbar will not render. Install the actions module (`bunx better-tables add actions`) and pass `slots={{ actionsToolbar: ActionsToolbar }}`.
+
+Run `bunx @better-tables/cli add actions`, then pass `slots={{ actionsToolbar: ActionsToolbar }}` (imported from the copied `table/actions-toolbar`). Row selection itself is core and still turns on whenever `actions` is non-empty — only the toolbar needs the module. See [Selection & actions](/docs/selection-and-actions#bulk-actions).
+
 ## An editable cell renders read-only
 
 Save resolution walks a fixed order (see [Inline editing](/docs/inline-editing#save-resolution)) and falls back to read-only, logging **one dev `console.warn` per column** explaining which condition failed. Check, in order: `editing={false}` on the table, missing/false `editable` config (`when(row)` returning false), and — for the adapter path — `adapter.meta.features.update`, an `updateRecord` implementation, a resolvable write target, and a row id (`rowConfig.getId` or an `id` field).
