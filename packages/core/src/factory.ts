@@ -127,10 +127,18 @@ export function betterTables<TAdapter extends object>(
     // in registration (array) order, threading their return value forward. A
     // throwing hook rejects the fetch (never swallowed). When `plugins` is
     // empty, both loops are no-ops, so the no-plugin path is unchanged.
+    //
+    // `primaryTable` is REASSERTED after each `beforeFetch`: table scoping is
+    // the instance layer's invariant (the caller can't override it either --
+    // `TableScopedFetchDataParams` omits it), so a plugin that returns a fresh
+    // params object without spreading it must not be able to drop the target.
     let fetchParams: FetchDataParams = { ...params, primaryTable: table.tableName };
     for (const plugin of plugins) {
       if (plugin.beforeFetch) {
-        fetchParams = await plugin.beforeFetch({ params: fetchParams, table });
+        fetchParams = {
+          ...(await plugin.beforeFetch({ params: fetchParams, table })),
+          primaryTable: table.tableName,
+        };
       }
     }
 

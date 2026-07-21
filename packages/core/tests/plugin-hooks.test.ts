@@ -185,6 +185,26 @@ describe('plugin fetch hooks', () => {
     expect(adapter.lastParams?.columns).toEqual(['name']);
   });
 
+  it('keeps primaryTable pinned even when beforeFetch returns a bare params object', async () => {
+    const adapter = createAdapter();
+    // This plugin does NOT spread `params` — it returns a fresh object. The
+    // instance must still scope the fetch to the table (invariant, not the
+    // plugin's responsibility).
+    const clobber: TableDefPlugin = {
+      name: 'clobber',
+      beforeFetch: () => ({ search: 'only-this' }),
+    };
+    const tables = betterTables({ database: adapter, plugins: [clobber] });
+    const usersTable = defineTable<typeof tables>()('users', (t) => ({
+      columns: [t.text('name')],
+    }));
+
+    await tables.fetchData(usersTable, { pagination: { page: 1, limit: 20 } });
+
+    expect(adapter.lastParams?.primaryTable).toBe('users');
+    expect(adapter.lastParams?.search).toBe('only-this');
+  });
+
   it('propagates a throwing hook (never swallowed)', async () => {
     const adapter = createAdapter();
     const boom: TableDefPlugin = {

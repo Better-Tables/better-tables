@@ -53,9 +53,22 @@ const tables = betterTables({
     logPlugin({ onFetch: ({ table, rowCount, total }) => track(table, rowCount, total) }),
     {
       name: 'only-active',
+      // AND `activeFilter` onto whatever filters are present — preserving an
+      // existing group (a bare `[]` fallback would silently drop an OR tree).
       beforeFetch: ({ params }) => ({
         ...params,
-        filters: [...(Array.isArray(params.filters) ? params.filters : []), activeFilter],
+        filters: {
+          kind: 'group',
+          logic: 'and',
+          children: [
+            ...(Array.isArray(params.filters)
+              ? params.filters
+              : params.filters
+                ? [params.filters]
+                : []),
+            activeFilter,
+          ],
+        },
       }),
     },
   ],

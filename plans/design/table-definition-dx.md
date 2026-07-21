@@ -320,22 +320,29 @@ per-user later.
 > seam).
 
 **Recommendation:** an array on the config (`plugins: [csvExport()]`),
-Better-Auth parity, with a minimal interface:
+Better-Auth parity. The interface **as landed (plan 049)** — hooks are flat and
+typed (not nested under `hooks`, not `unknown`):
 
 ```typescript
 interface TableDefPlugin {
   name: string;
-  // Capability contributions: e.g. { aggregates: ['count','sum'] } merged
-  // into AdapterMeta (ties to plan 006's capability extension).
-  capabilities?: Record<string, unknown>;
-  // Lifecycle hooks into the fetch path — sketch only, exact signature
-  // deferred to whichever plan implements the query pipeline hook points.
-  hooks?: {
-    beforeFetch?: (params: unknown) => unknown | Promise<unknown>;
-    afterFetch?: (result: unknown) => unknown | Promise<unknown>;
-  };
+  // Fetch-lifecycle hooks (EXECUTED — plan 049). Run in array order around
+  // `tables.fetchData`; a throwing hook fails the fetch.
+  beforeFetch?(ctx: PluginBeforeFetchContext): FetchDataParams | Promise<FetchDataParams>;
+  afterFetch?(
+    ctx: PluginAfterFetchContext
+  ): FetchDataResult<unknown> | Promise<FetchDataResult<unknown>>;
+  // Escape hatch for plugin-specific methods/capabilities (e.g. an `export()`
+  // method, or `{ aggregates: [...] }` capability declarations later).
+  [key: string]: unknown;
 }
 ```
+
+The original sketch nested these under a `hooks` object with `unknown`
+parameters and reserved a `capabilities?` field; the landed shape flattens the
+hooks, types them against the real fetch surface, and folds
+capability-style extras into the `[key: string]` escape hatch (a dedicated
+`capabilities?` field can return if a plugin needs a structured one).
 
 Two concrete, repo-grounded motivating examples:
 

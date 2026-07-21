@@ -5,9 +5,10 @@
  * exporting all builders, managers, types, and utilities needed to create powerful,
  * performant, and customizable data tables.
  *
- * The library is organized into four main modules:
+ * The library is organized into these main modules:
  * - **Builders**: Fluent API for creating column definitions
  * - **Managers**: State management for filters, pagination, sorting, selection, and virtualization
+ * - **Plugins**: Core-tier data hooks (`beforeFetch`/`afterFetch`) for `betterTables({ plugins })`
  * - **Types**: TypeScript definitions for all table-related interfaces and types
  * - **Utils**: Utility functions for common operations
  *
