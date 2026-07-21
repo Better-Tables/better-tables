@@ -4,8 +4,6 @@ import type {
   EmptyStateConfig,
   EmptyStateProps,
   ErrorStateConfig,
-  ExportConfig,
-  LoadingStateConfig,
   RowConfig,
   TableAdapter,
   TableConfig,
@@ -94,14 +92,6 @@ describe('Table Types', () => {
             columns: ['name', 'email'],
           },
         ],
-        defaultFilters: [
-          {
-            columnId: 'name',
-            type: 'text',
-            operator: 'contains',
-            values: [''],
-          },
-        ],
       };
 
       expectTypeOf(tableConfig.id).toBeString();
@@ -116,37 +106,30 @@ describe('Table Types', () => {
         filtering: true,
         sorting: true,
         pagination: true,
-        export: true,
-        columnResizing: false,
         columnReordering: false,
         rowSelection: true,
-        virtualScrolling: false,
-        realTimeUpdates: false,
         columnVisibility: true,
-        rowExpansion: true,
       };
 
       for (const [_key, value] of Object.entries(features)) {
         expect(typeof value).toBe('boolean');
       }
     });
-  });
 
-  describe('ExportConfig', () => {
-    it('should configure export options', () => {
-      const exportConfig: ExportConfig = {
-        formats: ['csv', 'json', 'excel'],
-        defaultFormat: 'csv',
-        includeHiddenColumns: false,
-        customHandler: async (_format, _data) => {
-          // Export as format
-        },
+    it('rejects the reserved flags removed in 0.6 (plan 057)', () => {
+      // The dead reserved surface (bulkActions/export/columnResizing/
+      // virtualScrolling/realTimeUpdates/rowExpansion) was removed outright.
+      // These pins fail to compile if any flag is silently reintroduced.
+      const virtualization: TableFeatures = {
+        // @ts-expect-error virtualScrolling was removed — use the `virtualized` prop
+        virtualScrolling: true,
       };
-
-      expectTypeOf(exportConfig.formats).toEqualTypeOf<('csv' | 'json' | 'excel')[] | undefined>();
-      expectTypeOf(exportConfig.defaultFormat).toEqualTypeOf<
-        'csv' | 'json' | 'excel' | undefined
-      >();
+      const exporting: TableFeatures = {
+        // @ts-expect-error the `export` feature flag was removed (export UI is plan 050)
+        export: true,
+      };
+      expect(virtualization).toBeDefined();
+      expect(exporting).toBeDefined();
     });
   });
 
@@ -187,18 +170,6 @@ describe('Table Types', () => {
       expectTypeOf(emptyConfig.component).toMatchTypeOf<
         React.ComponentType<EmptyStateProps> | undefined
       >();
-    });
-  });
-
-  describe('LoadingStateConfig', () => {
-    it('should configure loading state', () => {
-      const loadingConfig: LoadingStateConfig = {
-        message: 'Loading data...',
-        component: () => null,
-      };
-
-      expectTypeOf(loadingConfig.message).toEqualTypeOf<string | undefined>();
-      expectTypeOf(loadingConfig.component).toMatchTypeOf<React.ComponentType | undefined>();
     });
   });
 
@@ -279,7 +250,6 @@ describe('Table Types', () => {
           filtering: true,
           sorting: true,
           pagination: true,
-          export: true,
           rowSelection: true,
         },
         pagination: {
@@ -308,10 +278,6 @@ describe('Table Types', () => {
             },
           },
         ],
-        exportOptions: {
-          formats: ['csv', 'json'],
-          defaultFormat: 'csv',
-        },
         rowConfig: {
           getId: (_row) => _row.id,
           isSelectable: (row) => row.inStock,
@@ -320,13 +286,6 @@ describe('Table Types', () => {
         emptyState: {
           title: 'No products found',
           description: 'Add products or adjust filters',
-        },
-        theme: {
-          name: 'default',
-          colors: {
-            primary: '#007bff',
-            secondary: '#6c757d',
-          },
         },
       };
 

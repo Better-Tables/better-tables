@@ -17,6 +17,10 @@
       "inputs": ["src/**/*.tsx", "src/**/*.ts", "tests/**/*.ts", "tests/**/*.tsx"]
     },
     "typecheck": {
+      "dependsOn": ["build", "^build"],
+      "outputs": []
+    },
+    "@better-tables/site#typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
     },

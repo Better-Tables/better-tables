@@ -149,22 +149,3 @@ export interface TableAction<TData = unknown> {
   /** Additional metadata for the action */
   meta?: Record<string, unknown>;
 }
-
-/**
- * Configuration for table actions system.
- *
- * Provides global settings for the actions feature.
- */
-export interface ActionsConfig {
-  /** Whether to show selected count in the toolbar */
-  showSelectedCount?: boolean;
-
-  /** Custom text for selected count (supports {count} placeholder) */
-  selectedCountText?: string;
-
-  /** Whether to show toast notifications on action completion */
-  showToastNotifications?: boolean;
-
-  /** Custom toast duration in milliseconds */
-  toastDuration?: number;
-}

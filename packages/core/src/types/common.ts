@@ -34,64 +34,6 @@ export interface BaseConfig {
 }
 
 /**
- * Theme configuration for table components.
- *
- * Provides comprehensive theming support including colors, CSS classes,
- * and component-specific overrides for consistent visual styling.
- *
- * @example
- * ```typescript
- * const theme: TableTheme = {
- *   name: 'dark',
- *   className: 'table-dark',
- *   colors: {
- *     primary: '#3b82f6',
- *     secondary: '#64748b',
- *     success: '#10b981',
- *     warning: '#f59e0b',
- *     error: '#ef4444'
- *   },
- *   components: {
- *     table: { borderColor: '#374151' },
- *     filter: { backgroundColor: '#1f2937' }
- *   }
- * };
- * ```
- */
-export interface TableTheme {
-  /** Theme identifier name */
-  name?: string;
-  /** CSS class name to apply to themed elements */
-  className?: string;
-  /** Color palette definitions */
-  colors?: {
-    /** Primary brand color */
-    primary?: string;
-    /** Secondary accent color */
-    secondary?: string;
-    /** Success state color */
-    success?: string;
-    /** Warning state color */
-    warning?: string;
-    /** Error state color */
-    error?: string;
-    /** Additional custom colors */
-    [key: string]: string | undefined;
-  };
-  /** Component-specific theme overrides */
-  components?: {
-    /** Table-specific theme properties */
-    table?: Record<string, unknown>;
-    /** Filter-specific theme properties */
-    filter?: Record<string, unknown>;
-    /** Pagination-specific theme properties */
-    pagination?: Record<string, unknown>;
-    /** Additional component themes */
-    [key: string]: Record<string, unknown> | undefined;
-  };
-}
-
-/**
  * Icon component type definition.
  *
  * Standardizes the interface for icon components used throughout the table,

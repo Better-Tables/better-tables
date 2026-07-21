@@ -15,7 +15,6 @@ import type {
   SortingConfig,
   SortingParams,
   SortingState,
-  TableTheme,
 } from '../../src/types';
 
 describe('Utility Types', () => {
@@ -128,32 +127,6 @@ describe('Utility Types', () => {
       expectTypeOf(config.id).toBeString();
       expectTypeOf(config.name).toEqualTypeOf<string | undefined>();
       expectTypeOf(config.meta).toEqualTypeOf<Record<string, unknown> | undefined>();
-    });
-
-    it('should type TableTheme correctly', () => {
-      const theme: TableTheme = {
-        name: 'dark',
-        className: 'dark-theme',
-        colors: {
-          primary: '#1a1a1a',
-          secondary: '#2a2a2a',
-          success: '#00ff00',
-          warning: '#ffff00',
-          error: '#ff0000',
-          customColor: '#custom',
-        },
-        components: {
-          table: { borderRadius: '8px' },
-          filter: { padding: '16px' },
-          pagination: { gap: '8px' },
-          customComponent: { margin: '0' },
-        },
-      };
-
-      expectTypeOf(theme.colors).toMatchTypeOf<Record<string, string | undefined> | undefined>();
-      expectTypeOf(theme.components).toMatchTypeOf<
-        Record<string, Record<string, unknown> | undefined> | undefined
-      >();
     });
 
     it('should type IconComponent correctly', () => {

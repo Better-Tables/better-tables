@@ -114,8 +114,4 @@ See [Inline editing](/docs/inline-editing) for the save-resolution order.
 
 Turning `pagination` off renders every row — pair with `virtualized` for big datasets.
 
-The `TableFeatures` type also declares `bulkActions`, `export`, `columnResizing`, `virtualScrolling`, `realTimeUpdates`, and `rowExpansion` — those flags are contract-only today; the copied component doesn't read them (bulk actions render whenever `actions` is non-empty and rows are selected, and virtualization is the `virtualized` prop).
-
-## Contract-only props
-
-Because `BetterTableProps` extends the core `TableConfig`, a few more fields typecheck but are not read by the copied component yet: `defaultFilters` (use `initialFilters`), `exportOptions`, `actionsConfig`, `theme`, and `loadingState` (use the `loading` boolean). The same goes for the `search` param on `fetchData` — declared on the adapter contract, not consumed by any first-party code. Treat all of these as reserved surface, not working features.
+Those are the only feature flags. Bulk-action controls appear for selected rows when `actions` is non-empty and at least one action is visible (`isVisible` can hide them) — there's no `bulkActions` flag — and virtualization is the `virtualized` prop, not a feature flag. Initial filters use the `initialFilters` prop and the loading state (skeleton rows) uses the `loading` boolean prop.
