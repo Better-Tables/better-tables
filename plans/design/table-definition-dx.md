@@ -308,23 +308,41 @@ per-user later.
 
 ### 5. Plugins
 
+> **Status update (plan 049, landed):** the fetch-lifecycle hooks below are no
+> longer a sketch — `TableDefPlugin` now models `beforeFetch(ctx)` /
+> `afterFetch(ctx)` (flat on the plugin, not nested under `hooks`), and
+> `tables.fetchData` executes them in array order around the adapter call
+> (`packages/core/src/factory.ts`). The first real plugin, `logPlugin()`,
+> ships in `packages/core/src/plugins/`. `capabilities` and additional hook
+> points (facet/write/per-row) remain deliberately deferred until a second
+> real plugin validates a second shape. `csvExport()`/`savedFilters()` below
+> are still illustrative future plugins (050 builds `csvExport()` on this
+> seam).
+
 **Recommendation:** an array on the config (`plugins: [csvExport()]`),
-Better-Auth parity, with a minimal interface:
+Better-Auth parity. The interface **as landed (plan 049)** — hooks are flat and
+typed (not nested under `hooks`, not `unknown`):
 
 ```typescript
 interface TableDefPlugin {
   name: string;
-  // Capability contributions: e.g. { aggregates: ['count','sum'] } merged
-  // into AdapterMeta (ties to plan 006's capability extension).
-  capabilities?: Record<string, unknown>;
-  // Lifecycle hooks into the fetch path — sketch only, exact signature
-  // deferred to whichever plan implements the query pipeline hook points.
-  hooks?: {
-    beforeFetch?: (params: unknown) => unknown | Promise<unknown>;
-    afterFetch?: (result: unknown) => unknown | Promise<unknown>;
-  };
+  // Fetch-lifecycle hooks (EXECUTED — plan 049). Run in array order around
+  // `tables.fetchData`; a throwing hook fails the fetch.
+  beforeFetch?(ctx: PluginBeforeFetchContext): FetchDataParams | Promise<FetchDataParams>;
+  afterFetch?(
+    ctx: PluginAfterFetchContext
+  ): FetchDataResult<unknown> | Promise<FetchDataResult<unknown>>;
+  // Escape hatch for plugin-specific methods/capabilities (e.g. an `export()`
+  // method, or `{ aggregates: [...] }` capability declarations later).
+  [key: string]: unknown;
 }
 ```
+
+The original sketch nested these under a `hooks` object with `unknown`
+parameters and reserved a `capabilities?` field; the landed shape flattens the
+hooks, types them against the real fetch surface, and folds
+capability-style extras into the `[key: string]` escape hatch (a dedicated
+`capabilities?` field can return if a plugin needs a structured one).
 
 Two concrete, repo-grounded motivating examples:
 
@@ -339,9 +357,18 @@ Two concrete, repo-grounded motivating examples:
 2. **Saved filter presets.** Listed on the README's roadmap (not yet
    implemented anywhere in `packages/core` as of this scan). A
    `savedFilters()` plugin would own persistence (where presets are stored)
-   and expose `tables.plugins.savedFilters.list()/.save()/.apply()`,
-   operating on the `FilterState[]` shape already defined in
-   `packages/core/src/types/filter.ts`.
+   and expose `list()/.save()/.apply()`, operating on the `FilterState[]`
+   shape already defined in `packages/core/src/types/filter.ts`.
+
+> **Access under the landed shape (plan 049):** `tables.plugins` is a plain
+> `readonly TableDefPlugin[]`, and a plugin's own methods live behind the
+> `[key: string]: unknown` escape hatch (so they read as `unknown`). So the
+> `tables.plugins.csvExport.download()` namespace access sketched above does
+> NOT work as-is — a consumer either retains the concrete plugin object
+> (`const csv = csvExport(); betterTables({ plugins: [csv] }); csv.download()`)
+> or a later plan adds a typed, name-keyed plugin registry
+> (`tables.plugin('csvExport')`). Plan 050 decides the ergonomic surface for
+> its `csvExport()`; the hook seam itself does not require one.
 
 **Trade-off:** this is explicitly a sketch, not a committed interface —
 plugins are not this design's critical path (per the plan). The risk of

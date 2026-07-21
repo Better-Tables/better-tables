@@ -28,14 +28,66 @@ import type { AdapterTableTypes, Paths, SchemaAwareAdapter, SchemaOf } from './p
 // ============================================================================
 
 /**
- * A Better Tables plugin (Better-Auth-style: an array on the instance
- * config). Capability contributions and fetch-lifecycle hooks are SKETCHED
- * (not modeled) here -- see the design doc Step 1 decision 5. Plugins are
- * not this plan's critical path; the config seam is stored and passed
- * through, but no hook execution happens yet (deferred, per plan 018 scope).
+ * Context passed to a plugin's {@link TableDefPlugin.beforeFetch} hook.
+ *
+ * `params` is the FULL adapter params (with `primaryTable` already injected by
+ * the table-scoped fetch path), so a plugin sees exactly what would hit the
+ * adapter and can return a modified copy.
+ */
+export interface PluginBeforeFetchContext {
+  /** The params about to be sent to the adapter (primaryTable injected). */
+  params: FetchDataParams;
+  /** The table definition the fetch is scoped to. */
+  table: TableDefinition<string, unknown>;
+}
+
+/**
+ * Context passed to a plugin's {@link TableDefPlugin.afterFetch} hook. `params`
+ * is the (possibly `beforeFetch`-modified) params that produced `result`.
+ */
+export interface PluginAfterFetchContext {
+  /** The params that produced `result` (after any `beforeFetch` edits). */
+  params: FetchDataParams;
+  /** The adapter's result — may be replaced by returning a new one. */
+  result: FetchDataResult<unknown>;
+  /** The table definition the fetch was scoped to. */
+  table: TableDefinition<string, unknown>;
+}
+
+/**
+ * A Better Tables plugin (Better-Auth-style: an array on the instance config).
+ *
+ * The fetch-lifecycle hooks EXECUTE (plan 049): the table-scoped fetch path
+ * (`tables.fetchData`) runs each plugin's `beforeFetch` in registration order
+ * (threading the possibly-modified params forward), calls the adapter, then
+ * runs each `afterFetch` (threading the possibly-modified result). Hooks are
+ * async; a throwing hook fails the fetch (never swallowed). Additional hook
+ * points (facet, write, per-row) are deliberately deferred until a second real
+ * plugin validates a second shape — do not add them speculatively.
+ *
+ * The `[key: string]: unknown` escape hatch lets a plugin expose its own
+ * methods/capabilities (e.g. an `export()` method) beyond the hooks.
  */
 export interface TableDefPlugin {
   name: string;
+  /**
+   * Runs before the adapter fetch. Return the params to use (a modified copy
+   * to change the query, or the same `ctx.params` to pass through).
+   */
+  beforeFetch?(ctx: PluginBeforeFetchContext): FetchDataParams | Promise<FetchDataParams>;
+  /**
+   * Runs after the adapter fetch. Return the result to use (a modified copy to
+   * transform the output, or the same `ctx.result` to pass through).
+   *
+   * Rows are typed `unknown`: a plugin is registered once at the instance level
+   * (`betterTables({ plugins })`) and runs across every table, so it cannot be
+   * typed to any single table's row. A plugin that rewrites rows is trusted to
+   * return a result still compatible with the fetched table's row type — the
+   * table-scoped `tables.fetchData` re-exposes the result as that row type.
+   */
+  afterFetch?(
+    ctx: PluginAfterFetchContext
+  ): FetchDataResult<unknown> | Promise<FetchDataResult<unknown>>;
   [key: string]: unknown;
 }
 
@@ -56,7 +108,10 @@ export interface BetterTablesConfig<TAdapter extends object = SchemaAwareAdapter
   database: TAdapter;
   /** Instance-wide defaults. */
   defaults?: BetterTablesDefaults;
-  /** Plugin seam -- stored, not yet executed (hooks are a follow-up). */
+  /**
+   * Plugins whose `beforeFetch`/`afterFetch` hooks run around the table-scoped
+   * fetch path, in array order (plan 049). See {@link TableDefPlugin}.
+   */
   plugins?: TableDefPlugin[];
 }
 
