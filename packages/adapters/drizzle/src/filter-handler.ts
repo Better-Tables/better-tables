@@ -426,6 +426,23 @@ export class FilterHandler {
               false
             );
           }
+
+          // Reaching here means core validation FAILED yet we have enough values
+          // to build a predicate anyway — the operator is over-specified (surplus
+          // values that translation silently ignores, e.g. `isEmpty` or a
+          // single-value operator handed extra values). It still applies
+          // correctly, so `'skip'` keeps it (no widening, unchanged behavior).
+          // But `'throw'` promises to reject EVERY leaf core rejects, so surface
+          // it — a caller in strict mode wants malformed filters flagged, not
+          // quietly trimmed. `nullOnlyIntent` is a real match-null request, not a
+          // tolerated malformation, so it is exempt.
+          if (this.onInvalidFilter === 'throw' && !nullOnlyIntent) {
+            return this.handleDroppedLeaf(
+              filter,
+              `operator "${filter.operator}" received values that do not match its expected shape for type "${filter.type ?? 'unknown'}".`,
+              false
+            );
+          }
         } else {
           // The operator is not valid for this filter's type (unknown operator,
           // or one this adapter does not advertise for the type).

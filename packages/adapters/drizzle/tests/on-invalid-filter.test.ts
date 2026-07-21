@@ -152,6 +152,27 @@ describe('onInvalidFilter — FilterHandler', () => {
       expect(() => handler.handleCrossTableFilters(nullOnly, 'users')).not.toThrow();
     });
   });
+
+  describe('over-specified operators (surplus values core rejects)', () => {
+    // `contains` takes one value; a second is surplus. Core rejects it, but
+    // translation still builds a valid predicate from the first value — so the
+    // leaf applies rather than being dropped. This is the gap that let a
+    // core-invalid leaf slip past 'throw'.
+    const overSpecified: FilterState[] = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['a', 'surplus'] },
+    ];
+
+    it("'skip' still applies it (surplus ignored — unchanged, no regression)", () => {
+      const { conditions } = makeHandler('skip').handleCrossTableFilters(overSpecified, 'users');
+      expect(conditions).toHaveLength(1);
+    });
+
+    it("'throw' now rejects it, so strict mode rejects every core-invalid leaf", () => {
+      expect(() => makeHandler('throw').handleCrossTableFilters(overSpecified, 'users')).toThrow(
+        QueryError
+      );
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

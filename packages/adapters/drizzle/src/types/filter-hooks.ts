@@ -18,9 +18,11 @@ import type { ColumnOrExpression } from './core';
  *   URL/UI filter state (plan 038). An invalid operator still logs a
  *   `[better-tables]` warning; genuinely incomplete values stay silent (they
  *   are normal mid-edit state). This is the historical behavior.
- * - `'throw'`: raise a `QueryError` instead of dropping. Use this when filters
- *   are constructed programmatically and every one MUST apply — a dropped
- *   scoping filter is a data-exposure bug, not a UI convenience.
+ * - `'throw'`: raise a `QueryError` for any leaf that fails validation —
+ *   whether it would be dropped (invalid operator, missing values) or leniently
+ *   accepted with surplus values core rejects. Use this when filters are
+ *   constructed programmatically and every one MUST apply as written — a
+ *   dropped scoping filter is a data-exposure bug, not a UI convenience.
  *
  * The legitimate "match null rows only" intent (`includeNull` with empty
  * values) is a real condition, not a drop, and is unaffected by either mode.

@@ -42,7 +42,15 @@ import { SQLiteQueryBuilder } from './sqlite-query-builder';
  *
  * @template TDriver - The database driver type
  * @param driver - The database driver identifier ('postgres', 'mysql', or 'sqlite')
- * @returns A factory function that creates a query builder for the specific driver
+ * @returns A factory function `(db, schema, relationshipManager, hooks?, onInvalidFilter?)`
+ *   that creates a query builder for the specific driver. Its parameters:
+ *   - `db` — the Drizzle database instance for the driver
+ *   - `schema` — the table schema (relations filtered out)
+ *   - `relationshipManager` — resolves relationship/join paths
+ *   - `hooks` — optional {@link FilterHandlerHooks} for customizing filter SQL
+ *   - `onInvalidFilter` — optional {@link InvalidFilterBehavior}; `'skip'`
+ *     (default) drops an untranslatable filter leaf, `'throw'` raises a
+ *     `QueryError`. Threaded straight through to the `FilterHandler`.
  *
  * @example
  * ```typescript
@@ -51,13 +59,15 @@ import { SQLiteQueryBuilder } from './sqlite-query-builder';
  * const queryBuilder = createQueryBuilder(
  *   nodePgDb, // NodePgDatabase, PostgresJsDatabase, or NeonHttpDatabase
  *   schema,
- *   relationshipManager
+ *   relationshipManager,
+ *   undefined, // no filter hooks
+ *   'throw' // reject filters that cannot be translated instead of dropping them
  * );
  * ```
  *
  * @throws {Error} If an unsupported driver is provided
  *
- * @since 1.0.0 (expanded to support all driver variants in 1.1.0)
+ * @since 1.0.0 (expanded to support all driver variants in 1.1.0; `onInvalidFilter` added in 1.2.0)
  */
 export function getQueryBuilderFactory<TDriver extends DatabaseDriver>(
   driver: TDriver
