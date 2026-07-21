@@ -52,6 +52,8 @@ export * from './factory';
 export * from './lib';
 // Managers
 export * from './managers';
+// Plugins (core-tier hooks)
+export * from './plugins';
 // Stores
 export * from './stores';
 // Types

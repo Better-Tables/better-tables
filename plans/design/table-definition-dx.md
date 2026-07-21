@@ -308,6 +308,17 @@ per-user later.
 
 ### 5. Plugins
 
+> **Status update (plan 049, landed):** the fetch-lifecycle hooks below are no
+> longer a sketch — `TableDefPlugin` now models `beforeFetch(ctx)` /
+> `afterFetch(ctx)` (flat on the plugin, not nested under `hooks`), and
+> `tables.fetchData` executes them in array order around the adapter call
+> (`packages/core/src/factory.ts`). The first real plugin, `logPlugin()`,
+> ships in `packages/core/src/plugins/`. `capabilities` and additional hook
+> points (facet/write/per-row) remain deliberately deferred until a second
+> real plugin validates a second shape. `csvExport()`/`savedFilters()` below
+> are still illustrative future plugins (050 builds `csvExport()` on this
+> seam).
+
 **Recommendation:** an array on the config (`plugins: [csvExport()]`),
 Better-Auth parity, with a minimal interface:
 

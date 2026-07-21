@@ -48,7 +48,12 @@ import {
   type CellEditAction,
   type CellEditPolicy,
 } from './lib/cell-edit-core';
-import type { FacetQueryParams, InferredColumnSpec, TableAdapter } from './types/adapter';
+import type {
+  FacetQueryParams,
+  FetchDataParams,
+  InferredColumnSpec,
+  TableAdapter,
+} from './types/adapter';
 import type { ColumnDefinition, ColumnType } from './types/column';
 import type {
   BetterTablesConfig,
@@ -113,10 +118,29 @@ export function betterTables<TAdapter extends object>(
     table: TableDefinition<string, unknown>,
     params?: TableScopedFetchDataParams
   ) => {
-    return asTableAdapter(config.database).fetchData({
-      ...params,
-      primaryTable: table.tableName,
-    });
+    const adapter = asTableAdapter(config.database);
+    const plugins = instance.plugins;
+
+    // Full adapter params (primaryTable injected). Plugin hooks (plan 049)
+    // wrap this one choke point: `beforeFetch` may rewrite the params before
+    // the adapter sees them, `afterFetch` may transform the result. Both run
+    // in registration (array) order, threading their return value forward. A
+    // throwing hook rejects the fetch (never swallowed). When `plugins` is
+    // empty, both loops are no-ops, so the no-plugin path is unchanged.
+    let fetchParams: FetchDataParams = { ...params, primaryTable: table.tableName };
+    for (const plugin of plugins) {
+      if (plugin.beforeFetch) {
+        fetchParams = await plugin.beforeFetch({ params: fetchParams, table });
+      }
+    }
+
+    let result = await adapter.fetchData(fetchParams);
+    for (const plugin of plugins) {
+      if (plugin.afterFetch) {
+        result = await plugin.afterFetch({ params: fetchParams, result, table });
+      }
+    }
+    return result;
   }) as unknown as BetterTablesInstance<TAdapter>['fetchData'];
 
   instance.getFacetedValues = (async (

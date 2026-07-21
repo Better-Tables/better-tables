@@ -40,6 +40,32 @@ Prefer these entry points everywhere:
 
 For tables without a database — playgrounds, tests, client-only arrays — `memoryAdapter(rows)` runs the same pipeline in memory, and `defineTableRow<Row>()` defines a table from hand-built columns. See [Custom adapters](/docs/adapters/custom) and [Columns](/docs/columns#standalone-columns-no-schema).
 
+## Plugins (data hooks)
+
+`betterTables({ plugins: [...] })` takes **plugins** — instance-level data hooks that wrap the query path. Each plugin can implement `beforeFetch` (rewrite the params before the adapter sees them) and/or `afterFetch` (transform the result). They run in array order around `tables.fetchData`; a throwing hook fails the fetch (nothing is swallowed), and the no-plugin path is unaffected.
+
+```ts
+import { betterTables, logPlugin } from '@better-tables/core';
+
+const tables = betterTables({
+  database: adapter,
+  plugins: [
+    logPlugin({ onFetch: ({ table, rowCount, total }) => track(table, rowCount, total) }),
+    {
+      name: 'only-active',
+      beforeFetch: ({ params }) => ({
+        ...params,
+        filters: [...(Array.isArray(params.filters) ? params.filters : []), activeFilter],
+      }),
+    },
+  ],
+});
+```
+
+<Callout>
+**Plugins vs. modules.** Plugins are npm-distributed **data** hooks on `betterTables({ plugins })` (this section). **Modules** are copied **UI** source added with `better-tables add` — see [UI & CLI](/docs/ui-and-cli#modules). Different tiers, kept distinct.
+</Callout>
+
 ## Authoritative demos
 
 Shipped examples live under `apps/marketing` — especially `src/lib/demo/support/` and the routes under [/examples](/examples). Those use the same 0.6 API this handbook teaches.
