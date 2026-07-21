@@ -2,18 +2,18 @@
  * @fileoverview Table configuration and feature types for better-tables setup.
  *
  * This module defines the main table configuration interface along with
- * feature flags, bulk actions, export options, and UI state configurations.
+ * feature flags and UI state configurations.
  *
  * @module types/table
  */
 
 import type { ComponentType } from 'react';
 import type { AutoGroupConfig } from '../utils/auto-group-filters';
-import type { ActionsConfig, TableAction } from './action';
+import type { TableAction } from './action';
 import type { TableAdapter } from './adapter';
 import type { ColumnDefinition } from './column';
-import type { EventHandler, IconComponent, TableTheme } from './common';
-import type { FilterGroup, FilterGroupNode, FilterState } from './filter';
+import type { EventHandler, IconComponent } from './common';
+import type { FilterGroup } from './filter';
 import type { PaginationConfig } from './pagination';
 import type { SortingConfig } from './sorting';
 
@@ -32,13 +32,9 @@ import type { SortingConfig } from './sorting';
  *   name: 'User Management',
  *   columns: userColumns,
  *   groups: filterGroups,
- *   defaultFilters: [{ columnId: 'status', operator: 'equals', values: ['active'] }],
  *   pagination: { defaultPageSize: 20 },
  *   sorting: { enabled: true, multiSort: true },
- *   bulkActions: [deleteAction, exportAction],
- *   exportOptions: { formats: ['csv', 'excel'] },
  *   adapter: userAdapter,
- *   theme: darkTheme,
  *   features: { filtering: true, sorting: true, pagination: true }
  * };
  * ```
@@ -59,12 +55,6 @@ export interface TableConfig<TData = unknown> {
   /** Automatic filter grouping configuration */
   autoGroupFilters?: AutoGroupConfig;
 
-  /**
-   * Default filters to apply on initialization -- a flat array (implicit
-   * AND) or a single {@link FilterGroupNode} tree.
-   */
-  defaultFilters?: FilterState[] | FilterGroupNode;
-
   /** Pagination configuration and options */
   pagination?: PaginationConfig;
 
@@ -74,17 +64,8 @@ export interface TableConfig<TData = unknown> {
   /** Actions available for selected rows */
   actions?: TableAction<TData>[];
 
-  /** Actions configuration and options */
-  actionsConfig?: ActionsConfig;
-
-  /** Export configuration and options */
-  exportOptions?: ExportConfig<TData>;
-
   /** Data adapter for table operations */
   adapter: TableAdapter<TData>;
-
-  /** UI theme and styling configuration */
-  theme?: TableTheme;
 
   /** Feature flags to enable/disable table capabilities */
   features?: TableFeatures;
@@ -94,9 +75,6 @@ export interface TableConfig<TData = unknown> {
 
   /** Empty state configuration and customization */
   emptyState?: EmptyStateConfig;
-
-  /** Loading state configuration and customization */
-  loadingState?: LoadingStateConfig;
 
   /** Error state configuration and customization */
   errorState?: ErrorStateConfig;
@@ -114,14 +92,9 @@ export interface TableConfig<TData = unknown> {
  *   filtering: true,
  *   sorting: true,
  *   pagination: true,
- *   export: true,
- *   columnResizing: true,
  *   columnReordering: false,
  *   rowSelection: true,
- *   virtualScrolling: false,
- *   realTimeUpdates: true,
- *   columnVisibility: true,
- *   rowExpansion: false
+ *   columnVisibility: true
  * };
  * ```
  */
@@ -135,76 +108,17 @@ export interface TableFeatures {
   /** Enable pagination functionality */
   pagination?: boolean;
 
-  /** Enable bulk actions for selected rows */
-  bulkActions?: boolean;
-
-  /** Enable data export functionality */
-  export?: boolean;
-
-  /** Enable column resizing */
-  columnResizing?: boolean;
-
   /** Enable column reordering */
   columnReordering?: boolean;
 
   /** Enable row selection */
   rowSelection?: boolean;
 
-  /**
-   * @deprecated Has no effect — `<BetterTable>` never read this flag. Use the
-   * top-level `virtualized` prop instead, which windows the table's rows under
-   * all the same filtering/sorting/selection/URL-sync machinery:
-   * `<BetterTable table={t} data={rows} virtualized />` (finding 6).
-   */
-  virtualScrolling?: boolean;
-
-  /** Enable real-time data updates */
-  realTimeUpdates?: boolean;
-
   /** Enable column visibility toggle */
   columnVisibility?: boolean;
 
-  /** Enable row expansion functionality */
-  rowExpansion?: boolean;
-
   /** Configuration for header context menu */
   headerContextMenu?: HeaderContextMenuConfig;
-}
-
-/**
- * Export configuration interface.
- *
- * Configures data export options including available formats,
- * custom handlers, and export behavior.
- *
- * @template TData - The type of data being exported
- *
- * @example
- * ```typescript
- * const exportConfig: ExportConfig<User> = {
- *   formats: ['csv', 'excel', 'json'],
- *   defaultFormat: 'csv',
- *   customHandler: async (format, data) => {
- *     if (format === 'custom') {
- *       await customExport(data);
- *     }
- *   },
- *   includeHiddenColumns: false
- * };
- * ```
- */
-export interface ExportConfig<TData = unknown> {
-  /** Available export formats */
-  formats?: ('csv' | 'json' | 'excel')[];
-
-  /** Default export format to use */
-  defaultFormat?: 'csv' | 'json' | 'excel';
-
-  /** Custom export handler for special cases */
-  customHandler?: (format: string, data: TData[]) => void | Promise<void>;
-
-  /** Whether to include hidden columns in exports */
-  includeHiddenColumns?: boolean;
 }
 
 /**
@@ -308,28 +222,6 @@ export interface EmptyStateProps {
 
   /** Function to clear all applied filters */
   onClearFilters: () => void;
-}
-
-/**
- * Loading state configuration interface.
- *
- * Configures the appearance and behavior of the loading state
- * while data is being fetched or processed.
- *
- * @example
- * ```typescript
- * const loadingState: LoadingStateConfig = {
- *   message: 'Loading users...',
- *   component: CustomLoadingSpinner
- * };
- * ```
- */
-export interface LoadingStateConfig {
-  /** Loading message to display */
-  message?: string;
-
-  /** Custom loading component */
-  component?: ComponentType;
 }
 
 /**

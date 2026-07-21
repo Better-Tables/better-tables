@@ -376,7 +376,7 @@ export interface FilterComponentProps<TValue = unknown> {
   /** Column definition */
   column: ColumnDefinition<unknown, TValue>;
   /** Theme configuration */
-  theme?: Record<string, unknown>; // Will be TableTheme
+  theme?: Record<string, unknown>;
 }
 
 /**
@@ -418,5 +418,5 @@ export interface FilterInputProps<TValue = unknown> {
   /** Column definition */
   column: ColumnDefinition<unknown, TValue>;
   /** Theme */
-  theme?: Record<string, unknown>; // Will be TableTheme
+  theme?: Record<string, unknown>;
 }
