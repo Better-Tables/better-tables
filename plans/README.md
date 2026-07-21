@@ -81,9 +81,11 @@ wave are in "Deferred by decision" at the bottom.
 ## Outstanding
 
 Waves A and B are merged; Wave C's feature train (053/054/055) is merged
-(PR #86). Remaining: Wave C fast-follows (048–050), Wave D (056–060), and
-Wave E adapter expansion (061/062). 008 is superseded by 061. All
-2026-07-17 audit findings are planned.
+(PR #86). Wave D's 056/057 are implemented on branch
+`claude/next-implementation-plans-q0nlfu` (PR #99, not yet merged). Remaining:
+Wave C fast-follows (048–050), Wave D (058–060), and Wave E adapter expansion
+(061/062). 008 is superseded by 061. All 2026-07-17 audit findings are
+planned.
 
 ### Wave A — pre-0.6-publish (do these before shipping 0.6)
 

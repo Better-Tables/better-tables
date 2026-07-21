@@ -114,4 +114,4 @@ See [Inline editing](/docs/inline-editing) for the save-resolution order.
 
 Turning `pagination` off renders every row — pair with `virtualized` for big datasets.
 
-Those are the only feature flags. Bulk-action controls appear automatically whenever `actions` is non-empty and rows are selected — there's no `bulkActions` flag — and virtualization is the `virtualized` prop, not a feature flag. Initial filters use the `initialFilters` prop and the loading spinner uses the `loading` boolean prop.
+Those are the only feature flags. Bulk-action controls appear for selected rows when `actions` is non-empty and at least one action is visible (`isVisible` can hide them) — there's no `bulkActions` flag — and virtualization is the `virtualized` prop, not a feature flag. Initial filters use the `initialFilters` prop and the loading state (skeleton rows) uses the `loading` boolean prop.

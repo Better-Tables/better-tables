@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type { ColumnDefinition, FilterState } from '@better-tables/core';
 import { cleanup, render } from '@testing-library/react';
 import { ActiveFilters } from '../../src/components/filters/active-filters';
@@ -58,19 +58,6 @@ function Harness({
 }
 
 describe('ActiveFilters / MemoizedFilterBadge render counts (UI-08)', () => {
-  // `FilterBadge` reads `window.innerWidth` in a mount effect to pick a
-  // dialog-vs-popover shell. A sibling test file that leaves the viewport at a
-  // mobile width would flip `isMobile` false→true on mount here, forcing an
-  // extra render that inflates the icon-based render counts below. Pin a
-  // desktop viewport so these counts are independent of test file order.
-  beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', {
-      configurable: true,
-      writable: true,
-      value: 1024,
-    });
-  });
-
   afterEach(() => {
     cleanup();
   });

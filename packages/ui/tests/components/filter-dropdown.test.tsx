@@ -52,24 +52,16 @@ function Harness({
 }
 
 describe('FilterDropdown (plan 042 step 2)', () => {
-  const setViewport = (value: number) => {
+  beforeEach(() => {
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
       writable: true,
-      value,
+      value: 1024,
     });
-  };
-
-  beforeEach(() => {
-    setViewport(1024);
   });
 
   afterEach(() => {
     cleanup();
-    // The mobile-viewport test below sets innerWidth to 480; restore the
-    // desktop default so the width can't leak into other test files (e.g.
-    // active-filters-render's render-count probes).
-    setViewport(1024);
   });
 
   it('drills into a group and navigates back to the groups overview', () => {
@@ -173,7 +165,11 @@ describe('FilterDropdown (plan 042 step 2)', () => {
   });
 
   it('uses a dialog shell on mobile viewports', () => {
-    setViewport(480);
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: 480,
+    });
 
     render(<Harness onSelect={mock(() => {})} />);
     expect(screen.getByRole('dialog')).toBeDefined();

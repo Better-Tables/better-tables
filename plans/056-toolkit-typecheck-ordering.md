@@ -259,8 +259,10 @@ Next build:
 ```
 
 `@better-tables/site#typecheck` needs only upstream library `dist/` (`^build`)
-— it runs `next typegen && tsc`, it does not consume its own `.next` output —
-so excluding `site#build` removes both the slowdown and the `.source` flake
+— it runs `next typegen && tsc`, consuming the generated `.next` type files
+(which `next typegen` produces itself) but not the production-build artifacts
+`site#build` would emit — so excluding `site#build` removes both the slowdown
+and the `.source` flake
 while preserving the plan's goal (every library package's typecheck runs
 strictly after its own tsdown build). Post-refinement the toolkit ordering is
 unchanged; the graph drops `site#build` and keeps the cheap `cli#build`.
