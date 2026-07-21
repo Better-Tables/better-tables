@@ -40,6 +40,7 @@ export const ticketsTable = defineTable<typeof tables>()('tickets', (t) => ({
 |---|---|
 | `defaultPrimaryTable` | Table for reads when a call provides neither `columns` nor `primaryTable` (required for that case on multi-table schemas — the adapter throws a `SchemaError` instead of guessing) |
 | `defaultMutationTable` | Table for writes on multi-table schemas |
+| `onInvalidFilter` | `'skip'` (default) or `'throw'`. What to do when a filter can't be translated — see [Invalid filters](#invalid-filters) below |
 | `cache` | Query result caching: `{ enabled, ttl, maxSize? }` (LRU, default max 500 entries) |
 | `optimization` | **Reserved / unimplemented** — typed only; join caps and related knobs are not wired at runtime |
 | `batching` | **Reserved / unimplemented** — typed only; the emitter uses fixed batch constants (`batchSize` 50, `maxBatchesPerGroup` 200) |
@@ -77,9 +78,27 @@ Try it live: [/examples/relationship-filtering](/examples/relationship-filtering
 
 `getFacetedValues` / `getMinMaxValues` / `fetchData({ faceted })` power filter option counts and range facets, with self-exclusion handled by the adapter. See the [Facets guide](/docs/facets) and [/examples/facets](/examples/facets).
 
+## Invalid filters
+
+When a filter leaf can't be translated to SQL — an operator that isn't valid for the column's type, or a supported operator with missing/incomplete values — the adapter has to decide between dropping it and failing. Dropping **widens** the result set: under implicit-AND, a discarded predicate reads as "no restriction", so a filter meant to scope rows silently returns everything.
+
+`options.onInvalidFilter` controls this:
+
+- **`'skip'` (default)** — drop the leaf and keep going, so partial URL/UI filter state still fetches. An invalid operator logs a `[better-tables]` warning; genuinely incomplete values stay silent (normal mid-edit state).
+- **`'throw'`** — raise a `QueryError` instead of dropping. Use this when filters are built programmatically and every one *must* apply — a dropped tenant or owner guard is a data-exposure bug, not a UI convenience.
+
+```ts
+// A server-side scoping filter that must never be silently dropped:
+const adapter = drizzleAdapter(db, {
+  options: { defaultPrimaryTable: 'users', onInvalidFilter: 'throw' },
+});
+```
+
+The legitimate "match null rows only" request (`includeNull` with empty values) is a real condition, not a drop, and is unaffected by either mode.
+
 ## Databases
 
-Postgres, MySQL, and SQLite are supported. Peer dependencies are your driver's (`postgres`, `mysql2`, `better-sqlite3`) plus `drizzle-orm`. Integration tests for MySQL/Postgres live under `packages/adapters/drizzle/tests` (optional `.env.local`).
+Postgres, MySQL, and SQLite are supported. Peer dependencies are your driver's (`postgres`, `mysql2`, `better-sqlite3`) plus `drizzle-orm`. Integration tests for MySQL/Postgres live under `packages/adapters/drizzle/tests` and **run in CI against real Postgres and MySQL service containers** (they self-skip locally when no DB URL is set; a CI guard fails the build if those URLs ever go missing so the suites can't silently skip).
 
 ## Performance tuning
 

@@ -19,6 +19,7 @@ import type {
   DatabaseDriver,
   DrizzleDatabase,
   FilterHandlerHooks,
+  InvalidFilterBehavior,
   MySqlDatabaseType,
   PostgresDatabaseType,
   QueryBuilderFactory,
@@ -65,7 +66,8 @@ export function getQueryBuilderFactory<TDriver extends DatabaseDriver>(
     db: DrizzleDatabase<TDriver>,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    hooks?: FilterHandlerHooks
+    hooks?: FilterHandlerHooks,
+    onInvalidFilter?: InvalidFilterBehavior
   ): BaseQueryBuilder => {
     switch (driver) {
       case 'postgres':
@@ -78,15 +80,28 @@ export function getQueryBuilderFactory<TDriver extends DatabaseDriver>(
           db as PostgresDatabaseType,
           schema,
           relationshipManager,
-          hooks
+          hooks,
+          onInvalidFilter
         );
       case 'mysql':
         // Same reasoning: DrizzleDatabase<'mysql'> = MySqlDatabaseType
-        return new MySQLQueryBuilder(db as MySqlDatabaseType, schema, relationshipManager, hooks);
+        return new MySQLQueryBuilder(
+          db as MySqlDatabaseType,
+          schema,
+          relationshipManager,
+          hooks,
+          onInvalidFilter
+        );
       case 'sqlite':
         // Same reasoning: DrizzleDatabase<'sqlite'> = SQLiteDatabaseType
         // which includes BetterSQLite3Database and LibSQLDatabase
-        return new SQLiteQueryBuilder(db as SQLiteDatabaseType, schema, relationshipManager, hooks);
+        return new SQLiteQueryBuilder(
+          db as SQLiteDatabaseType,
+          schema,
+          relationshipManager,
+          hooks,
+          onInvalidFilter
+        );
       default:
         throw new Error(`Unsupported database driver: ${driver as string}`);
     }

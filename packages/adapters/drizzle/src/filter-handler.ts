@@ -58,8 +58,9 @@ import type {
   ColumnPath,
   DatabaseDriver,
   FilterHandlerHooks,
+  InvalidFilterBehavior,
 } from './types';
-import { QueryError } from './types';
+import { DrizzleAdapterError, QueryError } from './types';
 
 /**
  * Collect every {@link FilterState} leaf out of a `filters` value that may be
@@ -190,18 +191,21 @@ export class FilterHandler {
   private hooks?: FilterHandlerHooks;
   private emitter: DrizzlePredicateEmitter;
   private router: FilterRouter<ColumnOrExpression, SQL | SQLWrapper>;
+  private onInvalidFilter: InvalidFilterBehavior;
 
   constructor(
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
     databaseType: DatabaseDriver,
-    hooks?: FilterHandlerHooks
+    hooks?: FilterHandlerHooks,
+    onInvalidFilter: InvalidFilterBehavior = 'skip'
   ) {
     this.schema = schema;
     this.relationshipManager = relationshipManager;
     if (hooks !== undefined) {
       this.hooks = hooks;
     }
+    this.onInvalidFilter = onInvalidFilter;
     this.emitter = new DrizzlePredicateEmitter(schema, databaseType, hooks);
     this.router = new FilterRouter(this.emitter);
   }
@@ -321,6 +325,44 @@ export class FilterHandler {
   }
 
   /**
+   * Resolve a filter leaf that produced no WHERE condition because it was
+   * malformed. Under `onInvalidFilter: 'throw'` this raises a {@link QueryError};
+   * under `'skip'` (the default) it returns `undefined` so the leaf is dropped,
+   * emitting a value-free `[better-tables]` warning only when the drop widens
+   * results (an invalid operator) rather than for normal mid-edit UI state
+   * (incomplete values).
+   *
+   * @param warnWhenSkipping - whether `'skip'` mode should warn. `true` for the
+   *   result-widening invalid-operator case; `false` for incomplete values,
+   *   where a warning would fire on every keystroke.
+   * @returns always `undefined` (in `'skip'` mode); never returns in `'throw'`.
+   */
+  private handleDroppedLeaf(
+    filter: FilterState,
+    reason: string,
+    warnWhenSkipping: boolean
+  ): undefined {
+    if (this.onInvalidFilter === 'throw') {
+      throw new QueryError(
+        `Filter on "${filter.columnId}" cannot be applied: ${reason} ` +
+          'It was rejected because this adapter is configured with onInvalidFilter: "throw". ' +
+          'Provide a valid operator and values, or set onInvalidFilter to "skip" to drop it instead.',
+        { columnId: filter.columnId, operator: filter.operator, type: filter.type }
+      );
+    }
+    if (warnWhenSkipping) {
+      // Value-free by convention -- never log `filter.values`, matching
+      // `normalizeFilterNode` / `deserializeFiltersFromURL`.
+      // biome-ignore lint/suspicious/noConsole: intentional warning for a dropped filter that widens results
+      console.warn(
+        `[better-tables] Dropped filter on "${filter.columnId}": ${reason} ` +
+          'The query will run WITHOUT this filter and may return more rows than intended.'
+      );
+    }
+    return undefined;
+  }
+
+  /**
    * Validate and build a single filter leaf's condition (plan 017 extracted
    * this from {@link handleCrossTableFilters}'s loop body so both the flat
    * path and {@link buildTreeCondition}'s recursive walk share one leaf
@@ -328,16 +370,12 @@ export class FilterHandler {
    * core/adapter validation rejects it or because {@link buildFilterCondition}
    * itself found no condition to build (e.g. empty values).
    *
-   * Two distinct reasons a leaf is skipped, deliberately treated differently:
+   * A malformed leaf (invalid operator, or incomplete values) is routed through
+   * {@link handleDroppedLeaf}, which either drops it (`onInvalidFilter: 'skip'`,
+   * the default) or throws a {@link QueryError} (`'throw'`) for callers whose
+   * filters must all apply — see {@link InvalidFilterBehavior}.
    *
-   * - **Incomplete values** for an operator this adapter DOES support (the user
-   *   picked a column but has not finished typing). Skipped silently — this is
-   *   normal mid-edit UI state and warning on it would fire on every keystroke.
-   * - **An operator that is not valid for the filter's type.** Also skipped
-   *   (plan 038 keeps partial URL/UI state fetchable) but WARNS, because
-   *   dropping a leaf widens the result set: under implicit-AND the query then
-   *   returns more rows than the caller asked for.
-   *
+   * @throws {QueryError} When `onInvalidFilter: 'throw'` and a leaf is malformed.
    * @throws {Error} Wraps any resolution/build error with the offending
    *   `columnId`, surfacing it instead of silently swallowing it.
    */
@@ -379,8 +417,14 @@ export class FilterHandler {
             !hasValidValues ||
             (expectedCount > 0 && filter.values.some((v) => v === undefined))
           ) {
-            // Skip invalid filters silently - this allows for partial filter states in UI
-            return undefined;
+            // Supported operator, but the values are missing/incomplete. In the
+            // UI this is normal mid-edit state, so `'skip'` drops it silently.
+            // Under `'throw'` it is a malformed programmatic filter and raises.
+            return this.handleDroppedLeaf(
+              filter,
+              `operator "${filter.operator}" requires values that are missing or incomplete.`,
+              false
+            );
           }
         } else {
           // The operator is not valid for this filter's type (unknown operator,
@@ -389,18 +433,14 @@ export class FilterHandler {
           // This is NOT a partial UI state -- it is a malformed filter, and
           // dropping it WIDENS the result set: under implicit-AND a dropped
           // leaf returns MORE rows than asked for, so a scoping filter that is
-          // silently discarded reads as "no restriction". Dropping stays the
-          // behavior (plan 038: partial URL/UI filter state must still fetch),
-          // but it must never be silent.
-          //
-          // Value-free by convention -- never log `filter.values`, matching
-          // `normalizeFilterNode` / `deserializeFiltersFromURL`.
-          // biome-ignore lint/suspicious/noConsole: intentional warning for a dropped filter that widens results
-          console.warn(
-            `[better-tables] Dropped filter on "${filter.columnId}": operator "${filter.operator}" is not valid for type "${filter.type ?? 'unknown'}". ` +
-              'The query will run WITHOUT this filter and may return more rows than intended.'
+          // silently discarded reads as "no restriction". Under `'skip'` it is
+          // dropped with a warning (plan 038: partial URL/UI state must still
+          // fetch); under `'throw'` it raises.
+          return this.handleDroppedLeaf(
+            filter,
+            `operator "${filter.operator}" is not valid for type "${filter.type ?? 'unknown'}".`,
+            true
           );
-          return undefined;
         }
       }
 
@@ -408,7 +448,13 @@ export class FilterHandler {
       // undefined means empty/invalid filter - treat the same as "skip"
       return condition !== undefined && condition !== null ? condition : undefined;
     } catch (error) {
-      // Re-throw the error to surface the issue instead of silently ignoring it
+      // Adapter errors (including a configured `onInvalidFilter: 'throw'`) are
+      // already descriptive and carry a stable `code` — surface them unchanged
+      // instead of flattening them into a generic Error and losing the type.
+      if (error instanceof DrizzleAdapterError) {
+        throw error;
+      }
+      // Re-throw anything else with the offending column for context.
       throw new Error(
         `Invalid filter configuration for column '${filter.columnId}': ${error instanceof Error ? error.message : 'Unknown error'}`
       );

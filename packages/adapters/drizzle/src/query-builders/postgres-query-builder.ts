@@ -26,6 +26,7 @@ import type {
   AnyTableType,
   ComputedFieldWithResolvedSortSql,
   FilterHandlerHooks,
+  InvalidFilterBehavior,
   PostgresDatabaseType,
   PostgresQueryBuilderWithJoins,
   QueryContext,
@@ -172,9 +173,10 @@ export class PostgresQueryBuilder extends BaseQueryBuilder {
     db: PostgresDatabaseType,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    hooks?: FilterHandlerHooks
+    hooks?: FilterHandlerHooks,
+    onInvalidFilter?: InvalidFilterBehavior
   ) {
-    super(schema, relationshipManager, 'postgres', hooks);
+    super(schema, relationshipManager, 'postgres', hooks, onInvalidFilter);
     this.db = db;
   }
 
