@@ -19,7 +19,13 @@
 import { type SQL, sql } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { RelationshipManager } from '../relationship-manager';
-import type { AnyColumnType, AnyTableType, FilterHandlerHooks, SQLiteDatabaseType } from '../types';
+import type {
+  AnyColumnType,
+  AnyTableType,
+  FilterHandlerHooks,
+  InvalidFilterBehavior,
+  SQLiteDatabaseType,
+} from '../types';
 import { BaseQueryBuilder, type DialectDb } from './base-query-builder';
 
 /**
@@ -42,9 +48,10 @@ export class SQLiteQueryBuilder extends BaseQueryBuilder {
     db: SQLiteDatabaseType,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    hooks?: FilterHandlerHooks
+    hooks?: FilterHandlerHooks,
+    onInvalidFilter?: InvalidFilterBehavior
   ) {
-    super(schema, relationshipManager, 'sqlite', hooks);
+    super(schema, relationshipManager, 'sqlite', hooks, onInvalidFilter);
     this.db = db;
   }
 

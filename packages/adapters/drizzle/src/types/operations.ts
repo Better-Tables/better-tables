@@ -14,7 +14,7 @@ import type {
   TableWithId,
 } from './core';
 import type { DatabaseDriver } from './drivers';
-import type { FilterHandlerHooks } from './filter-hooks';
+import type { FilterHandlerHooks, InvalidFilterBehavior } from './filter-hooks';
 import type { RelationshipMap } from './relationships';
 
 export interface DatabaseOperations<TRecord> {
@@ -95,7 +95,8 @@ export type QueryBuilderFactory<TDriver extends DatabaseDriver> = (
   db: DrizzleDatabase<TDriver>,
   schema: Record<string, AnyTableType>,
   relationshipManager: RelationshipManager,
-  hooks?: FilterHandlerHooks
+  hooks?: FilterHandlerHooks,
+  onInvalidFilter?: InvalidFilterBehavior
 ) => BaseQueryBuilder;
 
 /**
@@ -309,6 +310,24 @@ export interface DrizzleAdapterOptions {
     /** Enable nested OR/AND grouping for very large arrays (default: true) */
     enableNestedGrouping?: boolean;
   };
+
+  /**
+   * How to handle a filter leaf that cannot be translated to a WHERE
+   * condition — an operator invalid for the filter's type, or a supported
+   * operator with missing/incomplete values. Defaults to `'skip'` (drop and
+   * continue, preserving partial UI state). Set to `'throw'` for
+   * server-side scoping filters that must never be silently dropped, since a
+   * dropped predicate widens results (see {@link InvalidFilterBehavior}).
+   *
+   * @default 'skip'
+   * @example
+   * ```typescript
+   * const adapter = drizzleAdapter(db, {
+   *   options: { onInvalidFilter: 'throw' }
+   * });
+   * ```
+   */
+  onInvalidFilter?: InvalidFilterBehavior;
 }
 
 /**

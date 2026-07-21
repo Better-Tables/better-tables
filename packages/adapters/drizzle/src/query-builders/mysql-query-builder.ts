@@ -18,7 +18,13 @@
 import { type SQL, sql } from 'drizzle-orm';
 import type { MySqlColumn } from 'drizzle-orm/mysql-core';
 import type { RelationshipManager } from '../relationship-manager';
-import type { AnyColumnType, AnyTableType, FilterHandlerHooks, MySqlDatabaseType } from '../types';
+import type {
+  AnyColumnType,
+  AnyTableType,
+  FilterHandlerHooks,
+  InvalidFilterBehavior,
+  MySqlDatabaseType,
+} from '../types';
 import { BaseQueryBuilder, type DialectDb } from './base-query-builder';
 
 /**
@@ -40,9 +46,10 @@ export class MySQLQueryBuilder extends BaseQueryBuilder {
     db: MySqlDatabaseType,
     schema: Record<string, AnyTableType>,
     relationshipManager: RelationshipManager,
-    hooks?: FilterHandlerHooks
+    hooks?: FilterHandlerHooks,
+    onInvalidFilter?: InvalidFilterBehavior
   ) {
-    super(schema, relationshipManager, 'mysql', hooks);
+    super(schema, relationshipManager, 'mysql', hooks, onInvalidFilter);
     this.db = db;
   }
 

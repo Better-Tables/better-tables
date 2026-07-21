@@ -420,7 +420,12 @@ jobs:
         env:
           CI: 'true'
           # Set connection strings for MySQL and Postgres services
-          # Using root for MySQL since tests need to create databases
+          # Using root for MySQL since tests need to create databases.
+          # NOTE: the integration suites skip themselves when these are unset.
+          # tests/ci-integration-guard.test.ts fails this job if either is
+          # missing under GitHub Actions, so a dropped URL can't turn the
+          # integration tests into a silent (green) skip. Remove that guard in
+          # the same change if you ever intentionally drop a database here.
           MYSQL_TEST_URL: mysql://root:testpassword@localhost:3306
           POSTGRES_TEST_URL: postgresql://testuser:testpassword@localhost:5432/drizzle_test
         run: |

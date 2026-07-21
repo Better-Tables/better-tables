@@ -92,6 +92,7 @@ export type {
   ExtractSchemaFromDB,
   FilterTablesFromSchema,
   InferSelectModelFromFilteredSchema,
+  InvalidFilterBehavior,
   JoinConfig,
   QueryBuilderFactory,
   QueryContext,
