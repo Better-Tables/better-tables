@@ -248,7 +248,7 @@ export function initCommand(): Command {
       process.exit(1);
     }
     // Summary
-    printCopySummary(results, categories);
+    const copiedOk = printCopySummary(results, categories);
     // Final message
     console.log(pc.bold(pc.green('\n✓ Better Tables initialized successfully!\n')));
     console.log(pc.dim('Next steps:'));
@@ -269,6 +269,11 @@ export function initCommand(): Command {
     // Discoverability: `init` copies `core` only — tell users what modules exist.
     printAvailableModules();
     console.log('');
+    // Genuine copy failures (not skips) must not report success — exit
+    // non-zero after showing the summary + failed-file details, like `add`.
+    if (!copiedOk) {
+      process.exit(1);
+    }
   });
   return command;
 }

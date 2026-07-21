@@ -268,7 +268,7 @@ describe('init command', () => {
     expect(getErrorOutput()).toContain('Unknown module');
   });
 
-  it('should print failed file details to stderr without exiting when some files fail to copy', async () => {
+  it('should print failed file details to stderr and exit non-zero when some files fail to copy', async () => {
     (fileOperationsLib.copyAllFiles as ReturnType<typeof spyOn>).mockImplementation(() =>
       Promise.resolve({
         results: [
@@ -283,10 +283,27 @@ describe('init command', () => {
     try {
       await command.parseAsync(['--yes'], { from: 'user' });
     } catch {
-      // Not expected to throw
+      // process.exit throws in tests
     }
 
     expect(getErrorOutput()).toContain('1 files failed to copy');
     expect(getErrorOutput()).toContain('permission denied');
+    // A genuine copy failure must not report success — exit non-zero.
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('does not exit non-zero when files are only skipped (not failed)', async () => {
+    (fileOperationsLib.copyAllFiles as ReturnType<typeof spyOn>).mockImplementation(() =>
+      Promise.resolve({
+        results: [
+          { success: true, skipped: false, path: 'a.ts' },
+          { success: true, skipped: true, path: 'b.ts' },
+        ] as CopyResult[],
+        categories: { table: 1 },
+      })
+    );
+    const command = initCommand();
+    await command.parseAsync(['--yes'], { from: 'user' });
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 });

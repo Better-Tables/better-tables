@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { ResolvedPaths } from '../src/lib/config';
 import {
   generateFileMappings,
+  getAllUiSourceFilePaths,
   getModuleSourceFilePaths,
   isUiModuleName,
   UI_MODULE_NAMES,
@@ -51,13 +52,23 @@ describe('UI module mappings', () => {
     }
   });
 
-  it('core and actions modules are disjoint and their union is the full set', () => {
+  it('every module is disjoint and their union is the full source set', () => {
     const core = new Set(getModuleSourceFilePaths('core'));
     const actions = getModuleSourceFilePaths('actions');
     for (const file of actions) {
       expect(core.has(file)).toBe(false);
     }
     expect(actions.length).toBe(2);
+
+    // The union of every module's files (summed, since modules are disjoint)
+    // must equal the total unique source set — so adding a future module
+    // without covering it, or double-counting a file, fails here.
+    const perModuleTotal = UI_MODULE_NAMES.reduce(
+      (sum, name) => sum + getModuleSourceFilePaths(name).length,
+      0
+    );
+    const unionUnique = new Set(getAllUiSourceFilePaths()).size;
+    expect(perModuleTotal).toBe(unionUnique);
   });
 
   it('isUiModuleName recognizes real modules and rejects others', () => {
