@@ -73,12 +73,10 @@ describe('lowerDerivedAggregateSpec guards', () => {
       values: ['1', 'NaN'],
     } as unknown as FilterState;
 
-    expect(() =>
-      config.filterSql?.(badGt, { primaryTable: 'users' } as never)
-    ).toThrow(QueryError);
+    expect(() => config.filterSql?.(badGt, { primaryTable: 'users' } as never)).toThrow(QueryError);
 
-    expect(() =>
-      config.filterSql?.(badBetween, { primaryTable: 'users' } as never)
-    ).toThrow(QueryError);
+    expect(() => config.filterSql?.(badBetween, { primaryTable: 'users' } as never)).toThrow(
+      QueryError
+    );
   });
 });

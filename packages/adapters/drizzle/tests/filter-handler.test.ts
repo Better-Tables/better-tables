@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { FilterState } from '@better-tables/core';
+import type { FilterGroupNode, FilterState } from '@better-tables/core';
 import { datetime, mysqlTable } from 'drizzle-orm/mysql-core';
 import { pgTable, timestamp } from 'drizzle-orm/pg-core';
 import { integer, sqliteTable } from 'drizzle-orm/sqlite-core';
-import { FilterHandler } from '../src/filter-handler';
+import { FilterHandler, resolveJoinPlanningLeaves } from '../src/filter-handler';
 import { RelationshipManager } from '../src/relationship-manager';
 
 // Create actual Drizzle tables for testing
@@ -368,5 +368,67 @@ describe('FilterHandler - Date Logic', () => {
       expect(condition).toBeDefined();
       // Should only have IS NULL, not duplicate it
     });
+  });
+});
+
+describe('resolveJoinPlanningLeaves', () => {
+  const nameFilter: FilterState = {
+    columnId: 'name',
+    type: 'text',
+    operator: 'contains',
+    values: ['a'],
+  };
+  const profileFilter: FilterState = {
+    columnId: 'profile.bio',
+    type: 'text',
+    operator: 'contains',
+    values: ['x'],
+  };
+  const joinOnlyLeaf: FilterState = {
+    columnId: 'posts.title',
+    type: 'text',
+    operator: 'contains',
+    values: ['y'],
+  };
+
+  it('prefers leaves from filters when present', () => {
+    const leaves = resolveJoinPlanningLeaves({
+      filters: [nameFilter, profileFilter],
+      filterJoinLeaves: [joinOnlyLeaf],
+    });
+    expect(leaves).toEqual([nameFilter, profileFilter]);
+  });
+
+  it('falls back to filterJoinLeaves when filters are empty or absent', () => {
+    expect(
+      resolveJoinPlanningLeaves({
+        filters: [],
+        filterJoinLeaves: [joinOnlyLeaf],
+      })
+    ).toEqual([joinOnlyLeaf]);
+
+    expect(
+      resolveJoinPlanningLeaves({
+        filterJoinLeaves: [joinOnlyLeaf],
+      })
+    ).toEqual([joinOnlyLeaf]);
+  });
+
+  it('returns an empty array when both sources are empty', () => {
+    expect(resolveJoinPlanningLeaves({})).toEqual([]);
+    expect(resolveJoinPlanningLeaves({ filters: [], filterJoinLeaves: [] })).toEqual([]);
+  });
+
+  it('flattens FilterGroupNode trees before preferring them over the fallback', () => {
+    const tree: FilterGroupNode = {
+      kind: 'group',
+      logic: 'or',
+      children: [nameFilter, profileFilter],
+    };
+    const leaves = resolveJoinPlanningLeaves({
+      filters: tree,
+      filterJoinLeaves: [joinOnlyLeaf],
+    });
+    expect(leaves).toEqual([nameFilter, profileFilter]);
   });
 });
