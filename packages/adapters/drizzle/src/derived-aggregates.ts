@@ -4,7 +4,7 @@
  */
 
 import type { DerivedFetchSpec, FilterState } from '@better-tables/core';
-import { getTableName, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { getTableName, type SQL, type SQLWrapper, sql } from 'drizzle-orm';
 import type { RelationshipManager } from './relationship-manager';
 import type {
   AnyColumnType,
@@ -15,11 +15,7 @@ import type {
 import { SchemaError } from './types';
 import { getColumnInfo } from './utils/drizzle-schema-utils';
 
-function resolveColumn(
-  table: AnyTableType,
-  fieldName: string,
-  tableKey: string
-): AnyColumnType {
+function resolveColumn(table: AnyTableType, fieldName: string, tableKey: string): AnyColumnType {
   const info = getColumnInfo(table, fieldName);
   if (!info) {
     throw new SchemaError(
@@ -60,10 +56,7 @@ function aggregateExpression(
   }
 }
 
-function compareSubquery(
-  subquery: SQL,
-  filter: FilterState
-): SQL | SQLWrapper {
+function compareSubquery(subquery: SQL, filter: FilterState): SQL | SQLWrapper {
   const values = filter.values ?? [];
   const n0 = Number(values[0]);
   const n1 = Number(values[1]);
@@ -145,11 +138,7 @@ export function lowerDerivedAggregateSpec(
   }
 
   const localColumn = resolveColumn(primaryTableSchema, relationship.localKey, primaryTable);
-  const foreignColumn = resolveColumn(
-    relatedTableSchema,
-    relationship.foreignKey,
-    relationship.to
-  );
+  const foreignColumn = resolveColumn(relatedTableSchema, relationship.foreignKey, relationship.to);
 
   let fieldColumn: AnyColumnType | undefined;
   if (spec.fn !== 'count') {
@@ -187,8 +176,7 @@ export function lowerDerivedAggregateSpec(
       return typeof value === 'number' ? value : Number(value ?? 0);
     },
     sortSql: () => buildSubquery(),
-    filterSql: (filter, _context: ComputedFieldContext) =>
-      compareSubquery(buildSubquery(), filter),
+    filterSql: (filter, _context: ComputedFieldContext) => compareSubquery(buildSubquery(), filter),
   };
 }
 

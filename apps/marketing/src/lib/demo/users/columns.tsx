@@ -106,7 +106,9 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
       )),
 
     // Server-derived relation count (plan 060) — filterable/sortable via SQL.
-    t.count('posts').displayName('Posts'),
+    t
+      .count('posts')
+      .displayName('Posts'),
 
     t.date('createdAt').displayName('Joined').filterable().sortable().editable(),
 

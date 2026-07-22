@@ -39,9 +39,7 @@ const ALL_AGGREGATE_FNS: AggregateFn[] = ['count', 'sum', 'avg', 'min', 'max'];
 /** Evaluate a derived aggregate over a nested array relation on the row. */
 function evaluateDerivedAggregate(row: unknown, spec: DerivedFetchSpec): number {
   const relationValue =
-    row && typeof row === 'object'
-      ? (row as Record<string, unknown>)[spec.relation]
-      : undefined;
+    row && typeof row === 'object' ? (row as Record<string, unknown>)[spec.relation] : undefined;
   const items = Array.isArray(relationValue) ? relationValue : [];
 
   if (spec.fn === 'count') {
@@ -512,10 +510,7 @@ export function memoryAdapter<TData>(
     return accessor;
   };
 
-  const applyFilters = (
-    source: TData[],
-    filters: FetchDataParams['filters']
-  ): TData[] => {
+  const applyFilters = (source: TData[], filters: FetchDataParams['filters']): TData[] => {
     if (!filters || (Array.isArray(filters) && filters.length === 0)) return [...source];
     return source.filter((row) => matchesNode(filters, row, getAccessor));
   };

@@ -33,9 +33,7 @@ export function collectDerivedFetchSpecs(
   return specs;
 }
 
-function collectFilterColumnIds(
-  filters: FilterState[] | FilterGroupNode | undefined
-): Set<string> {
+function collectFilterColumnIds(filters: FilterState[] | FilterGroupNode | undefined): Set<string> {
   const ids = new Set<string>();
   if (filters == null) return ids;
 

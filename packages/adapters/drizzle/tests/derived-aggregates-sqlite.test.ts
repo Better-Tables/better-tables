@@ -8,11 +8,7 @@ import type { FilterGroupNode } from '@better-tables/core';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
 import type { DrizzleDatabase } from '../src/types';
 import { SchemaError } from '../src/types';
-import {
-  closeDatabase,
-  createTestDatabase,
-  setupTestDatabase,
-} from './helpers/test-fixtures';
+import { closeDatabase, createTestDatabase, setupTestDatabase } from './helpers/test-fixtures';
 import { relationsSchema as testRelations, schema as testSchema } from './helpers/test-schema';
 
 describe('Derived aggregates (plan 060) — SQLite', () => {

@@ -64,9 +64,7 @@ function derivedMatrix(
         primaryTable: 'users',
         columns: ['name', 'postsCount'],
         derived: [{ columnId: 'postsCount', kind: 'aggregate', relation: 'posts', fn: 'count' }],
-        filters: [
-          { columnId: 'postsCount', type: 'number', operator: 'greaterThan', values: [1] },
-        ],
+        filters: [{ columnId: 'postsCount', type: 'number', operator: 'greaterThan', values: [1] }],
       });
       expect(filtered.total).toBe(1);
 

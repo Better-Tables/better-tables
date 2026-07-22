@@ -415,7 +415,14 @@ describe('memoryAdapter', () => {
     }
 
     const users: UserWithPosts[] = [
-      { id: '1', name: 'Ada', posts: [{ title: 'a', views: 10 }, { title: 'b', views: 20 }] },
+      {
+        id: '1',
+        name: 'Ada',
+        posts: [
+          { title: 'a', views: 10 },
+          { title: 'b', views: 20 },
+        ],
+      },
       { id: '2', name: 'Grace', posts: [{ title: 'c', views: 5 }] },
       { id: '3', name: 'Alan', posts: [] },
     ];
@@ -435,7 +442,10 @@ describe('memoryAdapter', () => {
         ],
       });
       const byId = Object.fromEntries(
-        result.data.map((row) => [row.id, row as UserWithPosts & { postsCount: number; viewsSum: number }])
+        result.data.map((row) => [
+          row.id,
+          row as UserWithPosts & { postsCount: number; viewsSum: number },
+        ])
       );
       expect(byId['1']?.postsCount).toBe(2);
       expect(byId['1']?.viewsSum).toBe(30);

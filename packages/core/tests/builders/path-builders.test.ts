@@ -231,7 +231,7 @@ describe('path builders (plan 018)', () => {
   });
 
   describe('t.count() / t.aggregate() (plan 060)', () => {
-    it('t.count(relation) defaults id to `${relation}Count` with a count derived spec', () => {
+    it('t.count(relation) defaults id to relationCount with a count derived spec', () => {
       const t = createPathColumnFactory<User>();
       const def = t.count('posts').build();
 
