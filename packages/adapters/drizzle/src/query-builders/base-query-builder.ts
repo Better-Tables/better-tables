@@ -39,7 +39,7 @@ import {
   sql,
   sum,
 } from 'drizzle-orm';
-import { collectFilterLeaves, FilterHandler } from '../filter-handler';
+import { collectFilterLeaves, FilterHandler, resolveJoinPlanningLeaves } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
   AggregateFunction,
@@ -1402,14 +1402,13 @@ export abstract class BaseQueryBuilder {
         .map((sort) => ({ columnId: sort.columnId })) || [];
 
     // Join planning must see every leaf's columnId, including ones nested
-    // inside a FilterGroupNode tree (plan 017) — collectFilterLeaves flattens
-    // either shape so a leaf buried in a group still contributes its JOIN.
-    // When filters were compiled to filterSql (plan 060), filterJoinLeaves
-    // carries the plain-column paths that additionalConditions no longer expose.
-    const joinPlanningLeaves =
-      collectFilterLeaves(params.filters).length > 0
-        ? collectFilterLeaves(params.filters)
-        : (params.filterJoinLeaves ?? []);
+    // inside a FilterGroupNode tree (plan 017). When filters were compiled to
+    // filterSql (plan 060), filterJoinLeaves carries the plain-column paths
+    // that additionalConditions no longer expose — must match getJoinCount.
+    const joinPlanningLeaves = resolveJoinPlanningLeaves({
+      filters: params.filters,
+      filterJoinLeaves: params.filterJoinLeaves,
+    });
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],

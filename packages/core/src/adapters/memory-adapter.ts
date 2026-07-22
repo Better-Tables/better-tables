@@ -101,9 +101,12 @@ export interface MemoryAdapterOptions<TData> {
    */
   enumInferenceLimit?: number;
   /**
-   * Derived aggregate column ids (from `t.count` / `t.aggregate`). Facets and
-   * min/max on these ids throw until facet transport carries derived specs.
-   * Ids seen on `fetchData({ derived })` are also tracked automatically.
+   * Derived aggregate column ids (from `t.count` / `t.aggregate`).
+   * **Required** when those columns exist and you may call facets/min-max —
+   * otherwise `getFacetedValues` / `getMinMaxValues` cannot tell a derived id
+   * from a missing field and would silently return empty/zero results.
+   * Pass the same ids you send on `fetchData({ derived })`. Facets on these
+   * ids throw until facet transport carries derived specs.
    */
   derivedColumnIds?: string[];
 }
@@ -506,6 +509,8 @@ export function memoryAdapter<TData>(
   const tableName = options.tableName ?? 'memory';
   const enumLimit = options.enumInferenceLimit ?? 12;
   const getRowId = options.getRowId ?? ((row: TData) => String((row as { id?: unknown }).id ?? ''));
+  // Explicit only — do not infer from fetchData order (that silently no-ops
+  // when facets run before the first derived fetch).
   const knownDerivedColumnIds = new Set<string>(options.derivedColumnIds ?? []);
   const accessorCache = new Map<string, (row: unknown) => unknown>();
   const getAccessor = (columnId: string) => {
@@ -520,7 +525,7 @@ export function memoryAdapter<TData>(
   const rejectDerivedFacet = (columnId: string): void => {
     if (!knownDerivedColumnIds.has(columnId)) return;
     throw new Error(
-      `[better-tables] memoryAdapter does not support facets or min/max on derived aggregate columns yet (column '${columnId}').`
+      `[better-tables] memoryAdapter does not support facets or min/max on derived aggregate columns yet (column '${columnId}'). Pass derivedColumnIds when constructing the adapter.`
     );
   };
 
@@ -551,9 +556,6 @@ export function memoryAdapter<TData>(
   return {
     async fetchData(params: FetchDataParams = {}): Promise<FetchDataResult<TData>> {
       throwIfAborted(params.signal);
-      for (const spec of params.derived ?? []) {
-        knownDerivedColumnIds.add(spec.columnId);
-      }
       const materialised = withDerivedValues(rows, params.derived);
       const filtered = applySorting(applyFilters(materialised, params.filters), params.sorting);
       const total = filtered.length;

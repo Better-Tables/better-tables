@@ -78,7 +78,11 @@ import { AdapterCache } from './adapter-cache';
 import { buildAdapterMeta } from './adapter-meta';
 import { lowerDerivedAggregateSpecs } from './derived-aggregates';
 import { convertToExportFormat, getMimeType } from './export-format';
-import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
+import {
+  collectFilterLeaves,
+  pruneFilterNodeForColumn,
+  resolveJoinPlanningLeaves,
+} from './filter-handler';
 import { getOperationsFactory } from './operations';
 import { type BaseQueryBuilder, getQueryBuilderFactory } from './query-builders';
 import { RelationshipDetector } from './relationship-detector';
@@ -1682,10 +1686,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     // contributes its JOIN to the count -- must agree with buildCompleteQuery's
     // own context (base-query-builder.ts), or `total` and page contents would
     // diverge under OR queries (plan 017 emphasis: count/data agreement).
-    const joinPlanningLeaves =
-      collectFilterLeaves(params.filters).length > 0
-        ? collectFilterLeaves(params.filters)
-        : (params.filterJoinLeaves ?? []);
+    const joinPlanningLeaves = resolveJoinPlanningLeaves({
+      filters: params.filters,
+      filterJoinLeaves: params.filterJoinLeaves,
+    });
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: columnsForContext,

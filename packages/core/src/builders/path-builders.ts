@@ -42,6 +42,14 @@ export type AggregateBuilderSpec = {
   field?: string;
 };
 
+function assertRelation(relation: string, caller: 't.count' | 't.aggregate'): void {
+  if (relation == null || String(relation).trim() === '') {
+    throw new Error(
+      `${caller}: relation must be a non-empty string (e.g. ${caller === 't.count' ? 't.count("posts")' : 't.aggregate("total", { relation: "orders", fn: "sum", field: "amount" })'}).`
+    );
+  }
+}
+
 function assertAggregateField(spec: AggregateBuilderSpec): void {
   if (spec.fn !== 'count' && (spec.field == null || spec.field === '')) {
     throw new Error(
@@ -51,6 +59,7 @@ function assertAggregateField(spec: AggregateBuilderSpec): void {
 }
 
 function derivedFromAggregate(spec: AggregateBuilderSpec): DerivedColumnSpec {
+  assertRelation(spec.relation, 't.aggregate');
   assertAggregateField(spec);
   if (spec.fn === 'count') {
     return { kind: 'aggregate', relation: spec.relation, fn: 'count' };
@@ -363,9 +372,7 @@ export function createPathColumnFactory<TRow>(): PathColumnFactory<TRow> {
     },
 
     count(relation: string) {
-      if (relation == null || String(relation).trim() === '') {
-        throw new Error('t.count: relation must be a non-empty string (e.g. t.count("posts")).');
-      }
+      assertRelation(relation, 't.count');
       const id = `${relation}Count` as const;
       return new NumberColumnBuilder<TRow, number, typeof id>()
         .id(id)
@@ -378,9 +385,6 @@ export function createPathColumnFactory<TRow>(): PathColumnFactory<TRow> {
     },
 
     aggregate<TId extends string>(id: TId, spec: AggregateBuilderSpec) {
-      if (spec.relation == null || String(spec.relation).trim() === '') {
-        throw new Error('t.aggregate: relation must be a non-empty string.');
-      }
       const derived = derivedFromAggregate(spec);
       return new NumberColumnBuilder<TRow, number, TId>()
         .id(id)

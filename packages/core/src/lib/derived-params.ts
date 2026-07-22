@@ -64,7 +64,8 @@ function collectFilterColumnIds(filters: FilterState[] | FilterGroupNode | undef
  */
 function collectDerivedScopeIds(
   columns: readonly ColumnDefinition[],
-  params: Pick<FetchDataParams, 'columns' | 'filters' | 'sorting'>
+  params: Pick<FetchDataParams, 'columns' | 'sorting'>,
+  filterColumnIds: Set<string>
 ): string[] | undefined {
   const requested = params.columns;
   if (requested == null || !Array.isArray(requested)) {
@@ -72,7 +73,7 @@ function collectDerivedScopeIds(
   }
 
   const scope = new Set(requested.map(String));
-  for (const id of collectFilterColumnIds(params.filters)) {
+  for (const id of filterColumnIds) {
     scope.add(id);
   }
   for (const sort of params.sorting ?? []) {
@@ -92,7 +93,9 @@ function collectDerivedScopeIds(
 export function assertAggregateCapabilities(
   adapterMeta: AdapterMeta,
   derived: readonly DerivedFetchSpec[],
-  params: Pick<FetchDataParams, 'filters' | 'sorting'>
+  params: Pick<FetchDataParams, 'filters' | 'sorting'>,
+  /** Precomputed filter column ids — avoids a second tree walk. */
+  filterColumnIds?: Set<string>
 ): void {
   if (derived.length === 0) return;
 
@@ -124,7 +127,7 @@ export function assertAggregateCapabilities(
   }
 
   const derivedIds = new Set(derived.map((d) => d.columnId));
-  const filterIds = collectFilterColumnIds(params.filters);
+  const filterIds = filterColumnIds ?? collectFilterColumnIds(params.filters);
   const needsFilter = [...filterIds].some((id) => derivedIds.has(id));
   if (needsFilter && !aggregates.filter) {
     throw new Error(
@@ -152,9 +155,10 @@ export function withDerivedFetchParams(
   if (columns == null || !Array.isArray(columns)) {
     return params;
   }
-  const scopeIds = collectDerivedScopeIds(columns, params);
+  const filterColumnIds = collectFilterColumnIds(params.filters);
+  const scopeIds = collectDerivedScopeIds(columns, params, filterColumnIds);
   const derived = collectDerivedFetchSpecs(columns, scopeIds);
-  assertAggregateCapabilities(adapterMeta, derived, params);
+  assertAggregateCapabilities(adapterMeta, derived, params, filterColumnIds);
   if (derived.length === 0) {
     return params;
   }

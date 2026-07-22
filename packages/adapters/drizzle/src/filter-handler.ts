@@ -88,6 +88,21 @@ export function collectFilterLeaves(
 }
 
 /**
+ * Leaves used for JOIN planning when filters may have been compiled away to
+ * opaque SQL (plan 060). Prefer real filter leaves; fall back to
+ * `filterJoinLeaves` preserved by the adapter. Shared by
+ * `buildCompleteQuery` and `getJoinCount` so count/data join sets stay aligned.
+ */
+export function resolveJoinPlanningLeaves(params: {
+  filters?: FilterState[] | FilterGroupNode | undefined;
+  filterJoinLeaves?: FilterState[] | undefined;
+}): FilterState[] {
+  const fromFilters = collectFilterLeaves(params.filters);
+  if (fromFilters.length > 0) return fromFilters;
+  return params.filterJoinLeaves ?? [];
+}
+
+/**
  * Recursively drop every leaf targeting `excludeColumnId` from a
  * {@link FilterNode}, per plan 021's self-exclusion faceting convention (see
  * `FacetQueryParams` in `@better-tables/core`): a group that becomes empty
