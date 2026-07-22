@@ -2,9 +2,18 @@ export const siteConfig = {
   name: 'Better Tables',
   tagline: 'React tables that reach your database',
   description:
-    'Most React table libraries render the grid and leave the database queries to you. Better Tables does both: define your columns once in TypeScript, and filtering, sorting, pagination, and inline edits become real queries against Postgres, MySQL, or SQLite. The UI ships as source you own.',
+    'React tables that compile filters, sorts, and edits into real SQL for Postgres, MySQL, or SQLite — UI you own.',
   cta: 'Browse examples',
-  url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  // Absolute base for metadata/OG image URLs. Prefer an explicit override, then
+  // Vercel's production domain, then the per-deployment URL, else localhost.
+  // Without this, og:image resolves to http://localhost:3000/og in production
+  // and social crawlers can't fetch it.
+  url:
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL &&
+      `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`) ||
+    (process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`) ||
+    'http://localhost:3000',
   installCommand: 'npx @better-tables/cli@latest init',
   keywords: [
     'Better Tables',
