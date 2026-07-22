@@ -533,6 +533,8 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         this.normalizeIncomingFilters(params.filters) ?? [];
       const computedFieldFilters: Array<{ filter: FilterState; config: ComputedFieldConfig }> = [];
       const additionalSqlConditions: (SQL | SQLWrapper)[] = [];
+      /** Join-planning leaves preserved when a tree is compiled to filterSql SQL. */
+      let filterJoinLeaves: FilterState[] | undefined;
 
       if (Array.isArray(processedFilters)) {
         for (const filter of processedFilters) {
@@ -541,10 +543,17 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
             computedFieldFilters.push({ filter, config: computedField });
           }
         }
-      } else {
+      } else if (this.treeContainsFilterSqlLeaves(processedFilters, tableComputedFields)) {
         // Compile the whole tree so filterSql leaves keep AND/OR position
         // (extracting them to top-level additionalConditions would AND them
-        // and break OR groups).
+        // and break OR groups). Plain-column leaves still need multi-hop JOINs
+        // via filterJoinLeaves once processedFilters is blanked. Exclude
+        // filterSql-backed computed leaves — they are in additionalConditions
+        // and are not real column paths for join planning.
+        filterJoinLeaves = collectFilterLeaves(processedFilters).filter((leaf) => {
+          const computedField = tableComputedFields.find((cf) => cf.field === leaf.columnId);
+          return !computedField?.filterSql;
+        });
         const treeSql = await this.compileTreeFiltersWithComputed(
           processedFilters,
           tableComputedFields,
@@ -560,6 +569,18 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
           additionalSqlConditions.push(treeSql);
         }
         processedFilters = [];
+      } else {
+        // Pre-060 path: reject callback-filter computed leaves, keep the tree
+        // for collectFilterLeaves + buildTreeCondition join/WHERE planning.
+        for (const leaf of collectFilterLeaves(processedFilters)) {
+          const computedField = tableComputedFields.find((cf) => cf.field === leaf.columnId);
+          if (computedField?.filter) {
+            throw new QueryError(
+              `Computed-field filters that use the callback \`filter\` form are not supported inside a FilterGroupNode (columnId: "${leaf.columnId}"). Restructure so those filters are top-level AND'd, or provide filterSql on the computed field.`,
+              { columnId: leaf.columnId, field: computedField.field }
+            );
+          }
+        }
       }
 
       // Build cache params early (needed for error handling)
@@ -571,6 +592,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         computedFields?: string[];
         computedFieldsRequiringColumns?: string[];
         computedFieldFilters?: FilterState[]; // Include original filters for cache key
+        filterJoinLeaves?: FilterState[];
       } = {
         ...params,
         columns: columnsWithoutComputed,
@@ -580,6 +602,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
           .filter((cf) => cf.requiresColumn)
           .map((cf) => cf.field),
         computedFieldFilters: originalComputedFieldFilters, // Include for cache key
+        ...(filterJoinLeaves !== undefined && { filterJoinLeaves }),
       };
 
       // Process computed field filters
@@ -746,6 +769,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       }
       if (Object.keys(computedFieldsForSorting).length > 0) {
         queryParams.computedFields = computedFieldsForSorting;
+      }
+      if (filterJoinLeaves !== undefined && filterJoinLeaves.length > 0) {
+        queryParams.filterJoinLeaves = filterJoinLeaves;
       }
       const { dataQuery, countQuery, columnMetadata, isNested, autoEmbedColumns } =
         this.queryBuilder.buildCompleteQuery(queryParams);
@@ -1483,6 +1509,23 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
 
   /**
+   * True when any leaf in the tree targets a computed field with `filterSql`
+   * (incl. plan-060 derived aggregates). Only those trees need compile-and-blank.
+   */
+  private treeContainsFilterSqlLeaves(
+    node: FilterNode,
+    tableComputedFields: ComputedFieldConfig[]
+  ): boolean {
+    if (isFilterGroupNode(node)) {
+      return node.children.some((child) =>
+        this.treeContainsFilterSqlLeaves(child, tableComputedFields)
+      );
+    }
+    const computedField = tableComputedFields.find((cf) => cf.field === node.columnId);
+    return computedField?.filterSql !== undefined;
+  }
+
+  /**
    * Compile a FilterGroupNode to SQL, substituting filterSql-backed computed
    * leaves in place so AND/OR structure is preserved (plan 060). Legacy
    * callback-`filter` computed fields still reject trees.
@@ -1609,6 +1652,7 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       computedFields?: string[];
       computedFieldsRequiringColumns?: string[];
       computedFieldFilters?: FilterState[];
+      filterJoinLeaves?: FilterState[];
     }
   ): number {
     // Determine primary table from params - use explicit if provided.
@@ -1638,10 +1682,14 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     // contributes its JOIN to the count -- must agree with buildCompleteQuery's
     // own context (base-query-builder.ts), or `total` and page contents would
     // diverge under OR queries (plan 017 emphasis: count/data agreement).
+    const joinPlanningLeaves =
+      collectFilterLeaves(params.filters).length > 0
+        ? collectFilterLeaves(params.filters)
+        : (params.filterJoinLeaves ?? []);
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: columnsForContext,
-        filters: collectFilterLeaves(params.filters).map((filter) => ({
+        filters: joinPlanningLeaves.map((filter) => ({
           columnId: filter.columnId,
         })),
         sorts: sortsForContext,

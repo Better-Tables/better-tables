@@ -31,7 +31,7 @@ function derivedMatrix(
     driver === 'postgres' ? !process.env.POSTGRES_TEST_URL : !process.env.MYSQL_TEST_URL
   )(`Derived aggregates (plan 060) — ${label}`, () => {
     let adapter: DrizzleAdapter<typeof testSchema, 'postgres' | 'mysql'>;
-    let cleanup: () => Promise<void>;
+    let cleanup: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const created = await createAdapter();

@@ -10,8 +10,13 @@
 /** Aggregate functions supported by derived columns. `distinct` is deferred. */
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
+/** Field-requiring aggregate fns (everything except `count`). */
+export type AggregateFnWithField = Exclude<AggregateFn, 'count'>;
+
 /**
  * Declarative aggregate over a single-hop many-relation on the primary table.
+ *
+ * Discriminated on `fn`: `count` has no field; sum/avg/min/max require `field`.
  *
  * @example
  * ```ts
@@ -19,14 +24,21 @@ export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
  * { kind: 'aggregate', relation: 'orders', fn: 'sum', field: 'amount' }
  * ```
  */
-export interface DerivedColumnSpec {
-  kind: 'aggregate';
-  /** Relation name on the primary table (e.g. `'posts'`). Single hop. */
-  relation: string;
-  fn: AggregateFn;
-  /** Required for sum/avg/min/max; ignored for count. */
-  field?: string;
-}
+export type DerivedColumnSpec =
+  | {
+      kind: 'aggregate';
+      /** Relation name on the primary table (e.g. `'posts'`). Single hop. */
+      relation: string;
+      fn: 'count';
+      field?: undefined;
+    }
+  | {
+      kind: 'aggregate';
+      relation: string;
+      fn: AggregateFnWithField;
+      /** Numeric column on the related table. */
+      field: string;
+    };
 
 /** A derived spec bound to its column id for fetch transport. */
 export type DerivedFetchSpec = { columnId: string } & DerivedColumnSpec;

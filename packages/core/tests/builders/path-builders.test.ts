@@ -247,6 +247,12 @@ describe('path builders (plan 018)', () => {
       ).toBe(3);
     });
 
+    it('t.count rejects an empty relation', () => {
+      const t = createPathColumnFactory<User>();
+      expect(() => t.count('')).toThrow(/non-empty/);
+      expect(() => t.count('   ')).toThrow(/non-empty/);
+    });
+
     it('t.aggregate requires field for non-count fns', () => {
       const t = createPathColumnFactory<User>();
       expect(() => t.aggregate('total', { relation: 'posts', fn: 'sum' })).toThrow(/field/);

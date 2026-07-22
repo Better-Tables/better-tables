@@ -113,6 +113,39 @@ describe('Derived aggregates (plan 060) — SQLite', () => {
     expect(names).toEqual(['Bob Johnson', 'John Doe']);
   });
 
+  it('OR tree with filterSql aggregate + cross-table plain leaf still plans profile join', async () => {
+    // When the tree is compiled to filterSql SQL, plain-column leaves must
+    // still drive join planning via filterJoinLeaves (not only opaque SQL).
+    const filters: FilterGroupNode = {
+      kind: 'group',
+      logic: 'or',
+      children: [
+        {
+          columnId: 'postsCount',
+          type: 'number',
+          operator: 'greaterThan',
+          values: [1],
+        },
+        {
+          columnId: 'profile.bio',
+          type: 'text',
+          operator: 'equals',
+          values: ['Designer'],
+        },
+      ],
+    };
+
+    const result = await adapter.fetchData({
+      primaryTable: 'users',
+      columns: ['id', 'name', 'postsCount'],
+      derived: [{ columnId: 'postsCount', kind: 'aggregate', relation: 'posts', fn: 'count' }],
+      filters,
+    });
+
+    const names = result.data.map((row) => (row as { name: string }).name).sort();
+    expect(names).toEqual(['Jane Smith', 'John Doe']);
+  });
+
   it('sorts by derived count', async () => {
     const result = await adapter.fetchData({
       primaryTable: 'users',

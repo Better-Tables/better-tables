@@ -578,6 +578,24 @@ describe('BaseQueryBuilder', () => {
       expect(queryBuilder.validateQuery(countQuery)).toBe(true);
     });
 
+    it('uses filterJoinLeaves for join planning when filters=[]', () => {
+      const { autoEmbedColumns } = queryBuilder.buildCompleteQuery({
+        columns: ['name'],
+        filters: [],
+        filterJoinLeaves: [
+          {
+            columnId: 'profile.bio',
+            type: 'text',
+            operator: 'equals',
+            values: ['Designer'],
+          },
+        ],
+        primaryTable: 'users',
+      });
+
+      expect(autoEmbedColumns.some((col) => col.startsWith('profile.'))).toBe(true);
+    });
+
     it('should build query with only sorting', () => {
       const { dataQuery, countQuery } = queryBuilder.buildCompleteQuery({
         sorting: [{ columnId: 'name', direction: 'asc' }],

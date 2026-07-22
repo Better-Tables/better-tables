@@ -100,6 +100,12 @@ export interface MemoryAdapterOptions<TData> {
    * to disable enum inference.
    */
   enumInferenceLimit?: number;
+  /**
+   * Derived aggregate column ids (from `t.count` / `t.aggregate`). Facets and
+   * min/max on these ids throw until facet transport carries derived specs.
+   * Ids seen on `fetchData({ derived })` are also tracked automatically.
+   */
+  derivedColumnIds?: string[];
 }
 
 const DEFAULT_FACET_LIMIT = 100;
@@ -500,6 +506,7 @@ export function memoryAdapter<TData>(
   const tableName = options.tableName ?? 'memory';
   const enumLimit = options.enumInferenceLimit ?? 12;
   const getRowId = options.getRowId ?? ((row: TData) => String((row as { id?: unknown }).id ?? ''));
+  const knownDerivedColumnIds = new Set<string>(options.derivedColumnIds ?? []);
   const accessorCache = new Map<string, (row: unknown) => unknown>();
   const getAccessor = (columnId: string) => {
     let accessor = accessorCache.get(columnId);
@@ -508,6 +515,13 @@ export function memoryAdapter<TData>(
       accessorCache.set(columnId, accessor);
     }
     return accessor;
+  };
+
+  const rejectDerivedFacet = (columnId: string): void => {
+    if (!knownDerivedColumnIds.has(columnId)) return;
+    throw new Error(
+      `[better-tables] memoryAdapter does not support facets or min/max on derived aggregate columns yet (column '${columnId}').`
+    );
   };
 
   const applyFilters = (source: TData[], filters: FetchDataParams['filters']): TData[] => {
@@ -537,6 +551,9 @@ export function memoryAdapter<TData>(
   return {
     async fetchData(params: FetchDataParams = {}): Promise<FetchDataResult<TData>> {
       throwIfAborted(params.signal);
+      for (const spec of params.derived ?? []) {
+        knownDerivedColumnIds.add(spec.columnId);
+      }
       const materialised = withDerivedValues(rows, params.derived);
       const filtered = applySorting(applyFilters(materialised, params.filters), params.sorting);
       const total = filtered.length;
@@ -569,6 +586,7 @@ export function memoryAdapter<TData>(
       params?: FacetQueryParams
     ): Promise<Map<string, number>> {
       throwIfAborted(params?.signal);
+      rejectDerivedFacet(columnId);
       const filters = excludeColumn(params?.filters, columnId);
       const accessor = getAccessor(columnId);
       const counts = new Map<string, number>();
@@ -588,6 +606,7 @@ export function memoryAdapter<TData>(
 
     async getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]> {
       throwIfAborted(params?.signal);
+      rejectDerivedFacet(columnId);
       const filters = excludeColumn(params?.filters, columnId);
       const accessor = getAccessor(columnId);
       let min = Number.POSITIVE_INFINITY;

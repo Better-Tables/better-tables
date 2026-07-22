@@ -1368,6 +1368,8 @@ export abstract class BaseQueryBuilder {
   buildCompleteQuery(params: {
     columns?: string[];
     filters?: FilterState[] | FilterGroupNode;
+    /** Plain-column leaves from a compiled filter tree (join planning only). */
+    filterJoinLeaves?: FilterState[];
     sorting?: SortingParams[];
     pagination?: PaginationParams;
     primaryTable: string;
@@ -1402,10 +1404,16 @@ export abstract class BaseQueryBuilder {
     // Join planning must see every leaf's columnId, including ones nested
     // inside a FilterGroupNode tree (plan 017) — collectFilterLeaves flattens
     // either shape so a leaf buried in a group still contributes its JOIN.
+    // When filters were compiled to filterSql (plan 060), filterJoinLeaves
+    // carries the plain-column paths that additionalConditions no longer expose.
+    const joinPlanningLeaves =
+      collectFilterLeaves(params.filters).length > 0
+        ? collectFilterLeaves(params.filters)
+        : (params.filterJoinLeaves ?? []);
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],
-        filters: collectFilterLeaves(params.filters).map((filter) => ({
+        filters: joinPlanningLeaves.map((filter) => ({
           columnId: filter.columnId,
         })),
         sorts: sortsForContext,

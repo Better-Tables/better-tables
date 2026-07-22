@@ -488,5 +488,11 @@ describe('memoryAdapter', () => {
       });
       expect(result.data.map((r) => r.id)).toEqual(['1', '2', '3']);
     });
+
+    it('rejects facets and min/max on derived aggregate columns', async () => {
+      const adapter = memoryAdapter(users, { derivedColumnIds: ['postsCount'] });
+      await expect(adapter.getFacetedValues('postsCount')).rejects.toThrow(/derived aggregate/);
+      await expect(adapter.getMinMaxValues('postsCount')).rejects.toThrow(/derived aggregate/);
+    });
   });
 });

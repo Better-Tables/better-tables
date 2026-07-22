@@ -58,6 +58,34 @@ function collectFilterColumnIds(filters: FilterState[] | FilterGroupNode | undef
 }
 
 /**
+ * Column ids that should carry derived specs for this fetch: requested
+ * `params.columns`, plus any derived column referenced by filters/sorting
+ * (so a filter on `postsCount` still attaches the spec when `columns` omits it).
+ */
+function collectDerivedScopeIds(
+  columns: readonly ColumnDefinition[],
+  params: Pick<FetchDataParams, 'columns' | 'filters' | 'sorting'>
+): string[] | undefined {
+  const requested = params.columns;
+  if (requested == null || !Array.isArray(requested)) {
+    return undefined; // all derived columns
+  }
+
+  const scope = new Set(requested.map(String));
+  for (const id of collectFilterColumnIds(params.filters)) {
+    scope.add(id);
+  }
+  for (const sort of params.sorting ?? []) {
+    scope.add(sort.columnId);
+  }
+
+  // Only keep ids that actually have derived specs (unrelated filter columns
+  // must not widen the allow-set to "all columns").
+  const derivedIds = new Set(columns.filter((c) => c.derived != null).map((c) => c.id));
+  return [...scope].filter((id) => derivedIds.has(id));
+}
+
+/**
  * Throw if the adapter cannot satisfy the requested derived specs for the
  * operations implied by the fetch params.
  */
@@ -121,7 +149,11 @@ export function withDerivedFetchParams(
   params: FetchDataParams,
   adapterMeta: AdapterMeta
 ): FetchDataParams {
-  const derived = collectDerivedFetchSpecs(columns, params.columns);
+  if (columns == null || !Array.isArray(columns)) {
+    return params;
+  }
+  const scopeIds = collectDerivedScopeIds(columns, params);
+  const derived = collectDerivedFetchSpecs(columns, scopeIds);
   assertAggregateCapabilities(adapterMeta, derived, params);
   if (derived.length === 0) {
     return params;

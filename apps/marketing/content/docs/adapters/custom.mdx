@@ -23,7 +23,7 @@ const result = await tables.fetchData(ticketsTable, {
 
 Options: `getRowId` (row identity for edits; defaults to the `id` field), `tableName`, and `enumInferenceLimit` (distinct-string ceiling for inferring `option` columns; default 12, `0` disables). Scope: own-table columns only — dot-path ids walk nested objects, but there's no relationship model or JOIN semantics; use a database adapter for relational data.
 
-`memoryAdapter` does support plan-060 **derived aggregates** when rows already carry nested arrays (`posts: [...]`): it materializes `t.count` / `t.aggregate` values before filter/sort and declares `meta.capabilities.aggregates` (all fns, render/filter/sort).
+`memoryAdapter` supports **derived aggregates** when rows already carry nested arrays (`posts: [...]`): it materializes `t.count` / `t.aggregate` values before filter/sort and declares `meta.capabilities.aggregates` (all fns, render/filter/sort).
 
 ## The contract
 

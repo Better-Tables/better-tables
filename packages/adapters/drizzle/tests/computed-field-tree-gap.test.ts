@@ -117,19 +117,18 @@ describe('Computed-field filters inside FilterGroupNode', () => {
       ],
     };
 
-    // Mock DB will fail later in query building/execution — the important
-    // assertion is that we no longer throw the tree-gap QueryError up front.
-    try {
-      await adapter.fetchData({
+    // Mock DB returns empty rows — the important assertion is that filterSql
+    // trees compile without the legacy tree-gap QueryError.
+    // Mock DB lacks limit/offset — assert compile succeeds past the tree-gap
+    // guard (rejects with a downstream QueryError, not callback-filter text).
+    await expect(
+      adapter.fetchData({
         columns: ['email'],
         filters,
         primaryTable: 'users',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      expect(message).not.toContain('callback `filter`');
-      expect(message).not.toContain('flatten the tree');
-      expect(message).not.toContain('not supported yet');
-    }
+      })
+    ).rejects.toMatchObject({
+      message: expect.not.stringContaining('callback `filter`'),
+    });
   });
 });

@@ -12,7 +12,7 @@ import type {
   ComputedFieldConfig,
   ComputedFieldContext,
 } from './types';
-import { SchemaError } from './types';
+import { QueryError, SchemaError } from './types';
 import { getColumnInfo } from './utils/drizzle-schema-utils';
 
 function resolveColumn(table: AnyTableType, fieldName: string, tableKey: string): AnyColumnType {
@@ -56,30 +56,61 @@ function aggregateExpression(
   }
 }
 
+function requireNumericFilterValue(
+  raw: unknown,
+  filter: FilterState,
+  slot: 'value' | 'lower bound' | 'upper bound'
+): number {
+  const n = Number(raw);
+  if (Number.isNaN(n)) {
+    throw new QueryError(
+      `Derived aggregate filter on '${filter.columnId}' (${filter.operator}) requires a numeric ${slot} but received '${String(raw)}'.`,
+      { columnId: filter.columnId, operator: filter.operator, value: raw, slot }
+    );
+  }
+  return n;
+}
+
 function compareSubquery(subquery: SQL, filter: FilterState): SQL | SQLWrapper {
   const values = filter.values ?? [];
-  const n0 = Number(values[0]);
-  const n1 = Number(values[1]);
 
   switch (filter.operator) {
     case 'equals':
-    case 'is':
+    case 'is': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'value');
       return sql`(${subquery}) = ${n0}`;
+    }
     case 'notEquals':
-    case 'isNot':
+    case 'isNot': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'value');
       return sql`(${subquery}) <> ${n0}`;
-    case 'greaterThan':
+    }
+    case 'greaterThan': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'value');
       return sql`(${subquery}) > ${n0}`;
-    case 'greaterThanOrEqual':
+    }
+    case 'greaterThanOrEqual': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'value');
       return sql`(${subquery}) >= ${n0}`;
-    case 'lessThan':
+    }
+    case 'lessThan': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'value');
       return sql`(${subquery}) < ${n0}`;
-    case 'lessThanOrEqual':
+    }
+    case 'lessThanOrEqual': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'value');
       return sql`(${subquery}) <= ${n0}`;
-    case 'between':
+    }
+    case 'between': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'lower bound');
+      const n1 = requireNumericFilterValue(values[1], filter, 'upper bound');
       return sql`(${subquery}) BETWEEN ${n0} AND ${n1}`;
-    case 'notBetween':
+    }
+    case 'notBetween': {
+      const n0 = requireNumericFilterValue(values[0], filter, 'lower bound');
+      const n1 = requireNumericFilterValue(values[1], filter, 'upper bound');
       return sql`(${subquery}) NOT BETWEEN ${n0} AND ${n1}`;
+    }
     case 'isNull':
       return sql`(${subquery}) IS NULL`;
     case 'isNotNull':
@@ -118,6 +149,13 @@ export function lowerDerivedAggregateSpec(
     throw new SchemaError(
       `Derived aggregates require a many-relation; '${spec.relation}' on '${primaryTable}' is '${relationship.cardinality}'.`,
       { primaryTable, relation: spec.relation, cardinality: relationship.cardinality }
+    );
+  }
+
+  if (relationship.isArray) {
+    throw new SchemaError(
+      `Derived aggregates on array-FK relations are not supported in v1; '${spec.relation}' on '${primaryTable}' is an array relationship.`,
+      { primaryTable, relation: spec.relation, isArray: true }
     );
   }
 
