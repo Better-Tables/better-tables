@@ -17,7 +17,7 @@ Pass `data` plus either a `table` definition (supplies identity and columns) or 
 |---|---|---|
 | `id` | `string` | Unique table instance id (keys the state store and URL params). Defaults to `table.tableName` when `table` is given |
 | `name` | `string` | Human-readable display name. Defaults to `table.tableName` |
-| `columns` | `ColumnDefinition[]` | Column definitions. Defaults to `table.columns` |
+| `columns` | `ColumnDefinition[]` | Column definitions. Defaults to `table.columns`. Server aggregates: [`t.count` / `t.aggregate`](/docs/columns#derived-columns-server-aggregates) |
 | `table` | `TableDefinition` | A `defineTable()` / `tables.define()` definition — sugar for `columns`/`id`/`name` (explicit props still win). Enables [auto columns](/docs/columns/auto-columns) resolution when paired with `adapter` |
 
 ## Data & fetching

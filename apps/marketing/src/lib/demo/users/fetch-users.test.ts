@@ -37,7 +37,9 @@ const actualUserColumns = await import('@/lib/demo/users/columns');
 
 mock.module('@/lib/demo/users/columns', () => ({
   ...actualUserColumns,
-  usersTable: { id: 'users' },
+  // Minimal stub for fetchUsers unit tests — keep `columns` so other suites
+  // that share this process (e.g. postgres smoke) don't see `undefined`.
+  usersTable: { id: 'users', tableName: 'users', columns: [] },
 }));
 
 const { fetchUsers } = await import('./fetch-users');

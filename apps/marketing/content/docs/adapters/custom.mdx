@@ -23,6 +23,8 @@ const result = await tables.fetchData(ticketsTable, {
 
 Options: `getRowId` (row identity for edits; defaults to the `id` field), `tableName`, and `enumInferenceLimit` (distinct-string ceiling for inferring `option` columns; default 12, `0` disables). Scope: own-table columns only — dot-path ids walk nested objects, but there's no relationship model or JOIN semantics; use a database adapter for relational data.
 
+`memoryAdapter` supports **derived aggregates** when rows already carry nested arrays (`posts: [...]`): it materializes `t.count` / `t.aggregate` values before filter/sort and declares `meta.capabilities.aggregates` (all fns, render/filter/sort).
+
 ## The contract
 
 ```ts
@@ -37,7 +39,7 @@ import type { TableAdapter } from '@better-tables/core';
 | `getFilterOptions(columnId, params?)` | Distinct choices for option filters → `FilterOption[]` |
 | `getFacetedValues(columnId, params?)` | Value counts → `Map<string, number>` (self-exclusion is YOUR job: a column's own filter must not narrow its own facet) |
 | `getMinMaxValues(columnId, params?)` | `[min, max]` for range facets |
-| `meta` | `AdapterMeta` — name, version, and the `features` flags below |
+| `meta` | `AdapterMeta` — name, version, `features`, and optional `capabilities` (e.g. `aggregates` for `t.count` / `t.aggregate`) |
 
 **Optional** — declare only what you support; `features` must match:
 
@@ -52,7 +54,7 @@ import type { TableAdapter } from '@better-tables/core';
 
 `AdapterFeatures` flags: `create`, `read`, `update`, `delete`, `bulkOperations`, `realTimeUpdates`, `export`, `transactions`. The UI checks these before offering behavior — `features.update: false` renders adapter-saved editable cells read-only.
 
-`fetchData` params to honor: `pagination` (1-based), `sorting[]`, `filters` (`FilterState[]` = implicit AND, **or** a `FilterGroupNode` tree — core does not canonicalize before dispatch; support both), `columns`, `primaryTable`, `params`, `signal`. The `search` param is declared on the contract but not yet consumed by first-party callers.
+`fetchData` params to honor: `pagination` (1-based), `sorting[]`, `filters` (`FilterState[]` = implicit AND, **or** a `FilterGroupNode` tree — core does not canonicalize before dispatch; support both), `columns`, `derived` (serializable aggregate specs from `t.count` / `t.aggregate`), `primaryTable`, `params`, `signal`. The `search` param is declared on the contract but not yet consumed by first-party callers. If you do not implement aggregates, omit `capabilities.aggregates` — instance fetch throws a clear error when specs are present.
 
 ## What the toolkit provides
 

@@ -48,6 +48,7 @@ import {
   type CellEditAction,
   type CellEditPolicy,
 } from './lib/cell-edit-core';
+import { withDerivedFetchParams } from './lib/derived-params';
 import type {
   FacetQueryParams,
   FetchDataParams,
@@ -141,6 +142,10 @@ export function betterTables<TAdapter extends object>(
         };
       }
     }
+
+    // Plan 060: attach derived specs from the table definition and enforce
+    // adapter aggregate capabilities before the adapter runs.
+    fetchParams = withDerivedFetchParams(table.columns, fetchParams, adapter.meta);
 
     let result = await adapter.fetchData(fetchParams);
     for (const plugin of plugins) {

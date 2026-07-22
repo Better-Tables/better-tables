@@ -57,7 +57,7 @@ export async function fetchUsers({
         // result rows (plan 030, finding 10), and column visibility is
         // client-side, so hidden-but-toggleable columns need their data too.
         // Includes `id` / `profile.id` for cell-edit row addressing.
-        // (hasBio / roleTags are computed client-side from these.)
+        // (hasBio / roleTags are client-only; postsCount attaches via derived.)
         columns: [...allUserColumnIds],
       })
     );

@@ -1,20 +1,23 @@
 'use client';
 
 import type {
+  ColumnDefinition,
   FetchDataParams,
   FetchDataResult,
   FilterState,
   PaginationState,
   TableAdapter,
 } from '@better-tables/core';
+import { withDerivedFetchParams } from '@better-tables/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Stable defaults so omitted `filters`/`params` don't recreate `fetchData`'s
-// identity (and retrigger the fetch effect) on every render the way inline
-// `= []` / `= {}` default-parameter literals would. Frozen so a shared
-// constant can't be mutated via fetchParams (e.g. filters.push).
+// Stable defaults so omitted `filters`/`params`/`columns` don't recreate
+// `fetchData`'s identity (and retrigger the fetch effect) on every render
+// the way inline `= []` / `= {}` default-parameter literals would. Frozen so
+// a shared constant can't be mutated via fetchParams (e.g. filters.push).
 const EMPTY_FILTERS = Object.freeze([] as FilterState[]) as FilterState[];
 const EMPTY_PARAMS = Object.freeze({}) as Record<string, unknown>;
+const EMPTY_COLUMNS = Object.freeze([] as ColumnDefinition[]) as ColumnDefinition[];
 
 export interface UseTableDataOptions<TData = unknown> {
   /** Table adapter for data fetching */
@@ -34,6 +37,14 @@ export interface UseTableDataOptions<TData = unknown> {
    * Pass a referentially stable object when possible.
    */
   params?: Record<string, unknown>;
+
+  /**
+   * Column definitions — used to attach `derived` aggregate specs onto fetch
+   * params (same seam as instance `fetchData` / {@link withDerivedFetchParams}).
+   * Pass a referentially stable array when possible; an inline `columns={[...]}`
+   * literal recreates `fetchData` every render and can loop refetches.
+   */
+  columns?: ColumnDefinition[];
 
   /** Whether to fetch data automatically */
   enabled?: boolean;
@@ -93,6 +104,7 @@ export function useTableData<TData = unknown>({
   filters = EMPTY_FILTERS,
   pagination,
   params = EMPTY_PARAMS,
+  columns = EMPTY_COLUMNS,
   enabled = true,
 }: UseTableDataOptions<TData>): UseTableDataResult<TData> {
   const [data, setData] = useState<TData[]>([]);
@@ -132,7 +144,12 @@ export function useTableData<TData = unknown>({
         };
       }
 
-      const result = await adapter.fetchData(fetchParams);
+      const withDerived =
+        columns.length > 0
+          ? withDerivedFetchParams(columns, fetchParams, adapter.meta)
+          : fetchParams;
+
+      const result = await adapter.fetchData(withDerived);
 
       if (requestId !== requestIdRef.current || abortController.signal.aborted) {
         return;
@@ -152,7 +169,7 @@ export function useTableData<TData = unknown>({
         setLoading(false);
       }
     }
-  }, [adapter, filters, pagination, params, enabled]);
+  }, [adapter, filters, pagination, params, columns, enabled]);
 
   const refetch = useCallback(async () => {
     await fetchData();

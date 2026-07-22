@@ -39,7 +39,7 @@ import {
   sql,
   sum,
 } from 'drizzle-orm';
-import { collectFilterLeaves, FilterHandler } from '../filter-handler';
+import { collectFilterLeaves, FilterHandler, resolveJoinPlanningLeaves } from '../filter-handler';
 import type { RelationshipManager } from '../relationship-manager';
 import type {
   AggregateFunction,
@@ -703,6 +703,20 @@ export abstract class BaseQueryBuilder {
    * this layer either way, with leaf predicate construction behind the
    * `PredicateEmitter` interface.
    */
+  /**
+   * Public leaf filter builder for plan-060 tree compilation (filterSql
+   * leaves must compose inside AND/OR groups, not only as top-level ANDs).
+   */
+  buildLeafFilterCondition(
+    filter: FilterState,
+    primaryTable: string
+  ): SQL | SQLWrapper | undefined {
+    // Must use the validated leaf path so `onInvalidFilter: 'throw'` still
+    // rejects malformed operators inside trees compiled by the adapter
+    // (plan 060 tree walk); raw `buildFilterCondition` skips that gate.
+    return this.filterHandler.buildValidatedLeafCondition(filter, primaryTable);
+  }
+
   applyFilters(
     query: QueryBuilderWithJoins,
     filters: FilterState[] | FilterGroupNode,
@@ -1354,6 +1368,8 @@ export abstract class BaseQueryBuilder {
   buildCompleteQuery(params: {
     columns?: string[];
     filters?: FilterState[] | FilterGroupNode;
+    /** Plain-column leaves from a compiled filter tree (join planning only). */
+    filterJoinLeaves?: FilterState[];
     sorting?: SortingParams[];
     pagination?: PaginationParams;
     primaryTable: string;
@@ -1386,12 +1402,17 @@ export abstract class BaseQueryBuilder {
         .map((sort) => ({ columnId: sort.columnId })) || [];
 
     // Join planning must see every leaf's columnId, including ones nested
-    // inside a FilterGroupNode tree (plan 017) — collectFilterLeaves flattens
-    // either shape so a leaf buried in a group still contributes its JOIN.
+    // inside a FilterGroupNode tree (plan 017). When filters were compiled to
+    // filterSql (plan 060), filterJoinLeaves carries the plain-column paths
+    // that additionalConditions no longer expose — must match getJoinCount.
+    const joinPlanningLeaves = resolveJoinPlanningLeaves({
+      filters: params.filters,
+      filterJoinLeaves: params.filterJoinLeaves,
+    });
     const context = this.relationshipManager.buildQueryContext(
       {
         columns: params.columns || [],
-        filters: collectFilterLeaves(params.filters).map((filter) => ({
+        filters: joinPlanningLeaves.map((filter) => ({
           columnId: filter.columnId,
         })),
         sorts: sortsForContext,

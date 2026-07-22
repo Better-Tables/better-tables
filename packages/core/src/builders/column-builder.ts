@@ -18,6 +18,7 @@ import type {
   ValidationRule,
 } from '../types/column';
 import type { IconComponent } from '../types/common';
+import type { DerivedColumnSpec } from '../types/derived';
 import type { FilterConfig, FilterOperator } from '../types/filter';
 
 /**
@@ -77,10 +78,13 @@ export class ColumnBuilder<TData = unknown, TValue = unknown, TId extends string
    * ```
    */
   constructor(type: ColumnType) {
+    // Client-only custom/computed columns have no DB backing — honest
+    // defaults suppress filter/sort until the caller opts in (plan 060).
+    const isCustom = type === 'custom';
     this.config = {
       type,
-      sortable: true,
-      filterable: true,
+      sortable: !isCustom,
+      filterable: !isCustom,
       resizable: true,
       align: 'left',
       nullable: false,
@@ -353,6 +357,14 @@ export class ColumnBuilder<TData = unknown, TValue = unknown, TId extends string
    */
   meta(meta: Record<string, unknown>): this {
     this.config.meta = { ...this.config.meta, ...meta };
+    return this;
+  }
+
+  /**
+   * Attach a server-derived column spec (plan 060 aggregates).
+   */
+  derived(spec: DerivedColumnSpec): this {
+    this.config.derived = spec;
     return this;
   }
 

@@ -88,6 +88,21 @@ export function collectFilterLeaves(
 }
 
 /**
+ * Leaves used for JOIN planning when filters may have been compiled away to
+ * opaque SQL (plan 060). Prefer real filter leaves; fall back to
+ * `filterJoinLeaves` preserved by the adapter. Shared by
+ * `buildCompleteQuery` and `getJoinCount` so count/data join sets stay aligned.
+ */
+export function resolveJoinPlanningLeaves(params: {
+  filters?: FilterState[] | FilterGroupNode | undefined;
+  filterJoinLeaves?: FilterState[] | undefined;
+}): FilterState[] {
+  const fromFilters = collectFilterLeaves(params.filters);
+  if (fromFilters.length > 0) return fromFilters;
+  return params.filterJoinLeaves ?? [];
+}
+
+/**
  * Recursively drop every leaf targeting `excludeColumnId` from a
  * {@link FilterNode}, per plan 021's self-exclusion faceting convention (see
  * `FacetQueryParams` in `@better-tables/core`): a group that becomes empty
@@ -208,6 +223,17 @@ export class FilterHandler {
     this.onInvalidFilter = onInvalidFilter;
     this.emitter = new DrizzlePredicateEmitter(schema, databaseType, hooks);
     this.router = new FilterRouter(this.emitter);
+  }
+
+  /**
+   * Validate + build a leaf (shared by flat filters and tree compilation).
+   * Honors `onInvalidFilter` the same way as {@link buildTreeCondition}.
+   */
+  buildValidatedLeafCondition(
+    filter: FilterState,
+    primaryTable: string
+  ): SQL | SQLWrapper | undefined {
+    return this.buildLeafCondition(filter, primaryTable);
   }
 
   /**

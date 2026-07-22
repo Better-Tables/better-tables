@@ -14,7 +14,7 @@
     "postinstall": "fumadocs-mdx",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "next typegen && fumadocs-mdx && tsc --noEmit",
     "test": "bun test",
     "clean": "git clean -xdf .cache .next .turbo .source node_modules"
   },

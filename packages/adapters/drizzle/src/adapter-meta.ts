@@ -37,6 +37,14 @@ export function buildAdapterMeta(
     supportedOperators,
     supportsFilterGroups: true,
     maxGroupDepth: 3,
+    capabilities: {
+      aggregates: {
+        fns: ['count', 'sum', 'avg', 'min', 'max'],
+        render: true,
+        filter: true,
+        sort: true,
+      },
+    },
     ...customMeta,
   };
 }

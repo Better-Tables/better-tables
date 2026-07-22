@@ -18,14 +18,13 @@
  * object shape, because they ARE the same builder class underneath.
  *
  * See `plans/018-instance-api-runtime.md` Step 3 for the scope this file
- * implements, and its "Deferred OUT of this plan" list for what's
- * intentionally NOT here: `t.count()`/`t.sum()` (aggregate builders --
- * need adapter execution work), `t.json().path()`, and runtime enum
- * auto-OPTIONS metadata.
+ * implements. Aggregate builders (`t.count` / `t.aggregate`) ship in plan
+ * 060. Still deferred: `t.json().path()`, runtime enum auto-OPTIONS.
  */
 
 import { humanize, lastPathSegment } from '../lib/format-utils';
 import type { ColumnDefinition } from '../types/column';
+import type { AggregateFn, DerivedColumnSpec } from '../types/derived';
 import type { Paths, PathsOfType, PathValue } from '../types/paths';
 import { BooleanColumnBuilder } from './boolean-column-builder';
 import { ColumnBuilder } from './column-builder';
@@ -34,6 +33,44 @@ import { MultiOptionColumnBuilder } from './multi-option-column-builder';
 import { NumberColumnBuilder } from './number-column-builder';
 import { OptionColumnBuilder } from './option-column-builder';
 import { TextColumnBuilder } from './text-column-builder';
+
+/** Options for {@link PathColumnFactory.aggregate}. */
+export type AggregateBuilderSpec = {
+  relation: string;
+  fn: AggregateFn;
+  /** Required for sum/avg/min/max; ignored for count. */
+  field?: string;
+};
+
+function assertRelation(relation: string, caller: 't.count' | 't.aggregate'): void {
+  if (relation == null || String(relation).trim() === '') {
+    throw new Error(
+      `${caller}: relation must be a non-empty string (e.g. ${caller === 't.count' ? 't.count("posts")' : 't.aggregate("total", { relation: "orders", fn: "sum", field: "amount" })'}).`
+    );
+  }
+}
+
+function assertAggregateField(spec: AggregateBuilderSpec): void {
+  if (spec.fn !== 'count' && (spec.field == null || spec.field === '')) {
+    throw new Error(
+      `t.aggregate: fn '${spec.fn}' requires a 'field' (the numeric column on '${spec.relation}').`
+    );
+  }
+}
+
+function derivedFromAggregate(spec: AggregateBuilderSpec): DerivedColumnSpec {
+  assertRelation(spec.relation, 't.aggregate');
+  assertAggregateField(spec);
+  if (spec.fn === 'count') {
+    return { kind: 'aggregate', relation: spec.relation, fn: 'count' };
+  }
+  return {
+    kind: 'aggregate',
+    relation: spec.relation,
+    fn: spec.fn,
+    field: spec.field as string,
+  };
+}
 
 /**
  * Walk a dot-notation path against a row, matching the RUNTIME accessor
@@ -150,11 +187,8 @@ export type ComputedBuilder<TData, TValue, TId extends string = string> = Column
 
 /**
  * The `t` builder factory bound to a specific table's row type `TRow`.
- * Implements plan 011 Step 3's required members
- * (`text/number/date/boolean/option/multiOption/computed/custom`).
- *
- * `t.count()`/`t.sum()` (aggregate builders) are deliberately NOT modeled --
- * deferred out of this plan (see module docblock).
+ * Implements plan 011 Step 3's required members plus plan 060 aggregates
+ * (`count` / `aggregate`).
  */
 export interface PathColumnFactory<TRow> {
   text<P extends PathsOfType<TRow, string | null>>(
@@ -221,6 +255,26 @@ export interface PathColumnFactory<TRow> {
    * entry.
    */
   auto(): ColumnDefinition<TRow, unknown>[];
+
+  /**
+   * Relation count column (plan 060). Id defaults to `` `${relation}Count` ``.
+   * Server-backed — filterable and sortable by default.
+   *
+   * @example
+   * ```ts
+   * t.count('posts').displayName('Posts')
+   * ```
+   */
+  count(relation: string): NumberColumnBuilder<TRow, number, `${string}Count`>;
+
+  /**
+   * General aggregate column (plan 060). Prefer {@link count} for counts.
+   * Non-count fns require `field`.
+   */
+  aggregate<TId extends string>(
+    id: TId,
+    spec: AggregateBuilderSpec
+  ): NumberColumnBuilder<TRow, number, TId>;
 }
 
 // ============================================================================
@@ -315,6 +369,31 @@ export function createPathColumnFactory<TRow>(): PathColumnFactory<TRow> {
 
     auto() {
       return [createAutoColumnsSentinel<TRow>()];
+    },
+
+    count(relation: string) {
+      assertRelation(relation, 't.count');
+      const id = `${relation}Count` as const;
+      return new NumberColumnBuilder<TRow, number, typeof id>()
+        .id(id)
+        .accessor((row) => {
+          const value = (row as Record<string, unknown>)[id];
+          return typeof value === 'number' ? value : Number(value ?? 0);
+        })
+        .displayName(humanize(id))
+        .derived(derivedFromAggregate({ relation, fn: 'count' }));
+    },
+
+    aggregate<TId extends string>(id: TId, spec: AggregateBuilderSpec) {
+      const derived = derivedFromAggregate(spec);
+      return new NumberColumnBuilder<TRow, number, TId>()
+        .id(id)
+        .accessor((row) => {
+          const value = (row as Record<string, unknown>)[id];
+          return typeof value === 'number' ? value : Number(value ?? 0);
+        })
+        .displayName(humanize(id))
+        .derived(derived);
     },
   };
 }

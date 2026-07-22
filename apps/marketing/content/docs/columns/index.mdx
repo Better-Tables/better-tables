@@ -39,8 +39,21 @@ export const usersTable = tables.define('users', (t) => ({
 
 ## Escape hatches
 
-- `t.computed(id, accessor)` — derived display values
-- `t.custom()` — full fluent builder when you need total control
+- `t.computed(id, accessor)` — client-only derived display values (`type: 'custom'`). Defaults to **not** filterable/sortable — there is no DB column behind the id.
+- `t.custom()` — full fluent builder when you need total control (same honest defaults)
+
+## Derived columns (server aggregates)
+
+For relation counts and aggregates the adapter can render, filter, and sort in SQL, use declarative builders — not hand-rolled `computedFields`:
+
+```ts
+t.count('posts').displayName('Posts'),
+// → column id `postsCount`, type number, filterable + sortable
+
+t.aggregate('revenueTotal', { relation: 'orders', fn: 'sum', field: 'amount' }),
+```
+
+Specs travel on `FetchDataParams.derived` (attached by instance `fetchData` / `useTableData`). Drizzle lowers them to correlated subqueries; `memoryAdapter` evaluates nested arrays. Adapters advertise support via `meta.capabilities.aggregates`. Acceptance one-liner: **a users table with `t.count('posts')` you can render, filter (`greaterThan` 5), and sort**.
 
 ## Standalone columns (no schema)
 

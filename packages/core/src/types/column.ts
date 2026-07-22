@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ColumnMeta } from './column-meta';
 import type { IconComponent, RenderProps } from './common';
+import type { DerivedColumnSpec } from './derived';
 import type { FilterConfig } from './filter';
 
 /**
@@ -94,6 +95,13 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown, TId extends
 
   /** Whether column supports null/undefined values */
   nullable?: boolean;
+
+  /**
+   * Server-derived column spec (plan 060). When set, adapters evaluate the
+   * value (e.g. relation `count`) instead of reading a physical column.
+   * Serializable — never functions or SQL strings.
+   */
+  derived?: DerivedColumnSpec;
 
   /** Column metadata - strongly typed */
   meta?: ColumnMeta;
