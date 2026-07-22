@@ -399,5 +399,84 @@ describe('memoryAdapter', () => {
       delete: false,
     });
     expect(adapter.meta.supportsFilterGroups).toBe(true);
+    expect(adapter.meta.capabilities?.aggregates).toMatchObject({
+      render: true,
+      filter: true,
+      sort: true,
+      fns: expect.arrayContaining(['count', 'sum']),
+    });
+  });
+
+  describe('derived aggregates (plan 060)', () => {
+    interface UserWithPosts {
+      id: string;
+      name: string;
+      posts: { title: string; views: number }[];
+    }
+
+    const users: UserWithPosts[] = [
+      { id: '1', name: 'Ada', posts: [{ title: 'a', views: 10 }, { title: 'b', views: 20 }] },
+      { id: '2', name: 'Grace', posts: [{ title: 'c', views: 5 }] },
+      { id: '3', name: 'Alan', posts: [] },
+    ];
+
+    it('renders count and sum over nested arrays', async () => {
+      const adapter = memoryAdapter(users);
+      const result = await adapter.fetchData({
+        derived: [
+          { columnId: 'postsCount', kind: 'aggregate', relation: 'posts', fn: 'count' },
+          {
+            columnId: 'viewsSum',
+            kind: 'aggregate',
+            relation: 'posts',
+            fn: 'sum',
+            field: 'views',
+          },
+        ],
+      });
+      const byId = Object.fromEntries(
+        result.data.map((row) => [row.id, row as UserWithPosts & { postsCount: number; viewsSum: number }])
+      );
+      expect(byId['1']?.postsCount).toBe(2);
+      expect(byId['1']?.viewsSum).toBe(30);
+      expect(byId['2']?.postsCount).toBe(1);
+      expect(byId['3']?.postsCount).toBe(0);
+    });
+
+    it('filters on count inside an OR group', async () => {
+      const adapter = memoryAdapter(users);
+      const filters: FilterGroupNode = {
+        kind: 'group',
+        logic: 'or',
+        children: [
+          {
+            columnId: 'postsCount',
+            type: 'number',
+            operator: 'greaterThan',
+            values: [1],
+          },
+          {
+            columnId: 'name',
+            type: 'text',
+            operator: 'equals',
+            values: ['Alan'],
+          },
+        ],
+      };
+      const result = await adapter.fetchData({
+        filters,
+        derived: [{ columnId: 'postsCount', kind: 'aggregate', relation: 'posts', fn: 'count' }],
+      });
+      expect(result.data.map((r) => r.id).sort()).toEqual(['1', '3']);
+    });
+
+    it('sorts by derived count', async () => {
+      const adapter = memoryAdapter(users);
+      const result = await adapter.fetchData({
+        sorting: [{ columnId: 'postsCount', direction: 'desc' }],
+        derived: [{ columnId: 'postsCount', kind: 'aggregate', relation: 'posts', fn: 'count' }],
+      });
+      expect(result.data.map((r) => r.id)).toEqual(['1', '2', '3']);
+    });
   });
 });

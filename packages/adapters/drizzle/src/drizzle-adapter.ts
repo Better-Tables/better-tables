@@ -73,8 +73,10 @@ import {
   normalizeFilterNode,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import { AdapterCache } from './adapter-cache';
 import { buildAdapterMeta } from './adapter-meta';
+import { lowerDerivedAggregateSpecs } from './derived-aggregates';
 import { convertToExportFormat, getMimeType } from './export-format';
 import { collectFilterLeaves, pruneFilterNodeForColumn } from './filter-handler';
 import { getOperationsFactory } from './operations';
@@ -458,8 +460,18 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     const primaryTable = this.resolvePrimaryTableForRead(params.columns, params.primaryTable);
 
     try {
-      // Get computed fields for this table
-      const tableComputedFields = this.computedFields[primaryTable] || [];
+      // Configured computed fields + plan-060 derived aggregates lowered into
+      // the same ComputedFieldConfig pipeline for this request only.
+      const derivedComputedFields = lowerDerivedAggregateSpecs(
+        params.derived,
+        primaryTable,
+        this.schema as Record<string, AnyTableType>,
+        this.relationshipManager
+      );
+      const tableComputedFields = [
+        ...(this.computedFields[primaryTable] || []),
+        ...derivedComputedFields,
+      ];
 
       // Filter out computed fields from columns and track which ones were requested
       const requestedComputedFields: ComputedFieldConfig[] = [];
@@ -472,6 +484,13 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       // Note: Both undefined and [] (empty array) are treated as "no columns specified"
       // Use spread operator to avoid mutating the input parameter
       const columnsToProcess = params.columns ? [...params.columns] : [];
+      // Derived specs always participate when present (even if columns is empty /
+      // omitted) so SELECT gets the correlated subquery aliases.
+      for (const derivedField of derivedComputedFields) {
+        if (!columnsToProcess.includes(derivedField.field)) {
+          columnsToProcess.push(derivedField.field);
+        }
+      }
       if (columnsToProcess.length === 0) {
         // Include computed fields that should be included by default
         // These will be processed like regular columns and added to finalColumns
@@ -507,11 +526,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       // Handle computed field filtering. `params.filters` may be a flat
       // FilterState[] (implicit AND) or a FilterGroupNode tree (plan 017);
       // normalizeIncomingFilters validates/normalizes a tree at this public
-      // API boundary (depth cap, dropping malformed nodes) and leaves a flat
-      // array untouched. Computed-field filter substitution below only
-      // understands the flat shape (computed fields are not real columns, so
-      // matching/replacing them inside an arbitrary AND/OR tree is out of
-      // scope for this plan) — it's skipped entirely when filters is a tree.
+      // API boundary. filterSql-backed fields (incl. plan-060 derived
+      // aggregates) substitute in place for both shapes; legacy callback
+      // `filter` still rejects trees.
       let processedFilters: FilterState[] | FilterGroupNode =
         this.normalizeIncomingFilters(params.filters) ?? [];
       const computedFieldFilters: Array<{ filter: FilterState; config: ComputedFieldConfig }> = [];
@@ -525,7 +542,24 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
           }
         }
       } else {
-        this.rejectComputedFieldFiltersInTree(processedFilters, tableComputedFields);
+        // Compile the whole tree so filterSql leaves keep AND/OR position
+        // (extracting them to top-level additionalConditions would AND them
+        // and break OR groups).
+        const treeSql = await this.compileTreeFiltersWithComputed(
+          processedFilters,
+          tableComputedFields,
+          {
+            primaryTable,
+            allRows: [],
+            db: this.db,
+            schema: this.schema,
+          },
+          primaryTable
+        );
+        if (treeSql) {
+          additionalSqlConditions.push(treeSql);
+        }
+        processedFilters = [];
       }
 
       // Build cache params early (needed for error handling)
@@ -632,9 +666,11 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         };
       }
 
-      // Resolve sortSql expressions for computed fields that are being sorted
+      // Resolve sortSql for requested computed fields (SELECT alias) and sorts.
+      // Derived aggregates always carry sortSql so the correlated subquery
+      // lands in SELECT even when the column is not being sorted.
       const computedFieldsForSorting: Record<string, ComputedFieldWithResolvedSortSql> = {};
-      if (params.sorting && params.sorting.length > 0) {
+      {
         const context: ComputedFieldContext<TSchema, TDriver> = {
           primaryTable,
           allRows: [],
@@ -642,42 +678,39 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
           schema: this.schema,
         };
 
-        for (const sort of params.sorting) {
-          const computedField = tableComputedFields.find((cf) => cf.field === sort.columnId);
-          if (computedField?.sortSql) {
-            try {
-              // Resolve sortSql expression (handle both sync and async)
-              const sqlExpression = computedField.sortSql(context);
-              const resolvedExpression =
-                sqlExpression instanceof Promise ? await sqlExpression : sqlExpression;
+        const fieldsNeedingSelect = new Set<string>(
+          requestedComputedFields.filter((cf) => cf.sortSql).map((cf) => cf.field)
+        );
+        for (const sort of params.sorting ?? []) {
+          fieldsNeedingSelect.add(sort.columnId);
+        }
 
-              // Validate that sortSql returned a valid SQL expression
-              if (!resolvedExpression) {
-                throw new QueryError(
-                  `sortSql returned null or undefined for computed field: ${sort.columnId}`,
-                  { columnId: sort.columnId, field: computedField.field }
-                );
-              }
-
-              computedFieldsForSorting[sort.columnId] = {
-                ...computedField,
-                __resolvedSortSql: resolvedExpression,
-              };
-            } catch (error) {
-              // Re-throw QueryError as-is (already has proper context)
-              if (error instanceof QueryError) {
-                throw error;
-              }
-              // Wrap other errors with context
+        for (const fieldName of fieldsNeedingSelect) {
+          const computedField = tableComputedFields.find((cf) => cf.field === fieldName);
+          if (!computedField?.sortSql) continue;
+          try {
+            const sqlExpression = computedField.sortSql(context);
+            const resolvedExpression =
+              sqlExpression instanceof Promise ? await sqlExpression : sqlExpression;
+            if (!resolvedExpression) {
               throw new QueryError(
-                `Failed to resolve sortSql for computed field: ${sort.columnId}`,
-                {
-                  columnId: sort.columnId,
-                  field: computedField.field,
-                  originalError: error instanceof Error ? error.message : String(error),
-                }
+                `sortSql returned null or undefined for computed field: ${fieldName}`,
+                { columnId: fieldName, field: computedField.field }
               );
             }
+            computedFieldsForSorting[fieldName] = {
+              ...computedField,
+              __resolvedSortSql: resolvedExpression,
+            };
+          } catch (error) {
+            if (error instanceof QueryError) {
+              throw error;
+            }
+            throw new QueryError(`Failed to resolve sortSql for computed field: ${fieldName}`, {
+              columnId: fieldName,
+              field: computedField.field,
+              originalError: error instanceof Error ? error.message : String(error),
+            });
           }
         }
       }
@@ -795,6 +828,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
 
       return result;
     } catch (error) {
+      if (error instanceof SchemaError || error instanceof QueryError) {
+        throw error;
+      }
       throw new QueryError(
         `Failed to fetch data: ${error instanceof Error ? error.message : 'Unknown error'}`,
         { params, error }
@@ -1447,29 +1483,45 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    */
 
   /**
-   * Computed-field filter substitution (plan 017) only runs on flat
-   * `FilterState[]` inputs. Filter trees must fail loudly until the
-   * computed-fields owner extends substitution to walk `FilterGroupNode`
-   * trees (plan 051 — documented, not implemented here).
+   * Compile a FilterGroupNode to SQL, substituting filterSql-backed computed
+   * leaves in place so AND/OR structure is preserved (plan 060). Legacy
+   * callback-`filter` computed fields still reject trees.
    */
-  private rejectComputedFieldFiltersInTree(
-    node: FilterGroupNode,
-    tableComputedFields: ComputedFieldConfig[]
-  ): void {
-    for (const child of node.children) {
-      if (isFilterGroupNode(child)) {
-        this.rejectComputedFieldFiltersInTree(child, tableComputedFields);
-        continue;
-      }
-
-      const computedField = tableComputedFields.find((cf) => cf.field === child.columnId);
-      if (computedField?.filter || computedField?.filterSql) {
-        throw new QueryError(
-          `Computed-field filters inside a FilterGroupNode are not supported yet (columnId: "${child.columnId}"). Use a flat FilterState[] (implicit AND) for computed-field filters, or flatten the tree at the call site.`,
-          { columnId: child.columnId, field: computedField.field }
+  private async compileTreeFiltersWithComputed(
+    node: FilterNode,
+    tableComputedFields: ComputedFieldConfig[],
+    context: ComputedFieldContext<TSchema, TDriver>,
+    primaryTable: string
+  ): Promise<SQL | SQLWrapper | undefined> {
+    if (isFilterGroupNode(node)) {
+      const parts: (SQL | SQLWrapper)[] = [];
+      for (const child of node.children) {
+        const part = await this.compileTreeFiltersWithComputed(
+          child,
+          tableComputedFields,
+          context,
+          primaryTable
         );
+        if (part !== undefined) parts.push(part);
       }
+      if (parts.length === 0) return undefined;
+      if (parts.length === 1) return parts[0];
+      const combined = node.logic === 'or' ? or(...parts) : and(...parts);
+      return combined ?? undefined;
     }
+
+    const computedField = tableComputedFields.find((cf) => cf.field === node.columnId);
+    if (computedField?.filterSql) {
+      return Promise.resolve(computedField.filterSql(node, context));
+    }
+    if (computedField?.filter) {
+      throw new QueryError(
+        `Computed-field filters that use the callback \`filter\` form are not supported inside a FilterGroupNode (columnId: "${node.columnId}"). Restructure so those filters are top-level AND'd, or provide filterSql on the computed field.`,
+        { columnId: node.columnId, field: computedField.field }
+      );
+    }
+
+    return this.queryBuilder.buildLeafFilterCondition(node, primaryTable);
   }
 
   /**

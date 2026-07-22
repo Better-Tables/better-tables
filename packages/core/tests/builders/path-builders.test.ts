@@ -213,6 +213,8 @@ describe('path builders (plan 018)', () => {
 
       expect(def.type).toBe('custom');
       expect(def.id).toBe('custom');
+      expect(def.filterable).toBe(false);
+      expect(def.sortable).toBe(false);
     });
 
     it('t.computed() infers the value type from the accessor and humanizes the id for the default label', () => {
@@ -222,7 +224,45 @@ describe('path builders (plan 018)', () => {
       expect(def.id).toBe('fullName');
       expect(def.displayName).toBe('Full Name');
       expect(def.type).toBe('custom');
+      expect(def.filterable).toBe(false);
+      expect(def.sortable).toBe(false);
       expect(def.accessor({ name: 'Ada', age: 30, posts: [] })).toBe('Ada!!');
+    });
+  });
+
+  describe('t.count() / t.aggregate() (plan 060)', () => {
+    it('t.count(relation) defaults id to `${relation}Count` with a count derived spec', () => {
+      const t = createPathColumnFactory<User>();
+      const def = t.count('posts').build();
+
+      expect(def.id).toBe('postsCount');
+      expect(def.type).toBe('number');
+      expect(def.filterable).toBe(true);
+      expect(def.sortable).toBe(true);
+      expect(def.derived).toEqual({ kind: 'aggregate', relation: 'posts', fn: 'count' });
+      expect(
+        def.accessor({ name: 'Ada', age: 30, posts: [], postsCount: 3 } as User & {
+          postsCount: number;
+        })
+      ).toBe(3);
+    });
+
+    it('t.aggregate requires field for non-count fns', () => {
+      const t = createPathColumnFactory<User>();
+      expect(() => t.aggregate('total', { relation: 'posts', fn: 'sum' })).toThrow(/field/);
+    });
+
+    it('t.aggregate(id, spec) carries the general derived shape', () => {
+      const t = createPathColumnFactory<User>();
+      const def = t.aggregate('postTitles', { relation: 'posts', fn: 'sum', field: 'age' }).build();
+
+      expect(def.id).toBe('postTitles');
+      expect(def.derived).toEqual({
+        kind: 'aggregate',
+        relation: 'posts',
+        fn: 'sum',
+        field: 'age',
+      });
     });
   });
 });

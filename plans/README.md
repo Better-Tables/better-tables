@@ -33,7 +33,7 @@ loose backlog. Deferred items are at the bottom.
 ## Where we are (2026-07-22)
 
 **0.6 is shippable.** Waves A–D are merged to `main`. Open work is Wave E
-plus two leftovers (048, 060). 058 stays deferred.
+plus leftover 048. 058 stays deferred; **060 landed**.
 
 | Wave | Plans | Outcome |
 |------|-------|---------|
@@ -41,7 +41,7 @@ plus two leftovers (048, 060). 058 stays deferred.
 | A — pre-0.6 | 033–036, 040, 046, 047 | [PR #83](https://github.com/Better-Tables/better-tables/pull/83) |
 | B — quality | 037–039, 041–045, 051, 052 | [PR #85](https://github.com/Better-Tables/better-tables/pull/85); reconcile audit at `7b58ed8` verified all 17 criteria |
 | C — features | 053–055, 049, 050 | Editable cells / auto columns / direct save ([PR #86](https://github.com/Better-Tables/better-tables/pull/86)); plugins ([PR #101](https://github.com/Better-Tables/better-tables/pull/101)); export UI ([PR #102](https://github.com/Better-Tables/better-tables/pull/102)). **048 still open** |
-| D — hygiene + modules | 056, 057, 059 | Typecheck order + contract cleanup ([PR #99](https://github.com/Better-Tables/better-tables/pull/99)); UI modules + actions opt-in ([PR #100](https://github.com/Better-Tables/better-tables/pull/100)). **058 deferred; 060 open** |
+| D — hygiene + modules | 056, 057, 059, 060 | Typecheck order + contract cleanup ([PR #99](https://github.com/Better-Tables/better-tables/pull/99)); UI modules + actions opt-in ([PR #100](https://github.com/Better-Tables/better-tables/pull/100)); derived aggregates (`t.count`). **058 deferred** |
 | Docs / demo | — | Handbook overhaul + `memoryAdapter` in core ([PR #88](https://github.com/Better-Tables/better-tables/pull/88)); marketing redesign ([PR #87](https://github.com/Better-Tables/better-tables/pull/87)) |
 
 ---
@@ -58,31 +58,36 @@ plus two leftovers (048, 060). 058 stays deferred.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [060](060-derived-aggregate-columns.md) | Server-derived aggregates: `t.count('posts')` render/filter/sort via drizzle computed-fields + memoryAdapter nested arrays; honest `filterable`/`sortable` defaults for `t.computed` | none | **TODO** (P2) |
 | [058](058-global-search.md) | Global search as filter sugar over `.searchable()` columns | none | **DEFERRED** (2026-07-21) — plan intact; `FetchDataParams.search` stays declared-but-unconsumed |
 
 ### Wave E — adapter expansion
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [061](061-prisma-adapter-full-parity.md) | Prisma at full Drizzle parity. Phase 1 = shared conformance suite (memory + drizzle). Later phases: reads, facets, schema, writes, export, aggregates | Phase 7 needs 060 (skip cleanly if not landed) | **TODO** (P2) |
-| [062](062-kysely-adapter.md) | Kysely adapter (SQL-native composition; full aggregate parity) | 061 Phases 1 + 6; aggregates need 060 | **TODO** |
+| [061](061-prisma-adapter-full-parity.md) | Prisma at full Drizzle parity. Phase 1 = shared conformance suite (memory + drizzle). Later phases: reads, facets, schema, writes, export, aggregates | Phase 7 can use 060 (landed) | **TODO** (P2) |
+| [062](062-kysely-adapter.md) | Kysely adapter (SQL-native composition; full aggregate parity) | 061 Phases 1 + 6; aggregates need 060 (done) | **TODO** |
 
 008 is superseded by 061 — do not execute 008.
+
+**060 DONE** (2026-07-22): `t.count` / `t.aggregate`, `FetchDataParams.derived`,
+Drizzle correlated-subquery lowering + `FilterGroupNode` walk for
+`filterSql`/derived specs (051 computed-TREE gap closed for that path;
+legacy callback-`filter` still throws), memoryAdapter nested-array eval,
+homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 
 ---
 
 ## Order notes (open plans only)
 
-- **060 first** if DX is the priority — unblocks honest derived columns and
-  Wave E aggregates. No hard deps; 058 is deferred so no `factory.ts` race.
 - **061 Phase 1** anytime — conformance suite is valuable alone and required
-  for 062. Phases merge independently; skip Phase 7 until 060 lands.
-- **048** anytime after 0.6 — no file overlap with 060/061; follow plan 041
+  for 062. Phases merge independently; Phase 7 can implement aggregates against
+  the 060 capability shape.
+- **048** anytime after 0.6 — no file overlap with 061; follow plan 041
   handler idioms and plan 042 input-test patterns.
 - **062** only after 061 Phases 1 + 6.
-- Capability asymmetry to design for in 060: Prisma can sort-by-count but
-  not filter-by-count; Kysely/Drizzle do both.
+- Capability asymmetry (from 060 design): Prisma can sort-by-count but
+  not filter-by-count; Kysely/Drizzle do both — declare honestly in
+  `AdapterMeta.capabilities.aggregates`.
 
 Standing product decisions that still constrain open work:
 
@@ -189,7 +194,7 @@ Details and criteria live in each plan file. One line per plan.
 | 043 | Cross-package integration harness (Playwright E2E deferred) |
 | 044 | Drizzle module decomposition |
 | 045 | Column-builder dedup |
-| 051 | Robustness sweep (detectDriver + computed-TREE documented/deferred) |
+| 051 | Robustness sweep (detectDriver + computed-TREE documented/deferred; TREE closed for `filterSql`/derived in 060) |
 | 052 | CI/toolchain hygiene; blocking lint |
 
 ### Wave C — [PR #86](https://github.com/Better-Tables/better-tables/pull/86), [#101](https://github.com/Better-Tables/better-tables/pull/101), [#102](https://github.com/Better-Tables/better-tables/pull/102)
@@ -202,13 +207,14 @@ Details and criteria live in each plan file. One line per plan.
 | 049 | Plugin hooks `beforeFetch`/`afterFetch` + `logPlugin()` |
 | 050 | Export UI (`ExportButton`, `csvExport()`, 50k row cap) |
 
-### Wave D — [PR #99](https://github.com/Better-Tables/better-tables/pull/99), [#100](https://github.com/Better-Tables/better-tables/pull/100)
+### Wave D — [PR #99](https://github.com/Better-Tables/better-tables/pull/99), [#100](https://github.com/Better-Tables/better-tables/pull/100), 060
 
 | Plan | What |
 |------|------|
 | 056 | Deterministic typecheck (`dependsOn` build; site override) |
 | 057 | Dead contract surface removed (reserved flags/types) |
 | 059 | UI modules tier + actions as first opt-in module |
+| 060 | Derived aggregates (`t.count` / `t.aggregate`); honest custom defaults |
 
 ### Notable non-plan merges
 
@@ -232,7 +238,7 @@ DX-10, `"use client"` unbundle, bun hoisted linker). Do not re-file.
   flag + feature together.
 - **Realtime UI** — UI flag removed; drizzle `subscribe` is real. Future
   059-style module (+ optional plugin).
-- **Facets on derived columns** — fast-follow after 060.
+- **Facets on derived columns** — fast-follow after 060 (landed).
 - **Saved/named views** (`savedFilters()` plugin) — after plugin seam has
   a second real plugin; sketch in `table-definition-dx.md`.
 - **Data import** — other half of export; large design, not near-term.

@@ -703,6 +703,20 @@ export abstract class BaseQueryBuilder {
    * this layer either way, with leaf predicate construction behind the
    * `PredicateEmitter` interface.
    */
+  /**
+   * Public leaf filter builder for plan-060 tree compilation (filterSql
+   * leaves must compose inside AND/OR groups, not only as top-level ANDs).
+   */
+  buildLeafFilterCondition(
+    filter: FilterState,
+    primaryTable: string
+  ): SQL | SQLWrapper | undefined {
+    // Must use the validated leaf path so `onInvalidFilter: 'throw'` still
+    // rejects malformed operators inside trees compiled by the adapter
+    // (plan 060 tree walk); raw `buildFilterCondition` skips that gate.
+    return this.filterHandler.buildValidatedLeafCondition(filter, primaryTable);
+  }
+
   applyFilters(
     query: QueryBuilderWithJoins,
     filters: FilterState[] | FilterGroupNode,

@@ -444,6 +444,11 @@ const columns = [
 
 ## Computed Fields
 
+> **Preferred for relation counts:** use `t.count('posts')` / `t.aggregate(...)` on
+> `defineTable` (see [Derived columns](https://better-tables.com/docs/columns#derived-columns-server-aggregates)).
+> Those specs lower into this same pipeline automatically. Prefer that path over
+> hand-rolling `computedFields` for single-hop many-relation aggregates.
+
 Computed fields allow you to add virtual columns that are calculated at runtime. These fields don't exist in the database schema but are computed from the row data, related tables, or any other source.
 
 ### Basic Computed Field

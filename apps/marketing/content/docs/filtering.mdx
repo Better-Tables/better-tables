@@ -87,7 +87,9 @@ await tables.fetchData(ticketsTable, {
 });
 ```
 
-Nested groups round-trip through URL sync and programmatic `setFilterNode` (see [URL State](/docs/url-state)). The filter bar stays a flat implicit-AND chip list — visual AND/OR tree editing is not shipped yet:
+Nested groups round-trip through URL sync and programmatic `setFilterNode` (see [URL State](/docs/url-state)). Server-derived aggregate columns (`t.count` / `t.aggregate` — see [Derived columns](/docs/columns#derived-columns-server-aggregates)) participate in the same trees: Drizzle substitutes correlated-subquery predicates in place so OR groups keep union semantics.
+
+The filter bar stays a flat implicit-AND chip list — visual AND/OR tree editing is not shipped yet:
 
 <Cards>
   <Card title="Query groups example" href="/examples/query-groups" description="AND/OR filter trees with URL share." />

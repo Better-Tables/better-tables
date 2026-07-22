@@ -77,11 +77,8 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
         </Badge>
       )),
 
-    // Derived display values: computed client-side from the fetched row.
-    // Builders default to filterable/sortable, so both must be turned OFF
-    // explicitly — there is no DB column behind these ids, and letting the
-    // controls through would send `hasBio` / `roleTags` to the query builder
-    // as if they were storage fields.
+    // Client-only display values (`type: 'custom'`). Honest defaults are
+    // filterable/sortable false (plan 060); explicit flags kept for clarity.
     t
       .computed('hasBio', (row) => Boolean(row.profile?.bio))
       .displayName('Has Bio')
@@ -107,6 +104,9 @@ export const usersTable = defineTable<UsersTables>()('users', (t) => ({
           ))}
         </div>
       )),
+
+    // Server-derived relation count (plan 060) — filterable/sortable via SQL.
+    t.count('posts').displayName('Posts'),
 
     t.date('createdAt').displayName('Joined').filterable().sortable().editable(),
 
@@ -190,6 +190,7 @@ export const allUserColumnIds = [
   'age',
   'role',
   'status',
+  'postsCount',
   'createdAt',
   'profile.id',
   'profile.bio',
@@ -205,6 +206,7 @@ export const defaultVisibleColumns = [
   'age',
   'role',
   'status',
+  'postsCount',
   'hasBio',
   'roleTags',
   'createdAt',

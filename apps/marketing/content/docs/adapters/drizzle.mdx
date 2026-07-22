@@ -74,6 +74,18 @@ PostgreSQL `.array()` foreign keys (with `.references()`) are detected automatic
 
 Try it live: [/examples/relationship-filtering](/examples/relationship-filtering).
 
+## Derived aggregates (`t.count`)
+
+Prefer declarative columns over hand-rolled `computedFields` for relation counts:
+
+```ts
+t.count('posts').displayName('Posts'), // id: postsCount
+```
+
+The adapter validates the many-relation on the primary table, lowers the spec to a correlated subquery on SELECT / WHERE / ORDER BY (via the existing computed-fields pipeline), and supports filters inside `FilterGroupNode` trees. Index the FK on the related table (`posts.user_id`) — each row pays one subquery.
+
+See [Derived columns](/docs/columns#derived-columns-server-aggregates).
+
 ## Facets
 
 `getFacetedValues` / `getMinMaxValues` / `fetchData({ faceted })` power filter option counts and range facets, with self-exclusion handled by the adapter. See the [Facets guide](/docs/facets) and [/examples/facets](/examples/facets).

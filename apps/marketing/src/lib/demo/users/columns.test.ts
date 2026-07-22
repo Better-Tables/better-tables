@@ -33,4 +33,17 @@ describe('homepage demo columns', () => {
     expect(byId.name?.filterable).toBe(true);
     expect(byId.name?.sortable).toBe(true);
   });
+
+  it('exposes a server-derived postsCount aggregate column (plan 060)', () => {
+    const column = byId.postsCount;
+    expect(column).toBeDefined();
+    expect(column?.type).toBe('number');
+    expect(column?.filterable).toBe(true);
+    expect(column?.sortable).toBe(true);
+    expect(column?.derived).toEqual({
+      kind: 'aggregate',
+      relation: 'posts',
+      fn: 'count',
+    });
+  });
 });

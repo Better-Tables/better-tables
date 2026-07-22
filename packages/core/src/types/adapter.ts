@@ -9,6 +9,7 @@
 
 import type { ColumnType } from './column';
 import type { DataEvent } from './common';
+import type { AdapterCapabilities, DerivedFetchSpec } from './derived';
 import type { FilterGroupNode, FilterOperator, FilterOption, FilterState } from './filter';
 import type { PaginationParams } from './pagination';
 import type { SortingParams } from './sorting';
@@ -56,6 +57,13 @@ export interface FetchDataParams {
 
   /** Specific columns to include in the result */
   columns?: string[];
+
+  /**
+   * Server-derived column specs (plan 060). Attached by the instance fetch
+   * path / UI from column definitions — not adapter-constructor config.
+   * Adapters validate each spec against schema/relationships.
+   */
+  derived?: DerivedFetchSpec[];
 
   /**
    * Explicit primary table specification.
@@ -640,6 +648,12 @@ export interface AdapterMeta {
    * plan 011's `Paths<T>` depth cap).
    */
   maxGroupDepth?: number;
+
+  /**
+   * Optional capability contributions (plan 060). Adapters that support
+   * server-derived aggregates declare `capabilities.aggregates`.
+   */
+  capabilities?: AdapterCapabilities;
 }
 
 /**

@@ -23,6 +23,7 @@ import type {
   TableAdapter,
 } from '../types/adapter';
 import type { ColumnType } from '../types/column';
+import type { AggregateFn, DerivedFetchSpec } from '../types/derived';
 import type {
   FilterGroupNode,
   FilterNode,
@@ -32,6 +33,59 @@ import type {
 } from '../types/filter';
 import { FILTER_OPERATORS, getDefaultOperatorsForType } from '../types/filter-operators';
 import type { SortingParams } from '../types/sorting';
+
+const ALL_AGGREGATE_FNS: AggregateFn[] = ['count', 'sum', 'avg', 'min', 'max'];
+
+/** Evaluate a derived aggregate over a nested array relation on the row. */
+function evaluateDerivedAggregate(row: unknown, spec: DerivedFetchSpec): number {
+  const relationValue =
+    row && typeof row === 'object'
+      ? (row as Record<string, unknown>)[spec.relation]
+      : undefined;
+  const items = Array.isArray(relationValue) ? relationValue : [];
+
+  if (spec.fn === 'count') {
+    return items.length;
+  }
+
+  const field = spec.field;
+  const numbers: number[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || field == null) continue;
+    const raw = (item as Record<string, unknown>)[field];
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    if (!Number.isNaN(n)) numbers.push(n);
+  }
+
+  if (numbers.length === 0) {
+    return 0;
+  }
+
+  switch (spec.fn) {
+    case 'sum':
+      return numbers.reduce((a, b) => a + b, 0);
+    case 'avg':
+      return numbers.reduce((a, b) => a + b, 0) / numbers.length;
+    case 'min':
+      return Math.min(...numbers);
+    case 'max':
+      return Math.max(...numbers);
+    default:
+      return 0;
+  }
+}
+
+/** Materialize derived column values onto shallow row copies. */
+function withDerivedValues<TData>(rows: TData[], derived: DerivedFetchSpec[] | undefined): TData[] {
+  if (!derived || derived.length === 0) return rows;
+  return rows.map((row) => {
+    const copy: Record<string, unknown> = { ...(row as object as Record<string, unknown>) };
+    for (const spec of derived) {
+      copy[spec.columnId] = evaluateDerivedAggregate(row, spec);
+    }
+    return copy as TData;
+  });
+}
 
 /** Options for {@link memoryAdapter}. */
 export interface MemoryAdapterOptions<TData> {
@@ -458,9 +512,12 @@ export function memoryAdapter<TData>(
     return accessor;
   };
 
-  const applyFilters = (filters: FetchDataParams['filters']): TData[] => {
-    if (!filters || (Array.isArray(filters) && filters.length === 0)) return [...rows];
-    return rows.filter((row) => matchesNode(filters, row, getAccessor));
+  const applyFilters = (
+    source: TData[],
+    filters: FetchDataParams['filters']
+  ): TData[] => {
+    if (!filters || (Array.isArray(filters) && filters.length === 0)) return [...source];
+    return source.filter((row) => matchesNode(filters, row, getAccessor));
   };
 
   const applySorting = (data: TData[], sorting: SortingParams[] | undefined): TData[] => {
@@ -485,7 +542,8 @@ export function memoryAdapter<TData>(
   return {
     async fetchData(params: FetchDataParams = {}): Promise<FetchDataResult<TData>> {
       throwIfAborted(params.signal);
-      const filtered = applySorting(applyFilters(params.filters), params.sorting);
+      const materialised = withDerivedValues(rows, params.derived);
+      const filtered = applySorting(applyFilters(materialised, params.filters), params.sorting);
       const total = filtered.length;
       const limit = Math.max(1, params.pagination?.limit ?? (total || 1));
       const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -519,7 +577,7 @@ export function memoryAdapter<TData>(
       const filters = excludeColumn(params?.filters, columnId);
       const accessor = getAccessor(columnId);
       const counts = new Map<string, number>();
-      for (const row of applyFilters(filters)) {
+      for (const row of applyFilters(rows, filters)) {
         const raw = accessor(row);
         if (raw == null) continue;
         const values = Array.isArray(raw) ? raw : [raw];
@@ -539,7 +597,7 @@ export function memoryAdapter<TData>(
       const accessor = getAccessor(columnId);
       let min = Number.POSITIVE_INFINITY;
       let max = Number.NEGATIVE_INFINITY;
-      for (const row of applyFilters(filters)) {
+      for (const row of applyFilters(rows, filters)) {
         const raw = accessor(row);
         const value = raw instanceof Date ? raw.getTime() : Number(raw);
         if (raw == null || Number.isNaN(value)) continue;
@@ -613,6 +671,14 @@ export function memoryAdapter<TData>(
         ])
       ) as Record<ColumnType, FilterOperator[]>,
       supportsFilterGroups: true,
+      capabilities: {
+        aggregates: {
+          fns: [...ALL_AGGREGATE_FNS],
+          render: true,
+          filter: true,
+          sort: true,
+        },
+      },
     },
   };
 }

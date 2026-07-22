@@ -233,6 +233,18 @@ export class FilterHandler {
    * );
    * ```
    */
+  /**
+   * Validate + build a leaf (shared by flat filters and plan-060 tree
+   * compilation). Honors `onInvalidFilter` the same way as
+   * {@link buildTreeCondition}.
+   */
+  buildValidatedLeafCondition(
+    filter: FilterState,
+    primaryTable: string
+  ): SQL | SQLWrapper | undefined {
+    return this.buildLeafCondition(filter, primaryTable);
+  }
+
   buildFilterCondition(filter: FilterState, primaryTable: string): SQL | SQLWrapper | undefined {
     // Apply beforeBuildFilterCondition hook if provided
     let processedFilter = filter;

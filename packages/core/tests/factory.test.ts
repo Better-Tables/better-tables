@@ -288,6 +288,52 @@ describe('betterTables() instance', () => {
       });
       expect(true).toBe(true);
     });
+
+    it('attaches derived specs from the table definition (plan 060)', async () => {
+      let capturedParams: FetchDataParams | undefined;
+      const adapter = createMockAdapter();
+      adapter.meta = {
+        ...adapter.meta,
+        capabilities: {
+          aggregates: {
+            fns: ['count', 'sum', 'avg', 'min', 'max'],
+            render: true,
+            filter: true,
+            sort: true,
+          },
+        },
+      };
+      adapter.fetchData = async (params) => {
+        capturedParams = params;
+        return {
+          data: [],
+          total: 0,
+          pagination: { page: 1, limit: 20, totalPages: 0, hasNext: false, hasPrev: false },
+        };
+      };
+      const tables = betterTables({ database: adapter });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name'), t.count('posts')],
+      }));
+
+      await tables.fetchData(usersTable, { columns: ['name', 'postsCount'] });
+
+      expect(capturedParams?.derived).toEqual([
+        { columnId: 'postsCount', kind: 'aggregate', relation: 'posts', fn: 'count' },
+      ]);
+    });
+
+    it('throws when derived columns are present but the adapter lacks capabilities.aggregates', async () => {
+      const adapter = createMockAdapter();
+      const tables = betterTables({ database: adapter });
+      const usersTable = defineTable<typeof tables>()('users', (t) => ({
+        columns: [t.text('name'), t.count('posts')],
+      }));
+
+      await expect(tables.fetchData(usersTable, { columns: ['postsCount'] })).rejects.toThrow(
+        /capabilities\.aggregates/
+      );
+    });
   });
 
   describe('tables.createRecord/updateRecord/deleteRecord -- table-scoped writes (plan 047)', () => {

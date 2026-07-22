@@ -1,7 +1,6 @@
 /**
- * Plan 051: computed-field filter substitution is intentionally limited to
- * flat FilterState[] inputs. Trees must fail loudly (documented in
- * the changeset's known-gaps note).
+ * Plan 051/060: callback-`filter` computed fields still reject FilterGroupNode
+ * trees. filterSql-backed fields (incl. derived aggregates) substitute in place.
  */
 import { describe, expect, it } from 'bun:test';
 import type { FilterGroupNode } from '@better-tables/core';
@@ -32,8 +31,56 @@ const mockDb = {
   },
 } as unknown as PostgresDatabaseType;
 
-describe('Computed-field filters inside FilterGroupNode (plan 051)', () => {
-  it('throws QueryError instead of treating the computed field as a real column', async () => {
+describe('Computed-field filters inside FilterGroupNode', () => {
+  it('throws QueryError for legacy callback-filter computed fields in a tree', async () => {
+    const config: DrizzleAdapterConfig<typeof schema, 'postgres'> = {
+      db: mockDb,
+      schema,
+      driver: 'postgres',
+      computedFields: {
+        users: [
+          {
+            field: 'fullName',
+            type: 'text',
+            compute: async (row) => row.email,
+            filter: async () => [],
+          },
+        ],
+      },
+    };
+
+    const adapter = new DrizzleAdapter(config);
+    const filters: FilterGroupNode = {
+      kind: 'group',
+      logic: 'and',
+      children: [
+        {
+          columnId: 'email',
+          type: 'text',
+          operator: 'contains',
+          values: ['a'],
+        },
+        {
+          columnId: 'fullName',
+          type: 'text',
+          operator: 'contains',
+          values: ['alice'],
+        },
+      ],
+    };
+
+    await expect(
+      adapter.fetchData({
+        columns: ['email'],
+        filters,
+        primaryTable: 'users',
+      })
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('callback `filter`'),
+    });
+  });
+
+  it('does not reject filterSql-backed computed fields in a tree (extracts SQL)', async () => {
     const config: DrizzleAdapterConfig<typeof schema, 'postgres'> = {
       db: mockDb,
       schema,
@@ -70,14 +117,19 @@ describe('Computed-field filters inside FilterGroupNode (plan 051)', () => {
       ],
     };
 
-    await expect(
-      adapter.fetchData({
+    // Mock DB will fail later in query building/execution — the important
+    // assertion is that we no longer throw the tree-gap QueryError up front.
+    try {
+      await adapter.fetchData({
         columns: ['email'],
         filters,
         primaryTable: 'users',
-      })
-    ).rejects.toMatchObject({
-      message: expect.stringContaining('FilterGroupNode'),
-    });
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain('callback `filter`');
+      expect(message).not.toContain('flatten the tree');
+      expect(message).not.toContain('not supported yet');
+    }
   });
 });
