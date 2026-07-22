@@ -52,9 +52,14 @@ function exportingAdapter(
 
 describe('useTableExport', () => {
   let clickSpy: ReturnType<typeof jest.fn>;
+  const originals: Record<string, unknown> = {};
 
   beforeEach(() => {
     // happy-dom has no object-URL API; stub it, and capture the anchor click.
+    // Save originals so afterEach can restore them (no cross-file stub leak).
+    originals.createObjectURL = (URL as unknown as { createObjectURL?: unknown }).createObjectURL;
+    originals.revokeObjectURL = (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL;
+    originals.click = HTMLAnchorElement.prototype.click;
     (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => {};
     clickSpy = jest.fn();
@@ -63,7 +68,10 @@ describe('useTableExport', () => {
   });
 
   afterEach(() => {
-    clickSpy.mockRestore?.();
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = originals.createObjectURL;
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = originals.revokeObjectURL;
+    // biome-ignore lint/suspicious/noExplicitAny: restore the anchor click
+    (HTMLAnchorElement.prototype as any).click = originals.click;
   });
 
   it('reports canExport=false and errors when the adapter cannot export', async () => {

@@ -67,13 +67,19 @@ export function ExportButton<TData = unknown>({
   maxRows,
   onError,
 }: ExportButtonProps<TData>) {
-  const { exportData, exporting, canExport } = useTableExport<TData>({
+  // Default to logging failures so a failed export is never fully silent; a
+  // consumer passing `onError` (e.g. to raise a toast) takes over.
+  // biome-ignore lint/suspicious/noConsole: default so failed exports aren't silent
+  const handleError =
+    onError ?? ((err: Error) => console.error('[better-tables] export failed', err));
+
+  const { exportData, exporting, canExport, error } = useTableExport<TData>({
     adapter,
     columns,
     filters,
     sorting,
     ...(maxRows !== undefined && { maxRows }),
-    ...(onError !== undefined && { onError }),
+    onError: handleError,
   });
 
   // Nothing to render when the adapter has no export capability.
@@ -83,7 +89,13 @@ export function ExportButton<TData = unknown>({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="outline" size="sm" disabled={exporting} className="h-8 border-dashed" />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting}
+            className={`h-8 border-dashed${error ? ' text-destructive' : ''}`}
+            {...(error && { title: `Export failed: ${error.message}` })}
+          />
         }
       >
         {exporting ? (

@@ -69,6 +69,12 @@ describe('Plan 050 — exportData', () => {
     expect(rows.map((r) => r.id)).toEqual([1, 2]);
   });
 
+  it('rejects selected-record export (ids) rather than ignoring it', async () => {
+    await expect(adapter.exportData({ format: 'json', ids: ['1', '2'] })).rejects.toThrow(
+      /specific record ids/i
+    );
+  });
+
   it('escapes CSV formula-injection payloads', async () => {
     const result = await adapter.exportData({
       format: 'csv',

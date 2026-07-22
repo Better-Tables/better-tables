@@ -720,4 +720,20 @@ describe('httpAdapter export (plan 050)', () => {
     const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
     await expect(client.exportData?.({ format: 'excel' })).rejects.toThrow(/excel/i);
   });
+
+  it('rejects selected-record export (ids)', async () => {
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+    await expect(client.exportData?.({ format: 'csv', ids: ['1'] })).rejects.toThrow(
+      /specific record ids/i
+    );
+  });
+
+  it('omits headers when includeHeaders is false', async () => {
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+    const result = await client.exportData?.({ format: 'csv', includeHeaders: false });
+    // The one seeded row is `{ id: 1, status: 'open' }` → a single data line.
+    expect((result?.data as string).split('\n')).toHaveLength(1);
+  });
 });

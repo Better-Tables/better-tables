@@ -57,4 +57,13 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     href: '/examples/facets',
     chips: ['drizzle · sqlite', 'getFacetedValues', 'getMinMaxValues'],
   },
+  {
+    id: '05',
+    title: 'CSV export',
+    demonstrates:
+      'Export the current filtered, sorted view to CSV or JSON — the ExportButton module in the toolbarExtra slot, bounded by a row cap.',
+    dataset: '20 tickets · SQLite',
+    href: '/examples/export',
+    chips: ['exportData', 'toolbarExtra slot', 'CSV / JSON', 'row cap'],
+  },
 ];

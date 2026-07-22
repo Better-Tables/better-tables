@@ -19,46 +19,57 @@ const columns: ColumnDefinition<Row, unknown>[] = [
 ];
 
 function makeAdapter(canExport: boolean) {
-  const calls: ExportParams[] = [];
-  const adapter = {
+  return {
     fetchData: async () => ({
       data: [],
       total: 0,
       pagination: { page: 1, limit: 20, totalPages: 0, hasNext: false, hasPrev: false },
     }),
-    exportData: async (p: ExportParams) => {
-      calls.push(p);
-      return { data: 'name\nAda', filename: 'export.csv', mimeType: 'text/csv' } satisfies ExportResult;
-    },
+    exportData: async (p: ExportParams) =>
+      ({
+        data: 'name\nAda',
+        filename: `export.${p.format}`,
+        mimeType: 'text/csv',
+      }) satisfies ExportResult,
     meta: { features: { export: canExport } },
   };
-  return { adapter, calls };
 }
 
 describe('ExportButton', () => {
+  const originals: Record<string, unknown> = {};
+
   beforeEach(() => {
+    originals.createObjectURL = (URL as unknown as { createObjectURL?: unknown }).createObjectURL;
+    originals.revokeObjectURL = (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL;
+    originals.click = HTMLAnchorElement.prototype.click;
     (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => {};
     // biome-ignore lint/suspicious/noExplicitAny: test stub of the anchor click
     (HTMLAnchorElement.prototype as any).click = jest.fn();
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = originals.createObjectURL;
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = originals.revokeObjectURL;
+    // biome-ignore lint/suspicious/noExplicitAny: restore the anchor click
+    (HTMLAnchorElement.prototype as any).click = originals.click;
+  });
 
   it('renders nothing when the adapter cannot export', () => {
-    const { adapter } = makeAdapter(false);
+    const adapter = makeAdapter(false);
     render(<ExportButton adapter={adapter} columns={columns} filters={[]} sorting={[]} />);
     expect(screen.queryByRole('button', { name: /export/i })).toBeNull();
   });
 
   it('renders an Export control when the adapter can export', () => {
-    const { adapter } = makeAdapter(true);
+    const adapter = makeAdapter(true);
     render(<ExportButton adapter={adapter} columns={columns} filters={[]} sorting={[]} />);
     expect(screen.getByRole('button', { name: /export/i })).toBeTruthy();
   });
 
   it('offers CSV and JSON (and not the unimplemented Excel) when opened', async () => {
-    const { adapter } = makeAdapter(true);
+    const adapter = makeAdapter(true);
     render(<ExportButton adapter={adapter} columns={columns} filters={[]} sorting={[]} />);
 
     fireEvent.click(screen.getByRole('button', { name: /export/i }));

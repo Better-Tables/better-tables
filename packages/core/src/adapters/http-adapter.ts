@@ -263,6 +263,11 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       if (params.format === 'excel') {
         throw new Error('Excel export is not supported over the HTTP adapter.');
       }
+      if (params.ids && params.ids.length > 0) {
+        // Selected-row export isn't implemented — reject rather than silently
+        // returning the whole (filtered) view, which would violate the contract.
+        throw new Error('Exporting specific record ids is not supported over the HTTP adapter.');
+      }
       const limit = params.maxRows ?? DEFAULT_EXPORT_ROW_CAP;
       const fetchBody = {
         method: 'fetchData' as const,
@@ -277,7 +282,9 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       const rows = result.data as Record<string, unknown>[];
       const isJson = params.format === 'json';
       return {
-        data: isJson ? recordsToJson(rows) : recordsToCsv(rows),
+        data: isJson
+          ? recordsToJson(rows)
+          : recordsToCsv(rows, { includeHeaders: params.includeHeaders !== false }),
         filename: `export.${params.format}`,
         mimeType: isJson ? 'application/json' : 'text/csv',
       };

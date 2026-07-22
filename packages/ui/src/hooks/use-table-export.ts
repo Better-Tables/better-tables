@@ -98,10 +98,12 @@ export function useTableExport<TData = unknown>({
       setExporting(true);
       setError(null);
       try {
-        // `adapterCanExport` guarantees `exportData` exists.
-        const run = adapter?.exportData;
-        if (!run) throw new Error('This table cannot be exported.');
-        const result = await run({
+        // Call ON the adapter so `this` is preserved — a class-based adapter
+        // (e.g. Drizzle) whose `exportData` calls `this.fetchData` would break
+        // if the method were extracted to a bare local. `adapterCanExport`
+        // guarantees `exportData` exists.
+        if (!adapter?.exportData) throw new Error('This table cannot be exported.');
+        const result = await adapter.exportData({
           format,
           columns: columns.map((c) => c.id),
           filters,
