@@ -70,8 +70,12 @@ describe('Plan 050 — exportData', () => {
   });
 
   it('rejects selected-record export (ids) rather than ignoring it', async () => {
-    await expect(adapter.exportData({ format: 'json', ids: ['1', '2'] })).rejects.toThrow(
-      /specific record ids/i
+    const promise = adapter.exportData({ format: 'json', ids: ['1', '2'] });
+    await expect(promise).rejects.toThrow(/specific record ids/i);
+    // The pre-condition guard runs before the try, so the message is NOT
+    // re-wrapped with the generic export failure prefix.
+    await expect(promise).rejects.toThrow(
+      new Error('Exporting specific record ids is not supported.')
     );
   });
 

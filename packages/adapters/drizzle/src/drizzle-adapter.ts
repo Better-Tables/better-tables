@@ -1327,12 +1327,15 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * Export data
    */
   async exportData(params: ExportParams): Promise<ExportResult> {
+    // Resolve pre-conditions BEFORE the try so this surfaces as its own error
+    // type instead of being re-wrapped with the generic "Failed to export
+    // data:" prefix by the catch below (mirrors `deleteRecord`).
+    if (params.ids && params.ids.length > 0) {
+      // Selected-row export isn't implemented — reject rather than silently
+      // ignoring `ids` and returning the whole (filtered) view.
+      throw new QueryError('Exporting specific record ids is not supported.', { params });
+    }
     try {
-      if (params.ids && params.ids.length > 0) {
-        // Selected-row export isn't implemented — reject rather than silently
-        // ignoring `ids` and returning the whole (filtered) view.
-        throw new QueryError('Exporting specific record ids is not supported.', { params });
-      }
       // Fetch the rows to export, HONORING the caller's current view: filters
       // and sorting flow through so an export matches what the user sees. The
       // page size is bounded (`maxRows`, default `DEFAULT_EXPORT_ROW_CAP`) so an
