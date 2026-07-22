@@ -34,7 +34,7 @@ function encodeCsvCell(value: unknown): string {
       : typeof value === 'object'
         ? JSON.stringify(value)
         : String(value);
-  const isFormula = /^[=+\-@]/.test(str);
+  const isFormula = /^[=+\-@\t\r\n＝＋－＠]/.test(str);
   if (isFormula) str = `'${str}`;
   if (isFormula || /[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
