@@ -126,8 +126,8 @@ export function addCommand(): Command {
     const ok = printCopySummary(results, categories);
 
     console.log(pc.bold(pc.green('\n✓ Module(s) added.\n')));
+    const aliasPrefix = getAliasPrefix(config);
     if (moduleNames.includes('actions')) {
-      const aliasPrefix = getAliasPrefix(config);
       console.log(pc.dim('Wire the actions toolbar into your table via the slot prop:'));
       console.log(
         pc.cyan(
@@ -135,6 +135,16 @@ export function addCommand(): Command {
         )
       );
       console.log(pc.cyan('  <BetterTable ... slots={{ actionsToolbar: ActionsToolbar }} />'));
+      console.log('');
+    }
+    if (moduleNames.includes('export')) {
+      console.log(pc.dim('Wire the export button into your table via the slot prop:'));
+      console.log(
+        pc.cyan(
+          `  import { ExportButton } from '${aliasPrefix}components/${componentsPath}/table/export-button';`
+        )
+      );
+      console.log(pc.cyan('  <BetterTable ... slots={{ toolbarExtra: ExportButton }} />'));
       console.log('');
     }
 

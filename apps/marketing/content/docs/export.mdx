@@ -1,0 +1,76 @@
+---
+title: Export
+description: Download the current (filtered, sorted) view as CSV or JSON — an opt-in UI module plus a data plugin.
+---
+
+Export downloads the table's **current view** — the same filters and sorting the user sees — as CSV or JSON. It comes in two pieces: a UI module (the button) and, for programmatic use, a core plugin.
+
+## The export button (UI module)
+
+The `ExportButton` is an opt-in [module](/docs/ui-and-cli#modules). Add it, then wire it into the `toolbarExtra` slot:
+
+```bash
+bunx @better-tables/cli add export
+```
+
+```tsx
+import { ExportButton } from '@/components/better-tables-ui/table/export-button';
+
+<BetterTable
+  table={usersTable}
+  adapter={adapter}
+  data={data}
+  slots={{ toolbarExtra: ExportButton }}
+/>
+```
+
+The button renders only when the adapter can export (`adapter.meta.features.export`), and offers CSV and JSON. It exports the current filters and sorting, so what downloads matches what's on screen.
+
+## `useTableExport`
+
+The button is a thin wrapper over `useTableExport`, which you can use directly to build your own control:
+
+```tsx
+const { exportData, exporting, error, canExport } = useTableExport({
+  adapter,
+  columns,
+  filters,
+  sorting,
+});
+
+// exportData('csv') fetches the current view and triggers a browser download.
+```
+
+## Row cap
+
+An "export all" on a large table could pull an unbounded result set into memory, so `exportData` bounds the fetch at **50,000 rows** (`DEFAULT_EXPORT_ROW_CAP`) by default. Raise it per-call when you need a bigger (costlier) export:
+
+```tsx
+<BetterTable ... slots={{ toolbarExtra: (props) => <ExportButton {...props} maxRows={200_000} /> }} />
+```
+
+## Adapter support
+
+Export rides the adapter's optional `exportData(params)`:
+
+- **Drizzle** — runs a bounded, filtered/sorted query server-side and formats CSV/JSON (Excel is not implemented yet).
+- **HTTP** — reuses the fetch proxy to pull the filtered rows, then formats CSV/JSON in the browser. No extra route: it advertises `features.export` and works wherever reads already work.
+
+Adapters that don't implement `exportData` leave `canExport` false, and the button renders nothing.
+
+## `csvExport()` plugin
+
+For programmatic export, `csvExport()` is a core-tier [plugin](/docs/architecture#plugins-data-hooks). It observes each fetch (via the `afterFetch` hook) and formats the most recent result:
+
+```ts
+import { betterTables, csvExport } from '@better-tables/core';
+
+const csv = csvExport();
+const tables = betterTables({ database: adapter, plugins: [csv] });
+
+await tables.fetchData(usersTable, { pagination: { page: 1, limit: 20 } });
+csv.toCsv();  // CSV of that page
+csv.toJson(); // JSON of that page
+```
+
+It formats the most recent fetched page. For a full filtered export, use the button / `exportData` above.

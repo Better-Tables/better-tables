@@ -176,6 +176,13 @@ const UI_MODULES = {
       table: ['action-confirmation-dialog.tsx', 'actions-toolbar.tsx'],
     },
   },
+  /** Export button + hook — rides `table.tsx`'s `toolbarExtra` slot. */
+  export: {
+    components: {
+      table: ['export-button.tsx'],
+    },
+    hooks: ['use-table-export.ts'],
+  },
 } as const satisfies Record<string, UiModuleFiles>;
 
 /** A valid UI module name (`'core' | 'actions' | …`). */
