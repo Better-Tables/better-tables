@@ -19,9 +19,11 @@ import type { DatabaseDriver } from '../types';
  * internal properties and methods that can be used for identification.
  *
  * Detection strategy:
- * 1. Check for driver-specific internal properties (_
- * 2. Check for driver-specific methods or dialect indicators
- * 3. Check constructor names as fallback
+ * 1. Check the dialect indicator (`db.dialect.name`)
+ * 2. Check driver-specific internal properties (`db._.session`)
+ * 3. Check driver-specific method signatures (`execute` vs. run/all/get/values)
+ *    — the reliable path, since method names survive minification
+ * 4. Check the constructor name as a last resort (mangled by minification)
  *
  * @remarks
  * **Next.js build-time limitation (plan 051, finding 13b):** During
@@ -110,14 +112,23 @@ export function detectDriver(db: unknown): DatabaseDriver | null {
     }
   }
 
-  // Strategy 3: Check for driver-specific methods
-  // PostgreSQL has query, execute
+  // Strategy 3: Check for driver-specific methods. Method (property) names
+  // survive JS minification — unlike class names, which Strategy 4 relies on —
+  // so this is the strategy that keeps auto-detection working in production
+  // builds (e.g. a minified Next.js app).
+  //
+  // PostgreSQL/MySQL expose `execute` and lack SQLite's `run`.
   if ('query' in dbAny && 'execute' in dbAny && !('run' in dbAny)) {
     return 'postgres';
   }
 
-  // SQLite has run, exec
-  if ('run' in dbAny && 'exec' in dbAny) {
+  // Every SQLite driver (better-sqlite3, bun:sqlite, libsql, d1, …) extends
+  // BaseSQLiteDatabase, which exposes the sync result accessors
+  // run/all/get/values. Postgres and MySQL have none of them. Note the drizzle
+  // `db` has `run` but NOT `exec` — `exec` lives on the raw driver handle, which
+  // is why the old `'run' && 'exec'` check never matched and detection fell
+  // through to the minification-fragile class-name path.
+  if ('run' in dbAny && 'all' in dbAny && 'get' in dbAny && 'values' in dbAny) {
     return 'sqlite';
   }
 

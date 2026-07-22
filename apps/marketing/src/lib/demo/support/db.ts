@@ -27,7 +27,8 @@ function buildSupportDb(sqlite: Database.Database) {
 }
 
 function buildSupportTables(db: ReturnType<typeof buildSupportDb>) {
-  // `drizzleAdapter(db)` picks up schema + relations from the Drizzle instance.
+  // `drizzleAdapter(db)` picks up schema + relations from the Drizzle instance,
+  // and auto-detects the sqlite driver from its method signature (minification-safe).
   return betterTables({
     database: drizzleAdapter(db),
     defaults: { pageSize: 10 },
