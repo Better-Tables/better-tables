@@ -34,7 +34,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '02',
     title: 'Query groups',
     demonstrates:
-      "Build nested AND/OR filters, read back to you as a plain sentence and saved into a shareable URL — including “is empty” filters.",
+      'Build nested AND/OR filters, read back to you as a plain sentence and saved into a shareable URL — including “is empty” filters.',
     dataset: '20 tickets · SQLite',
     href: '/examples/query-groups',
     chips: ['drizzle · sqlite', 'FilterGroupNode', 'isNull', 'url presets'],

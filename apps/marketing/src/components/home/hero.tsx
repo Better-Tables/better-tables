@@ -33,9 +33,9 @@ export function Hero() {
       >
         A data table is really two problems: the grid your users see, and the queries behind it.
         Most libraries hand you the grid and leave the SQL to you. Better Tables does both — define
-        your columns once in TypeScript, and filtering, sorting, pagination, even inline edits become
-        real queries against Postgres, MySQL, or SQLite. The UI is source you copy into your repo and
-        own.
+        your columns once in TypeScript, and filtering, sorting, pagination, even inline edits
+        become real queries against Postgres, MySQL, or SQLite. The UI is source you copy into your
+        repo and own.
       </p>
 
       <div
