@@ -15,7 +15,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '00',
     title: 'Users directory',
     demonstrates:
-      'Cross-table filtering, bulk actions, and the live SQL readout — on the homepage against Postgres when DATABASE_URL is set (SQLite fallback otherwise).',
+      'Filter across joined tables, run bulk actions, and watch the exact SQL appear as you go. Lives on the homepage — Postgres when DATABASE_URL is set, SQLite otherwise.',
     dataset: '~1M · Postgres / 5k · SQLite',
     href: '/#demo',
     anchor: true,
@@ -25,7 +25,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '01',
     title: 'Relationship filtering',
     demonstrates:
-      'Filter tickets by joined customer and assignee fields; the query trail explains each JOIN the adapter resolves.',
+      "Filter tickets by fields on related tables — the customer's plan, the assignee's team. A query trail shows every JOIN the adapter builds to answer you.",
     dataset: '20 tickets · SQLite',
     href: '/examples/relationship-filtering',
     chips: ['drizzle · sqlite', 't.auto()', 'customer.plan', 'editable cells', 'query trail'],
@@ -34,7 +34,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '02',
     title: 'Query groups',
     demonstrates:
-      'Nested AND/OR filter trees, read back as a sentence and serialized into a shareable URL — including a null-only filter.',
+      "Build nested AND/OR filters, read back to you as a plain sentence and saved into a shareable URL — including “is empty” filters.",
     dataset: '20 tickets · SQLite',
     href: '/examples/query-groups',
     chips: ['drizzle · sqlite', 'FilterGroupNode', 'isNull', 'url presets'],
@@ -43,7 +43,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '03',
     title: 'Big board',
     demonstrates:
-      'Virtualized scrolling through 12,000 rows with variable row heights — only rows near the viewport ever mount.',
+      'Scroll 12,000 rows without the browser breaking a sweat. Only the rows near your viewport are ever rendered, even when row heights vary.',
     dataset: '12,000 rows · SQLite',
     href: '/examples/big-board',
     chips: ['drizzle · sqlite', 'virtualized', 'dynamic heights'],
@@ -52,7 +52,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '04',
     title: 'Facets',
     demonstrates:
-      'Self-excluding facet counts and min/max ranges computed in SQL, aware of every other active filter.',
+      'A faceted sidebar whose counts and ranges are computed in SQL and update with every filter you apply — without a facet ever hiding its own options.',
     dataset: '20 tickets · SQLite',
     href: '/examples/facets',
     chips: ['drizzle · sqlite', 'getFacetedValues', 'getMinMaxValues'],
@@ -61,7 +61,7 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     id: '05',
     title: 'CSV export',
     demonstrates:
-      'Export the current filtered, sorted view to CSV or JSON — the ExportButton module in the toolbarExtra slot, bounded by a row cap.',
+      'Export exactly what you are looking at — the current filtered, sorted view — to CSV or JSON, straight from the toolbar.',
     dataset: '20 tickets · SQLite',
     href: '/examples/export',
     chips: ['exportData', 'toolbarExtra slot', 'CSV / JSON', 'row cap'],

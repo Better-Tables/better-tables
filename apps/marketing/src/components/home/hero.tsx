@@ -31,9 +31,11 @@ export function Hero() {
         className="mt-6 max-w-[52ch] text-[15.5px] leading-relaxed text-muted-foreground md:text-[17px] animate-fade-up"
         style={{ animationDelay: '120ms' }}
       >
-        Define columns once, in TypeScript. Better Tables compiles filtering, sorting, pagination —
-        even cell edits — into real queries against Postgres, MySQL, or SQLite. The UI is
-        shadcn-style source you copy into your repo and own.
+        A data table is really two problems: the grid your users see, and the queries behind it.
+        Most libraries hand you the grid and leave the SQL to you. Better Tables does both — define
+        your columns once in TypeScript, and filtering, sorting, pagination, even inline edits become
+        real queries against Postgres, MySQL, or SQLite. The UI is source you copy into your repo and
+        own.
       </p>
 
       <div

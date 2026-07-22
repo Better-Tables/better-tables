@@ -2,7 +2,7 @@ export const siteConfig = {
   name: 'Better Tables',
   tagline: 'React tables that reach your database',
   description:
-    'Define columns once in TypeScript. Better Tables compiles filtering, sorting, pagination, and cell edits into real queries against Postgres, MySQL, or SQLite — and the UI is shadcn-style source you own.',
+    'Most React table libraries render the grid and leave the database queries to you. Better Tables does both: define your columns once in TypeScript, and filtering, sorting, pagination, and inline edits become real queries against Postgres, MySQL, or SQLite. The UI ships as source you own.',
   cta: 'Browse examples',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   installCommand: 'npx @better-tables/cli@latest init',

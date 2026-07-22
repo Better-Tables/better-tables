@@ -40,19 +40,19 @@ const steps: Array<{
   {
     key: 'define',
     heading: 'Define columns',
-    body: 'One builder chain per column. Dot-paths cross into related tables, and typos in any path are compile errors.',
+    body: 'One builder chain per column. A dotted path like customer.company pulls in a field from a related table — and any typo in that path is a compile error, not a 2 a.m. surprise.',
     block: <CodeBlock code={DEFINE_SNIPPET} lang="tsx" title="columns.ts" />,
   },
   {
     key: 'compile',
     heading: 'State becomes SQL',
-    body: 'Filters, sorts, and pages compile to queries in your database — the adapter joins only the tables a query actually touches.',
+    body: 'Every filter, sort, and page turns into a real query against your database. The adapter joins only the tables that query actually needs — nothing speculative, nothing over-fetched.',
     block: <CodeBlock code={SQL_SNIPPET} lang="sql" title="what the adapter runs" />,
   },
   {
     key: 'own',
     heading: 'Own the UI',
-    body: 'The CLI copies the table and filter components into your repo as source, wired to your shadcn theme.',
+    body: 'The CLI copies the table and filter components into your repo as source you can edit, already wired to your shadcn/ui theme. No black-box dependency to fight later.',
     block: <CodeBlock code={INIT_SNIPPET} lang="bash" title="terminal" />,
   },
 ];
@@ -63,7 +63,7 @@ export function Pipeline() {
       index="02"
       label="how it works"
       title="Columns in. Queries out."
-      description="One definition drives the whole pipeline: the core compiles table state, the adapter turns it into SQL for Postgres, MySQL, or SQLite, and the UI renders it — typed end to end."
+      description="One column definition drives everything. When a user filters or sorts, that action becomes SQL for Postgres, MySQL, or SQLite; the results render straight back into the UI — typed all the way from the database to the cell."
     >
       <div className="grid gap-8 lg:grid-cols-3 lg:gap-6">
         {steps.map((step) => (

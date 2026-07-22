@@ -22,10 +22,11 @@ export default function ExamplesIndexPage() {
           Every example is running.
         </h1>
         <p className="mt-4 text-[15.5px] leading-relaxed text-muted-foreground">
-          Each example picks its own backend — the homepage users directory prefers Neon Postgres
-          when <code className="font-mono text-[13px]">DATABASE_URL</code> is set, and the ticket
-          demos use an in-memory SQLite seed. Same adapter contract, different dialects. Filter
-          something, watch the URL carry your state, then read the source.
+          Every example below runs against a real database, right here on this site — no mocked
+          JSON, no screenshots. Filter one, sort it, watch the URL update to match, then open the
+          source to see how it's built. The ticket demos run on in-memory SQLite; the homepage users
+          directory uses Neon Postgres when{' '}
+          <code className="font-mono text-[13px]">DATABASE_URL</code> is set, SQLite otherwise.
         </p>
       </div>
 
