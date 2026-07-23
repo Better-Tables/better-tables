@@ -32,8 +32,8 @@ loose backlog. Deferred items are at the bottom.
 
 ## Where we are (2026-07-22)
 
-**0.6 is shippable.** Waves A–D are merged to `main`. Open work is Wave E
-plus leftover 048. 058 stays deferred; **060 landed**.
+**0.6 is shippable.** Waves A–D are merged to `main`. Open work is Waves
+E–F plus leftover 048. 058 stays deferred; **060 landed**.
 
 | Wave | Plans | Outcome |
 |------|-------|---------|
@@ -75,6 +75,12 @@ Drizzle correlated-subquery lowering + `FilterGroupNode` walk for
 legacy callback-`filter` still throws), memoryAdapter nested-array eval,
 homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 
+### Wave F — performance harness
+
+| Plan | What | Depends on | Status |
+|------|------|------------|--------|
+| [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines for the reported pagination/filter lag | 042/043 helpers (done) | **TODO** (P2) |
+
 ---
 
 ## Order notes (open plans only)
@@ -85,6 +91,10 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 - **048** anytime after 0.6 — no file overlap with 061; follow plan 041
   handler idioms and plan 042 input-test patterns.
 - **062** only after 061 Phases 1 + 6.
+- **063** anytime — measurement only (tests/bench/CI, no product `src/**`);
+  steps land independently; expected to spawn fix plans for the demo lag
+  findings (loading affordance, URL-debounce scope, facet batching,
+  cold-start seeding).
 - Capability asymmetry (from 060 design): Prisma can sort-by-count but
   not filter-by-count; Kysely/Drizzle do both — declare honestly in
   `AdapterMeta.capabilities.aggregates`.
