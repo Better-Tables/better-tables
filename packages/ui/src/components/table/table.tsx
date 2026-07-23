@@ -1386,7 +1386,10 @@ function BetterTableInner<TData = unknown>({
         {sortAnnouncement}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* `items-start` so a slot module (Export/actions) stays aligned with the
+          first row of the filter bar's controls when the bar wraps to multiple
+          rows on narrow screens, rather than floating in the vertical center. */}
+      <div className="flex flex-wrap items-start gap-2">
         {/* Actions toolbar — an opt-in module rendered through the
             `actionsToolbar` slot, independent of filtering. Absent slot with
             `actions` present is a no-op (a one-time dev warn fires above). */}

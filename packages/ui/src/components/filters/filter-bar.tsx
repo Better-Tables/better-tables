@@ -304,17 +304,21 @@ export function FilterBar<TData = unknown>({
         </div>
       )}
 
-      {/* Main Filter Controls — a single wrapping row. The action buttons
-          (Add filter, Clear all, column toggle) stay inline together even on
-          mobile; the active-filter chips take their own full-width line below
-          on small screens and grow to fill the middle on desktop. Keeping the
-          controls in one shrinkable, wrapping row (rather than stacking full
-          width) is what stops the toolbar from overflowing the viewport on
-          narrow screens. */}
+      {/* Main Filter Controls — one wrapping row. The DOM order is the desktop
+          reading order (Add filter → active chips → Clear all → column toggle),
+          so on desktop the visual, DOM, and keyboard-focus order all match with
+          no CSS `order` (WCAG 2.4.3): the chips flow inline and fill the middle
+          via `sm:flex-1`. On mobile the chips alone drop to their own full-width
+          line beneath the buttons (`order-last w-full`) so the action buttons
+          stay together in a single row instead of stacking full width — which
+          is what was overflowing the viewport on narrow screens. `sm:ml-auto`
+          on the column toggle keeps it right-aligned on desktop when there are
+          no chips to fill the middle (a margin, so it doesn't affect focus
+          order). */}
       <div className="flex w-full flex-wrap items-center gap-2">
         {/* Add Filter Button & Dropdown */}
         {showAddFilter && (
-          <div className="order-1 shrink-0">
+          <div className="shrink-0">
             <FilterDropdown
               columns={availableColumns}
               onSelect={handleAddFilter}
@@ -337,41 +341,12 @@ export function FilterBar<TData = unknown>({
           </div>
         )}
 
-        {/* Clear All Button */}
-        {showClearAll && hasRemovableFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearAll}
-            disabled={disabled}
-            className={cn('order-3 h-8 shrink-0 px-2 lg:px-3', theme?.clearButton)}
-          >
-            <X className="mr-1 h-4 w-4" />
-            Clear all
-          </Button>
-        )}
-
-        {/* Column Visibility Toggle — inline beside Add filter on mobile,
-            pinned to the right on desktop. `sm:ml-auto` keeps it right-aligned
-            even when there are no active filters filling the middle. */}
-        {showColumnVisibility && columnVisibility && onToggleColumnVisibility && (
-          <div className="order-2 shrink-0 sm:order-4 sm:ml-auto">
-            <ColumnVisibilityToggle
-              columns={columns}
-              columnVisibility={columnVisibility}
-              onToggleVisibility={onToggleColumnVisibility}
-              enableReordering={enableColumnReordering}
-              disabled={disabled}
-              {...(columnOrder !== undefined && { columnOrder })}
-              {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
-            />
-          </div>
-        )}
-
-        {/* Active Filters — its own full-width line on mobile (chips scroll
-            horizontally within it), growing to fill the middle on desktop. */}
+        {/* Active Filters — inline, filling the middle on desktop (`sm:flex-1`);
+            on mobile it takes its own full-width line below the buttons
+            (`order-last w-full`), which lets the action buttons share one row.
+            Chips scroll horizontally within it on mobile, wrap on desktop. */}
         {filters.length > 0 && (
-          <div className="order-4 min-w-0 basis-full sm:order-2 sm:basis-0 sm:flex-1">
+          <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
             <ActiveFilters
               columns={columns}
               filters={filters}
@@ -380,6 +355,36 @@ export function FilterBar<TData = unknown>({
               disabled={disabled}
               {...(isFilterProtected !== undefined && { isFilterProtected })}
               {...(theme?.activeFilters !== undefined && { className: theme.activeFilters })}
+            />
+          </div>
+        )}
+
+        {/* Clear All Button */}
+        {showClearAll && hasRemovableFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearAll}
+            disabled={disabled}
+            className={cn('h-8 shrink-0 px-2 lg:px-3', theme?.clearButton)}
+          >
+            <X className="mr-1 h-4 w-4" />
+            Clear all
+          </Button>
+        )}
+
+        {/* Column Visibility Toggle — `sm:ml-auto` right-aligns it on desktop
+            when there are no chips filling the middle. */}
+        {showColumnVisibility && columnVisibility && onToggleColumnVisibility && (
+          <div className="shrink-0 sm:ml-auto">
+            <ColumnVisibilityToggle
+              columns={columns}
+              columnVisibility={columnVisibility}
+              onToggleVisibility={onToggleColumnVisibility}
+              enableReordering={enableColumnReordering}
+              disabled={disabled}
+              {...(columnOrder !== undefined && { columnOrder })}
+              {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
             />
           </div>
         )}
