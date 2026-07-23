@@ -177,6 +177,52 @@ function hydrateFromUrl(
 }
 
 /**
+ * Capture the table's starting pagination once (its app-configured / SSR-seeded
+ * default) so later writes can keep default `page`/`limit` out of a URL that
+ * doesn't already carry them. Called before the first hydration, while the
+ * store still holds its initial pagination.
+ */
+function captureDefaultPagination(
+  store: TableStore,
+  ref: { current: { page: number; limit: number } | null }
+): void {
+  if (ref.current) return;
+  const p = store.getState().manager.getPagination();
+  ref.current = { page: p.page, limit: p.limit };
+}
+
+/**
+ * Drop `page`/`limit` from a params write when they're at the captured default
+ * AND absent from the current URL, so a change that doesn't touch pagination
+ * (row selection, a column toggle) on a clean URL doesn't introduce
+ * `?page=1&limit=<default>` and trigger a navigation/refetch. Mutates
+ * `urlParams`. Never removes a param the URL already carries — only skips
+ * adding a redundant default one.
+ */
+function stripDefaultPaginationFromWrite(
+  urlParams: Record<string, string | null>,
+  pagination: { page: number; limit: number } | undefined,
+  defaults: { page: number; limit: number } | null,
+  adapter: UrlSyncAdapter
+): void {
+  if (!defaults || !pagination) return;
+  if (
+    urlParams.page != null &&
+    pagination.page === defaults.page &&
+    adapter.getParam('page') === null
+  ) {
+    delete urlParams.page;
+  }
+  if (
+    urlParams.limit != null &&
+    pagination.limit === defaults.limit &&
+    adapter.getParam('limit') === null
+  ) {
+    delete urlParams.limit;
+  }
+}
+
+/**
  * Whether writing `urlParams` would actually change any synced URL param.
  *
  * The table manager emits `state_changed` for mutations that touch no synced
@@ -262,6 +308,11 @@ export function useTableUrlSync(
 ): void {
   const stableConfig = useStableUrlSyncConfig(config);
   const hasHydratedFromUrl = useRef(false);
+  // The pagination the table starts at (its app-configured / SSR-seeded
+  // default), captured once before the first user interaction. Used to keep
+  // default `page`/`limit` out of a URL that doesn't already carry them — see
+  // the write-out effect below.
+  const defaultPaginationRef = useRef<{ page: number; limit: number } | null>(null);
   const [storeReady, setStoreReady] = useState(() => Boolean(getTableStore(tableId)));
   // Recomputed every render (cheap: a handful of adapter.getParam reads) so
   // it changes whenever the URL's relevant params change, even for adapters
@@ -279,6 +330,7 @@ export function useTableUrlSync(
     // from looping with the store->URL write-out effect below.
     const store = getTableStore(tableId);
     if (store) {
+      captureDefaultPagination(store, defaultPaginationRef);
       // First hydration must not clear SSR-seeded initialFilters; later ones
       // (soft navs) may clear (finding 15).
       hydrateFromUrl(store, stableConfig, adapter, hasHydratedFromUrl.current);
@@ -296,6 +348,7 @@ export function useTableUrlSync(
       attempts += 1;
       const lateStore = getTableStore(tableId);
       if (lateStore) {
+        captureDefaultPagination(lateStore, defaultPaginationRef);
         hydrateFromUrl(lateStore, stableConfig, adapter, hasHydratedFromUrl.current);
         hasHydratedFromUrl.current = true;
         setStoreReady(true);
@@ -323,6 +376,15 @@ export function useTableUrlSync(
     const manager = store.getState().manager;
     const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce((tableState) => {
       const urlParams = serializeTableStateToUrl(tableState);
+      // Keep default page/limit out of a URL that doesn't already carry them,
+      // so a change that doesn't touch pagination (selection, column toggle)
+      // doesn't introduce `?page=1&limit=<default>`.
+      stripDefaultPaginationFromWrite(
+        urlParams,
+        tableState.pagination,
+        defaultPaginationRef.current,
+        adapter
+      );
       // Skip writes that wouldn't change the URL (e.g. a row-selection change,
       // which emits `state_changed` but touches no synced param) so adapters
       // that navigate on `setParams` don't refetch for nothing.
