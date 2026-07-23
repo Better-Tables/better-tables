@@ -1386,7 +1386,7 @@ function BetterTableInner<TData = unknown>({
         {sortAnnouncement}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {/* Actions toolbar — an opt-in module rendered through the
             `actionsToolbar` slot, independent of filtering. Absent slot with
             `actions` present is a no-op (a one-time dev warn fires above). */}
@@ -1414,9 +1414,12 @@ function BetterTableInner<TData = unknown>({
           />
         )}
 
-        {/* Filter Bar - only show when filtering is enabled */}
+        {/* Filter Bar - only show when filtering is enabled. `flex-1 min-w-0`
+            lets it share the toolbar row with the actions/export controls and
+            shrink instead of pushing them onto their own line. */}
         {filtering && (
           <FilterBar
+            className="min-w-0 flex-1"
             columns={columnsWithDefaults}
             filters={filters}
             onFiltersChange={handleFiltersChange}

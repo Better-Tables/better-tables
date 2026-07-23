@@ -304,50 +304,38 @@ export function FilterBar<TData = unknown>({
         </div>
       )}
 
-      {/* Main Filter Controls */}
-      <div className="flex w-full flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-        {/* Mobile: Stack vertically, Desktop: Horizontal layout */}
-        <div className="flex w-full flex-1 flex-col sm:flex-row gap-2">
-          {/* Add Filter Button & Dropdown */}
-          {showAddFilter && (
-            <div className="shrink-0">
-              <FilterDropdown
-                columns={availableColumns}
-                onSelect={handleAddFilter}
-                open={isDropdownOpen}
-                onOpenChange={setIsDropdownOpen}
-                searchable={searchable}
-                searchPlaceholder={searchPlaceholder}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                disabled={disabled}
-                {...(showGroups && effectiveGroups !== undefined && { groups: effectiveGroups })}
-              >
-                <FilterButton
-                  hasFilters={hasFilters}
-                  disabled={isAddFilterDisabled}
-                  label={addFilterLabel}
-                  className={cn('w-full sm:w-auto', theme?.addButton)}
-                />
-              </FilterDropdown>
-            </div>
-          )}
-
-          {/* Active Filters with horizontal scrolling on mobile */}
-          <div className="flex-1 min-w-0">
-            {filters.length > 0 && (
-              <ActiveFilters
-                columns={columns}
-                filters={filters}
-                onUpdateFilter={handleUpdateFilter}
-                onRemoveFilter={handleRemoveFilter}
-                disabled={disabled}
-                {...(isFilterProtected !== undefined && { isFilterProtected })}
-                {...(theme?.activeFilters !== undefined && { className: theme.activeFilters })}
+      {/* Main Filter Controls — a single wrapping row. The action buttons
+          (Add filter, Clear all, column toggle) stay inline together even on
+          mobile; the active-filter chips take their own full-width line below
+          on small screens and grow to fill the middle on desktop. Keeping the
+          controls in one shrinkable, wrapping row (rather than stacking full
+          width) is what stops the toolbar from overflowing the viewport on
+          narrow screens. */}
+      <div className="flex w-full flex-wrap items-center gap-2">
+        {/* Add Filter Button & Dropdown */}
+        {showAddFilter && (
+          <div className="order-1 shrink-0">
+            <FilterDropdown
+              columns={availableColumns}
+              onSelect={handleAddFilter}
+              open={isDropdownOpen}
+              onOpenChange={setIsDropdownOpen}
+              searchable={searchable}
+              searchPlaceholder={searchPlaceholder}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              disabled={disabled}
+              {...(showGroups && effectiveGroups !== undefined && { groups: effectiveGroups })}
+            >
+              <FilterButton
+                hasFilters={hasFilters}
+                disabled={isAddFilterDisabled}
+                label={addFilterLabel}
+                className={cn(theme?.addButton)}
               />
-            )}
+            </FilterDropdown>
           </div>
-        </div>
+        )}
 
         {/* Clear All Button */}
         {showClearAll && hasRemovableFilters && (
@@ -356,24 +344,44 @@ export function FilterBar<TData = unknown>({
             size="sm"
             onClick={handleClearAll}
             disabled={disabled}
-            className={cn('h-8 px-2 lg:px-3 w-full sm:w-auto', theme?.clearButton)}
+            className={cn('order-3 h-8 shrink-0 px-2 lg:px-3', theme?.clearButton)}
           >
             <X className="mr-1 h-4 w-4" />
             Clear all
           </Button>
         )}
 
-        {/* Column Visibility Toggle */}
+        {/* Column Visibility Toggle — inline beside Add filter on mobile,
+            pinned to the right on desktop. `sm:ml-auto` keeps it right-aligned
+            even when there are no active filters filling the middle. */}
         {showColumnVisibility && columnVisibility && onToggleColumnVisibility && (
-          <ColumnVisibilityToggle
-            columns={columns}
-            columnVisibility={columnVisibility}
-            onToggleVisibility={onToggleColumnVisibility}
-            enableReordering={enableColumnReordering}
-            disabled={disabled}
-            {...(columnOrder !== undefined && { columnOrder })}
-            {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
-          />
+          <div className="order-2 shrink-0 sm:order-4 sm:ml-auto">
+            <ColumnVisibilityToggle
+              columns={columns}
+              columnVisibility={columnVisibility}
+              onToggleVisibility={onToggleColumnVisibility}
+              enableReordering={enableColumnReordering}
+              disabled={disabled}
+              {...(columnOrder !== undefined && { columnOrder })}
+              {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
+            />
+          </div>
+        )}
+
+        {/* Active Filters — its own full-width line on mobile (chips scroll
+            horizontally within it), growing to fill the middle on desktop. */}
+        {filters.length > 0 && (
+          <div className="order-4 min-w-0 basis-full sm:order-2 sm:basis-0 sm:flex-1">
+            <ActiveFilters
+              columns={columns}
+              filters={filters}
+              onUpdateFilter={handleUpdateFilter}
+              onRemoveFilter={handleRemoveFilter}
+              disabled={disabled}
+              {...(isFilterProtected !== undefined && { isFilterProtected })}
+              {...(theme?.activeFilters !== undefined && { className: theme.activeFilters })}
+            />
+          </div>
         )}
       </div>
     </div>

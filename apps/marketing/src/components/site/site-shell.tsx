@@ -20,7 +20,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
   return (
     <div className="site-frame">
       <SiteHeader />
-      <div className="flex-1">{children}</div>
+      {/* `min-w-0` keeps this flex child from growing to its content's
+          intrinsic width, so a wide table scrolls inside its own container
+          instead of forcing horizontal scroll on the whole page. */}
+      <div className="min-w-0 flex-1">{children}</div>
       <SiteFooter />
     </div>
   );
