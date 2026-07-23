@@ -39,6 +39,7 @@
   "devDependencies": {
     "@better-tables/core": "workspace:*",
     "drizzle-orm": "catalog:",
+    "mitata": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },

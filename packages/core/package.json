@@ -46,6 +46,7 @@
   "devDependencies": {
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "mitata": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tsdown": "catalog:",

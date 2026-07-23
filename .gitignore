@@ -88,4 +88,6 @@ out/
 # Test artifacts
 test-results/
 playwright-report/
-playwright/.cache/ e2e-results/
+playwright/.cache/
+e2e-results/
+bench-results/
