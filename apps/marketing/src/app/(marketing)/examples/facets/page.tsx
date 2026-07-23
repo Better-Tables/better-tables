@@ -55,7 +55,7 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <FacetsSidebar activeFilters={fetchResult.filters} />
 
         <section aria-label="Facets ticket table" className="rounded-lg border bg-card p-4 md:p-6">

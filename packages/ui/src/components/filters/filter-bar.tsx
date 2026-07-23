@@ -304,50 +304,60 @@ export function FilterBar<TData = unknown>({
         </div>
       )}
 
-      {/* Main Filter Controls */}
-      <div className="flex w-full flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-        {/* Mobile: Stack vertically, Desktop: Horizontal layout */}
-        <div className="flex w-full flex-1 flex-col sm:flex-row gap-2">
-          {/* Add Filter Button & Dropdown */}
-          {showAddFilter && (
-            <div className="shrink-0">
-              <FilterDropdown
-                columns={availableColumns}
-                onSelect={handleAddFilter}
-                open={isDropdownOpen}
-                onOpenChange={setIsDropdownOpen}
-                searchable={searchable}
-                searchPlaceholder={searchPlaceholder}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                disabled={disabled}
-                {...(showGroups && effectiveGroups !== undefined && { groups: effectiveGroups })}
-              >
-                <FilterButton
-                  hasFilters={hasFilters}
-                  disabled={isAddFilterDisabled}
-                  label={addFilterLabel}
-                  className={cn('w-full sm:w-auto', theme?.addButton)}
-                />
-              </FilterDropdown>
-            </div>
-          )}
-
-          {/* Active Filters with horizontal scrolling on mobile */}
-          <div className="flex-1 min-w-0">
-            {filters.length > 0 && (
-              <ActiveFilters
-                columns={columns}
-                filters={filters}
-                onUpdateFilter={handleUpdateFilter}
-                onRemoveFilter={handleRemoveFilter}
-                disabled={disabled}
-                {...(isFilterProtected !== undefined && { isFilterProtected })}
-                {...(theme?.activeFilters !== undefined && { className: theme.activeFilters })}
+      {/* Main Filter Controls — one wrapping row. The DOM order is the desktop
+          reading order (Add filter → active chips → Clear all → column toggle),
+          so on desktop the visual, DOM, and keyboard-focus order all match with
+          no CSS `order` (WCAG 2.4.3): the chips flow inline and fill the middle
+          via `sm:flex-1`. On mobile the chips alone drop to their own full-width
+          line beneath the buttons (`order-last w-full`) so the action buttons
+          stay together in a single row instead of stacking full width — which
+          is what was overflowing the viewport on narrow screens. `sm:ml-auto`
+          on the column toggle keeps it right-aligned on desktop when there are
+          no chips to fill the middle (a margin, so it doesn't affect focus
+          order). */}
+      <div className="flex w-full flex-wrap items-center gap-2">
+        {/* Add Filter Button & Dropdown */}
+        {showAddFilter && (
+          <div className="shrink-0">
+            <FilterDropdown
+              columns={availableColumns}
+              onSelect={handleAddFilter}
+              open={isDropdownOpen}
+              onOpenChange={setIsDropdownOpen}
+              searchable={searchable}
+              searchPlaceholder={searchPlaceholder}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              disabled={disabled}
+              {...(showGroups && effectiveGroups !== undefined && { groups: effectiveGroups })}
+            >
+              <FilterButton
+                hasFilters={hasFilters}
+                disabled={isAddFilterDisabled}
+                label={addFilterLabel}
+                className={cn(theme?.addButton)}
               />
-            )}
+            </FilterDropdown>
           </div>
-        </div>
+        )}
+
+        {/* Active Filters — inline, filling the middle on desktop (`sm:flex-1`);
+            on mobile it takes its own full-width line below the buttons
+            (`order-last w-full`), which lets the action buttons share one row.
+            Chips scroll horizontally within it on mobile, wrap on desktop. */}
+        {filters.length > 0 && (
+          <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
+            <ActiveFilters
+              columns={columns}
+              filters={filters}
+              onUpdateFilter={handleUpdateFilter}
+              onRemoveFilter={handleRemoveFilter}
+              disabled={disabled}
+              {...(isFilterProtected !== undefined && { isFilterProtected })}
+              {...(theme?.activeFilters !== undefined && { className: theme.activeFilters })}
+            />
+          </div>
+        )}
 
         {/* Clear All Button */}
         {showClearAll && hasRemovableFilters && (
@@ -356,24 +366,27 @@ export function FilterBar<TData = unknown>({
             size="sm"
             onClick={handleClearAll}
             disabled={disabled}
-            className={cn('h-8 px-2 lg:px-3 w-full sm:w-auto', theme?.clearButton)}
+            className={cn('h-8 shrink-0 px-2 lg:px-3', theme?.clearButton)}
           >
             <X className="mr-1 h-4 w-4" />
             Clear all
           </Button>
         )}
 
-        {/* Column Visibility Toggle */}
+        {/* Column Visibility Toggle — `sm:ml-auto` right-aligns it on desktop
+            when there are no chips filling the middle. */}
         {showColumnVisibility && columnVisibility && onToggleColumnVisibility && (
-          <ColumnVisibilityToggle
-            columns={columns}
-            columnVisibility={columnVisibility}
-            onToggleVisibility={onToggleColumnVisibility}
-            enableReordering={enableColumnReordering}
-            disabled={disabled}
-            {...(columnOrder !== undefined && { columnOrder })}
-            {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
-          />
+          <div className="shrink-0 sm:ml-auto">
+            <ColumnVisibilityToggle
+              columns={columns}
+              columnVisibility={columnVisibility}
+              onToggleVisibility={onToggleColumnVisibility}
+              enableReordering={enableColumnReordering}
+              disabled={disabled}
+              {...(columnOrder !== undefined && { columnOrder })}
+              {...(onResetColumnOrder !== undefined && { onResetColumnOrder })}
+            />
+          </div>
         )}
       </div>
     </div>

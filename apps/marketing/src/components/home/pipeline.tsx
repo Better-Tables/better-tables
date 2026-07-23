@@ -65,7 +65,7 @@ export function Pipeline() {
       title="Columns in. Queries out."
       description="One column definition drives everything. When a user filters or sorts, that action becomes SQL for Postgres, MySQL, or SQLite; the results render straight back into the UI — typed all the way from the database to the cell."
     >
-      <div className="grid gap-8 lg:grid-cols-3 lg:gap-6">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-6">
         {steps.map((step) => (
           <div key={step.key} className="flex flex-col gap-4">
             <div>
