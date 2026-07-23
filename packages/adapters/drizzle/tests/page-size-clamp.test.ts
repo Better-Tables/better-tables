@@ -13,12 +13,21 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { DEFAULT_MAX_PAGE_SIZE } from '@better-tables/core';
 import { DrizzleAdapter } from '../src/drizzle-adapter';
 import type { DrizzleAdapterConfig, DrizzleDatabase } from '../src/types';
-import {
-  closeDatabase,
-  createTestDatabase,
-  setupTestDatabase,
-} from './helpers/test-fixtures';
-import { relationsSchema, schema } from './helpers/test-schema';
+import { closeDatabase, createTestDatabase, setupTestDatabase } from './helpers/test-fixtures';
+import { relationsSchema, schema, users } from './helpers/test-schema';
+
+/** Insert `count` extra users so a page cap can actually bite the row set. */
+async function seedManyUsers(
+  db: ReturnType<typeof createTestDatabase>['db'],
+  count: number
+): Promise<void> {
+  const rows = Array.from({ length: count }, (_, i) => ({
+    id: 1000 + i,
+    name: `User ${i}`,
+    email: `user${i}@example.com`,
+  }));
+  await db.insert(users).values(rows);
+}
 
 function makeAdapter(
   db: ReturnType<typeof createTestDatabase>['db'],
@@ -86,5 +95,36 @@ describe('DrizzleAdapter - page-size clamp', () => {
 
     // No clamp: the requested (absurd) limit is echoed back unchanged.
     expect(result.pagination?.limit).toBe(100_000);
+  });
+
+  it('actually limits the SQL result set to the default cap (not just metadata)', async () => {
+    // Seed well past the cap so an unclamped query would return far more rows.
+    await seedManyUsers(db, 250);
+    const adapter = makeAdapter(db);
+    const result = await adapter.fetchData({ pagination: { page: 1, limit: 100_000 } });
+
+    expect(result.data.length).toBe(DEFAULT_MAX_PAGE_SIZE);
+  });
+
+  it('floors a fractional maxPageSize to a whole page size', async () => {
+    const adapter = makeAdapter(db, 2.5);
+    const result = await adapter.fetchData({ pagination: { page: 1, limit: 1000 } });
+
+    // 2.5 -> 2 so LIMIT/OFFSET and metadata stay integral.
+    expect(result.pagination?.limit).toBe(2);
+    expect(result.data.length).toBe(2);
+    expect(Number.isInteger(result.pagination?.limit)).toBe(true);
+  });
+
+  it('does NOT clamp exports (export keeps its own row cap)', async () => {
+    // Seed past the interactive cap; the export must still return every row up
+    // to its own maxRows bound, not be truncated to maxPageSize.
+    await seedManyUsers(db, 250);
+    const adapter = makeAdapter(db, 200);
+    const result = await adapter.exportData({ format: 'json', maxRows: 10_000 });
+
+    const rows = JSON.parse(result.data as string) as unknown[];
+    // 250 seeded + 3 fixture users = 253, all well over the 200 page cap.
+    expect(rows.length).toBeGreaterThan(DEFAULT_MAX_PAGE_SIZE);
   });
 });

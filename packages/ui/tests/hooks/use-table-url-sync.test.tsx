@@ -219,4 +219,71 @@ describe('useTableUrlSync', () => {
     expect(burstCalls.length).toBe(1);
     expect(burstCalls[0]?.page).toBe('2');
   });
+
+  it('does not introduce default page/limit into a clean URL', async () => {
+    createStore();
+    const { adapter, setParamsCalls } = createFakeUrlAdapter(); // clean URL
+    const config: UrlSyncConfig = { filters: true, pagination: true };
+    renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    const store = getTableStore(TABLE_ID);
+    if (!store) {
+      throw new Error('Expected table store');
+    }
+
+    const before = setParamsCalls.length;
+    jest.useFakeTimers();
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['x'],
+      });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
+
+    const calls = setParamsCalls.slice(before);
+    expect(calls.length).toBeGreaterThan(0);
+    const last = calls[calls.length - 1] ?? {};
+    // The filter is written, but the default page/limit are NOT introduced into
+    // the (previously clean) URL.
+    expect(last.filters).toBeTruthy();
+    expect('page' in last).toBe(false);
+    expect('limit' in last).toBe(false);
+  });
+
+  it('suppresses a write when the change touches no synced param (pagination default)', async () => {
+    createStore();
+    const { adapter, setParamsCalls } = createFakeUrlAdapter(); // clean URL
+    // Only pagination is synced; a filter change touches nothing in the URL,
+    // and pagination is at its default, so there is nothing to write.
+    const config: UrlSyncConfig = { pagination: true };
+    renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    const store = getTableStore(TABLE_ID);
+    if (!store) {
+      throw new Error('Expected table store');
+    }
+
+    const before = setParamsCalls.length;
+    jest.useFakeTimers();
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['x'],
+      });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
+
+    expect(setParamsCalls.length - before).toBe(0);
+  });
 });

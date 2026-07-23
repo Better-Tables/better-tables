@@ -412,13 +412,21 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * `maxPageSize` (default {@link DEFAULT_MAX_PAGE_SIZE}). Never mutates the
    * caller's object. A non-positive or non-finite cap disables the clamp; a
    * non-finite incoming `limit` is left untouched (other code validates it).
+   * The cap is floored to a whole number so a fractional `maxPageSize` (e.g.
+   * `2.5`) can't produce a non-integral `LIMIT`/`OFFSET` or paging metadata.
+   *
+   * The `export` path (`exportData`) opts out via `clampPageSize: false`: its
+   * page size is its own, separately-bounded row cap (`maxRows` /
+   * {@link DEFAULT_EXPORT_ROW_CAP}), not a URL-driven interactive limit, so the
+   * interactive cap must not silently truncate an export.
    */
   private withClampedPageSize(params: FetchDataParams): FetchDataParams {
     const { pagination } = params;
     if (!pagination) return params;
 
-    const cap = this.options?.maxPageSize ?? DEFAULT_MAX_PAGE_SIZE;
-    if (!Number.isFinite(cap) || cap <= 0) return params;
+    const rawCap = this.options?.maxPageSize ?? DEFAULT_MAX_PAGE_SIZE;
+    if (!Number.isFinite(rawCap) || rawCap <= 0) return params;
+    const cap = Math.floor(rawCap);
     if (!Number.isFinite(pagination.limit) || pagination.limit <= cap) return params;
 
     return { ...params, pagination: { ...pagination, limit: cap } };
@@ -472,7 +480,12 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * @since 1.0.0
    */
   async fetchData(
-    params: FetchDataParams
+    params: FetchDataParams,
+    // Internal-only: `exportData` passes `clampPageSize: false` because an
+    // export's page size is its own separately-bounded row cap, not an
+    // interactive limit (see `withClampedPageSize`). External callers use the
+    // public single-arg signature and always get the clamp.
+    options?: { clampPageSize?: boolean }
   ): Promise<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>> {
     const startTime = Date.now();
 
@@ -481,7 +494,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     // result set or force the client to render tens of thousands of rows. The
     // clamped value flows through to both the query and the returned pagination
     // metadata below, since everything downstream reads `params.pagination`.
-    params = this.withClampedPageSize(params);
+    if (options?.clampPageSize !== false) {
+      params = this.withClampedPageSize(params);
+    }
 
     // Resolved before the try block so a multi-table-ambiguity SchemaError
     // surfaces to the caller as-is, rather than being wrapped in a
@@ -1439,7 +1454,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         pagination: { page: 1, limit },
       };
 
-      const result = await this.fetchData(fetchParams);
+      // Opt out of the interactive page-size clamp: the export cap above IS the
+      // bound here, so clamping to `maxPageSize` would silently truncate exports
+      // of more than `maxPageSize` rows.
+      const result = await this.fetchData(fetchParams, { clampPageSize: false });
 
       // Convert to export format
       const exportData = convertToExportFormat(

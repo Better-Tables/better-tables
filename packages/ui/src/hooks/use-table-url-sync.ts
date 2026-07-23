@@ -313,6 +313,13 @@ export function useTableUrlSync(
   // default `page`/`limit` out of a URL that doesn't already carry them — see
   // the write-out effect below.
   const defaultPaginationRef = useRef<{ page: number; limit: number } | null>(null);
+  // Re-capture the default pagination when this hook is pointed at a different
+  // table, so table B's writes aren't measured against table A's defaults.
+  const capturedForTableIdRef = useRef<string | null>(null);
+  if (capturedForTableIdRef.current !== tableId) {
+    capturedForTableIdRef.current = tableId;
+    defaultPaginationRef.current = null;
+  }
   const [storeReady, setStoreReady] = useState(() => Boolean(getTableStore(tableId)));
   // Recomputed every render (cheap: a handful of adapter.getParam reads) so
   // it changes whenever the URL's relevant params change, even for adapters
