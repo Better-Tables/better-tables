@@ -214,7 +214,12 @@ export interface BetterTableProps<TData = unknown>
   /** Adapter (optional when data is provided directly) */
   adapter?: TableConfig<TData>['adapter'];
 
-  /** Loading state */
+  /**
+   * Loading state. With no rows yet (initial load) the table renders a
+   * skeleton; during a refetch with rows on screen the CURRENT rows stay
+   * visible, dimmed and `aria-busy`, until the new data arrives — a
+   * pagination/filter change never unmounts the table to a spinner.
+   */
   loading?: boolean;
 
   /** Error state */
@@ -1269,8 +1274,11 @@ function BetterTableInner<TData = unknown>({
   // the scrollbar sized to the rendered window instead of the whole dataset.
   const virtualSpacerColSpan = visibleColumns.length + (shouldShowRowSelection ? 1 : 0);
 
-  // Render loading state
-  if (loading) {
+  // Render the skeleton only while there is nothing else to show (initial
+  // load / empty refetch). A refetch with rows on screen keeps them rendered
+  // — dimmed via the main path below — instead of unmounting every row to a
+  // skeleton on each pagination/filter change.
+  if (loading && data.length === 0) {
     return (
       // biome-ignore lint/a11y/useSemanticElements: Fine for live regions
       <div
@@ -1389,7 +1397,12 @@ function BetterTableInner<TData = unknown>({
   const ToolbarExtraSlot = slots?.toolbarExtra;
 
   const tableContent = (
-    <div className={cn('space-y-4', className)} {...props} {...(name !== undefined && { name })}>
+    <div
+      className={cn('space-y-4', className)}
+      aria-busy={loading}
+      {...props}
+      {...(name !== undefined && { name })}
+    >
       {/* Always mounted so SSR/client DOM structure matches */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {sortAnnouncement}
@@ -1453,7 +1466,12 @@ function BetterTableInner<TData = unknown>({
         )}
       </div>
       <div
-        className="border rounded-md"
+        className={cn(
+          'border rounded-md',
+          // Refetch affordance: rows stay visible (and interactive) but dim
+          // while new data is in flight, instead of unmounting to a skeleton.
+          loading && 'opacity-60 transition-opacity duration-150'
+        )}
         {...(isVirtualized && {
           ref: virtualContainerRef,
           style: { height: virtualHeight, overflowY: 'auto' as const },

@@ -196,3 +196,79 @@ describe('useFacets (plan 032 step 4, finding 7)', () => {
     ).toEqual(['baz', 'foo bar']);
   });
 });
+
+describe('useFacets batch path (lag fix: one round-trip per refresh)', () => {
+  it('prefers adapter.getFacets: ONE batched call, zero singular calls, results distributed', async () => {
+    const { adapter, facetCalls, rangeCalls } = createDeferredFetchAdapter();
+    const batchCalls: Array<{
+      requests: readonly { columnId: string; kind: string }[];
+    }> = [];
+    const batchAdapter: typeof adapter = {
+      ...adapter,
+      getFacets: async (requests) => {
+        batchCalls.push({ requests });
+        return {
+          values: {
+            status: new Map([
+              ['open', 2],
+              ['closed', 1],
+            ]),
+            priority: new Map([['high', 3]]),
+          },
+          ranges: { reopenCount: [0, 5] as [number, number] },
+        };
+      },
+    };
+
+    const { result } = renderHook(() =>
+      useFacets({
+        adapter: batchAdapter,
+        columnIds: ['status', 'priority'],
+        rangeColumnIds: ['reopenCount'],
+        filters: [],
+      })
+    );
+
+    await waitFor(() => expect(result.current.facets.status).toBeDefined());
+
+    // One batch call carrying every column with its kind — and none of the
+    // singular per-column methods.
+    expect(batchCalls).toHaveLength(1);
+    expect(batchCalls[0]?.requests).toEqual([
+      { columnId: 'status', kind: 'values' },
+      { columnId: 'priority', kind: 'values' },
+      { columnId: 'reopenCount', kind: 'minmax' },
+    ]);
+    expect(facetCalls).toHaveLength(0);
+    expect(rangeCalls).toHaveLength(0);
+
+    expect(result.current.facets.status).toEqual([
+      { value: 'open', count: 2 },
+      { value: 'closed', count: 1 },
+    ]);
+    expect(result.current.facets.priority).toEqual([{ value: 'high', count: 3 }]);
+    expect(result.current.ranges.reopenCount).toEqual([0, 5]);
+  });
+
+  it('a column missing from the batch result yields an empty option list, not a crash', async () => {
+    const { adapter } = createDeferredFetchAdapter();
+    const batchAdapter: typeof adapter = {
+      ...adapter,
+      getFacets: async () => ({ values: {}, ranges: {} }),
+    };
+
+    const { result } = renderHook(() =>
+      useFacets({
+        adapter: batchAdapter,
+        columnIds: ['status'],
+        rangeColumnIds: ['reopenCount'],
+        filters: [],
+      })
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.facets.status).toEqual([]);
+    expect(result.current.ranges.reopenCount).toBeUndefined();
+    expect(result.current.error).toBeNull();
+  });
+});

@@ -149,21 +149,49 @@ export function useFacets<TData = unknown>({
     };
 
     try {
-      const [facetResults, rangeResults] = await Promise.all([
-        Promise.all(
-          stableColumnIds.map(async (columnId) => {
-            const map = await adapter.getFacetedValues(columnId, facetParams);
-            const options: FacetOption[] = Array.from(map, ([value, count]) => ({ value, count }));
-            return [columnId, options] as const;
-          })
-        ),
-        Promise.all(
-          stableRangeColumnIds.map(async (columnId) => {
-            const range = await adapter.getMinMaxValues(columnId, facetParams);
-            return [columnId, range] as const;
-          })
-        ),
-      ]);
+      let facetResults: (readonly [string, FacetOption[]])[];
+      let rangeResults: (readonly [string, [number, number]])[];
+
+      if (adapter.getFacets) {
+        // Batch-capable adapter (e.g. `httpAdapter`): ONE round-trip for the
+        // whole sidebar instead of one request per column.
+        const batch = await adapter.getFacets(
+          [
+            ...stableColumnIds.map((columnId) => ({ columnId, kind: 'values' as const })),
+            ...stableRangeColumnIds.map((columnId) => ({ columnId, kind: 'minmax' as const })),
+          ],
+          facetParams
+        );
+        facetResults = stableColumnIds.map((columnId) => {
+          const map = batch.values[columnId] ?? new Map<string, number>();
+          const options: FacetOption[] = Array.from(map, ([value, count]) => ({ value, count }));
+          return [columnId, options] as const;
+        });
+        rangeResults = stableRangeColumnIds.flatMap((columnId) => {
+          const range = batch.ranges[columnId];
+          return range ? [[columnId, range] as const] : [];
+        });
+      } else {
+        // In-process adapters: parallel singular calls (no transport to save).
+        [facetResults, rangeResults] = await Promise.all([
+          Promise.all(
+            stableColumnIds.map(async (columnId) => {
+              const map = await adapter.getFacetedValues(columnId, facetParams);
+              const options: FacetOption[] = Array.from(map, ([value, count]) => ({
+                value,
+                count,
+              }));
+              return [columnId, options] as const;
+            })
+          ),
+          Promise.all(
+            stableRangeColumnIds.map(async (columnId) => {
+              const range = await adapter.getMinMaxValues(columnId, facetParams);
+              return [columnId, range] as const;
+            })
+          ),
+        ]);
+      }
 
       if (requestId !== requestIdRef.current) {
         return;

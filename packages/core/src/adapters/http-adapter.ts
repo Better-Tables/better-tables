@@ -14,7 +14,9 @@ import type {
   CellWriteTarget,
   ExportParams,
   ExportResult,
+  FacetBatchResult,
   FacetQueryParams,
+  FacetRequest,
   FetchDataParams,
   FetchDataResult,
   InferredColumnSpec,
@@ -134,10 +136,11 @@ export class HttpAdapterError extends Error {
 }
 
 /**
- * Create a client-side {@link TableAdapter} that proxies its four read methods
- * (`fetchData`, `getFilterOptions`, `getFacetedValues`, `getMinMaxValues`) to
- * an HTTP endpoint. Mount {@link handleAdapterRequest} at that endpoint,
- * backed by your real (server-only) adapter.
+ * Create a client-side {@link TableAdapter} that proxies its read methods
+ * (`fetchData`, `getFilterOptions`, `getFacetedValues`, `getMinMaxValues`,
+ * and the batched `getFacets`) to an HTTP endpoint. Mount
+ * {@link handleAdapterRequest} at that endpoint, backed by your real
+ * (server-only) adapter.
  *
  * @example
  * ```tsx
@@ -162,7 +165,22 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
 
   const cacheTtlMs =
     config.cacheTtlMs === false || config.cacheTtlMs === 0 ? 0 : (config.cacheTtlMs ?? 2000);
-  const inFlight = new Map<string, Promise<unknown>>();
+  /**
+   * One shared underlying request per identical body. Followers with an
+   * `AbortSignal` get per-caller abort semantics (their promise rejects
+   * immediately) without cancelling the shared request out from under other
+   * callers — it is aborted only when every follower has aborted and no
+   * signal-less caller pinned it.
+   */
+  interface InFlightEntry {
+    promise: Promise<unknown>;
+    controller: AbortController;
+    /** Followers whose signal has not (yet) aborted. */
+    activeWaiters: number;
+    /** A signal-less caller joined — never abort the shared request. */
+    pinned: boolean;
+  }
+  const inFlight = new Map<string, InFlightEntry>();
   const resultCache = new Map<string, { result: unknown; expiresAt: number }>();
 
   async function resolveHeaders(): Promise<Record<string, string>> {
@@ -202,27 +220,100 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
     return performFetch(body, signal);
   }
 
-  async function sendCacheable(body: AdapterRequestBody): Promise<unknown> {
+  function abortError(): Error {
+    const error = new Error('The operation was aborted.');
+    error.name = 'AbortError';
+    return error;
+  }
+
+  /**
+   * TTL cache + in-flight dedup for idempotent reads. A caller's
+   * `AbortSignal` no longer routes around the cache (the pre-fix behavior
+   * made every `useFacets` read a fresh POST): a fresh cached result is
+   * returned regardless of signal, and concurrent identical reads share one
+   * underlying request while keeping per-caller abort semantics.
+   */
+  async function sendCacheable(body: AdapterRequestBody, signal?: AbortSignal): Promise<unknown> {
+    if (cacheTtlMs <= 0) return performFetch(body, signal);
+    if (signal?.aborted) throw abortError();
+
     const cacheKey = JSON.stringify(body);
-    if (cacheTtlMs > 0) {
-      const cached = resultCache.get(cacheKey);
-      if (cached && cached.expiresAt > Date.now()) return cached.result;
-      let pending = inFlight.get(cacheKey);
-      if (pending) return pending;
-      pending = performFetch(body);
-      inFlight.set(cacheKey, pending);
-      try {
-        const result = await pending;
-        resultCache.set(cacheKey, { result, expiresAt: Date.now() + cacheTtlMs });
-        return result;
-      } catch (error) {
-        resultCache.delete(cacheKey);
-        throw error;
-      } finally {
-        inFlight.delete(cacheKey);
-      }
+    const cached = resultCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+    let entry = inFlight.get(cacheKey);
+    if (!entry) {
+      const controller = new AbortController();
+      const created: InFlightEntry = {
+        promise: Promise.resolve<unknown>(undefined),
+        controller,
+        activeWaiters: 0,
+        pinned: false,
+      };
+      created.promise = performFetch(body, controller.signal)
+        .then((result) => {
+          resultCache.set(cacheKey, { result, expiresAt: Date.now() + cacheTtlMs });
+          return result;
+        })
+        .catch((error) => {
+          resultCache.delete(cacheKey);
+          throw error;
+        })
+        .finally(() => {
+          // Only remove OUR entry — an all-aborted entry is evicted early so a
+          // fresh caller may already have replaced it under the same key.
+          if (inFlight.get(cacheKey) === created) {
+            inFlight.delete(cacheKey);
+          }
+        });
+      entry = created;
+      inFlight.set(cacheKey, entry);
     }
-    return performFetch(body);
+
+    if (!signal) {
+      entry.pinned = true;
+      return entry.promise;
+    }
+
+    const shared = entry;
+    shared.activeWaiters += 1;
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        shared.activeWaiters -= 1;
+        if (shared.activeWaiters <= 0 && !shared.pinned) {
+          shared.controller.abort();
+          // Evict immediately: a caller arriving after this must start a
+          // fresh request, not join a doomed one.
+          if (inFlight.get(cacheKey) === shared) {
+            inFlight.delete(cacheKey);
+          }
+        }
+        reject(abortError());
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      // Both handlers are attached for every follower, so a late settlement
+      // after this caller aborted is still "handled" (the settled guard
+      // no-ops it) — no unhandled-rejection noise.
+      shared.promise.then(
+        (result) => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener('abort', onAbort);
+          shared.activeWaiters -= 1;
+          resolve(result);
+        },
+        (error) => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener('abort', onAbort);
+          shared.activeWaiters -= 1;
+          reject(error);
+        }
+      );
+    });
   }
 
   // Default meta advertises the real capability surface: update flips on
@@ -298,7 +389,7 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
         columnId,
         ...(hasParams ? { params: serializable } : {}),
       };
-      const result = signal ? await send(body, signal) : await sendCacheable(body);
+      const result = await sendCacheable(body, signal);
       return result as FilterOption[];
     },
 
@@ -313,7 +404,7 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
         columnId,
         ...(hasParams ? { params: serializable } : {}),
       };
-      const result = signal ? await send(body, signal) : await sendCacheable(body);
+      const result = await sendCacheable(body, signal);
       return new Map(result as [string, number][]);
     },
 
@@ -325,8 +416,34 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
         columnId,
         ...(hasParams ? { params: serializable } : {}),
       };
-      const result = signal ? await send(body, signal) : await sendCacheable(body);
+      const result = await sendCacheable(body, signal);
       return result as [number, number];
+    },
+
+    /**
+     * Batched facet reads — one POST for a whole sidebar refresh instead of
+     * one per column. Cached/deduped like the singular facet reads.
+     */
+    async getFacets(
+      requests: FacetRequest[],
+      params?: FacetQueryParams
+    ): Promise<FacetBatchResult> {
+      const { signal, ...serializable } = params ?? {};
+      const hasParams = Object.keys(serializable).length > 0;
+      const body = {
+        method: 'getFacets' as const,
+        requests,
+        ...(hasParams ? { params: serializable } : {}),
+      };
+      const raw = (await sendCacheable(body, signal)) as {
+        values?: Record<string, [string, number][]>;
+        ranges?: Record<string, [number, number]>;
+      };
+      const values: FacetBatchResult['values'] = {};
+      for (const [id, entries] of Object.entries(raw.values ?? {})) {
+        values[id] = new Map(entries);
+      }
+      return { values, ranges: raw.ranges ?? {} };
     },
 
     async describeColumns(table?: string): Promise<InferredColumnSpec[]> {

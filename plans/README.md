@@ -92,9 +92,10 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
   handler idioms and plan 042 input-test patterns.
 - **062** only after 061 Phases 1 + 6.
 - **063** anytime — measurement only (tests/bench/CI, no product `src/**`);
-  steps land independently; expected to spawn fix plans for the demo lag
-  findings (loading affordance, URL-debounce scope, facet batching,
-  cold-start seeding).
+  steps land independently. The four demo-lag fixes it originally queued
+  (loading affordance, leading-edge URL writes, facet batch + signal cache,
+  boot-time seeding) LANDED 2026-07-23 on the plan's branch — Tier-1/Tier-4
+  characterization pins the post-fix contract (see the plan's update note).
 - Capability asymmetry (from 060 design): Prisma can sort-by-count but
   not filter-by-count; Kysely/Drizzle do both — declare honestly in
   `AdapterMeta.capabilities.aggregates`.

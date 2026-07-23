@@ -29,7 +29,7 @@ export function TicketsTableClient({
   initialSorting,
   initialFilters,
 }: TicketsTableClientProps) {
-  const urlAdapter = useNextjsUrlAdapter();
+  const { adapter: urlAdapter, isPending } = useNextjsUrlAdapter();
 
   useTableUrlSync(
     TABLE_ID,
@@ -58,6 +58,7 @@ export function TicketsTableClient({
       table={ticketsTable}
       adapter={adapter}
       data={data}
+      loading={isPending}
       totalCount={totalCount}
       initialPagination={initialPagination}
       initialSorting={initialSorting}

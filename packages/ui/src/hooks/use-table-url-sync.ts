@@ -20,32 +20,64 @@ type TableStore = NonNullable<ReturnType<typeof getTableStore>>;
 const HYDRATION_RETRY_MS = 100;
 const HYDRATION_MAX_ATTEMPTS = 5;
 
+type UrlWriteState = Parameters<typeof serializeTableStateToUrl>[0];
+
 /**
- * Debounce utility to batch rapid updates.
- * Returns a cancel function so timers can be cleared on unmount.
+ * Leading + trailing coalescer for URL writes.
+ *
+ * A trailing-only debounce put a fixed `wait` of idle time in front of EVERY
+ * write — and for server-driven tables (Next.js demos) the URL write IS the
+ * refetch trigger, so a single pagination click or filter commit paid a
+ * built-in latency floor before the network even started. Instead:
+ *
+ * - a change arriving outside a cooldown window writes IMMEDIATELY (a
+ *   discrete click/commit gets zero added latency), then opens a `wait`
+ *   cooldown;
+ * - changes arriving inside the cooldown are coalesced: only the LATEST is
+ *   written when the cooldown expires (which re-opens it, so a continuous
+ *   stream still writes at most once per `wait`).
+ *
+ * `func` returns whether it actually wrote (it skips writes that wouldn't
+ * change the URL); a skipped leading write does NOT open a cooldown, so a
+ * no-op change (e.g. row selection) never delays the next real one.
  */
-function debounce<T extends (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void>(
-  func: T,
+function coalesceUrlWrites(
+  func: (tableState: UrlWriteState) => boolean,
   wait: number
 ): {
-  fn: (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void;
+  fn: (tableState: UrlWriteState) => void;
   cancel: () => void;
 } {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let pending: UrlWriteState | null = null;
 
   const cancel = () => {
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
+    pending = null;
   };
 
-  const fn = (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => {
-    cancel();
-    timeoutId = setTimeout(() => {
-      timeoutId = null;
-      func(tableState);
-    }, wait);
+  const onCooldownEnd = () => {
+    timeoutId = null;
+    if (pending !== null) {
+      const state = pending;
+      pending = null;
+      if (func(state)) {
+        timeoutId = setTimeout(onCooldownEnd, wait);
+      }
+    }
+  };
+
+  const fn = (tableState: UrlWriteState) => {
+    if (timeoutId === null) {
+      if (func(tableState)) {
+        timeoutId = setTimeout(onCooldownEnd, wait);
+      }
+      return;
+    }
+    pending = tableState;
   };
 
   return { fn, cancel };
@@ -381,25 +413,29 @@ export function useTableUrlSync(
     }
 
     const manager = store.getState().manager;
-    const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce((tableState) => {
-      const urlParams = serializeTableStateToUrl(tableState);
-      // Keep default page/limit out of a URL that doesn't already carry them,
-      // so a change that doesn't touch pagination (selection, column toggle)
-      // doesn't introduce `?page=1&limit=<default>`.
-      stripDefaultPaginationFromWrite(
-        urlParams,
-        tableState.pagination,
-        defaultPaginationRef.current,
-        adapter
-      );
-      // Skip writes that wouldn't change the URL (e.g. a row-selection change,
-      // which emits `state_changed` but touches no synced param) so adapters
-      // that navigate on `setParams` don't refetch for nothing.
-      if (!serializedParamsDifferFromUrl(urlParams, adapter)) {
-        return;
-      }
-      adapter.setParams(urlParams);
-    }, 150);
+    const { fn: coalescedUrlUpdate, cancel: cancelCoalescedUrlUpdate } = coalesceUrlWrites(
+      (tableState) => {
+        const urlParams = serializeTableStateToUrl(tableState);
+        // Keep default page/limit out of a URL that doesn't already carry them,
+        // so a change that doesn't touch pagination (selection, column toggle)
+        // doesn't introduce `?page=1&limit=<default>`.
+        stripDefaultPaginationFromWrite(
+          urlParams,
+          tableState.pagination,
+          defaultPaginationRef.current,
+          adapter
+        );
+        // Skip writes that wouldn't change the URL (e.g. a row-selection change,
+        // which emits `state_changed` but touches no synced param) so adapters
+        // that navigate on `setParams` don't refetch for nothing.
+        if (!serializedParamsDifferFromUrl(urlParams, adapter)) {
+          return false;
+        }
+        adapter.setParams(urlParams);
+        return true;
+      },
+      150
+    );
 
     const unsubscribe = manager.subscribe((event: TableStateEvent) => {
       if (!hasHydratedFromUrl.current) return;
@@ -432,13 +468,13 @@ export function useTableUrlSync(
           tableState.columnOrder = getColumnOrderModifications(columns, event.state.columnOrder);
         }
 
-        debouncedUrlUpdate(tableState);
+        coalescedUrlUpdate(tableState);
       }
     });
 
     return () => {
       unsubscribe();
-      cancelDebouncedUrlUpdate();
+      cancelCoalescedUrlUpdate();
     };
   }, [tableId, stableConfig, adapter, storeReady]);
 }

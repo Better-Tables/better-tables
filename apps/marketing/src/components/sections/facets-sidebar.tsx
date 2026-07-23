@@ -30,7 +30,7 @@ interface FacetsSidebarProps {
  * loads counts/ranges for the active filters. Toggle a value to update the URL.
  */
 export function FacetsSidebar({ activeFilters }: FacetsSidebarProps) {
-  const urlAdapter = useNextjsUrlAdapter();
+  const { adapter: urlAdapter } = useNextjsUrlAdapter();
 
   // Browser proxy to the server Drizzle adapter.
   const adapter = useMemo(() => httpAdapter({ url: '/api/tables/tickets' }), []);

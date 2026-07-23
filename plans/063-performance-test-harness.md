@@ -59,8 +59,25 @@ tests. There is no harness that would catch the next regression class:
 
 ## Current state (verified 2026-07-23 at `dcd90c1`)
 
-What a pagination click / filter change actually costs today, and where the
-felt lag comes from — these are the behaviors the harness must measure:
+> **Update (2026-07-23, this branch):** the four lag causes below were fixed
+> ahead of this plan, on `claude/performance-testing-strategy-m35acc`.
+> Tier-1/Tier-4 characterization must pin the POST-fix contract:
+> server-affecting URL writes are leading-edge immediate with a 150 ms
+> trailing coalesce window (a discrete pagination click/filter commit pays
+> ZERO added latency; a rapid burst produces the first write plus at most
+> one trailing write per window); `<BetterTable loading>` keeps current rows
+> mounted (dimmed, `aria-busy`) during a refetch and reserves the skeleton
+> for an empty initial load, and the demos feed it `isPending` from a
+> transition around `router.replace`; `useFacets` issues ONE batched
+> `getFacets` POST on batch-capable adapters (singular per-column calls
+> remain only for in-process adapters), and `httpAdapter`'s TTL cache/dedup
+> now applies to signalled reads with per-caller abort semantics; demo
+> seeding warms at server boot (`instrumentation.ts`) and re-warms on demo
+> reset. The paragraphs below describe the PRE-fix behavior for the record.
+
+What a pagination click / filter change cost before those fixes, and where
+the felt lag came from — the regression classes the harness must keep
+covered:
 
 - **Interaction pipeline is synchronous to `state_changed`**: click →
   `table-pagination.tsx:101/166/180` → store → managers
@@ -175,11 +192,15 @@ Characterize, then assert EXACTLY (comment each number with why):
 - Adding a filter with empty `values` (`filter-bar.tsx:216`): characterize
   whether a fetch fires at all — whatever the current contract is, pin it
   and note it in the report (an empty-value fetch is a finding, not a fix).
-- Committing a filter value: 1 fetch, exactly K facet + R min/max calls for
-  a table with K option facets and R range facets (assert K=2, R=1 with a
-  3-facet fixture), 1 URL write, auto-show effect fires at most once.
-- Rapid double pagination click inside one debounce window: exactly 1 URL
-  write / 1 fetch (documents the debounce floor as intended coalescing).
+- Committing a filter value: 1 fetch, exactly ONE batched `getFacets` call
+  on a batch-capable adapter (assert the request list carries K option +
+  R range columns with a 3-facet fixture; K+R singular calls only for an
+  adapter without `getFacets`), 1 URL write, auto-show effect fires at most
+  once.
+- A single pagination click: the URL write is SYNCHRONOUS (leading edge) —
+  assert 1 write with timers frozen. A rapid double click inside the 150 ms
+  window: first write immediate, second coalesced to one trailing write
+  (2 total, each a real page change).
 
 Wire the so-far-unused `createRenderCounter`
 (`tests/helpers/render-count.tsx:16`) around the whole `<BetterTable>` to
@@ -328,15 +349,23 @@ check-only lint `bunx biome check .`); CI green on the branch including the
 new files; trend job proven by a manual `workflow_dispatch` run or a dry
 run with `save-data-file: false` noted in the report.
 
-## Expected follow-up fix plans (NOT in scope — file, don't fix)
+## Follow-up fixes — LANDED ahead of this plan (2026-07-23)
 
-The baselines are expected to motivate, at minimum: (a) an interaction
-feedback affordance in the demos (`loading`/transition instead of frozen
-stale rows — and reconsider the library's all-rows skeleton unmount);
-(b) scoping the 150 ms URL debounce (pagination clicks arguably shouldn't
-pay it); (c) facet request batching and the signal-vs-cache bypass in
-`useFacets`/`httpAdapter`; (d) demo cold-start seeding off the first
-request. Each becomes its own plan with a Tier-1/Tier-4 number attached.
+The four fix candidates this plan originally queued all landed on
+`claude/performance-testing-strategy-m35acc` before harness execution:
+(a) refetch feedback — `<BetterTable loading>` keeps rows mounted
+(dim + `aria-busy`; skeleton only for empty initial load) and every demo
+client passes `isPending` from a transition-wrapped `router.replace`
+(shared across siblings via `UrlNavigationPendingProvider` where the
+navigator and the table are different components); (b) URL writes are
+leading-edge immediate with a 150 ms trailing coalesce
+(`coalesceUrlWrites` in `use-table-url-sync.ts`) — no debounce floor on
+discrete interactions; (c) `TableAdapter.getFacets` batch (wire method +
+handler fan-out + `useFacets` batch path) and a signal-compatible
+TTL cache/dedup in `httpAdapter` (per-caller abort, refcounted underlying
+cancel); (d) demo seeding warmed at boot (`instrumentation.ts`) and after
+"Reset demo". Tier 4 baselines now VERIFY these fixes and guard them
+against regression, rather than motivating them.
 
 ## Scope
 

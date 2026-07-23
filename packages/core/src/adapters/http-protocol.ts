@@ -6,7 +6,7 @@
  * fetch plumbing or `Map` (de)serialization.
  */
 
-import type { FacetQueryParams, FetchDataParams } from '../types/adapter';
+import type { FacetQueryParams, FacetRequest, FetchDataParams } from '../types/adapter';
 
 /**
  * The methods the HTTP transport proxies: the reads (always available) plus
@@ -18,9 +18,17 @@ export type AdapterMethod =
   | 'getFilterOptions'
   | 'getFacetedValues'
   | 'getMinMaxValues'
+  | 'getFacets'
   | 'describeColumns'
   | 'resolveCellWriteTarget'
   | 'cellEdit';
+
+/**
+ * Upper bound on entries in one `getFacets` batch. Far above any real
+ * sidebar (a handful of facets); exists so a malicious body can't fan a
+ * single POST out into thousands of adapter queries.
+ */
+export const MAX_FACET_BATCH_SIZE = 50;
 
 /**
  * A single request over the wire. `fetchData` carries a `params` object
@@ -37,6 +45,17 @@ export type AdapterRequestBody =
   | {
       method: 'getFilterOptions' | 'getFacetedValues' | 'getMinMaxValues';
       columnId: string;
+      /** {@link FacetQueryParams} without `signal` (handled client-side). */
+      params?: Omit<FacetQueryParams, 'signal'>;
+    }
+  | {
+      method: 'getFacets';
+      /**
+       * Batched facet reads answered in one round-trip. At most
+       * {@link MAX_FACET_BATCH_SIZE} entries; the server rejects larger
+       * batches as `bad_request`.
+       */
+      requests: FacetRequest[];
       /** {@link FacetQueryParams} without `signal` (handled client-side). */
       params?: Omit<FacetQueryParams, 'signal'>;
     }
@@ -72,6 +91,8 @@ export type AdapterRequestBody =
  * The response envelope. `result` is the method's return value already made
  * JSON-safe:
  * - a `getFacetedValues` `Map` is sent as its `[value, count][]` entries
+ * - a `getFacets` result's `values` maps are sent the same way
+ *   (`{ values: Record<columnId, [value, count][]>, ranges: ... }`)
  * - `fetchData` result's optional `faceted` maps are sent the same way
  *   (`Record<string, [value, count][]>`) and rebuilt into `Map`s on the client
  * - `Date` values in filter params / rows serialize as ISO strings (JSON)

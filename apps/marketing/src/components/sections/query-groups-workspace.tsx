@@ -8,7 +8,7 @@ import type { FetchTicketsResult } from '@/lib/demo/support/fetch-tickets';
 import { countFilterLeaves, describeFilters } from '@/lib/demo/support/filter-sentence';
 import { queryGroupPresets } from '@/lib/demo/support/relationship-trail';
 import { serializeSupportPresetToUrl } from '@/lib/demo/support/serialize-preset';
-import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
+import { UrlNavigationPendingProvider, useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 import { cn } from '@/lib/utils';
 
 interface QueryGroupsWorkspaceProps {
@@ -16,9 +16,22 @@ interface QueryGroupsWorkspaceProps {
   activePresetId: string | null;
 }
 
-export function QueryGroupsWorkspace({ fetchResult, activePresetId }: QueryGroupsWorkspaceProps) {
+/**
+ * Provider wrapper so a preset/reset click (this component's hook) and the
+ * table's dim-while-pending (`QueryGroupsTableClient`'s hook) share one
+ * transition — the inner component's hook must run UNDER the provider.
+ */
+export function QueryGroupsWorkspace(props: QueryGroupsWorkspaceProps) {
+  return (
+    <UrlNavigationPendingProvider>
+      <QueryGroupsWorkspaceInner {...props} />
+    </UrlNavigationPendingProvider>
+  );
+}
+
+function QueryGroupsWorkspaceInner({ fetchResult, activePresetId }: QueryGroupsWorkspaceProps) {
   const { result, filters, sorting, error } = fetchResult;
-  const urlAdapter = useNextjsUrlAdapter();
+  const { adapter: urlAdapter } = useNextjsUrlAdapter();
   const [copied, setCopied] = useState(false);
 
   const activePreset = queryGroupPresets.find((preset) => preset.id === activePresetId) ?? null;

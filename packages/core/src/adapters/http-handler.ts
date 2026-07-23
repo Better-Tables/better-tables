@@ -8,8 +8,9 @@
  */
 
 import { coerceCellValue } from '../lib/cell-edit-core';
-import type { FetchDataResult, TableAdapter } from '../types/adapter';
+import type { FacetBatchResult, FetchDataResult, TableAdapter } from '../types/adapter';
 import type { AdapterRequestBody, AdapterResponseBody } from './http-protocol';
+import { MAX_FACET_BATCH_SIZE } from './http-protocol';
 
 /**
  * Opt-in write configuration (plan 055). Absent/false = writes disabled
@@ -98,6 +99,22 @@ function isValidBody(body: unknown): body is AdapterRequestBody {
     method === 'getMinMaxValues'
   ) {
     return typeof (body as { columnId?: unknown }).columnId === 'string';
+  }
+  if (method === 'getFacets') {
+    const requests = (body as { requests?: unknown }).requests;
+    return (
+      Array.isArray(requests) &&
+      requests.length > 0 &&
+      requests.length <= MAX_FACET_BATCH_SIZE &&
+      requests.every(
+        (entry: unknown) =>
+          !!entry &&
+          typeof entry === 'object' &&
+          typeof (entry as { columnId?: unknown }).columnId === 'string' &&
+          ((entry as { kind?: unknown }).kind === 'values' ||
+            (entry as { kind?: unknown }).kind === 'minmax')
+      )
+    );
   }
   if (method === 'describeColumns') {
     const table = (body as { table?: unknown }).table;
@@ -188,6 +205,41 @@ export async function handleAdapterRequest<TData = unknown>(
       case 'getMinMaxValues': {
         const result = await adapter.getMinMaxValues(body.columnId, body.params);
         return { ok: true, result };
+      }
+      case 'getFacets': {
+        // One POST, K facet reads. Prefer the adapter's own batch when it has
+        // one; otherwise fan out to the singular methods server-side — the
+        // round-trips this saves are the client↔server ones, not the
+        // adapter↔DB ones.
+        let batch: FacetBatchResult;
+        if (adapter.getFacets) {
+          batch = await adapter.getFacets(body.requests, body.params);
+        } else {
+          const values: FacetBatchResult['values'] = {};
+          const ranges: FacetBatchResult['ranges'] = {};
+          await Promise.all(
+            body.requests.map(async (entry) => {
+              if (entry.kind === 'values') {
+                values[entry.columnId] = await adapter.getFacetedValues(
+                  entry.columnId,
+                  body.params
+                );
+              } else {
+                ranges[entry.columnId] = await adapter.getMinMaxValues(entry.columnId, body.params);
+              }
+            })
+          );
+          batch = { values, ranges };
+        }
+        return {
+          ok: true,
+          result: {
+            values: Object.fromEntries(
+              Object.entries(batch.values).map(([key, map]) => [key, Array.from(map.entries())])
+            ),
+            ranges: batch.ranges,
+          },
+        };
       }
       case 'describeColumns': {
         // Optional capability (plan 054): an adapter without it is a caller
