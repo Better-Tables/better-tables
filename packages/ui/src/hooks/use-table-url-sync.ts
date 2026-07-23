@@ -177,6 +177,34 @@ function hydrateFromUrl(
 }
 
 /**
+ * Whether writing `urlParams` would actually change any synced URL param.
+ *
+ * The table manager emits `state_changed` for mutations that touch no synced
+ * URL param at all — row selection is the common one — and the write-out below
+ * serializes the *current* value of every configured field, not a diff. Without
+ * this check every such change would call `adapter.setParams` with values
+ * identical to the URL; harmless for a history-only adapter, but with an adapter
+ * that navigates on `setParams` (e.g. a Next.js router adapter) it forces a
+ * needless refetch / full RSC round-trip (e.g. re-fetching the page just to tick
+ * a checkbox).
+ *
+ * Each entry is compared against the adapter's current value. A `null` value
+ * means "this param should be absent", which matches an absent (`null`) current
+ * value; `undefined` from the adapter is normalized to `null`.
+ */
+function serializedParamsDifferFromUrl(
+  urlParams: Record<string, string | null>,
+  adapter: UrlSyncAdapter
+): boolean {
+  for (const [key, value] of Object.entries(urlParams)) {
+    if ((adapter.getParam(key) ?? null) !== (value ?? null)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Build a signature string from the URL param values relevant to `config`.
  * Used as a render-time effect dependency so the hydration effect re-runs
  * whenever the underlying URL values change -- even if the `adapter`
@@ -295,6 +323,12 @@ export function useTableUrlSync(
     const manager = store.getState().manager;
     const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce((tableState) => {
       const urlParams = serializeTableStateToUrl(tableState);
+      // Skip writes that wouldn't change the URL (e.g. a row-selection change,
+      // which emits `state_changed` but touches no synced param) so adapters
+      // that navigate on `setParams` don't refetch for nothing.
+      if (!serializedParamsDifferFromUrl(urlParams, adapter)) {
+        return;
+      }
       adapter.setParams(urlParams);
     }, 150);
 
