@@ -328,6 +328,27 @@ export interface DrizzleAdapterOptions {
    * ```
    */
   onInvalidFilter?: InvalidFilterBehavior;
+
+  /**
+   * Upper bound on a single page's `limit` (rows per page). An incoming
+   * `pagination.limit` larger than this is clamped down to it before the query
+   * runs. Because `limit` is commonly URL-driven, this guards against a crafted
+   * `?limit=…` pulling an unbounded result set from the database and forcing the
+   * client to render tens of thousands of rows.
+   *
+   * Defaults to {@link DEFAULT_MAX_PAGE_SIZE} (200). Raise it for a deliberately
+   * large page (e.g. a virtualized "load everything" view); a non-positive or
+   * non-finite value disables the clamp.
+   *
+   * @default 200
+   * @example
+   * ```typescript
+   * const adapter = drizzleAdapter(db, {
+   *   options: { maxPageSize: 500 }
+   * });
+   * ```
+   */
+  maxPageSize?: number;
 }
 
 /**

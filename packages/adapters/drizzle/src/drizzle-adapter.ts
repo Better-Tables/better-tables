@@ -69,6 +69,7 @@ import type {
 } from '@better-tables/core';
 import {
   DEFAULT_EXPORT_ROW_CAP,
+  DEFAULT_MAX_PAGE_SIZE,
   isFilterGroupNode,
   normalizeFilterNode,
 } from '@better-tables/core';
@@ -407,6 +408,23 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
   }
 
   /**
+   * Return `params` with `pagination.limit` clamped to the configured
+   * `maxPageSize` (default {@link DEFAULT_MAX_PAGE_SIZE}). Never mutates the
+   * caller's object. A non-positive or non-finite cap disables the clamp; a
+   * non-finite incoming `limit` is left untouched (other code validates it).
+   */
+  private withClampedPageSize(params: FetchDataParams): FetchDataParams {
+    const { pagination } = params;
+    if (!pagination) return params;
+
+    const cap = this.options?.maxPageSize ?? DEFAULT_MAX_PAGE_SIZE;
+    if (!Number.isFinite(cap) || cap <= 0) return params;
+    if (!Number.isFinite(pagination.limit) || pagination.limit <= cap) return params;
+
+    return { ...params, pagination: { ...pagination, limit: cap } };
+  }
+
+  /**
    * Fetch data with filtering, sorting, and pagination.
    *
    * This is the main method for retrieving data from the database. It handles:
@@ -457,6 +475,13 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     params: FetchDataParams
   ): Promise<FetchDataResult<InferSelectModelFromFilteredSchema<TSchema>>> {
     const startTime = Date.now();
+
+    // Clamp an oversized page size (commonly URL-driven via `?limit=…`) before
+    // it reaches the database, so a crafted request can't pull an unbounded
+    // result set or force the client to render tens of thousands of rows. The
+    // clamped value flows through to both the query and the returned pagination
+    // metadata below, since everything downstream reads `params.pagination`.
+    params = this.withClampedPageSize(params);
 
     // Resolved before the try block so a multi-table-ambiguity SchemaError
     // surfaces to the caller as-is, rather than being wrapped in a
