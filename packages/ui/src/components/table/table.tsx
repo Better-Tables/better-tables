@@ -1014,7 +1014,8 @@ function BetterTableInner<TData = unknown>({
     // writes. Depending on `columnVisibility` here previously made this
     // effect re-fire on its own `setColumnVisibility` call.
     if (newlyFilteredColumns.length > 0 || unfilteredColumns.length > 0) {
-      const newVisibility = { ...store.getState().columnVisibility };
+      const currentVisibility = store.getState().columnVisibility;
+      const newVisibility = { ...currentVisibility };
       for (const columnId of newlyFilteredColumns) {
         newVisibility[columnId] = true;
       }
@@ -1025,7 +1026,15 @@ function BetterTableInner<TData = unknown>({
           }
         }
       }
-      setColumnVisibility(newVisibility);
+      // Only write when visibility actually changed. The common case — filtering
+      // a column that's already visible — otherwise pushes a new-but-equal object
+      // into the store and re-renders the whole table for nothing.
+      const changed = Object.keys(newVisibility).some(
+        (key) => newVisibility[key] !== currentVisibility[key]
+      );
+      if (changed) {
+        setColumnVisibility(newVisibility);
+      }
     }
 
     // Update ref for next comparison

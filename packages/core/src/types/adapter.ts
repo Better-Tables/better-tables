@@ -342,6 +342,17 @@ export interface ExportParams {
 export const DEFAULT_EXPORT_ROW_CAP = 50_000;
 
 /**
+ * Default upper bound on a single page's `limit` (rows per page). Adapters
+ * clamp an incoming `pagination.limit` to this when a larger value arrives —
+ * pagination `limit` is frequently URL-driven (e.g. `?limit=…`), so without a
+ * cap a crafted request can ask the database for an unbounded result set and
+ * force the client to render tens of thousands of rows. `200` is a safe
+ * default for interactive tables; override per-adapter for genuinely larger
+ * pages (e.g. a virtualized "load everything" view).
+ */
+export const DEFAULT_MAX_PAGE_SIZE = 200;
+
+/**
  * Result from data export operation.
  *
  * Contains the exported data as a blob or string along with
