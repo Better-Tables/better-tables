@@ -16,7 +16,11 @@
       "!!.git",
       "!!.turbo",
       "!!**/next-env.d.ts",
-      "!!packages/cli/ui-src"
+      "!!packages/cli/ui-src",
+      "!!**/test-results",
+      "!!**/e2e-results",
+      "!!**/playwright-report",
+      "!!**/bench-results"
     ]
   },
   "linter": {

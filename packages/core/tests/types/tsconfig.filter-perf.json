@@ -1,0 +1,16 @@
+{
+  // Isolated-check config for the plan 031 filter type-perf fixture: real
+  // package compiler options (extends), but ONLY this fixture included, and
+  // only @types/node loaded — a bare `tsc <file>` would use DEFAULT options
+  // (target ES5) and auto-load every hoisted @types package (@types/mdx
+  // breaks without JSX), which is why the gate runs through this config.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["filter-perf-fixture.ts"]
+}

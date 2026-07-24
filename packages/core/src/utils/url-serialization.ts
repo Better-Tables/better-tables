@@ -21,6 +21,7 @@
 
 import type { FilterGroupNode, FilterState, PaginationState, SortingState } from '@/types';
 import { compressAndEncode, decompressAndDecode } from './compression';
+import { getEffectiveFilters } from './filter-effect';
 import { deserializeFiltersFromURL, serializeFiltersToURL } from './filter-serialization';
 
 /**
@@ -78,6 +79,13 @@ export interface DeserializedTableState {
  * - 4 filters: ~400 chars → ~150-200 chars (50-60% reduction)
  * - 10+ filters: ~1000+ chars → ~300-400 chars (60-70% reduction)
  *
+ * **Filter handling:** only filters that actually constrain results are
+ * serialized — a value-taking filter with empty `values` (e.g. a chip added
+ * before its value is chosen) is dropped via `getEffectiveFilters`, so it
+ * never appears in the URL and never triggers a needless refetch / RSC
+ * round-trip. No-value operators (`isEmpty`/`isNull`/…) still serialize.
+ * (A `FilterGroupNode` tree is serialized as-is; see `getEffectiveFilters`.)
+ *
  * @param state - Table state to serialize
  * @returns Record of URL parameter keys and values (null values should be removed from URL)
  *
@@ -104,15 +112,22 @@ export function serializeTableStateToUrl(
 ): Record<string, string | null> {
   const params: Record<string, string | null> = {};
 
-  // Serialize filters (compressed and encoded) - use core serialization function
+  // Serialize filters (compressed and encoded) - use core serialization function.
+  // Only filters that actually constrain results are written: a chip added
+  // before its value is chosen (`values: []`) must not change the URL — that
+  // would trigger a needless refetch / RSC round-trip for a filter that can't
+  // narrow anything yet (plan 063 follow-up). `getEffectiveFilters` drops those
+  // no-effect leaves from a flat list; a FilterGroupNode passes through
+  // unchanged (see its docs).
   if (state.filters !== undefined) {
+    const effectiveFilters = getEffectiveFilters(state.filters);
     // A FilterGroupNode has no `.length` and (per design §1.4) is never
     // meaningfully "empty" after validation, so only an empty FilterState[]
     // array counts as "nothing to serialize".
-    const isEmptyArray = Array.isArray(state.filters) && state.filters.length === 0;
+    const isEmptyArray = Array.isArray(effectiveFilters) && effectiveFilters.length === 0;
     if (!isEmptyArray) {
       try {
-        params.filters = serializeFiltersToURL(state.filters);
+        params.filters = serializeFiltersToURL(effectiveFilters);
       } catch {
         // Silently ignore serialization errors
       }

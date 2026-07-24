@@ -9,16 +9,29 @@ import {
   supportScenarioPresets,
 } from '@/lib/demo/support/relationship-trail';
 import { serializeSupportPresetToUrl } from '@/lib/demo/support/serialize-preset';
-import { useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
+import { UrlNavigationPendingProvider, useNextjsUrlAdapter } from '@/lib/nextjs-url-adapter';
 import { cn } from '@/lib/utils';
 
 interface SupportDemoWorkspaceProps {
   fetchResult: FetchTicketsResult;
 }
 
-export function SupportDemoWorkspace({ fetchResult }: SupportDemoWorkspaceProps) {
+/**
+ * Provider wrapper so a preset/reset click (this component's hook) and the
+ * table's dim-while-pending (`TicketsTableClient`'s hook) share one
+ * transition — the inner component's hook must run UNDER the provider.
+ */
+export function SupportDemoWorkspace(props: SupportDemoWorkspaceProps) {
+  return (
+    <UrlNavigationPendingProvider>
+      <SupportDemoWorkspaceInner {...props} />
+    </UrlNavigationPendingProvider>
+  );
+}
+
+function SupportDemoWorkspaceInner({ fetchResult }: SupportDemoWorkspaceProps) {
   const { result, filters, sorting, error } = fetchResult;
-  const urlAdapter = useNextjsUrlAdapter();
+  const { adapter: urlAdapter } = useNextjsUrlAdapter();
   const relationshipTrail = useMemo(() => buildRelationshipTrail(filters), [filters]);
 
   const applyPreset = (presetId: string) => {

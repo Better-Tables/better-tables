@@ -33,7 +33,7 @@ export function UsersTableClient({
   initialFilters,
 }: UsersTableClientProps) {
   const router = useRouter();
-  const urlAdapter = useNextjsUrlAdapter();
+  const { adapter: urlAdapter, isPending } = useNextjsUrlAdapter();
 
   useTableUrlSync(
     TABLE_ID,
@@ -78,6 +78,7 @@ export function UsersTableClient({
       // project these are `better-tables add actions export` + these slot lines.
       slots={{ actionsToolbar: ActionsToolbar, toolbarExtra: ExportButton }}
       data={data}
+      loading={isPending}
       totalCount={totalCount}
       initialPagination={initialPagination}
       initialSorting={initialSorting}

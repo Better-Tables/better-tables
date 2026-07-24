@@ -10,6 +10,7 @@ export * from './column-order';
 export * from './column-visibility';
 export * from './compression';
 export * from './equality';
+export * from './filter-effect';
 export * from './filter-serialization';
 export * from './filter-value';
 export * from './meta-accessors';

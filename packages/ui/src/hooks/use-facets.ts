@@ -1,6 +1,7 @@
 'use client';
 
 import type { FilterGroupNode, FilterState, TableAdapter } from '@better-tables/core';
+import { getEffectiveFilterKey, MAX_FACET_BATCH_SIZE } from '@better-tables/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /** A single faceted option: a distinct value and how many rows match it. */
@@ -10,7 +11,12 @@ export interface FacetOption {
 }
 
 export interface UseFacetsOptions<TData = unknown> {
-  /** Table adapter -- must implement `getFacetedValues`/`getMinMaxValues`. */
+  /**
+   * Table adapter. Must implement `getFacetedValues`/`getMinMaxValues`; may
+   * additionally implement the optional `getFacets` batch method, which the
+   * hook prefers when present to fetch the whole sidebar in a single
+   * round-trip per {@link MAX_FACET_BATCH_SIZE}-sized chunk (e.g. `httpAdapter`).
+   */
   adapter: TableAdapter<TData>;
 
   /**
@@ -73,12 +79,20 @@ const EMPTY_IDS: string[] = [];
  *
  * This is the reusable version of the fetch/self-exclusion/`Map`-to-array
  * plumbing every faceted-sidebar consumer otherwise hand-builds (plan 032,
- * finding 7): it owns the `Promise.all` batching, the race guard (only the
- * newest request's results are applied), and the `Map<string, number>` ->
- * `FacetOption[]` conversion. It does NOT own filter STATE -- pass your
- * `filters` in (e.g. from `useTableFilters`) and use the returned
- * `facets`/`ranges` to render checkboxes/ranges that toggle real filters
- * via your own `onFiltersChange`/`setFilters`.
+ * finding 7): the race guard (only the newest request's results are applied)
+ * and the `Map<string, number>` -> `FacetOption[]` conversion. It does NOT
+ * own filter STATE -- pass your `filters` in (e.g. from `useTableFilters`)
+ * and use the returned `facets`/`ranges` to render checkboxes/ranges that
+ * toggle real filters via your own `onFiltersChange`/`setFilters`.
+ *
+ * Fetch strategy depends on the adapter: when it implements the optional
+ * `getFacets` batch method (e.g. `httpAdapter`), the whole sidebar is fetched
+ * in one round-trip per {@link MAX_FACET_BATCH_SIZE}-sized chunk; otherwise
+ * the hook falls back to concurrent singular `getFacetedValues`/
+ * `getMinMaxValues` calls (`Promise.all`), one per column — fine for
+ * in-process adapters where there is no transport to save. The refetch
+ * trigger keys on the EFFECTIVE filters, so an incomplete filter chip
+ * (`values: []`) does not refire.
  *
  * @example
  * ```tsx
@@ -125,7 +139,16 @@ export function useFacets<TData = unknown>({
   // every render and re-fire the fetch effect indefinitely. Intern by JSON
   // content -- filter state is small and this only runs on identity change,
   // not on every fetch.
-  const filtersKey = JSON.stringify(filters ?? null);
+  //
+  // Key on the EFFECTIVE filters (no-effect leaves dropped) so a chip added
+  // before its value is chosen (`values: []`) does not refire the facet batch
+  // — it cannot change any facet's counts yet (plan 063 follow-up). The full
+  // `filters` array is still what's passed to the adapter (self-exclusion is
+  // its job over the complete state); only the refetch TRIGGER is effective.
+  // BigInt/circular-safe key (a `custom` filter value must not throw here).
+  const filtersKey = getEffectiveFilterKey(filters);
+  // Intern `filters` by effective content, not identity: `filtersKey` (not
+  // `filters`) is the dependency on purpose.
   const stableFilters = useMemo(() => filters, [filtersKey]);
 
   const fetchFacets = useCallback(async () => {
@@ -149,21 +172,64 @@ export function useFacets<TData = unknown>({
     };
 
     try {
-      const [facetResults, rangeResults] = await Promise.all([
-        Promise.all(
-          stableColumnIds.map(async (columnId) => {
-            const map = await adapter.getFacetedValues(columnId, facetParams);
-            const options: FacetOption[] = Array.from(map, ([value, count]) => ({ value, count }));
-            return [columnId, options] as const;
-          })
-        ),
-        Promise.all(
-          stableRangeColumnIds.map(async (columnId) => {
-            const range = await adapter.getMinMaxValues(columnId, facetParams);
-            return [columnId, range] as const;
-          })
-        ),
-      ]);
+      let facetResults: (readonly [string, FacetOption[]])[];
+      let rangeResults: (readonly [string, [number, number]])[];
+
+      if (adapter.getFacets) {
+        // Batch-capable adapter (e.g. `httpAdapter`): one round-trip per
+        // chunk instead of one request per column. Chunk to
+        // `MAX_FACET_BATCH_SIZE` so a sidebar with more facet+range columns
+        // than the server's per-batch cap doesn't fail as `bad_request` — it
+        // just costs an extra round-trip per chunk (still far fewer than one
+        // per column). The chunks run concurrently.
+        const requests = [
+          ...stableColumnIds.map((columnId) => ({ columnId, kind: 'values' as const })),
+          ...stableRangeColumnIds.map((columnId) => ({ columnId, kind: 'minmax' as const })),
+        ];
+        const chunks: (typeof requests)[] = [];
+        for (let i = 0; i < requests.length; i += MAX_FACET_BATCH_SIZE) {
+          chunks.push(requests.slice(i, i + MAX_FACET_BATCH_SIZE));
+        }
+        const getFacets = adapter.getFacets.bind(adapter);
+        const batchResults = await Promise.all(
+          chunks.map((chunk) => getFacets(chunk, facetParams))
+        );
+        const values: Record<string, Map<string, number>> = {};
+        const ranges: Record<string, [number, number]> = {};
+        for (const batch of batchResults) {
+          Object.assign(values, batch.values);
+          Object.assign(ranges, batch.ranges);
+        }
+        facetResults = stableColumnIds.map((columnId) => {
+          const map = values[columnId] ?? new Map<string, number>();
+          const options: FacetOption[] = Array.from(map, ([value, count]) => ({ value, count }));
+          return [columnId, options] as const;
+        });
+        rangeResults = stableRangeColumnIds.flatMap((columnId) => {
+          const range = ranges[columnId];
+          return range ? [[columnId, range] as const] : [];
+        });
+      } else {
+        // In-process adapters: parallel singular calls (no transport to save).
+        [facetResults, rangeResults] = await Promise.all([
+          Promise.all(
+            stableColumnIds.map(async (columnId) => {
+              const map = await adapter.getFacetedValues(columnId, facetParams);
+              const options: FacetOption[] = Array.from(map, ([value, count]) => ({
+                value,
+                count,
+              }));
+              return [columnId, options] as const;
+            })
+          ),
+          Promise.all(
+            stableRangeColumnIds.map(async (columnId) => {
+              const range = await adapter.getMinMaxValues(columnId, facetParams);
+              return [columnId, range] as const;
+            })
+          ),
+        ]);
+      }
 
       if (requestId !== requestIdRef.current) {
         return;

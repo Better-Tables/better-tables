@@ -4,6 +4,7 @@ import { ExampleShell } from '@/components/examples/example-shell';
 import { FacetsSidebar } from '@/components/sections/facets-sidebar';
 import { FacetsTableClient } from '@/components/sections/facets-table-client';
 import { fetchTickets } from '@/lib/demo/support/fetch-tickets';
+import { UrlNavigationPendingProvider } from '@/lib/nextjs-url-adapter';
 import { constructMetadata } from '@/lib/utils';
 
 export const metadata = constructMetadata({
@@ -55,31 +56,39 @@ export default async function FacetsPage({ searchParams }: FacetsPageProps) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <FacetsSidebar activeFilters={fetchResult.filters} />
+      {/* Shared transition: a sidebar facet click dims the table while its
+          RSC round-trip is in flight (both components' url adapters join the
+          same pending state). */}
+      <UrlNavigationPendingProvider>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <FacetsSidebar activeFilters={fetchResult.filters} />
 
-        <section aria-label="Facets ticket table" className="rounded-lg border bg-card p-4 md:p-6">
-          <Suspense
-            fallback={<div className="text-sm text-muted-foreground">Loading table...</div>}
+          <section
+            aria-label="Facets ticket table"
+            className="rounded-lg border bg-card p-4 md:p-6"
           >
-            <FacetsTableClient
-              data={fetchResult.result.data ?? []}
-              totalCount={fetchResult.result.total ?? 0}
-              initialPagination={
-                fetchResult.result.pagination ?? {
-                  page: 1,
-                  limit: 10,
-                  totalPages: 1,
-                  hasNext: false,
-                  hasPrev: false,
+            <Suspense
+              fallback={<div className="text-sm text-muted-foreground">Loading table...</div>}
+            >
+              <FacetsTableClient
+                data={fetchResult.result.data ?? []}
+                totalCount={fetchResult.result.total ?? 0}
+                initialPagination={
+                  fetchResult.result.pagination ?? {
+                    page: 1,
+                    limit: 10,
+                    totalPages: 1,
+                    hasNext: false,
+                    hasPrev: false,
+                  }
                 }
-              }
-              initialSorting={fetchResult.sorting}
-              initialFilters={fetchResult.filters}
-            />
-          </Suspense>
-        </section>
-      </div>
+                initialSorting={fetchResult.sorting}
+                initialFilters={fetchResult.filters}
+              />
+            </Suspense>
+          </section>
+        </div>
+      </UrlNavigationPendingProvider>
     </ExampleShell>
   );
 }

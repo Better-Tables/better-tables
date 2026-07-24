@@ -1,0 +1,113 @@
+# Performance baselines — plan 063 harness
+
+Numbers from every tier of the plan 063 harness, captured on the
+`claude/performance-testing-strategy-m35acc` branch. Machine: CI-class Linux
+x64 container (Xeon ~2.1 GHz, Bun 1.3.11); wall-time values are indicative,
+not comparable across machines — trends live on gh-pages via the
+`perf-trend` job, counts are pinned in the blocking suites.
+
+Provenance: Tiers 1–3 first captured 2026-07-23 after the four
+interaction-lag fixes (commit `728aa68`); the Tier 4 table below is a fresh
+run on 2026-07-24 after the empty-filter fix + the review hardening (each
+labeled at its section).
+
+## Tier 1 — deterministic interaction / query costs (PR-blocking)
+
+Pinned in `packages/ui/tests/components/interaction-cost.test.tsx` and
+`packages/adapters/drizzle/tests/query-count.test.ts`:
+
+| Interaction / operation | Cost (exact) |
+|---|---|
+| Table mount (library wiring) | 1 fetch, 1 batched facet call (K=2 values + R=1 minmax in ONE request), 0 URL writes |
+| Pagination click | 1 fetch, 0 facet calls, 1 **synchronous** URL write (leading edge — no 150 ms floor) |
+| Rapid double pagination click | 2 fetches, 2 URL writes (leading + one coalesced trailing) |
+| Page-size change | 1 fetch, 1 immediate URL write |
+| Filter commit | 1 fetch, 1 batched facet refresh, 1 immediate URL write |
+| Filter add with EMPTY values | **0 fetch, 0 facet, 0 URL write** (FIXED via `getEffectiveFilters`; was 1/1/1 before — a real RSC navigation in server-driven apps). Committing the first value pays exactly once |
+| Facets without `getFacets` (in-process adapters) | exactly K+R singular calls |
+| `fetchData` (plain) | 2 SQL statements (data + count) |
+| `fetchData` + many-to-one column | 2 statements (single-query join path) |
+| `fetchData` + one-to-many column | 3 statements (plan 020 two-phase fan-out + count) |
+| `getFacetedValues` / `getMinMaxValues` | 1 statement each |
+| Repeated identical `fetchData` | 0 statements (plan 040 LRU hit); write → invalidate → 2 again |
+| EXPLAIN canaries | filtered status query + its count: `SEARCH … USING (COVERING) INDEX`, never `SCAN tickets`; many-to-one join probes `agents` by INTEGER PRIMARY KEY; facet GROUP BY walks the covering index with no temp b-tree |
+
+## Tier 2 — growth ratios (PR-blocking, 10k/1k, median of 5)
+
+5 consecutive local runs, zero flakes:
+
+| Operation | Measured ratio (bound) |
+|---|---|
+| Page-1 LIMIT'd `fetchData` | 0.37–0.74 (≤ 8) — flat, as expected |
+| Filtered fetch + count (un-indexed column) | 1.02–1.50 (≤ 15) |
+| Transformer, flat 10k rows | 3.9–5.7 (≤ 15) |
+| Transformer, one-to-many fan-out 10k rows | 5.6–7.9 (≤ 15) |
+
+## Tier 3 — micro-bench trends (mitata p50, ns/iter; non-blocking)
+
+`bun run bench` (~40 s total; 17 entries feed the gh-pages trend):
+
+| Bench | p50 |
+|---|---|
+| core/pagination.goToPage | 166 ns |
+| core/sorting.toggleSort | 242 ns |
+| core/filter.setFilters (50 leaves) | 7.2 µs |
+| core/filter-node build+serialize (depth 3) | 104 µs |
+| core/url-state.serialize 1 / 10 / 50 filters | 16 µs / 91 µs / 486 µs |
+| toolkit/transformToNested flat 1k / 10k | 0.65 ms / 8.4 ms |
+| toolkit/transformToNested one-to-many 1k / 10k | 1.9 ms / 21.7 ms |
+| drizzle/fetchData no-filters / 20-leaf / depth-3 tree / relational | 111 µs / 773 µs / 410 µs / 984 µs |
+
+Type-perf gate (blocking in `bun test`, budgets ≤ 2 M instantiations hard /
+7.5 s loose): filter fixture **1,344** instantiations / 0.27 s; table-def
+fixture **145,080** / 1.22 s. Measured via the per-fixture tsconfigs (real
+package options + `skipLibCheck` + `types: ["node"]`) — NOT comparable to
+the old manual bare-file numbers (~199 k), which mostly counted stdlib
+checking that default options don't skip.
+
+## Tier 4 — E2E interaction latency (report-only baselines)
+
+`bun run test:e2e:perf` (production `next start`, in-memory SQLite demo,
+Chromium, CDP CPU throttle 4×, 15 reps − 3 warm-ups, in-page
+click→rows-updated):
+
+Measured to the FIRST DATA ROW's content change (the user-visible result),
+after the empty-filter fix + the review-hardening below:
+
+| Interaction | p50 | p75 |
+|---|---|---|
+| Homepage pagination click | 225 ms | 233 ms |
+| Homepage sort header click | 215 ms | 226 ms |
+| Facets sidebar filter toggle | 104 ms | 109 ms |
+
+Reading: at 4× throttle these round-trips (RSC render + fetch + hydrate +
+paint) are the remaining cost — the pre-fix 150 ms debounce floor and the
+no-feedback freeze are gone (rows now dim via `aria-busy` during the
+trip). Budgets deliberately NOT set yet; revisit after the gh-pages trend
+accumulates (~2 weeks) and pick p75 budgets with observed variance
+(workflow TODO dated 2026-08-06).
+
+## Review hardening (cubic, 2026-07-24)
+
+Correctness fixes made in response to the PR review, each with a
+regression test: (a) url-sync dropped a pending trailing write when a
+navigation recreated the adapter mid-burst — ref-latched the coalescer +
+added a write-in-flight guard so re-hydration can't clobber ahead-of-URL
+state; (b) `httpAdapter`'s signal-aware cache was unbounded and an
+aborted request's late settle could touch a newer entry — added an LRU cap
++ expired-delete + a still-live-entry guard; (c) `useFacets` now chunks
+`getFacets` to `MAX_FACET_BATCH_SIZE` so a >50-facet sidebar can't hit the
+server cap; (d) the E2E harness measures the first-row change (not any
+tbody mutation) and never reuses a stale server; (e) growth-ratio gates
+batch the op so the 10k/1k ratio needs no denominator floor.
+
+## Follow-up candidates from the numbers
+
+1. ~~Empty-values filter add costs a full navigation~~ — FIXED
+   (`getEffectiveFilters`; an incomplete chip now costs 0 fetch / 0 facet /
+   0 URL write).
+2. Pagination p75 (233 ms throttled) is dominated by the whole-page RSC
+   re-render; a `<Suspense>`/partial-prerender boundary around the demo
+   table could shrink the server render — measure before pursuing.
+3. url-state serialize at 50 filters (486 µs) is lz-string-bound; only
+   worth touching if real apps carry that many filters.

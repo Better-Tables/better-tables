@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "bench": "bun bench/index.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@better-tables/core": "workspace:*",
     "drizzle-orm": "catalog:",
+    "mitata": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },

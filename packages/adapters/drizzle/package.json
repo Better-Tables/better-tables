@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "bench": "bun bench/index.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -62,6 +63,7 @@
     "better-sqlite3": "catalog:",
     "dotenv": "^17.2.3",
     "drizzle-orm": "catalog:",
+    "mitata": "catalog:",
     "mysql2": "^3.12.0",
     "postgres": "^3.4.0",
     "react": "catalog:",

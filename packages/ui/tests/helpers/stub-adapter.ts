@@ -1,6 +1,7 @@
 import type {
   ColumnType,
   FacetQueryParams,
+  FacetRequest,
   FetchDataParams,
   FetchDataResult,
   FilterOperator,
@@ -171,4 +172,99 @@ export function createSelfExclusionFacetAdapter<TRow extends { id: string }>(row
   };
 
   return { adapter, facetCalls, rangeCalls };
+}
+
+export type StubBatchCall = {
+  requests: readonly FacetRequest[];
+  params: FacetQueryParams | undefined;
+};
+
+/**
+ * Auto-resolving adapter with per-method call counters — the fixture for the
+ * plan-063 interaction-cost gates. `fetchData` answers immediately with a
+ * deterministic page slice of `totalRows` synthetic rows, so tests can pin
+ * EXACT call counts per user interaction (one pagination click = one fetch,
+ * zero facet calls, ...). With `batchFacets: true` the adapter also
+ * implements `getFacets`, letting tests assert the batch path (one call per
+ * refresh) versus the singular fallback (K + R calls).
+ */
+export function createCountingAdapter(options?: { totalRows?: number; batchFacets?: boolean }) {
+  const totalRows = options?.totalRows ?? 25;
+  const fetchCalls: FetchDataParams[] = [];
+  const facetCalls: StubFacetCall[] = [];
+  const rangeCalls: StubFacetCall[] = [];
+  const batchCalls: StubBatchCall[] = [];
+
+  const base: TableAdapter<Row> = {
+    meta: {
+      name: 'stub-counting',
+      version: 'test',
+      features: {
+        create: false,
+        read: true,
+        update: false,
+        delete: false,
+        bulkOperations: false,
+        realTimeUpdates: false,
+        export: false,
+        transactions: false,
+      },
+      supportedColumnTypes: ['text', 'option', 'number'],
+      supportedOperators: {
+        text: ['contains'],
+        option: ['is'],
+        number: ['between'],
+      } as unknown as Record<ColumnType, FilterOperator[]>,
+    },
+    fetchData: async (params) => {
+      fetchCalls.push(params);
+      const page = params.pagination?.page ?? 1;
+      const limit = params.pagination?.limit ?? 10;
+      const start = (page - 1) * limit;
+      const count = Math.max(0, Math.min(limit, totalRows - start));
+      return {
+        data: Array.from({ length: count }, (_, i) => ({ id: `row-${start + i}` })),
+        total: totalRows,
+        pagination: {
+          page,
+          limit,
+          totalPages: Math.ceil(totalRows / limit),
+          hasNext: start + count < totalRows,
+          hasPrev: page > 1,
+        },
+      };
+    },
+    getFilterOptions: async () => [],
+    getFacetedValues: async (columnId, params) => {
+      facetCalls.push({ columnId, params });
+      return new Map([['a', 1]]);
+    },
+    getMinMaxValues: async (columnId, params) => {
+      rangeCalls.push({ columnId, params });
+      return [0, 1];
+    },
+  };
+
+  const adapter: TableAdapter<Row> = options?.batchFacets
+    ? {
+        ...base,
+        getFacets: async (requests, params) => {
+          batchCalls.push({ requests, params });
+          return {
+            values: Object.fromEntries(
+              requests
+                .filter((request) => request.kind === 'values')
+                .map((request) => [request.columnId, new Map([['a', 1]])])
+            ),
+            ranges: Object.fromEntries(
+              requests
+                .filter((request) => request.kind === 'minmax')
+                .map((request) => [request.columnId, [0, 1] as [number, number]])
+            ),
+          };
+        },
+      }
+    : base;
+
+  return { adapter, fetchCalls, facetCalls, rangeCalls, batchCalls };
 }

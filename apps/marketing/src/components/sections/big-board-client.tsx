@@ -26,7 +26,7 @@ export function BigBoardClient({
   initialFilters,
   initialSorting,
 }: BigBoardClientProps) {
-  const urlAdapter = useNextjsUrlAdapter();
+  const { adapter: urlAdapter, isPending } = useNextjsUrlAdapter();
 
   useTableUrlSync(TABLE_ID, { filters: true, sorting: true }, urlAdapter);
 
@@ -36,6 +36,7 @@ export function BigBoardClient({
         id={TABLE_ID}
         table={bulkTicketsTable}
         data={data}
+        loading={isPending}
         totalCount={total}
         initialFilters={initialFilters}
         initialSorting={initialSorting}

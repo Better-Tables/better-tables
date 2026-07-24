@@ -50,6 +50,15 @@ export function collectAdapterColumnIds(body: AdapterRequestBody): string[] {
     return ids;
   }
 
+  // Batched facets: every requested column + any filter column ids.
+  if (body.method === 'getFacets') {
+    for (const request of body.requests) {
+      ids.push(request.columnId);
+    }
+    ids.push(...collectFilterColumnIds(body.params?.filters));
+    return ids;
+  }
+
   // Facet / filter-option methods: target column + any filter column ids.
   ids.push(body.columnId);
   ids.push(...collectFilterColumnIds(body.params?.filters));

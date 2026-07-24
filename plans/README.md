@@ -33,7 +33,8 @@ loose backlog. Deferred items are at the bottom.
 ## Where we are (2026-07-22)
 
 **0.6 is shippable.** Waves A–D are merged to `main`. Open work is Wave E
-plus leftover 048. 058 stays deferred; **060 landed**.
+plus leftover 048; Wave F (perf harness, 063) is **DONE** on its branch.
+058 stays deferred; **060 landed**.
 
 | Wave | Plans | Outcome |
 |------|-------|---------|
@@ -75,6 +76,12 @@ Drizzle correlated-subquery lowering + `FilterGroupNode` walk for
 legacy callback-`filter` still throws), memoryAdapter nested-array eval,
 homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 
+### Wave F — performance harness
+
+| Plan | What | Depends on | Status |
+|------|------|------------|--------|
+| [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines | 042/043 helpers (done) | **DONE** (2026-07-23) — all 7 steps + the four lag fixes on the plan branch; baselines in [design/perf-baselines.md](design/perf-baselines.md). The one FINDING (empty-filter add cost a navigation) is now FIXED via `getEffectiveFilters` |
+
 ---
 
 ## Order notes (open plans only)
@@ -85,6 +92,8 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 - **048** anytime after 0.6 — no file overlap with 061; follow plan 041
   handler idioms and plan 042 input-test patterns.
 - **062** only after 061 Phases 1 + 6.
+- **063 executed** (2026-07-23, all 7 steps + the four lag fixes) — see the
+  Wave F row. Numbers: [design/perf-baselines.md](design/perf-baselines.md).
 - Capability asymmetry (from 060 design): Prisma can sort-by-count but
   not filter-by-count; Kysely/Drizzle do both — declare honestly in
   `AdapterMeta.capabilities.aggregates`.

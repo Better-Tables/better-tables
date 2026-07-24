@@ -225,6 +225,31 @@ export interface FacetQueryParams {
 }
 
 /**
+ * One entry in a batched facet read ({@link TableAdapter.getFacets}).
+ */
+export interface FacetRequest {
+  /** The column to facet — same resolution as the singular facet methods. */
+  columnId: string;
+  /**
+   * Which facet shape to compute for this column:
+   * `'values'` → distinct value counts (the {@link TableAdapter.getFacetedValues}
+   * shape); `'minmax'` → a `[min, max]` range (the
+   * {@link TableAdapter.getMinMaxValues} shape).
+   */
+  kind: 'values' | 'minmax';
+}
+
+/**
+ * Result of a batched facet read: every requested `'values'` column appears
+ * in `values`, every requested `'minmax'` column in `ranges`. Columns the
+ * caller did not request MUST NOT appear.
+ */
+export interface FacetBatchResult {
+  values: Record<string, Map<string, number>>;
+  ranges: Record<string, [number, number]>;
+}
+
+/**
  * Schema-derived column description — the raw material for auto columns
  * (plan 054). Returned by {@link TableAdapter.describeColumns}; consumed by
  * `resolveTableColumns` (core) to enrich explicit column definitions and to
@@ -471,6 +496,17 @@ export interface TableAdapter<TData = unknown> {
    * ```
    */
   getMinMaxValues(columnId: string, params?: FacetQueryParams): Promise<[number, number]>;
+
+  /**
+   * Optional: answer several facet reads in ONE call. Semantically identical
+   * to calling {@link TableAdapter.getFacetedValues} (`kind: 'values'`) /
+   * {@link TableAdapter.getMinMaxValues} (`kind: 'minmax'`) once per entry
+   * with the same `params` — including the mandatory self-exclusion rule,
+   * applied per column. Exists so transports can collapse a K-facet sidebar
+   * refresh into a single round-trip; in-process adapters gain nothing and
+   * may omit it (callers fall back to the singular methods).
+   */
+  getFacets?(requests: FacetRequest[], params?: FacetQueryParams): Promise<FacetBatchResult>;
 
   /**
    * Optional: describe a table's columns from the underlying schema —

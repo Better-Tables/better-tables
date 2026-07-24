@@ -20,35 +20,73 @@ type TableStore = NonNullable<ReturnType<typeof getTableStore>>;
 const HYDRATION_RETRY_MS = 100;
 const HYDRATION_MAX_ATTEMPTS = 5;
 
+type UrlWriteState = Parameters<typeof serializeTableStateToUrl>[0];
+
 /**
- * Debounce utility to batch rapid updates.
- * Returns a cancel function so timers can be cleared on unmount.
+ * Leading + trailing coalescer for URL writes.
+ *
+ * A trailing-only debounce put a fixed `wait` of idle time in front of EVERY
+ * write — and for server-driven tables (Next.js demos) the URL write IS the
+ * refetch trigger, so a single pagination click or filter commit paid a
+ * built-in latency floor before the network even started. Instead:
+ *
+ * - a change arriving outside a cooldown window writes IMMEDIATELY (a
+ *   discrete click/commit gets zero added latency), then opens a `wait`
+ *   cooldown;
+ * - changes arriving inside the cooldown are coalesced: only the LATEST is
+ *   written when the cooldown expires (which re-opens it, so a continuous
+ *   stream still writes at most once per `wait`).
+ *
+ * `func` returns whether it actually wrote (it skips writes that wouldn't
+ * change the URL); a skipped leading write does NOT open a cooldown, so a
+ * no-op change (e.g. row selection) never delays the next real one.
  */
-function debounce<T extends (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void>(
-  func: T,
+function coalesceUrlWrites(
+  func: (tableState: UrlWriteState) => boolean,
   wait: number
 ): {
-  fn: (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => void;
+  fn: (tableState: UrlWriteState) => void;
   cancel: () => void;
+  /**
+   * Whether a write is in flight — a cooldown is open (a write just fired and
+   * more may be queued). While true the store may be AHEAD of the URL, so a
+   * soft-nav re-hydration must not clobber it back to the lagging URL.
+   */
+  isInFlight: () => boolean;
 } {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let pending: UrlWriteState | null = null;
 
   const cancel = () => {
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
+    pending = null;
   };
 
-  const fn = (tableState: Parameters<typeof serializeTableStateToUrl>[0]) => {
-    cancel();
-    timeoutId = setTimeout(() => {
-      timeoutId = null;
-      func(tableState);
-    }, wait);
+  const onCooldownEnd = () => {
+    timeoutId = null;
+    if (pending !== null) {
+      const state = pending;
+      pending = null;
+      if (func(state)) {
+        timeoutId = setTimeout(onCooldownEnd, wait);
+      }
+    }
   };
 
-  return { fn, cancel };
+  const fn = (tableState: UrlWriteState) => {
+    if (timeoutId === null) {
+      if (func(tableState)) {
+        timeoutId = setTimeout(onCooldownEnd, wait);
+      }
+      return;
+    }
+    pending = tableState;
+  };
+
+  return { fn, cancel, isInFlight: () => timeoutId !== null };
 }
 
 /**
@@ -308,6 +346,26 @@ export function useTableUrlSync(
 ): void {
   const stableConfig = useStableUrlSyncConfig(config);
   const hasHydratedFromUrl = useRef(false);
+  // Ref-latch the mutable inputs the WRITE-OUT effect reads at write time.
+  // A framework adapter (e.g. `useNextjsUrlAdapter`) recreates its identity on
+  // every navigation — i.e. on every write it triggers. If the write-out
+  // effect depended on `adapter`, that identity churn would tear the coalescer
+  // down and CANCEL a pending trailing write the instant a leading write's
+  // navigation landed, so a rapid burst could settle on its first state. Reading
+  // adapter/config from refs lets the coalescer + subscription outlive those
+  // re-renders (effect keyed on `[tableId, storeReady]` only), while each write
+  // still uses the latest adapter/config.
+  const adapterRef = useRef(adapter);
+  adapterRef.current = adapter;
+  const configRef = useRef(stableConfig);
+  configRef.current = stableConfig;
+  // True while the write-out coalescer has a write in flight. The store is
+  // then AHEAD of the URL (a debounced write is landing), so a soft-nav
+  // re-hydration — which a navigation's `searchParams` change re-triggers —
+  // must not read the lagging URL and clobber the store's newer state (which
+  // would also drop the pending trailing write). Populated by the write-out
+  // effect; read by the hydration effect.
+  const writeInFlightRef = useRef<() => boolean>(() => false);
   // The pagination the table starts at (its app-configured / SSR-seeded
   // default), captured once before the first user interaction. Used to keep
   // default `page`/`limit` out of a URL that doesn't already carry them — see
@@ -338,9 +396,18 @@ export function useTableUrlSync(
     const store = getTableStore(tableId);
     if (store) {
       captureDefaultPagination(store, defaultPaginationRef);
-      // First hydration must not clear SSR-seeded initialFilters; later ones
-      // (soft navs) may clear (finding 15).
-      hydrateFromUrl(store, stableConfig, adapter, hasHydratedFromUrl.current);
+      // Skip a POST-mount re-hydration while a write is in flight: a navigation
+      // this write triggered recreates the adapter (and moves `urlSignature`),
+      // re-running this effect with a URL that still LAGS the store. Hydrating
+      // from it would clobber the store's newer state and drop the pending
+      // trailing write. The first (mount) hydration always runs — no write can
+      // be in flight yet.
+      const skipForInFlightWrite = hasHydratedFromUrl.current && writeInFlightRef.current();
+      if (!skipForInFlightWrite) {
+        // First hydration must not clear SSR-seeded initialFilters; later ones
+        // (soft navs) may clear (finding 15).
+        hydrateFromUrl(store, stableConfig, adapter, hasHydratedFromUrl.current);
+      }
       if (!hasHydratedFromUrl.current) {
         hasHydratedFromUrl.current = true;
         setStoreReady(true);
@@ -381,7 +448,14 @@ export function useTableUrlSync(
     }
 
     const manager = store.getState().manager;
-    const { fn: debouncedUrlUpdate, cancel: cancelDebouncedUrlUpdate } = debounce((tableState) => {
+    const {
+      fn: coalescedUrlUpdate,
+      cancel: cancelCoalescedUrlUpdate,
+      isInFlight,
+    } = coalesceUrlWrites((tableState) => {
+      // Read the LATEST adapter at write time (it may have been recreated by
+      // a navigation since this coalescer was created).
+      const currentAdapter = adapterRef.current;
       const urlParams = serializeTableStateToUrl(tableState);
       // Keep default page/limit out of a URL that doesn't already carry them,
       // so a change that doesn't touch pagination (selection, column toggle)
@@ -390,36 +464,42 @@ export function useTableUrlSync(
         urlParams,
         tableState.pagination,
         defaultPaginationRef.current,
-        adapter
+        currentAdapter
       );
       // Skip writes that wouldn't change the URL (e.g. a row-selection change,
       // which emits `state_changed` but touches no synced param) so adapters
       // that navigate on `setParams` don't refetch for nothing.
-      if (!serializedParamsDifferFromUrl(urlParams, adapter)) {
-        return;
+      if (!serializedParamsDifferFromUrl(urlParams, currentAdapter)) {
+        return false;
       }
-      adapter.setParams(urlParams);
+      currentAdapter.setParams(urlParams);
+      return true;
     }, 150);
+    // Let the hydration effect see when a write is in flight (store ahead of URL).
+    writeInFlightRef.current = isInFlight;
 
     const unsubscribe = manager.subscribe((event: TableStateEvent) => {
       if (!hasHydratedFromUrl.current) return;
 
       if (event.type === 'state_changed') {
+        // Latest config (ref-latched) so a config change doesn't need to
+        // re-subscribe and reset the coalescer.
+        const currentConfig = configRef.current;
         const tableState: Parameters<typeof serializeTableStateToUrl>[0] = {};
 
-        if (stableConfig.filters) {
+        if (currentConfig.filters) {
           tableState.filters = event.state.filters;
         }
 
-        if (stableConfig.pagination) {
+        if (currentConfig.pagination) {
           tableState.pagination = event.state.pagination;
         }
 
-        if (stableConfig.sorting) {
+        if (currentConfig.sorting) {
           tableState.sorting = event.state.sorting;
         }
 
-        if (stableConfig.columnVisibility) {
+        if (currentConfig.columnVisibility) {
           const { columns } = store.getState();
           tableState.columnVisibility = getColumnVisibilityModifications(
             columns,
@@ -427,20 +507,25 @@ export function useTableUrlSync(
           );
         }
 
-        if (stableConfig.columnOrder) {
+        if (currentConfig.columnOrder) {
           const { columns } = store.getState();
           tableState.columnOrder = getColumnOrderModifications(columns, event.state.columnOrder);
         }
 
-        debouncedUrlUpdate(tableState);
+        coalescedUrlUpdate(tableState);
       }
     });
 
     return () => {
       unsubscribe();
-      cancelDebouncedUrlUpdate();
+      cancelCoalescedUrlUpdate();
+      writeInFlightRef.current = () => false;
     };
-  }, [tableId, stableConfig, adapter, storeReady]);
+    // Intentionally NOT depending on `adapter`/`stableConfig`: they are
+    // ref-latched above so a navigation (adapter identity change) does not
+    // tear down the coalescer and drop a pending trailing write. Re-subscribe
+    // only when the table or its store readiness changes.
+  }, [tableId, storeReady]);
 }
 
 /**

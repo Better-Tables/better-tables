@@ -112,8 +112,10 @@ export async function getUsersDatabaseAdapter(): Promise<UsersAdapter> {
 }
 
 /**
- * Reset is SQLite-only. Closes the in-memory DB so the next request re-seeds.
- * No-op-safe to call after checking supportsReset.
+ * Reset is SQLite-only. Closes the in-memory DB and immediately kicks the
+ * re-seed (fire-and-forget), so the fresh data is warming while the demo
+ * refreshes instead of the user's next interaction paying the whole seed
+ * cost inline. No-op-safe to call after checking supportsReset.
  */
 export async function resetUsersDatabase() {
   const dialect = await getUsersDialect();
@@ -122,6 +124,10 @@ export async function resetUsersDatabase() {
   }
   await resetSqliteDatabase();
   resetAdapterCaches();
+  void ensureResolved().catch(() => {
+    // Warmup failure is non-fatal: the next real read retries and surfaces
+    // the error through the normal fetch path.
+  });
 }
 
 /** Test helper — drop both backends' caches/connections. */

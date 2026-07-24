@@ -737,3 +737,289 @@ describe('httpAdapter export (plan 050)', () => {
     expect((result?.data as string).split('\n')).toHaveLength(1);
   });
 });
+
+describe('signal-aware facet caching (lag fix: cache no longer bypassed)', () => {
+  it('serves signalled facet reads from the TTL cache and dedups them', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 5000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    // Two sequential identical reads, each with a live AbortSignal (the
+    // useFacets pattern) — the second must hit the cache.
+    await client.getFacetedValues('status', { signal: new AbortController().signal });
+    await client.getFacetedValues('status', { signal: new AbortController().signal });
+    expect(fetchCount).toBe(1);
+
+    // Concurrent identical signalled reads share one request.
+    await Promise.all([
+      client.getMinMaxValues('reopens', { signal: new AbortController().signal }),
+      client.getMinMaxValues('reopens', { signal: new AbortController().signal }),
+    ]);
+    expect(fetchCount).toBe(2);
+  });
+
+  it('aborting one follower rejects it without cancelling the shared request', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { adapter: server } = makeServerAdapter();
+    let underlyingAborted = false;
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 5000,
+      fetch: async (url, init) => {
+        init?.signal?.addEventListener('abort', () => {
+          underlyingAborted = true;
+        });
+        await gate;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    const controllerA = new AbortController();
+    const controllerB = new AbortController();
+    const promiseA = client.getFacetedValues('status', { signal: controllerA.signal });
+    const promiseB = client.getFacetedValues('status', { signal: controllerB.signal });
+
+    controllerA.abort();
+    await expect(promiseA).rejects.toMatchObject({ name: 'AbortError' });
+    expect(underlyingAborted).toBe(false);
+
+    release();
+    const map = await promiseB;
+    expect(map.get('open')).toBe(12);
+  });
+
+  it('aborts the shared request when EVERY follower aborts, and a later caller refetches', async () => {
+    const { adapter: server } = makeServerAdapter();
+    let fetchCount = 0;
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 5000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          // First request: reject on abort like real fetch — including a
+          // signal that is ALREADY aborted when the fetch starts (listeners
+          // added after abort never fire, and a forever-pending promise
+          // wedges the test runner).
+          await new Promise<void>((_resolve, reject) => {
+            const rejectAborted = () => {
+              const error = new Error('The operation was aborted.');
+              error.name = 'AbortError';
+              reject(error);
+            };
+            if (init?.signal?.aborted) {
+              rejectAborted();
+              return;
+            }
+            init?.signal?.addEventListener('abort', rejectAborted);
+          });
+        }
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    const controllerA = new AbortController();
+    const controllerB = new AbortController();
+    const promiseA = client.getFacetedValues('status', { signal: controllerA.signal });
+    const promiseB = client.getFacetedValues('status', { signal: controllerB.signal });
+
+    // Attach plain settle handlers BEFORE aborting so neither rejection is
+    // ever handler-less (the runner reports late-handled rejections). Not
+    // `.rejects` matchers: attached to a still-pending promise they wedge
+    // this bun version once it rejects.
+    const settle = (promise: Promise<unknown>) =>
+      promise.then(
+        () => 'resolved' as const,
+        (error: unknown) => (error instanceof Error ? error.name : 'unknown')
+      );
+    const settled = Promise.all([settle(promiseA), settle(promiseB)]);
+    controllerA.abort();
+    controllerB.abort();
+    expect(await settled).toEqual(['AbortError', 'AbortError']);
+
+    // Aborted request was not cached; a fresh caller starts a NEW request
+    // (never joins the doomed entry) and succeeds.
+    const map = await client.getFacetedValues('status', {
+      signal: new AbortController().signal,
+    });
+    expect(map.get('open')).toBe(12);
+    expect(fetchCount).toBe(2);
+
+    // The fresh result IS cached: a later read hits it (fetchCount stays 2).
+    // If the aborted request's late `.catch` had deleted the shared key, this
+    // would refetch — the abort-guard prevents that cross-entry delete.
+    const again = await client.getFacetedValues('status', {
+      signal: new AbortController().signal,
+    });
+    expect(again.get('open')).toBe(12);
+    expect(fetchCount).toBe(2);
+  });
+
+  it('bounds the result cache (LRU): an evicted key refetches, a touched key survives', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 60_000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    // Fill the cache to its cap with distinct facet keys (one per columnId).
+    // MAX_CACHE_ENTRIES is 100; use column 'c0' first so we can watch it.
+    await client.getFacetedValues('c0');
+    for (let i = 1; i < 100; i++) {
+      await client.getFacetedValues(`c${i}`);
+    }
+    expect(fetchCount).toBe(100);
+
+    // Touch 'c0' (cache hit → marked most-recently-used, no fetch).
+    await client.getFacetedValues('c0');
+    expect(fetchCount).toBe(100);
+
+    // One more distinct key pushes size over the cap → the LRU entry is
+    // evicted. 'c0' was just touched, so 'c1' (now oldest) is evicted, not 'c0'.
+    await client.getFacetedValues('c100');
+    expect(fetchCount).toBe(101);
+
+    // 'c0' still cached (touch saved it): no refetch.
+    await client.getFacetedValues('c0');
+    expect(fetchCount).toBe(101);
+
+    // 'c1' was evicted: it refetches.
+    await client.getFacetedValues('c1');
+    expect(fetchCount).toBe(102);
+  });
+
+  it('a pre-aborted signal rejects without fetching', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 5000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      client.getFacetedValues('status', { signal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchCount).toBe(0);
+  });
+});
+
+describe('getFacets batch (lag fix: one round-trip per sidebar refresh)', () => {
+  it('answers a mixed values/minmax batch in ONE request via server fan-out', async () => {
+    let fetchCount = 0;
+    const { adapter: server, calls } = makeServerAdapter();
+    const client = httpAdapter({
+      url: '/api/tables',
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    const result = await client.getFacets?.(
+      [
+        { columnId: 'status', kind: 'values' },
+        { columnId: 'priority', kind: 'values' },
+        { columnId: 'reopens', kind: 'minmax' },
+      ],
+      { filters: [{ columnId: 'status', type: 'option', operator: 'is', values: ['open'] }] }
+    );
+
+    expect(fetchCount).toBe(1);
+    expect(result?.values.status).toBeInstanceOf(Map);
+    expect(result?.values.status?.get('open')).toBe(12);
+    expect(result?.values.priority?.get('closed')).toBe(3);
+    expect(result?.ranges.reopens).toEqual([0, 9]);
+    // The server-side fan-out hit the singular methods once per entry.
+    expect(calls.filter((c) => c.method === 'getFacetedValues')).toHaveLength(2);
+    expect(calls.filter((c) => c.method === 'getMinMaxValues')).toHaveLength(1);
+  });
+
+  it('prefers the server adapter own getFacets when implemented', async () => {
+    const { adapter: server, calls } = makeServerAdapter();
+    let batchCalls = 0;
+    server.getFacets = async (requests) => {
+      batchCalls += 1;
+      expect(requests).toHaveLength(2);
+      return {
+        values: { status: new Map([['open', 7]]) },
+        ranges: { reopens: [1, 2] },
+      };
+    };
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+
+    const result = await client.getFacets?.([
+      { columnId: 'status', kind: 'values' },
+      { columnId: 'reopens', kind: 'minmax' },
+    ]);
+
+    expect(batchCalls).toBe(1);
+    expect(calls.filter((c) => c.method === 'getFacetedValues')).toHaveLength(0);
+    expect(result?.values.status?.get('open')).toBe(7);
+    expect(result?.ranges.reopens).toEqual([1, 2]);
+  });
+
+  it('caches identical batches and keys distinct batches separately', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 5000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    const batch = [{ columnId: 'status', kind: 'values' as const }];
+    await client.getFacets?.(batch, { signal: new AbortController().signal });
+    await client.getFacets?.(batch, { signal: new AbortController().signal });
+    expect(fetchCount).toBe(1);
+    await client.getFacets?.([{ columnId: 'priority', kind: 'values' }]);
+    expect(fetchCount).toBe(2);
+  });
+
+  it('rejects malformed and oversized getFacets bodies as bad_request', async () => {
+    const { adapter: server } = makeServerAdapter();
+
+    expect(await handleAdapterRequest(server, { method: 'getFacets', requests: [] })).toMatchObject(
+      { ok: false, kind: 'bad_request' }
+    );
+
+    expect(
+      await handleAdapterRequest(server, {
+        method: 'getFacets',
+        requests: [{ columnId: 'status', kind: 'bogus' }],
+      })
+    ).toMatchObject({ ok: false, kind: 'bad_request' });
+
+    expect(
+      await handleAdapterRequest(server, {
+        method: 'getFacets',
+        requests: Array.from({ length: 51 }, (_, i) => ({
+          columnId: `c${i}`,
+          kind: 'values' as const,
+        })),
+      })
+    ).toMatchObject({ ok: false, kind: 'bad_request' });
+  });
+});

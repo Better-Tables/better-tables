@@ -30,7 +30,74 @@ function createStore() {
 }
 
 describe('useTableUrlSync', () => {
-  it('does not call setParams after unmount when a debounced update was queued', async () => {
+  it('preserves a pending trailing write when the adapter identity changes mid-burst (navigation)', async () => {
+    createStore();
+    // Two adapter identities backed by ONE param store + call log — models a
+    // framework adapter (e.g. useNextjsUrlAdapter) that recreates itself on
+    // every navigation while reading/writing the same URL.
+    const params = new Map<string, string>();
+    const setParamsCalls: Record<string, string | null>[] = [];
+    const makeAdapter = () => ({
+      getParam: (key: string) => params.get(key) ?? null,
+      setParams: (updates: Record<string, string | null>) => {
+        setParamsCalls.push(updates);
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === null) params.delete(key);
+          else params.set(key, value);
+        }
+      },
+    });
+
+    let adapter = makeAdapter();
+    const config: UrlSyncConfig = { filters: true, pagination: true };
+    const { rerender } = renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    await act(async () => {});
+
+    const store = getTableStore(TABLE_ID);
+    if (!store) throw new Error('Expected table store');
+    const callsBefore = setParamsCalls.length;
+
+    jest.useFakeTimers();
+    // Leading write (fires immediately, "navigates").
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['first'],
+      });
+    });
+    expect(setParamsCalls.length - callsBefore).toBe(1);
+
+    // A second change lands inside the cooldown → becomes the pending trailing
+    // write. THEN the "navigation" completes: the adapter identity changes and
+    // the hook re-renders (as useNextjsUrlAdapter would on a searchParams change).
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['second'],
+      });
+    });
+    adapter = makeAdapter();
+    rerender();
+
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
+
+    // The trailing write must still fire (through the NEW adapter) — before the
+    // ref-latch fix, the re-subscription cancelled it and the burst settled on
+    // "first".
+    expect(setParamsCalls.length - callsBefore).toBe(2);
+    const lastFilters = setParamsCalls.at(-1)?.filters;
+    expect(typeof lastFilters).toBe('string');
+  });
+
+  it('does not flush a pending coalesced write after unmount', async () => {
     createStore();
     const { adapter, setParamsCalls } = createFakeUrlAdapter();
     const config: UrlSyncConfig = { filters: true };
@@ -48,13 +115,23 @@ describe('useTableUrlSync', () => {
 
     jest.useFakeTimers();
     act(() => {
+      // First change writes immediately (leading edge)...
       store.getState().manager.addFilter({
         columnId: 'name',
         type: 'text',
         operator: 'contains',
         values: ['queued'],
       });
+      // ...second lands inside the cooldown and becomes the pending
+      // trailing write.
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['pending'],
+      });
     });
+    expect(setParamsCalls.length - callsBeforeChange).toBe(1);
 
     unmount();
 
@@ -63,7 +140,8 @@ describe('useTableUrlSync', () => {
     });
     jest.useRealTimers();
 
-    expect(setParamsCalls.length - callsBeforeChange).toBe(0);
+    // The pending trailing write queued at unmount must never fire.
+    expect(setParamsCalls.length - callsBeforeChange).toBe(1);
   });
 
   it('hydrates filters from the URL when the table store is created after mount', async () => {
@@ -175,7 +253,7 @@ describe('useTableUrlSync', () => {
     expect(setParamsCalls.length).toBe(callsAfterSettling);
   });
 
-  it('coalesces rapid state changes into a single setParams call with the final state', async () => {
+  it('writes the first change of a burst immediately and coalesces the rest into one trailing write', async () => {
     createStore();
     const { adapter, setParamsCalls } = createFakeUrlAdapter();
     const config: UrlSyncConfig = { filters: true, pagination: true };
@@ -210,14 +288,53 @@ describe('useTableUrlSync', () => {
       });
     });
 
+    // Leading write already happened, synchronously, with the FIRST state.
+    expect(setParamsCalls.length - callsBeforeBurst).toBe(1);
+
     await act(async () => {
       jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
     });
     jest.useRealTimers();
 
     const burstCalls = setParamsCalls.slice(callsBeforeBurst);
-    expect(burstCalls.length).toBe(1);
-    expect(burstCalls[0]?.page).toBe('2');
+    expect(burstCalls.length).toBe(2);
+    // Leading write: the first filter, no pagination change yet (default
+    // page/limit stay out of a clean URL).
+    expect(burstCalls[0]?.filters).toBeTruthy();
+    expect(burstCalls[0] && 'page' in burstCalls[0]).toBe(false);
+    // Trailing write: the burst's FINAL state, coalesced into one call.
+    expect(burstCalls[1]?.page).toBe('2');
+  });
+
+  it('writes a discrete change immediately — no debounce latency floor on e.g. a pagination click', async () => {
+    createStore();
+    const { adapter, setParamsCalls } = createFakeUrlAdapter();
+    const config: UrlSyncConfig = { filters: true, pagination: true };
+
+    renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    await act(async () => {});
+
+    const store = getTableStore(TABLE_ID);
+    if (!store) throw new Error('Expected table store');
+
+    const before = setParamsCalls.length;
+
+    // Freeze timers: if the write required the cooldown timer to fire, this
+    // test would see zero calls.
+    jest.useFakeTimers();
+    act(() => {
+      const pagination = store.getState().manager.getPagination();
+      store.getState().manager.updateState({
+        pagination: { ...pagination, page: 3 },
+      });
+    });
+    const calls = setParamsCalls.slice(before);
+    jest.useRealTimers();
+
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.page).toBe('3');
   });
 
   it('does not introduce default page/limit into a clean URL', async () => {
