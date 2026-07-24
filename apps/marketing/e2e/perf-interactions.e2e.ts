@@ -94,7 +94,7 @@ function record(name: string, samples: Sample[]): void {
     value: Math.round(p75 * 100) / 100,
     extra: `n=${values.length} min=${Math.min(...values).toFixed(1)} max=${Math.max(...values).toFixed(1)}`,
   });
-  // eslint-disable-next-line no-console
+  // biome-ignore lint/suspicious/noConsole: perf harness reporter output
   console.log(
     `[perf] ${name}: p50=${p50.toFixed(1)}ms p75=${p75.toFixed(1)}ms ` +
       `min=${Math.min(...values).toFixed(1)} max=${Math.max(...values).toFixed(1)} n=${values.length}`
@@ -105,7 +105,7 @@ test.afterAll(() => {
   const outPath = join(__dirname, '..', 'e2e-results', 'perf-interactions.json');
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, `${JSON.stringify(results, null, 2)}\n`);
-  // eslint-disable-next-line no-console
+  // biome-ignore lint/suspicious/noConsole: perf harness reporter output
   console.log(`[perf] wrote ${outPath}`);
 });
 
