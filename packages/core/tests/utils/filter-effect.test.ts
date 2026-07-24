@@ -149,7 +149,10 @@ describe('getEffectiveFilterKey (BigInt/circular-safe)', () => {
     expect(key).toContain('"label":"a"');
     // Changing the (circular) value's non-circular content changes the key —
     // the fallback must NOT collapse to a value-insensitive signature.
-    const changed: CustomFilterState = { ...custom, values: [makeCircular('b') as unknown as string] };
+    const changed: CustomFilterState = {
+      ...custom,
+      values: [makeCircular('b') as unknown as string],
+    };
     expect(getEffectiveFilterKey([changed])).not.toBe(key);
   });
 });
