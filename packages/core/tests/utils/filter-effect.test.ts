@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import type { FilterGroupNode, FilterState } from '../../src/types/filter';
-import { filterHasEffect, getEffectiveFilters } from '../../src/utils/filter-effect';
+import type { CustomFilterState, FilterGroupNode, FilterState } from '../../src/types/filter';
+import {
+  filterHasEffect,
+  getEffectiveFilterKey,
+  getEffectiveFilters,
+} from '../../src/utils/filter-effect';
 import { serializeTableStateToUrl } from '../../src/utils/url-serialization';
 
 /**
@@ -90,6 +94,55 @@ describe('getEffectiveFilters', () => {
       children: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['a'] }],
     };
     expect(getEffectiveFilters(tree)).toBe(tree);
+  });
+});
+
+describe('getEffectiveFilterKey (BigInt/circular-safe)', () => {
+  it('returns "null" for undefined and a stable key for equal effective filters', () => {
+    expect(getEffectiveFilterKey(undefined)).toBe('null');
+    const a: FilterState[] = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['x'] },
+    ];
+    const b: FilterState[] = [
+      { columnId: 'name', type: 'text', operator: 'contains', values: ['x'] },
+      // an incomplete chip is dropped, so the key matches `a`
+      { columnId: 'status', type: 'option', operator: 'isAnyOf', values: [] },
+    ];
+    expect(getEffectiveFilterKey(b)).toBe(getEffectiveFilterKey(a));
+  });
+
+  it('does NOT throw on a BigInt custom filter value (would crash the hook render)', () => {
+    const custom: CustomFilterState = {
+      columnId: 'big',
+      type: 'custom',
+      operator: 'equals',
+      values: [10n as unknown as string],
+    };
+    let key = '';
+    expect(() => {
+      key = getEffectiveFilterKey([custom]);
+    }).not.toThrow();
+    expect(key).toContain('10n');
+    // Distinguishes different bigints.
+    const other: CustomFilterState = { ...custom, values: [11n as unknown as string] };
+    expect(getEffectiveFilterKey([other])).not.toBe(key);
+  });
+
+  it('falls back to a structural signature on a circular value instead of throwing', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const custom: CustomFilterState = {
+      columnId: 'c',
+      type: 'custom',
+      operator: 'equals',
+      values: [circular as unknown as string],
+    };
+    let key = '';
+    expect(() => {
+      key = getEffectiveFilterKey([custom]);
+    }).not.toThrow();
+    expect(key.startsWith('shape:')).toBe(true);
+    expect(key).toContain('c:equals:1');
   });
 });
 

@@ -8,7 +8,7 @@ import type {
   PaginationState,
   TableAdapter,
 } from '@better-tables/core';
-import { getEffectiveFilters, withDerivedFetchParams } from '@better-tables/core';
+import { getEffectiveFilterKey, withDerivedFetchParams } from '@better-tables/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Stable defaults so omitted `filters`/`params`/`columns` don't recreate
@@ -125,7 +125,9 @@ export function useTableData<TData = unknown>({
   // fetch callback identity stable across such no-op changes.
   // `effectiveFiltersKey` (not `filters`) is the dependency on purpose — the
   // memo returns the current `filters` only when its EFFECT changes.
-  const effectiveFiltersKey = JSON.stringify(getEffectiveFilters(filters));
+  // `getEffectiveFilterKey` is BigInt/circular-safe so a `custom` filter value
+  // can't throw during render.
+  const effectiveFiltersKey = getEffectiveFilterKey(filters);
   const stableFilters = useMemo(() => filters, [effectiveFiltersKey]);
 
   const fetchData = useCallback(async () => {

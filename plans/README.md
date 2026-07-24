@@ -80,7 +80,7 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines | 042/043 helpers (done) | **DONE** (2026-07-23) — all 7 steps + the four lag fixes on the plan branch; baselines in [design/perf-baselines.md](design/perf-baselines.md); one FINDING open (empty-filter add costs a navigation) |
+| [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines | 042/043 helpers (done) | **DONE** (2026-07-23) — all 7 steps + the four lag fixes on the plan branch; baselines in [design/perf-baselines.md](design/perf-baselines.md). The one FINDING (empty-filter add cost a navigation) is now FIXED via `getEffectiveFilters` |
 
 ---
 

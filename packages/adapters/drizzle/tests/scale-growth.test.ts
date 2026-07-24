@@ -8,11 +8,15 @@
  * only absolute number is a catastrophic ceiling wide enough to never
  * flake on a slow shared runner.
  *
- * Method (per plan 063): `performance.now()`, median of 5 runs after 1
- * discarded warm-up run. Plan 040's LRU cache is explicitly DISABLED on
- * these adapters — with the default-on cache every timed run after the
- * warm-up would be a 0-query cache hit and the ratio would measure the
- * cache, not the database.
+ * Method (per plan 063): `performance.now()`, median of 5 BATCHED samples
+ * after 1 discarded warm-up batch — each sample runs the op `BATCH` (20)
+ * times so even the fast 1k case measures well above timer resolution, so the
+ * 10k/1k ratio needs no denominator floor (BATCH cancels out of the ratio).
+ * The absolute catastrophic ceiling is therefore on the BATCH total, not a
+ * single op (noted at the assertion). Plan 040's LRU cache is explicitly
+ * DISABLED on these adapters — with the default-on cache every timed run
+ * after the warm-up would be a 0-query cache hit and the ratio would measure
+ * the cache, not the database.
  *
  * Bun caveat (plan 063 Step 3): this bun version has a `.rejects`/pending-
  * promise matcher bug — everything here is plain async/await over promises

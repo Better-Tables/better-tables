@@ -1,11 +1,15 @@
-# Performance baselines — plan 063 harness (captured 2026-07-23)
+# Performance baselines — plan 063 harness
 
-First numbers from every tier of the plan 063 harness, captured on the
-`claude/performance-testing-strategy-m35acc` branch AFTER the four
-interaction-lag fixes landed (same branch, commit `728aa68`). Machine:
-CI-class Linux x64 container (Xeon ~2.1 GHz, Bun 1.3.11); wall-time values
-are indicative, not comparable across machines — trends live on gh-pages
-via the `perf-trend` job, counts are pinned in the blocking suites.
+Numbers from every tier of the plan 063 harness, captured on the
+`claude/performance-testing-strategy-m35acc` branch. Machine: CI-class Linux
+x64 container (Xeon ~2.1 GHz, Bun 1.3.11); wall-time values are indicative,
+not comparable across machines — trends live on gh-pages via the
+`perf-trend` job, counts are pinned in the blocking suites.
+
+Provenance: Tiers 1–3 first captured 2026-07-23 after the four
+interaction-lag fixes (commit `728aa68`); the Tier 4 table below is a fresh
+run on 2026-07-24 after the empty-filter fix + the review hardening (each
+labeled at its section).
 
 ## Tier 1 — deterministic interaction / query costs (PR-blocking)
 
@@ -19,7 +23,7 @@ Pinned in `packages/ui/tests/components/interaction-cost.test.tsx` and
 | Rapid double pagination click | 2 fetches, 2 URL writes (leading + one coalesced trailing) |
 | Page-size change | 1 fetch, 1 immediate URL write |
 | Filter commit | 1 fetch, 1 batched facet refresh, 1 immediate URL write |
-| Filter add with EMPTY values | **FINDING**: 1 fetch + 1 facet refresh + 1 URL write before any value is chosen — a real RSC navigation in server-driven apps; candidate fix: skip fetch/serialize until a value commits |
+| Filter add with EMPTY values | **0 fetch, 0 facet, 0 URL write** (FIXED via `getEffectiveFilters`; was 1/1/1 before — a real RSC navigation in server-driven apps). Committing the first value pays exactly once |
 | Facets without `getFacets` (in-process adapters) | exactly K+R singular calls |
 | `fetchData` (plain) | 2 SQL statements (data + count) |
 | `fetchData` + many-to-one column | 2 statements (single-query join path) |

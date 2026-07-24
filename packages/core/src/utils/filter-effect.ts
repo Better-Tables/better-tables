@@ -17,6 +17,7 @@
 
 import type { FilterGroupNode, FilterState } from '../types/filter';
 import { getOperatorDefinition } from '../types/filter-operators';
+import { flattenFilterNode, isFilterGroupNode } from './type-guards';
 
 /**
  * Does `filter` actually constrain query results?
@@ -56,4 +57,36 @@ export function getEffectiveFilters(
     return filters.filter(filterHasEffect);
   }
   return filters;
+}
+
+/**
+ * A stable string key for the EFFECTIVE filters, safe to use as a React memo
+ * dependency (so an incomplete chip doesn't refire fetch/facets — plan 063
+ * follow-up). `undefined` → `'null'`.
+ *
+ * `JSON.stringify` alone is unsafe here: a `custom` filter's `values` is
+ * `unknown[]`, so a `BigInt` value throws `TypeError` and a circular value
+ * throws — during render, which would crash the consuming hook. This uses a
+ * BigInt-aware replacer and, on any remaining serialization failure, falls
+ * back to a structural signature (per effective leaf: `columnId`, `operator`,
+ * value count) that still changes when the effective filters change without
+ * touching the offending value.
+ */
+export function getEffectiveFilterKey(
+  filters: FilterState[] | FilterGroupNode | undefined
+): string {
+  if (filters === undefined) return 'null';
+  const effective = getEffectiveFilters(filters);
+  try {
+    return (
+      JSON.stringify(effective, (_key, value) =>
+        typeof value === 'bigint' ? `${value}n` : value
+      ) ?? 'null'
+    );
+  } catch {
+    const leaves = isFilterGroupNode(effective) ? flattenFilterNode(effective) : effective;
+    return `shape:${leaves
+      .map((leaf) => `${leaf.columnId}:${leaf.operator}:${leaf.values.length}`)
+      .join('|')}`;
+  }
 }

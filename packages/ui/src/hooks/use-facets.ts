@@ -1,7 +1,7 @@
 'use client';
 
 import type { FilterGroupNode, FilterState, TableAdapter } from '@better-tables/core';
-import { getEffectiveFilters, MAX_FACET_BATCH_SIZE } from '@better-tables/core';
+import { getEffectiveFilterKey, MAX_FACET_BATCH_SIZE } from '@better-tables/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /** A single faceted option: a distinct value and how many rows match it. */
@@ -145,7 +145,8 @@ export function useFacets<TData = unknown>({
   // — it cannot change any facet's counts yet (plan 063 follow-up). The full
   // `filters` array is still what's passed to the adapter (self-exclusion is
   // its job over the complete state); only the refetch TRIGGER is effective.
-  const filtersKey = JSON.stringify(filters === undefined ? null : getEffectiveFilters(filters));
+  // BigInt/circular-safe key (a `custom` filter value must not throw here).
+  const filtersKey = getEffectiveFilterKey(filters);
   // Intern `filters` by effective content, not identity: `filtersKey` (not
   // `filters`) is the dependency on purpose.
   const stableFilters = useMemo(() => filters, [filtersKey]);

@@ -79,6 +79,13 @@ export interface DeserializedTableState {
  * - 4 filters: ~400 chars → ~150-200 chars (50-60% reduction)
  * - 10+ filters: ~1000+ chars → ~300-400 chars (60-70% reduction)
  *
+ * **Filter handling:** only filters that actually constrain results are
+ * serialized — a value-taking filter with empty `values` (e.g. a chip added
+ * before its value is chosen) is dropped via `getEffectiveFilters`, so it
+ * never appears in the URL and never triggers a needless refetch / RSC
+ * round-trip. No-value operators (`isEmpty`/`isNull`/…) still serialize.
+ * (A `FilterGroupNode` tree is serialized as-is; see `getEffectiveFilters`.)
+ *
  * @param state - Table state to serialize
  * @returns Record of URL parameter keys and values (null values should be removed from URL)
  *

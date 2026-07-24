@@ -6,7 +6,10 @@
  * transform over 1,000 and 10,000 flat rows and bound the 10k/1k RATIO
  * (ratios cancel host speed; an accidental O(n²) — the exact regression
  * class plan 040's hoists removed — lands ~100×, far past the 15× bound).
- * The only absolute assertion is a catastrophic ceiling.
+ * Each timed sample runs the op `BATCH` (20) times so even the 1k case
+ * measures well above timer resolution (no denominator floor needed; BATCH
+ * cancels out of the ratio). The only absolute assertion is a catastrophic
+ * ceiling on the BATCH total.
  *
  * Port construction mirrors tests/data-transformer-cache.test.ts (and the
  * bench/ suite): a toy schema-introspection + relationship-manager pair,
