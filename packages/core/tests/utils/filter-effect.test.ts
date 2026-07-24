@@ -128,21 +128,29 @@ describe('getEffectiveFilterKey (BigInt/circular-safe)', () => {
     expect(getEffectiveFilterKey([other])).not.toBe(key);
   });
 
-  it('falls back to a structural signature on a circular value instead of throwing', () => {
-    const circular: Record<string, unknown> = {};
-    circular.self = circular;
+  it('handles a circular value without throwing AND stays value-sensitive', () => {
+    const makeCircular = (label: string) => {
+      const circular: Record<string, unknown> = { label };
+      circular.self = circular;
+      return circular;
+    };
     const custom: CustomFilterState = {
       columnId: 'c',
       type: 'custom',
       operator: 'equals',
-      values: [circular as unknown as string],
+      values: [makeCircular('a') as unknown as string],
     };
     let key = '';
     expect(() => {
       key = getEffectiveFilterKey([custom]);
     }).not.toThrow();
-    expect(key.startsWith('shape:')).toBe(true);
-    expect(key).toContain('c:equals:1');
+    // Circular reference is marked, not dropped — value content survives.
+    expect(key).toContain('[Circular]');
+    expect(key).toContain('"label":"a"');
+    // Changing the (circular) value's non-circular content changes the key —
+    // the fallback must NOT collapse to a value-insensitive signature.
+    const changed: CustomFilterState = { ...custom, values: [makeCircular('b') as unknown as string] };
+    expect(getEffectiveFilterKey([changed])).not.toBe(key);
   });
 });
 
