@@ -854,6 +854,53 @@ describe('signal-aware facet caching (lag fix: cache no longer bypassed)', () =>
     });
     expect(map.get('open')).toBe(12);
     expect(fetchCount).toBe(2);
+
+    // The fresh result IS cached: a later read hits it (fetchCount stays 2).
+    // If the aborted request's late `.catch` had deleted the shared key, this
+    // would refetch — the abort-guard prevents that cross-entry delete.
+    const again = await client.getFacetedValues('status', {
+      signal: new AbortController().signal,
+    });
+    expect(again.get('open')).toBe(12);
+    expect(fetchCount).toBe(2);
+  });
+
+  it('bounds the result cache (LRU): an evicted key refetches, a touched key survives', async () => {
+    let fetchCount = 0;
+    const { adapter: server } = makeServerAdapter();
+    const client = httpAdapter({
+      url: '/api/tables',
+      cacheTtlMs: 60_000,
+      fetch: async (url, init) => {
+        fetchCount += 1;
+        return loopbackFetch(server)(url, init);
+      },
+    });
+
+    // Fill the cache to its cap with distinct facet keys (one per columnId).
+    // MAX_CACHE_ENTRIES is 100; use column 'c0' first so we can watch it.
+    await client.getFacetedValues('c0');
+    for (let i = 1; i < 100; i++) {
+      await client.getFacetedValues(`c${i}`);
+    }
+    expect(fetchCount).toBe(100);
+
+    // Touch 'c0' (cache hit → marked most-recently-used, no fetch).
+    await client.getFacetedValues('c0');
+    expect(fetchCount).toBe(100);
+
+    // One more distinct key pushes size over the cap → the LRU entry is
+    // evicted. 'c0' was just touched, so 'c1' (now oldest) is evicted, not 'c0'.
+    await client.getFacetedValues('c100');
+    expect(fetchCount).toBe(101);
+
+    // 'c0' still cached (touch saved it): no refetch.
+    await client.getFacetedValues('c0');
+    expect(fetchCount).toBe(101);
+
+    // 'c1' was evicted: it refetches.
+    await client.getFacetedValues('c1');
+    expect(fetchCount).toBe(102);
   });
 
   it('a pre-aborted signal rejects without fetching', async () => {

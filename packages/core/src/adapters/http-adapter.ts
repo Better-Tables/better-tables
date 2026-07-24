@@ -182,6 +182,19 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
   }
   const inFlight = new Map<string, InFlightEntry>();
   const resultCache = new Map<string, { result: unknown; expiresAt: number }>();
+  // Bound the TTL cache. Filter-varied reads produce a fresh JSON key each
+  // time, so without a cap a long-lived table session accretes one entry per
+  // param combination forever (the TTL only blocks stale HITS, it never frees
+  // keys). Map preserves insertion order, so the first key is the
+  // least-recently-used (reads re-insert on hit — see `sendCacheable`).
+  const MAX_CACHE_ENTRIES = 100;
+  function evictOverCap(): void {
+    while (resultCache.size > MAX_CACHE_ENTRIES) {
+      const oldest = resultCache.keys().next().value;
+      if (oldest === undefined) break;
+      resultCache.delete(oldest);
+    }
+  }
 
   async function resolveHeaders(): Promise<Record<string, string>> {
     const base = { 'content-type': 'application/json' };
@@ -239,7 +252,16 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
 
     const cacheKey = JSON.stringify(body);
     const cached = resultCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return cached.result;
+    if (cached) {
+      if (cached.expiresAt > Date.now()) {
+        // LRU touch: re-insert so this key becomes most-recently-used.
+        resultCache.delete(cacheKey);
+        resultCache.set(cacheKey, cached);
+        return cached.result;
+      }
+      // Expired — free it now rather than leaving it resident until eviction.
+      resultCache.delete(cacheKey);
+    }
 
     let entry = inFlight.get(cacheKey);
     if (!entry) {
@@ -252,11 +274,21 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       };
       created.promise = performFetch(body, controller.signal)
         .then((result) => {
-          resultCache.set(cacheKey, { result, expiresAt: Date.now() + cacheTtlMs });
+          // Cache only if this exact request is still the live entry AND wasn't
+          // aborted — a late settle from an evicted/aborted request must never
+          // populate or overwrite a NEWER entry's cache under the same key.
+          if (!controller.signal.aborted && inFlight.get(cacheKey) === created) {
+            resultCache.set(cacheKey, { result, expiresAt: Date.now() + cacheTtlMs });
+            evictOverCap();
+          }
           return result;
         })
         .catch((error) => {
-          resultCache.delete(cacheKey);
+          // Only clear cache for OUR live entry, for the same reason — a late
+          // failure from an evicted request must not delete a newer result.
+          if (inFlight.get(cacheKey) === created) {
+            resultCache.delete(cacheKey);
+          }
           throw error;
         })
         .finally(() => {

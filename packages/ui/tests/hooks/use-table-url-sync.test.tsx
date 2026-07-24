@@ -30,6 +30,73 @@ function createStore() {
 }
 
 describe('useTableUrlSync', () => {
+  it('preserves a pending trailing write when the adapter identity changes mid-burst (navigation)', async () => {
+    createStore();
+    // Two adapter identities backed by ONE param store + call log — models a
+    // framework adapter (e.g. useNextjsUrlAdapter) that recreates itself on
+    // every navigation while reading/writing the same URL.
+    const params = new Map<string, string>();
+    const setParamsCalls: Record<string, string | null>[] = [];
+    const makeAdapter = () => ({
+      getParam: (key: string) => params.get(key) ?? null,
+      setParams: (updates: Record<string, string | null>) => {
+        setParamsCalls.push(updates);
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === null) params.delete(key);
+          else params.set(key, value);
+        }
+      },
+    });
+
+    let adapter = makeAdapter();
+    const config: UrlSyncConfig = { filters: true, pagination: true };
+    const { rerender } = renderHook(() => useTableUrlSync(TABLE_ID, config, adapter));
+    await waitFor(() => expect(getTableStore(TABLE_ID)).toBeDefined());
+    await act(async () => {});
+
+    const store = getTableStore(TABLE_ID);
+    if (!store) throw new Error('Expected table store');
+    const callsBefore = setParamsCalls.length;
+
+    jest.useFakeTimers();
+    // Leading write (fires immediately, "navigates").
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['first'],
+      });
+    });
+    expect(setParamsCalls.length - callsBefore).toBe(1);
+
+    // A second change lands inside the cooldown → becomes the pending trailing
+    // write. THEN the "navigation" completes: the adapter identity changes and
+    // the hook re-renders (as useNextjsUrlAdapter would on a searchParams change).
+    act(() => {
+      store.getState().manager.addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: ['second'],
+      });
+    });
+    adapter = makeAdapter();
+    rerender();
+
+    await act(async () => {
+      jest.advanceTimersByTime(URL_SYNC_DEBOUNCE_MS);
+    });
+    jest.useRealTimers();
+
+    // The trailing write must still fire (through the NEW adapter) — before the
+    // ref-latch fix, the re-subscription cancelled it and the burst settled on
+    // "first".
+    expect(setParamsCalls.length - callsBefore).toBe(2);
+    const lastFilters = setParamsCalls.at(-1)?.filters;
+    expect(typeof lastFilters).toBe('string');
+  });
+
   it('does not flush a pending coalesced write after unmount', async () => {
     createStore();
     const { adapter, setParamsCalls } = createFakeUrlAdapter();
