@@ -43,6 +43,34 @@ describe('createAdapterGuard', () => {
     ).toBe(false);
   });
 
+  it('collects every column of a batched getFacets request plus its filter columns', () => {
+    const body: AdapterRequestBody = {
+      method: 'getFacets',
+      requests: [
+        { columnId: 'status', kind: 'values' },
+        { columnId: 'name', kind: 'values' },
+        { columnId: 'owner.email', kind: 'minmax' },
+      ],
+      params: {
+        filters: [{ columnId: 'name', type: 'text', operator: 'contains', values: ['a'] }],
+      },
+    };
+    expect(collectAdapterColumnIds(body)).toEqual(['status', 'name', 'owner.email', 'name']);
+    expect(guard.isAllowed(body)).toBe(true);
+  });
+
+  it('rejects a batched getFacets request that references a column outside the allowlist', () => {
+    expect(
+      guard.isAllowed({
+        method: 'getFacets',
+        requests: [
+          { columnId: 'status', kind: 'values' },
+          { columnId: 'company', kind: 'values' },
+        ],
+      })
+    ).toBe(false);
+  });
+
   it('pins fetchData / describeColumns / resolveCellWriteTarget to the table', () => {
     const fetchConstrained = guard.constrain({
       method: 'fetchData',

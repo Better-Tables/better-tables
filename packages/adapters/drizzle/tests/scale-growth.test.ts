@@ -76,27 +76,26 @@ function createSeededFixture(rowCount: number) {
   return { sqlite, adapter };
 }
 
-/** Median of 5 timed runs after 1 discarded warm-up (plan 063 method). */
-async function medianMs(run: () => Promise<unknown>): Promise<number> {
-  await run(); // warm-up, discarded
+// Run the op BATCH times inside each timed sample so even the fast 1k case
+// measures well above timer resolution — the 10k/1k ratio then never needs a
+// denominator floor (which could otherwise mask a real regression when the 1k
+// time dips into sub-millisecond noise). BATCH cancels out of the ratio.
+const BATCH = 20;
+
+/** Median of 5 batched runs after 1 discarded warm-up batch (plan 063 method). */
+async function medianBatchMs(run: () => Promise<unknown>): Promise<number> {
+  for (let i = 0; i < BATCH; i++) await run(); // warm-up batch, discarded
   const samples: number[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let s = 0; s < 5; s++) {
     const start = performance.now();
-    await run();
+    for (let i = 0; i < BATCH; i++) await run();
     samples.push(performance.now() - start);
   }
   samples.sort((a, b) => a - b);
   return samples[2] as number;
 }
 
-/**
- * Guard the ratio's denominator: a sub-0.1 ms median is inside timer/GC
- * noise, and dividing by it fabricates huge ratios out of nothing. The
- * floor only ever LOWERS a reported ratio for operations that are already
- * far too fast to regress meaningfully at this scale.
- */
-const MIN_DENOMINATOR_MS = 0.1;
-const ratioOf = (t10k: number, t1k: number): number => t10k / Math.max(t1k, MIN_DENOMINATOR_MS);
+const ratioOf = (t10k: number, t1k: number): number => t10k / t1k;
 
 describe('DrizzleAdapter — 10k/1k growth ratios (plan 063 Step 3)', () => {
   let small: ReturnType<typeof createSeededFixture>;
@@ -119,8 +118,8 @@ describe('DrizzleAdapter — 10k/1k growth ratios (plan 063 Step 3)', () => {
         pagination: { page: 1, limit: 50 },
       });
 
-    const t1k = await medianMs(pageFetch(small));
-    const t10k = await medianMs(pageFetch(large));
+    const t1k = await medianBatchMs(pageFetch(small));
+    const t10k = await medianBatchMs(pageFetch(large));
     const ratio = ratioOf(t10k, t1k);
     console.log(
       `[scale-growth] page-1 fetchData: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
@@ -131,8 +130,9 @@ describe('DrizzleAdapter — 10k/1k growth ratios (plan 063 Step 3)', () => {
     // resolves via a rowid scan — cheap at both scales. 8× is wide slack
     // over "near-flat"; an O(n) data path would already land ~10×.
     expect(ratio).toBeLessThanOrEqual(8);
-    // Catastrophic ceiling only (never a wall-time budget): a page fetch
-    // over 10k in-memory rows taking 2 s means something is pathological.
+    // Catastrophic ceiling only (never a wall-time budget): BATCH page fetches
+    // over 10k in-memory rows taking 2 s (≈100 ms each) means something is
+    // pathological.
     expect(t10k).toBeLessThan(2_000);
   }, 30_000);
 
@@ -153,8 +153,8 @@ describe('DrizzleAdapter — 10k/1k growth ratios (plan 063 Step 3)', () => {
     });
     expect(sanity.total).toBe(5_000);
 
-    const t1k = await medianMs(filteredFetch(small));
-    const t10k = await medianMs(filteredFetch(large));
+    const t1k = await medianBatchMs(filteredFetch(small));
+    const t10k = await medianBatchMs(filteredFetch(large));
     const ratio = ratioOf(t10k, t1k);
     console.log(
       `[scale-growth] filtered fetchData+count: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`

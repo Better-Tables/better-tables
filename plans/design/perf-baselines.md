@@ -67,11 +67,14 @@ checking that default options don't skip.
 Chromium, CDP CPU throttle 4×, 15 reps − 3 warm-ups, in-page
 click→rows-updated):
 
+Measured to the FIRST DATA ROW's content change (the user-visible result),
+after the empty-filter fix + the review-hardening below:
+
 | Interaction | p50 | p75 |
 |---|---|---|
-| Homepage pagination click | 339 ms | 368 ms |
-| Homepage sort header click | 293 ms | 307 ms |
-| Facets sidebar filter toggle | 149 ms | 155 ms |
+| Homepage pagination click | 225 ms | 233 ms |
+| Homepage sort header click | 215 ms | 226 ms |
+| Facets sidebar filter toggle | 104 ms | 109 ms |
 
 Reading: at 4× throttle these round-trips (RSC render + fetch + hydrate +
 paint) are the remaining cost — the pre-fix 150 ms debounce floor and the
@@ -80,10 +83,26 @@ trip). Budgets deliberately NOT set yet; revisit after the gh-pages trend
 accumulates (~2 weeks) and pick p75 budgets with observed variance
 (workflow TODO dated 2026-08-06).
 
+## Review hardening (cubic, 2026-07-24)
+
+Correctness fixes made in response to the PR review, each with a
+regression test: (a) url-sync dropped a pending trailing write when a
+navigation recreated the adapter mid-burst — ref-latched the coalescer +
+added a write-in-flight guard so re-hydration can't clobber ahead-of-URL
+state; (b) `httpAdapter`'s signal-aware cache was unbounded and an
+aborted request's late settle could touch a newer entry — added an LRU cap
++ expired-delete + a still-live-entry guard; (c) `useFacets` now chunks
+`getFacets` to `MAX_FACET_BATCH_SIZE` so a >50-facet sidebar can't hit the
+server cap; (d) the E2E harness measures the first-row change (not any
+tbody mutation) and never reuses a stale server; (e) growth-ratio gates
+batch the op so the 10k/1k ratio needs no denominator floor.
+
 ## Follow-up candidates from the numbers
 
-1. Empty-values filter add costs a full navigation (Tier 1 FINDING above).
-2. Pagination p75 (368 ms throttled) is dominated by the whole-page RSC
+1. ~~Empty-values filter add costs a full navigation~~ — FIXED
+   (`getEffectiveFilters`; an incomplete chip now costs 0 fetch / 0 facet /
+   0 URL write).
+2. Pagination p75 (233 ms throttled) is dominated by the whole-page RSC
    re-render; a `<Suspense>`/partial-prerender boundary around the demo
    table could shrink the server render — measure before pursuing.
 3. url-state serialize at 50 filters (486 µs) is lz-string-bound; only

@@ -99,22 +99,26 @@ function makeOneToManyRows(count: number): Record<string, unknown>[] {
   return rows;
 }
 
-/** Median of 5 timed runs after 1 discarded warm-up (plan 063 method). */
-function medianMs(run: () => unknown): number {
-  run(); // warm-up, discarded
+// Run the op BATCH times inside each timed sample. Batching pushes even the
+// fast 1k case well above timer resolution, so the 10k/1k ratio never needs a
+// denominator floor (which could otherwise mask a real regression when the 1k
+// time dips into sub-millisecond noise). BATCH cancels out of the ratio.
+const BATCH = 20;
+
+/** Median of 5 batched runs after 1 discarded warm-up (plan 063 method). */
+function medianBatchMs(op: () => unknown): number {
+  for (let i = 0; i < BATCH; i++) op(); // warm-up batch, discarded
   const samples: number[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let s = 0; s < 5; s++) {
     const start = performance.now();
-    run();
+    for (let i = 0; i < BATCH; i++) op();
     samples.push(performance.now() - start);
   }
   samples.sort((a, b) => a - b);
   return samples[2] as number;
 }
 
-/** Same denominator floor as the drizzle suite — see its comment. */
-const MIN_DENOMINATOR_MS = 0.1;
-const ratioOf = (t10k: number, t1k: number): number => t10k / Math.max(t1k, MIN_DENOMINATOR_MS);
+const ratioOf = (t10k: number, t1k: number): number => t10k / t1k;
 
 describe('DataTransformer — 10k/1k growth ratios (plan 063 Step 3)', () => {
   it('flat transform grows ≤ 15× from 1k to 10k rows', () => {
@@ -123,11 +127,11 @@ describe('DataTransformer — 10k/1k growth ratios (plan 063 Step 3)', () => {
     const transformer = new DataTransformer(schema, relationshipManager, schemaPort);
     const columns = ['email', 'name', 'age'];
 
-    const t1k = medianMs(() => transformer.transformToNested(flat1k, 'users', columns));
-    const t10k = medianMs(() => transformer.transformToNested(flat10k, 'users', columns));
+    const t1k = medianBatchMs(() => transformer.transformToNested(flat1k, 'users', columns));
+    const t10k = medianBatchMs(() => transformer.transformToNested(flat10k, 'users', columns));
     const ratio = ratioOf(t10k, t1k);
     console.log(
-      `[transformer-growth] flat: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
+      `[transformer-growth batched] flat: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
     );
 
     expect(ratio).toBeLessThanOrEqual(15);
@@ -140,11 +144,11 @@ describe('DataTransformer — 10k/1k growth ratios (plan 063 Step 3)', () => {
     const transformer = new DataTransformer(schema, relationshipManager, schemaPort);
     const columns = ['email', 'name', 'posts.title'];
 
-    const t1k = medianMs(() => transformer.transformToNested(fanOut1k, 'users', columns));
-    const t10k = medianMs(() => transformer.transformToNested(fanOut10k, 'users', columns));
+    const t1k = medianBatchMs(() => transformer.transformToNested(fanOut1k, 'users', columns));
+    const t10k = medianBatchMs(() => transformer.transformToNested(fanOut10k, 'users', columns));
     const ratio = ratioOf(t10k, t1k);
     console.log(
-      `[transformer-growth] one-to-many: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
+      `[transformer-growth batched] one-to-many: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
     );
 
     expect(ratio).toBeLessThanOrEqual(15);
