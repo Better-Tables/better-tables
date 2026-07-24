@@ -1,0 +1,16 @@
+{
+  // Isolated-check config for the plan 018 table-definition type-perf
+  // fixture — see tsconfig.filter-perf.json for why the gate cannot use a
+  // bare `tsc <file>` invocation. This fixture imports real src modules
+  // (defineTable), so the package's actual target/strictness flags are
+  // load-bearing for both correctness and the instantiation count.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["table-def-perf-fixture.ts"]
+}

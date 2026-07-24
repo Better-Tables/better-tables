@@ -32,8 +32,9 @@ loose backlog. Deferred items are at the bottom.
 
 ## Where we are (2026-07-22)
 
-**0.6 is shippable.** Waves A–D are merged to `main`. Open work is Waves
-E–F plus leftover 048. 058 stays deferred; **060 landed**.
+**0.6 is shippable.** Waves A–D are merged to `main`. Open work is Wave E
+plus leftover 048; Wave F (perf harness, 063) is **DONE** on its branch.
+058 stays deferred; **060 landed**.
 
 | Wave | Plans | Outcome |
 |------|-------|---------|
@@ -79,7 +80,7 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
-| [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines for the reported pagination/filter lag | 042/043 helpers (done) | **TODO** (P2) |
+| [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines | 042/043 helpers (done) | **DONE** (2026-07-23) — all 7 steps + the four lag fixes on the plan branch; baselines in [design/perf-baselines.md](design/perf-baselines.md); one FINDING open (empty-filter add costs a navigation) |
 
 ---
 
@@ -91,11 +92,8 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 - **048** anytime after 0.6 — no file overlap with 061; follow plan 041
   handler idioms and plan 042 input-test patterns.
 - **062** only after 061 Phases 1 + 6.
-- **063** anytime — measurement only (tests/bench/CI, no product `src/**`);
-  steps land independently. The four demo-lag fixes it originally queued
-  (loading affordance, leading-edge URL writes, facet batch + signal cache,
-  boot-time seeding) LANDED 2026-07-23 on the plan's branch — Tier-1/Tier-4
-  characterization pins the post-fix contract (see the plan's update note).
+- **063 executed** (2026-07-23, all 7 steps + the four lag fixes) — see the
+  Wave F row. Numbers: [design/perf-baselines.md](design/perf-baselines.md).
 - Capability asymmetry (from 060 design): Prisma can sort-by-count but
   not filter-by-count; Kysely/Drizzle do both — declare honestly in
   `AdapterMeta.capabilities.aggregates`.

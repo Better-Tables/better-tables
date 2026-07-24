@@ -79,7 +79,9 @@ function CostHarness({
     adapter,
     filters,
     pagination: fetchPagination,
-    columns: COLUMNS,
+    // useTableData takes ColumnDefinition<unknown>[] (it only reads derived
+    // specs); the row generic is irrelevant to that read.
+    columns: COLUMNS as unknown as ColumnDefinition[],
   });
 
   useTableUrlSync(tableId, { filters: true, pagination: true, sorting: true }, urlAdapter);
@@ -130,7 +132,10 @@ async function mountSettled(tableId: string, options?: { batchFacets?: boolean }
 }
 
 /** Snapshot the counters so per-interaction assertions are deltas. */
-function baseline(counting: ReturnType<typeof createCountingAdapter>, fakeUrl: ReturnType<typeof createFakeUrlAdapter>) {
+function baseline(
+  counting: ReturnType<typeof createCountingAdapter>,
+  fakeUrl: ReturnType<typeof createFakeUrlAdapter>
+) {
   return {
     fetches: counting.fetchCalls.length,
     batches: counting.batchCalls.length,
@@ -262,9 +267,9 @@ describe('interaction cost gates (plan 063 Step 1)', () => {
 
     jest.useFakeTimers();
     act(() => {
-      store.getState().setFilters([
-        { columnId: 'name', type: 'text', operator: 'contains', values: ['alpha'] },
-      ]);
+      store
+        .getState()
+        .setFilters([{ columnId: 'name', type: 'text', operator: 'contains', values: ['alpha'] }]);
     });
     // Leading-edge write carries the filter — no 150 ms floor on a commit.
     expect(fakeUrl.setParamsCalls.length - before.urlWrites).toBe(1);
@@ -321,9 +326,9 @@ describe('interaction cost gates (plan 063 Step 1)', () => {
     if (!store) throw new Error('store missing');
 
     act(() => {
-      store.getState().setFilters([
-        { columnId: 'name', type: 'text', operator: 'contains', values: ['alpha'] },
-      ]);
+      store
+        .getState()
+        .setFilters([{ columnId: 'name', type: 'text', operator: 'contains', values: ['alpha'] }]);
     });
 
     await waitFor(() => {

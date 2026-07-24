@@ -20,6 +20,11 @@
       "dependsOn": ["build", "^build"],
       "outputs": []
     },
+    "bench": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": []
+    },
     "@better-tables/site#typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
