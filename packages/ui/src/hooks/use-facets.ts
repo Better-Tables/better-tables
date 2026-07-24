@@ -1,6 +1,7 @@
 'use client';
 
 import type { FilterGroupNode, FilterState, TableAdapter } from '@better-tables/core';
+import { getEffectiveFilters } from '@better-tables/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /** A single faceted option: a distinct value and how many rows match it. */
@@ -125,7 +126,15 @@ export function useFacets<TData = unknown>({
   // every render and re-fire the fetch effect indefinitely. Intern by JSON
   // content -- filter state is small and this only runs on identity change,
   // not on every fetch.
-  const filtersKey = JSON.stringify(filters ?? null);
+  //
+  // Key on the EFFECTIVE filters (no-effect leaves dropped) so a chip added
+  // before its value is chosen (`values: []`) does not refire the facet batch
+  // — it cannot change any facet's counts yet (plan 063 follow-up). The full
+  // `filters` array is still what's passed to the adapter (self-exclusion is
+  // its job over the complete state); only the refetch TRIGGER is effective.
+  const filtersKey = JSON.stringify(filters === undefined ? null : getEffectiveFilters(filters));
+  // Intern `filters` by effective content, not identity: `filtersKey` (not
+  // `filters`) is the dependency on purpose.
   const stableFilters = useMemo(() => filters, [filtersKey]);
 
   const fetchFacets = useCallback(async () => {

@@ -285,14 +285,14 @@ describe('interaction cost gates (plan 063 Step 1)', () => {
     expect(counting.rangeCalls).toHaveLength(0);
   });
 
-  it('adding a filter with EMPTY values: characterized cost (pinned)', async () => {
+  it('adding a filter with EMPTY values is FREE: 0 fetch, 0 facet, 0 URL write', async () => {
     const tableId = 'cost-empty-filter';
     const { counting, fakeUrl } = await mountSettled(tableId);
     const before = baseline(counting, fakeUrl);
     const store = getTableStore(tableId);
     if (!store) throw new Error('store missing');
 
-    act(() => {
+    await act(async () => {
       // What FilterBar's handleAddFilter dispatches before any value is
       // chosen (filter-bar.tsx builds `values: []`).
       store.getState().addFilter({
@@ -304,15 +304,46 @@ describe('interaction cost gates (plan 063 Step 1)', () => {
     });
     await act(async () => {});
 
-    // CHARACTERIZATION: an empty-values filter still changes the filters
-    // array identity/content, so today it costs one refetch and one facet
-    // refresh before the user has typed anything — and the URL serializer
-    // KEEPS valueless filters, so the URL changes too.
-    // FINDING: in a server-driven app (Next.js demos) that URL write is a
-    // real RSC navigation for a filter that cannot narrow anything yet;
-    // skipping fetch/serialize until a value commits would save one
-    // round-trip per added filter chip. Pinned as-is; update these numbers
-    // alongside any such fix.
+    // A chip with no value can't narrow anything, so it costs NOTHING until a
+    // value commits: `getEffectiveFilters` drops it, so the fetch trigger, the
+    // facet-batch trigger, and the serialized URL are all unchanged. Because
+    // no URL write fires, no coalescer cooldown even opens — there is nothing
+    // to flush, so no fake timers are needed. Before the plan-063 follow-up
+    // this was 1 fetch + 1 facet refresh + 1 URL write (a real RSC navigation
+    // in server-driven apps) per empty chip.
+    expect(counting.fetchCalls.length - before.fetches).toBe(0);
+    expect(counting.batchCalls.length - before.batches).toBe(0);
+    expect(counting.facetCalls.length + counting.rangeCalls.length - before.singularFacets).toBe(0);
+    expect(fakeUrl.setParamsCalls.length - before.urlWrites).toBe(0);
+  });
+
+  it('committing a value on a previously-empty chip pays exactly once (fetch + facet + write)', async () => {
+    const tableId = 'cost-empty-then-value';
+    const { counting, fakeUrl } = await mountSettled(tableId);
+    const store = getTableStore(tableId);
+    if (!store) throw new Error('store missing');
+
+    // Add the empty chip (free), then commit a value on it.
+    act(() => {
+      store.getState().addFilter({
+        columnId: 'name',
+        type: 'text',
+        operator: 'contains',
+        values: [],
+      });
+    });
+    await act(async () => {});
+    const before = baseline(counting, fakeUrl);
+
+    await act(async () => {
+      store
+        .getState()
+        .setFilters([{ columnId: 'name', type: 'text', operator: 'contains', values: ['alpha'] }]);
+    });
+    await act(async () => {});
+
+    // Committing the value pays exactly once: the effective filters changed
+    // for the first time, so one fetch, one facet batch, and one URL write.
     expect(counting.fetchCalls.length - before.fetches).toBe(1);
     expect(counting.batchCalls.length - before.batches).toBe(1);
     expect(fakeUrl.setParamsCalls.length - before.urlWrites).toBe(1);

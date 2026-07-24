@@ -8,8 +8,8 @@ import type {
   PaginationState,
   TableAdapter,
 } from '@better-tables/core';
-import { withDerivedFetchParams } from '@better-tables/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { getEffectiveFilters, withDerivedFetchParams } from '@better-tables/core';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Stable defaults so omitted `filters`/`params`/`columns` don't recreate
 // `fetchData`'s identity (and retrigger the fetch effect) on every render
@@ -118,6 +118,16 @@ export function useTableData<TData = unknown>({
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
 
+  // Trigger refetches on the filters that actually constrain results, keyed by
+  // content. A chip added before its value is chosen (`values: []`) changes
+  // the `filters` array identity but not its effect, so it must NOT refetch
+  // (plan 063 follow-up). Interning by effective-filter content makes the
+  // fetch callback identity stable across such no-op changes.
+  // `effectiveFiltersKey` (not `filters`) is the dependency on purpose — the
+  // memo returns the current `filters` only when its EFFECT changes.
+  const effectiveFiltersKey = JSON.stringify(getEffectiveFilters(filters));
+  const stableFilters = useMemo(() => filters, [effectiveFiltersKey]);
+
   const fetchData = useCallback(async () => {
     if (!enabled) return;
 
@@ -132,7 +142,7 @@ export function useTableData<TData = unknown>({
 
     try {
       const fetchParams: FetchDataParams = {
-        filters,
+        filters: stableFilters,
         ...params,
         signal: abortController.signal,
       };
@@ -169,7 +179,7 @@ export function useTableData<TData = unknown>({
         setLoading(false);
       }
     }
-  }, [adapter, filters, pagination, params, columns, enabled]);
+  }, [adapter, stableFilters, pagination, params, columns, enabled]);
 
   const refetch = useCallback(async () => {
     await fetchData();
