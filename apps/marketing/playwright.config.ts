@@ -32,7 +32,11 @@ export default defineConfig({
   webServer: {
     command: 'bun run start',
     url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env.CI,
+    // Never reuse an already-running server: this harness measures the
+    // PRODUCTION build (`test:e2e:perf` runs `next build` first), and reusing
+    // a stray `next dev` or a stale `next start` would silently produce
+    // invalid latency baselines. Always launch a fresh `next start`.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

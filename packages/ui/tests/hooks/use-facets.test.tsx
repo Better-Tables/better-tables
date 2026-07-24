@@ -271,4 +271,33 @@ describe('useFacets batch path (lag fix: one round-trip per refresh)', () => {
     expect(result.current.ranges.reopenCount).toBeUndefined();
     expect(result.current.error).toBeNull();
   });
+
+  it('chunks a sidebar larger than MAX_FACET_BATCH_SIZE into multiple getFacets calls', async () => {
+    const { adapter } = createDeferredFetchAdapter();
+    const batchSizes: number[] = [];
+    // 120 option columns → 3 chunks of 50/50/20 (MAX_FACET_BATCH_SIZE = 50).
+    const columnIds = Array.from({ length: 120 }, (_, i) => `c${i}`);
+    const batchAdapter: typeof adapter = {
+      ...adapter,
+      getFacets: async (requests) => {
+        batchSizes.push(requests.length);
+        return {
+          values: Object.fromEntries(requests.map((r) => [r.columnId, new Map([['x', 1]])])),
+          ranges: {},
+        };
+      },
+    };
+
+    const { result } = renderHook(() =>
+      useFacets({ adapter: batchAdapter, columnIds, filters: [] })
+    );
+
+    await waitFor(() => expect(result.current.facets.c0).toBeDefined());
+
+    // No chunk exceeds the cap, and every column is covered — so a >50-facet
+    // sidebar never hits the server's bad_request cap.
+    expect(batchSizes).toEqual([50, 50, 20]);
+    expect(batchSizes.every((n) => n <= 50)).toBe(true);
+    expect(result.current.facets.c119).toEqual([{ value: 'x', count: 1 }]);
+  });
 });

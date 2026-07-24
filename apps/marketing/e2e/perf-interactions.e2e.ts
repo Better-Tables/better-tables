@@ -30,7 +30,8 @@ const REPS = 15;
 const WARMUP = 3;
 
 interface Sample {
-  ms: number;
+  /** Click → the FIRST DATA ROW's text changed to a new value. */
+  domUpdateMs: number;
 }
 
 function percentile(samples: number[], p: number): number {
@@ -40,39 +41,71 @@ function percentile(samples: number[], p: number): number {
 }
 
 /**
- * Click `clickTarget` (resolved in-page) and resolve with the elapsed ms
- * until the observed container's text content changes. Rejects (via test
- * timeout) if nothing changes — a rows-never-updated regression fails the
- * mechanics assertion, not just the numbers.
+ * Click a target (resolved in-page) and measure `domUpdateMs`: click → the
+ * FIRST DATA ROW's text changes to a new value.
+ *
+ * Keying on the first row (not whole-`tbody` text) ties the number to the
+ * user-visible RESULT: the loading affordance dims via a CSS class (no text
+ * change), so an intermediate mutation during the refetch can't satisfy this
+ * the way a coarse whole-container text observer could. An in-page cap rejects
+ * if the row never changes, so a broken interaction fails fast rather than
+ * wedging the whole test timeout.
+ *
+ * NOTE: an input-to-next-paint (Event Timing) metric was considered but does
+ * not work here — the Event Timing API only records TRUSTED user input, and
+ * this harness dispatches a synthetic in-page `element.click()` (needed to
+ * anchor `performance.now()` at the exact dispatch). Capturing INP would
+ * require driving the click through Playwright's trusted-input path and
+ * correlating it back, which is a larger follow-up; the DOM-update latency
+ * above is the primary, reliable signal.
  */
 async function measureClickToRowsChanged(
   page: Page,
-  options: { clickScript: string; observeSelector: string }
-): Promise<number> {
+  options: { clickScript: string; rowSelector: string }
+): Promise<Sample> {
   return page.evaluate(
-    async ({ clickScript, observeSelector }) => {
-      const container = document.querySelector(observeSelector);
-      if (!container) throw new Error(`observe target missing: ${observeSelector}`);
-      // Indirect eval resolves the click target lazily, at dispatch time.
+    async ({ clickScript, rowSelector }) => {
+      const IN_PAGE_TIMEOUT_MS = 8000;
+      const firstRowText = () => document.querySelector(rowSelector)?.textContent ?? null;
       const resolveTarget = new Function(`return (${clickScript});`) as () => HTMLElement | null;
       const target = resolveTarget();
       if (!target) throw new Error('click target missing');
+      const before = firstRowText();
+      if (before === null) throw new Error(`row target missing: ${rowSelector}`);
 
-      const before = container.textContent;
       const start = performance.now();
-      const done = new Promise<number>((resolve) => {
-        const observer = new MutationObserver(() => {
-          if (container.textContent !== before) {
-            observer.disconnect();
-            resolve(performance.now() - start);
+      const domUpdateMs = await new Promise<number>((resolve, reject) => {
+        let settled = false;
+        const finish = (fn: () => void) => {
+          if (settled) return;
+          settled = true;
+          observer.disconnect();
+          clearInterval(poll);
+          clearTimeout(cap);
+          fn();
+        };
+        const check = () => {
+          if (!settled && firstRowText() !== before) {
+            const elapsed = performance.now() - start;
+            finish(() => resolve(elapsed));
           }
-        });
-        observer.observe(container, { subtree: true, childList: true, characterData: true });
+        };
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+        // Poll as a backstop (a first-row swap that reuses text nodes may not
+        // fire a characterData mutation the observer catches).
+        const poll = setInterval(check, 16);
+        const cap = setTimeout(
+          () => finish(() => reject(new Error('rows did not change within cap'))),
+          IN_PAGE_TIMEOUT_MS
+        );
+        // Dispatch the interaction now that the observers/timer are armed.
+        target.click();
       });
-      target.click();
-      return done;
+
+      return { domUpdateMs };
     },
-    { clickScript: options.clickScript, observeSelector: options.observeSelector }
+    { clickScript: options.clickScript, rowSelector: options.rowSelector }
   );
 }
 
@@ -83,8 +116,8 @@ async function throttleCpu(page: Page, rate: number): Promise<void> {
 
 const results: Array<{ name: string; unit: string; value: number; extra?: string }> = [];
 
-function record(name: string, samples: Sample[]): void {
-  const values = samples.map((sample) => sample.ms);
+function recordSeries(name: string, values: number[]): void {
+  if (values.length === 0) return;
   const p50 = percentile(values, 50);
   const p75 = percentile(values, 75);
   results.push({ name: `${name} p50`, unit: 'ms', value: Math.round(p50 * 100) / 100 });
@@ -98,6 +131,13 @@ function record(name: string, samples: Sample[]): void {
   console.log(
     `[perf] ${name}: p50=${p50.toFixed(1)}ms p75=${p75.toFixed(1)}ms ` +
       `min=${Math.min(...values).toFixed(1)} max=${Math.max(...values).toFixed(1)} n=${values.length}`
+  );
+}
+
+function record(name: string, samples: Sample[]): void {
+  recordSeries(
+    `${name}.click-to-rows`,
+    samples.map((s) => s.domUpdateMs)
   );
 }
 
@@ -120,15 +160,15 @@ test('homepage pagination click latency', async ({ page }) => {
     // Alternate Next/Previous so state stays bounded; both are pagination
     // clicks and count as samples.
     const label = i % 2 === 0 ? 'Next page' : 'Previous page';
-    const ms = await measureClickToRowsChanged(page, {
+    const sample = await measureClickToRowsChanged(page, {
       clickScript: `document.querySelector('[aria-label="${label}"]')`,
-      observeSelector: 'tbody',
+      rowSelector: 'tbody tr',
     });
-    if (i >= WARMUP) samples.push({ ms });
-    await page.waitForTimeout(50);
+    if (i >= WARMUP) samples.push(sample);
+    await page.waitForTimeout(250);
   }
   expect(samples).toHaveLength(REPS - WARMUP);
-  record('e2e/pagination.click-to-rows', samples);
+  record('e2e/pagination', samples);
 });
 
 test('homepage sort header click latency', async ({ page }) => {
@@ -141,15 +181,15 @@ test('homepage sort header click latency', async ({ page }) => {
   const clickScript = `[...document.querySelectorAll('thead th')].find((th) => (th.textContent || '').includes('Name'))`;
   const samples: Sample[] = [];
   for (let i = 0; i < REPS; i++) {
-    const ms = await measureClickToRowsChanged(page, {
+    const sample = await measureClickToRowsChanged(page, {
       clickScript,
-      observeSelector: 'tbody',
+      rowSelector: 'tbody tr',
     });
-    if (i >= WARMUP) samples.push({ ms });
-    await page.waitForTimeout(50);
+    if (i >= WARMUP) samples.push(sample);
+    await page.waitForTimeout(250);
   }
   expect(samples).toHaveLength(REPS - WARMUP);
-  record('e2e/sort.click-to-rows', samples);
+  record('e2e/sort', samples);
 });
 
 test('facets sidebar filter toggle latency', async ({ page }) => {
@@ -165,13 +205,13 @@ test('facets sidebar filter toggle latency', async ({ page }) => {
   for (let i = 0; i < REPS; i++) {
     // Each click toggles the same facet value on/off — add and remove are
     // both filter-change interactions.
-    const ms = await measureClickToRowsChanged(page, {
+    const sample = await measureClickToRowsChanged(page, {
       clickScript,
-      observeSelector: 'tbody',
+      rowSelector: 'tbody tr',
     });
-    if (i >= WARMUP) samples.push({ ms });
-    await page.waitForTimeout(100);
+    if (i >= WARMUP) samples.push(sample);
+    await page.waitForTimeout(250);
   }
   expect(samples).toHaveLength(REPS - WARMUP);
-  record('e2e/facet-toggle.click-to-rows', samples);
+  record('e2e/facet-toggle', samples);
 });

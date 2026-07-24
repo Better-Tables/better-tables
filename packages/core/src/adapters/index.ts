@@ -25,5 +25,10 @@ export {
   type HandleAdapterRequestOptions,
   handleAdapterRequest,
 } from './http-handler';
-export type { AdapterMethod, AdapterRequestBody, AdapterResponseBody } from './http-protocol';
+export {
+  type AdapterMethod,
+  type AdapterRequestBody,
+  type AdapterResponseBody,
+  MAX_FACET_BATCH_SIZE,
+} from './http-protocol';
 export { type MemoryAdapterOptions, memoryAdapter } from './memory-adapter';
