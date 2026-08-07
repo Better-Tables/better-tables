@@ -8,18 +8,24 @@ const COMMIT_ANALYZER_PRESET = 'conventionalcommits';
  * directory semantic-release is invoked from, so each package's
  * release.config.cjs must be run with that package's directory as cwd.
  *
- * @param {{ name: string, tagFormat?: string }} options
+ * Deliberately does NOT override `tagFormat`: semantic-release-monorepo's
+ * `generateNotes`/`success`/`fail` wrapping unconditionally renders release
+ * notes and changelog headings using its own `<name>-v<version>` format
+ * (see its `version-to-git-tag.js`), regardless of what `tagFormat` this
+ * config sets. Overriding `tagFormat` to a different scheme (e.g. the
+ * `<name>@<version>` format the old changesets-based tags used) makes the
+ * actual git tag disagree with the CHANGELOG.md/release-notes heading text.
+ * Using the library's own default for both keeps them consistent.
+ *
+ * @param {{ name: string }} options
  */
-function createReleaseConfig({ name, tagFormat }) {
+function createReleaseConfig({ name }) {
   if (!name) {
     throw new Error('createReleaseConfig requires a package `name`');
   }
 
   return {
     branches: ['main'],
-    // Preserve the tag format used by the previous changesets-based release
-    // workflow (`@scope/pkg@1.2.3`) so tag history stays continuous.
-    tagFormat: tagFormat || `${name}@\${version}`,
     extends: 'semantic-release-monorepo',
     plugins: [
       ['@semantic-release/commit-analyzer', { preset: COMMIT_ANALYZER_PRESET }],
