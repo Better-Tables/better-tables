@@ -33,7 +33,40 @@ response, with URL state sync.
 | Test (one package) | `cd packages/<name> && bun test` | e.g. `cd packages/core && bun test`. |
 | Lint (check) | `cd packages/<name> && bun run lint` | Per-package `biome check .` — read-only. |
 | Lint (root) | `bun run lint` (root) | **Mutates**: `biome check --write --unsafe .` across the whole repo. Don't run this to "just check" — use the per-package command or add `-- --no-write` awareness before running at root. |
-| Changesets | `bun run changeset` (root) | Required for any user-facing change to a published package (see `CONTRIBUTING.md`). |
+| Release (dry run) | `bun run release:dry-run` (root) | Previews what semantic-release would publish for every package, no side effects. |
+
+## Releases
+
+Fully automated via [semantic-release](https://semantic-release.org) — no
+manual version bumps, changelog edits, or `npm publish`.
+
+- **Commit messages must be [Conventional Commits](https://www.conventionalcommits.org/)**
+  (`feat:`, `fix:`, `perf:`, `feat!:`/`BREAKING CHANGE:`, etc.) — this is
+  what drives versioning. Enforced locally by commitlint
+  (`.husky/commit-msg`) and on PRs by `.github/workflows/pr-title-lint.yml`
+  (PR title must be conventional, since a squash-merged PR's title becomes
+  the commit message on `main`).
+- On every push to `main` (after `.github/workflows/test.yml` passes),
+  `.github/workflows/release.yml` runs `scripts/release/run.sh`, which
+  invokes semantic-release once per publishable package directory
+  (`packages/core`, `packages/cli`, `packages/adapters/drizzle`,
+  `packages/adapters/toolkit`), each scoped to only its own directory's
+  commits via `semantic-release-monorepo`
+  (`scripts/release/create-release-config.cjs` is the shared factory each
+  package's `release.config.cjs` calls).
+- Each package release: version bump (in `package.json`), `CHANGELOG.md`
+  update, git tag (`<pkg-name>-v<version>` — `semantic-release-monorepo`'s
+  own default; don't override `tagFormat` per-package, since its
+  `generateNotes` step hardcodes this same format when rendering
+  changelog/release-note headings, and a different `tagFormat` would make
+  the actual tag disagree with that text), npm publish via `bun publish`
+  (resolves `workspace:*` deps to real semver — this is why
+  `@semantic-release/npm` runs with `npmPublish: false`), and a GitHub
+  Release.
+- `@better-tables/ui` and `apps/marketing` are private and never released.
+- No pre-1.0/breaking-change special-casing: standard semver — `feat` →
+  minor, `fix`/`perf` → patch, breaking → major, regardless of current
+  `0.x` version.
 
 ## Test locations
 
