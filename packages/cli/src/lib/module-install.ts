@@ -74,7 +74,7 @@ export function printCopySummary(
   results: CopyResult[],
   categories: Record<string, number>
 ): boolean {
-  const _successful = results.filter((r) => r.success && !r.skipped).length;
+  // const _successful = results.filter((r) => r.success && !r.skipped).length;
   const skipped = results.filter((r) => r.skipped).length;
   const failed = results.filter((r) => !r.success).length;
   if (Object.keys(categories).length === 0) {

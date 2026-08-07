@@ -3,7 +3,7 @@
  * save function — policy-gated, type-coerced, explicit-table writes.
  */
 
-import { describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { betterTables, defineTableRow } from '../src/factory';
 import type { CellEditActionInput } from '../src/lib/cell-edit-core';
 import type { CellWriteTarget, MutationOptions } from '../src/types/adapter';

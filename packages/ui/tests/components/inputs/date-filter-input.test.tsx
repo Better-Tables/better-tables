@@ -47,9 +47,15 @@ describe('DateFilterInput (plan 042 step 1)', () => {
       expect(lastCall?.length).toBe(2);
     });
 
-    const emitted = onChange.mock.calls.at(-1)?.[0] as Date[];
+    const lastCall = onChange.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+
+    const emitted = lastCall?.[0] as Date[];
+
+    expect(emitted).toHaveLength(2);
     expect(emitted[0]).toBeInstanceOf(Date);
     expect(emitted[1]).toBeInstanceOf(Date);
+
     expect(emitted[0]?.getTime()).toBeLessThanOrEqual(emitted[1]?.getTime());
   });
 

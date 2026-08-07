@@ -1,8 +1,8 @@
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { Command } from 'commander';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
-import { getAliasPrefix, getConfig } from '../lib/config';
+import { getConfig } from '../lib/config';
 import { type CopyResult, copyAllFiles } from '../lib/file-operations';
 import {
   isValidRelativeSubpath,
@@ -69,7 +69,7 @@ export function addCommand(): Command {
     }
     const { config, resolvedPaths } = configResult;
 
-    const _componentsBasePath = join(resolvedPaths.components, componentsPath);
+    // const _componentsBasePath = join(resolvedPaths.components, componentsPath);
     let shouldCopy = true;
     if (!skipPrompts) {
       shouldCopy = await confirm('Proceed with copying files?', true);
@@ -96,7 +96,7 @@ export function addCommand(): Command {
     }
 
     const ok = printCopySummary(results, categories);
-    const _aliasPrefix = getAliasPrefix(config);
+    // const _aliasPrefix = getAliasPrefix(config);
     if (moduleNames.includes('actions')) {
     }
     if (moduleNames.includes('export')) {

@@ -4,7 +4,7 @@
  * 403 semantics, and the singular cell-oriented wire shape.
  */
 
-import { describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { type FetchLike, HttpAdapterError, httpAdapter } from '../../src/adapters/http-adapter';
 import { createAdapterRouteHandler, handleAdapterRequest } from '../../src/adapters/http-handler';
 import type {
