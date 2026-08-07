@@ -21,6 +21,14 @@ on:
 permissions:
   contents: read
 
+# Serialize release runs: two overlapping runs could both try to publish
+# the same next version, or push a version-bump commit that the other's
+# checkout doesn't have. Queue instead of canceling — a canceled run could
+# leave a package half-published.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Release changed packages

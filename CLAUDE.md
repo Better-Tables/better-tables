@@ -55,10 +55,14 @@ manual version bumps, changelog edits, or `npm publish`.
   (`scripts/release/create-release-config.cjs` is the shared factory each
   package's `release.config.cjs` calls).
 - Each package release: version bump (in `package.json`), `CHANGELOG.md`
-  update, git tag (`<pkg-name>@<version>`, matching pre-existing tag
-  history), npm publish via `bun publish` (resolves `workspace:*` deps to
-  real semver — this is why `@semantic-release/npm` runs with
-  `npmPublish: false`), and a GitHub Release.
+  update, git tag (`<pkg-name>-v<version>` — `semantic-release-monorepo`'s
+  own default; don't override `tagFormat` per-package, since its
+  `generateNotes` step hardcodes this same format when rendering
+  changelog/release-note headings, and a different `tagFormat` would make
+  the actual tag disagree with that text), npm publish via `bun publish`
+  (resolves `workspace:*` deps to real semver — this is why
+  `@semantic-release/npm` runs with `npmPublish: false`), and a GitHub
+  Release.
 - `@better-tables/ui` and `apps/marketing` are private and never released.
 - No pre-1.0/breaking-change special-casing: standard semver — `feat` →
   minor, `fix`/`perf` → patch, breaking → major, regardless of current
