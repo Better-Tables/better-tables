@@ -33,9 +33,6 @@ updates:
       # Turbo - major updates need careful review
       - dependency-name: "turbo"
         update-types: ["version-update:semver-major"]
-      # Changesets - major updates need careful review
-      - dependency-name: "@changesets/cli"
-        update-types: ["version-update:semver-major"]
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"

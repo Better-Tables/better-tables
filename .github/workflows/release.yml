@@ -1,20 +1,41 @@
 name: Release
 
+# Runs after the Test Suite workflow succeeds on main, then releases each
+# publishable package independently via semantic-release: version is
+# computed from Conventional Commits scoped to that package's directory
+# (packages/core, packages/cli, packages/adapters/drizzle,
+# packages/adapters/toolkit), it's published to npm with `bun publish`
+# (which resolves `workspace:*` deps to real semver), and a GitHub Release
+# + CHANGELOG.md + tag are created to match.
+#
+# @better-tables/ui and apps/marketing are private and never released here.
 on:
-  push:
-    tags:
-      - '@better-tables/*@*'  # Match Changesets tag format
+  workflow_run:
+    workflows:
+      - Test Suite
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
+    name: Release changed packages
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Setup Bun
@@ -22,101 +43,30 @@ jobs:
         with:
           bun-version: '1.3.11'
 
-      - name: Extract tag, package, and version
-        id: tag
-        run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          # Extract package name and version from tag like @better-tables/core@0.5.3
-          if [[ "$TAG_NAME" =~ @better-tables/([^@]+)@(.+) ]]; then
-            PACKAGE_NAME="@better-tables/${BASH_REMATCH[1]}"
-            VERSION="${BASH_REMATCH[2]}"
-          else
-            # Fallback for v* format if needed
-            PACKAGE_NAME="Better Tables"
-            VERSION=${TAG_NAME#v}
-          fi
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "package=$PACKAGE_NAME" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Tag: $TAG_NAME, Package: $PACKAGE_NAME, Version: $VERSION"
-
-      - name: Generate release notes from CHANGELOG
-        id: changelog
-        run: |
-          VERSION="${{ steps.tag.outputs.version }}"
-          PACKAGE_NAME="${{ steps.tag.outputs.package }}"
-          RELEASE_NOTES=""
-          
-          # Function to extract changelog section for a version
-          extract_changelog() {
-            local changelog_file=$1
-            local version=$2
-            local package_name=$3
-            
-            if [ ! -f "$changelog_file" ]; then
-              return
-            fi
-            
-            # Extract section between ## version and next ##
-            local section=$(awk "/^## \[?$version\]?/,/^## /" "$changelog_file" | head -n -1)
-            
-            if [ -n "$section" ]; then
-              if [ -n "$RELEASE_NOTES" ]; then
-                RELEASE_NOTES="$RELEASE_NOTES\n\n"
-              fi
-              RELEASE_NOTES="$RELEASE_NOTES## $package_name\n\n$section"
-            fi
-          }
-          
-          # Determine which CHANGELOG to check based on package name
-          case "$PACKAGE_NAME" in
-            "@better-tables/core")
-              extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
-              ;;
-            "@better-tables/ui")
-              extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
-              ;;
-            "@better-tables/adapters-drizzle")
-              extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
-              ;;
-            "@better-tables/cli")
-              extract_changelog "packages/cli/CHANGELOG.md" "$VERSION" "$PACKAGE_NAME"
-              ;;
-            *)
-              # Check all package CHANGELOG files
-              extract_changelog "packages/core/CHANGELOG.md" "$VERSION" "@better-tables/core"
-              extract_changelog "packages/ui/CHANGELOG.md" "$VERSION" "@better-tables/ui"
-              extract_changelog "packages/adapters/drizzle/CHANGELOG.md" "$VERSION" "@better-tables/adapters-drizzle"
-              extract_changelog "packages/cli/CHANGELOG.md" "$VERSION" "@better-tables/cli"
-              ;;
-          esac
-          
-          # If no changelog found, use default message
-          if [ -z "$RELEASE_NOTES" ]; then
-            RELEASE_NOTES="Release $PACKAGE_NAME $VERSION\n\nSee [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.tag.outputs.tag }}/CHANGELOG.md) for details."
-          fi
-          
-          {
-            echo "body<<EOF"
-            echo -e "$RELEASE_NOTES"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Determine if prerelease
-        id: prerelease
-        run: |
-          VERSION="${{ steps.tag.outputs.version }}"
-          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ${{ steps.tag.outputs.package }} ${{ steps.tag.outputs.version }}
-          body: ${{ steps.changelog.outputs.body }}
-          draft: false
-          prerelease: ${{ steps.prerelease.outputs.prerelease == 'true' }}
+          node-version: '22'
+
+      - name: Install dependencies
+        env:
+          # Skip husky's commit-msg hook install: CI commits (via
+          # @semantic-release/git) shouldn't be linted the way local dev
+          # commits are — commitlint is a developer safety net, not a
+          # pipeline gate here.
+          HUSKY: '0'
+        run: bun install --frozen-lockfile
+
+      - name: Build all packages
+        run: bun run build
+
+      - name: Configure release commit identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Release packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bash scripts/release/run.sh

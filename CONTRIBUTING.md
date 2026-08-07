@@ -25,10 +25,15 @@ MySQL/Postgres integration tests.
 
 - Branch names are short, kebab-case, and describe the change (e.g.
   `fix-join-count-inflation`, `dx-hygiene-sweep`) — no required prefix.
-- Commit messages are imperative-mood, present-tense sentences describing
-  the change (e.g. "Fix identifier escaping to escape-and-wrap
-  atomically", "Add sideEffects false to core and ui"). No conventional-
-  commits prefix convention is enforced.
+- Commit messages **must** follow [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat: ...`, `fix: ...`, `perf: ...`, `feat!: ...` / a `BREAKING CHANGE:`
+  footer for breaking changes, `chore:`/`docs:`/`refactor:`/`test:`/`ci:`
+  for everything else). This is enforced by commitlint on commit
+  (`.husky/commit-msg`) and it's what drives releases — see
+  [Releases](#releases) below. If you squash-merge, the **PR title** must
+  also be a valid Conventional Commit (linted by
+  `.github/workflows/pr-title-lint.yml`), since GitHub uses it as the
+  squashed commit's message on `main`.
 - Prefer one logical change per commit; large or multi-step work should
   read as a sequence of independently-revertable commits (see any
   `plans/*.md` for examples of how work gets broken down).
@@ -36,20 +41,19 @@ MySQL/Postgres integration tests.
   step/commit structure and update `plans/README.md`'s status row when
   you finish, unless told otherwise.
 
-## Changesets
+## Releases
 
-Any user-facing change to a **published** package
+Releases are fully automated by [semantic-release](https://semantic-release.org)
+on merge to `main` — there's no manual versioning step, and nothing to run
+before opening a PR. Each published package
 (`@better-tables/core`, `@better-tables/cli`,
-`@better-tables/adapters-drizzle`) needs a changeset:
-
-```bash
-bun run changeset
-```
-
-Pick the affected package(s) and bump type (patch/minor/major), and write
-a description aimed at consumers — what changed and, for breaking changes,
-what they need to do about it. Changes to `@better-tables/ui` don't need a
-changeset (it's private, distributed via the CLI, not versioned on npm).
+`@better-tables/adapters-drizzle`, `@better-tables/adapters-toolkit`) is
+versioned independently from the Conventional Commits that touched its
+directory: `feat` → minor, `fix`/`perf` → patch, a breaking-change commit
+→ major. `@better-tables/ui` and `apps/marketing` are private and never
+published. See [`CLAUDE.md`](CLAUDE.md#releases) for how the pipeline
+works, and `bun run release:dry-run` to preview what would be released
+without publishing anything.
 
 ## Before opening a PR
 
@@ -58,7 +62,8 @@ changeset (it's private, distributed via the CLI, not versioned on npm).
 - [ ] `cd packages/<pkg> && bun run lint` is clean (don't run the root
       `lint` script to "just check" — it auto-fixes unsafely across the
       whole repo)
-- [ ] A changeset exists if you changed a published package's behavior
+- [ ] Commit messages (and, for squash-merged PRs, the PR title) are valid
+      Conventional Commits
 - [ ] If you added a new package, it's listed in `CLAUDE.md`'s package map
 - [ ] Docs (`README.md`, package `README.md`s) still describe the real,
       shipped behavior — don't let quick-starts drift from what's
