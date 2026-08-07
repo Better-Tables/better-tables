@@ -1,10 +1,24 @@
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
-import type * as React from 'react';
+import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Popover({ ...props }: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />;
+function Popover({ onOpenChange, ...props }: PopoverPrimitive.Root.Props) {
+  const handleOpenChange: NonNullable<PopoverPrimitive.Root.Props['onOpenChange']> =
+    React.useCallback(
+      (open, ...args) => {
+        if (open) {
+          const scrollPosition = { x: window.scrollX, y: window.scrollY };
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: scrollPosition.y, left: scrollPosition.x });
+          });
+        }
+        onOpenChange?.(open, ...args);
+      },
+      [onOpenChange]
+    );
+
+  return <PopoverPrimitive.Root data-slot="popover" onOpenChange={handleOpenChange} {...props} />;
 }
 
 function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
