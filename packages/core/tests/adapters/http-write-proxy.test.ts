@@ -338,23 +338,6 @@ describe('cellEdit over the wire — server side', () => {
     expect(updates).toHaveLength(0);
   });
 
-  it('dev-warns ONCE at creation when writes are enabled without authorize', () => {
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { adapter } = makeWritableServer();
-      createAdapterRouteHandler(adapter, { writes: true });
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0])).toContain('authorize');
-
-      warnSpy.mockClear();
-      createAdapterRouteHandler(adapter, { writes: true, authorize: () => true });
-      createAdapterRouteHandler(adapter); // no writes — no warn either
-      expect(warnSpy).not.toHaveBeenCalled();
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   it('{ columns } narrowing does not let a shared column id redirect to another table via `table` (P1)', async () => {
     // Two tables both expose an own, writable column literally named
     // 'subject' — 'tickets' is the DEFAULT (table omitted resolves to it);

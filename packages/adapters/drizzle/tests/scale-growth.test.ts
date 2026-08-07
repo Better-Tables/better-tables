@@ -125,9 +125,6 @@ describe('DrizzleAdapter — 10k/1k growth ratios (plan 063 Step 3)', () => {
     const t1k = await medianBatchMs(pageFetch(small));
     const t10k = await medianBatchMs(pageFetch(large));
     const ratio = ratioOf(t10k, t1k);
-    console.log(
-      `[scale-growth] page-1 fetchData: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
-    );
 
     // A LIMIT 50 page reads 50 rows regardless of table size; the only
     // size-dependent statement is the parallel `count(*)`, which SQLite
@@ -160,9 +157,6 @@ describe('DrizzleAdapter — 10k/1k growth ratios (plan 063 Step 3)', () => {
     const t1k = await medianBatchMs(filteredFetch(small));
     const t10k = await medianBatchMs(filteredFetch(large));
     const ratio = ratioOf(t10k, t1k);
-    console.log(
-      `[scale-growth] filtered fetchData+count: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
-    );
 
     // The filtered `count(*)` must scan every matching row (no index on
     // status here by design) → linear-ish, ideal ratio ~10×. 15× is the

@@ -585,10 +585,6 @@ export function mapColumnInfoToColumnType(info: ColumnInfo): ColumnType {
     return mapped;
   }
   if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production') {
-    console.warn(
-      `[better-tables] describeColumns: no column-type mapping for '${info.name}' ` +
-        `(dataType '${info.dataType}') — falling back to 'text'.`
-    );
   }
   return 'text';
 }

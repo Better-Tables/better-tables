@@ -133,9 +133,6 @@ describe('DataTransformer — 10k/1k growth ratios (plan 063 Step 3)', () => {
     const t1k = medianBatchMs(() => transformer.transformToNested(flat1k, 'users', columns));
     const t10k = medianBatchMs(() => transformer.transformToNested(flat10k, 'users', columns));
     const ratio = ratioOf(t10k, t1k);
-    console.log(
-      `[transformer-growth batched] flat: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
-    );
 
     expect(ratio).toBeLessThanOrEqual(15);
     expect(t10k).toBeLessThan(2_000);
@@ -150,9 +147,6 @@ describe('DataTransformer — 10k/1k growth ratios (plan 063 Step 3)', () => {
     const t1k = medianBatchMs(() => transformer.transformToNested(fanOut1k, 'users', columns));
     const t10k = medianBatchMs(() => transformer.transformToNested(fanOut10k, 'users', columns));
     const ratio = ratioOf(t10k, t1k);
-    console.log(
-      `[transformer-growth batched] one-to-many: 1k=${t1k.toFixed(3)}ms 10k=${t10k.toFixed(3)}ms ratio=${ratio.toFixed(2)}`
-    );
 
     expect(ratio).toBeLessThanOrEqual(15);
     expect(t10k).toBeLessThan(2_000);

@@ -336,11 +336,10 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
     }
   }
 
-  const warnOnce = useCallback((columnId: string, message: string) => {
+  const warnOnce = useCallback((columnId: string, _message: string) => {
     if (process.env.NODE_ENV === 'production') return;
     if (warnedColumnsRef.current.has(columnId)) return;
     warnedColumnsRef.current.add(columnId);
-    console.warn(`[better-tables] editable column "${columnId}": ${message}`);
   }, []);
 
   /**
@@ -604,9 +603,6 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
 
       if (!editability.editable) {
         if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            `[better-tables] commitEdit on non-editable column "${column.id}": ${editability.reason}`
-          );
         }
         return;
       }
@@ -620,10 +616,6 @@ export function useEditableCells<TData = unknown>(options: UseEditableCellsOptio
         const relatedId = buildPathAccessor(target.relatedIdPath)(row);
         if (relatedId == null) {
           if (process.env.NODE_ENV !== 'production') {
-            console.warn(
-              `[better-tables] commitEdit on "${column.id}": related row id missing at ` +
-                `'${target.relatedIdPath}' — cell is read-only for this row`
-            );
           }
           return;
         }

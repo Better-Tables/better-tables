@@ -1,8 +1,8 @@
-import {  resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { Command } from 'commander';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
-import {  getConfig } from '../lib/config';
+import { getConfig } from '../lib/config';
 import { type CopyResult, copyAllFiles, type UiModuleName } from '../lib/file-operations';
 import {
   isValidRelativeSubpath,

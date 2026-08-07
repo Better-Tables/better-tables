@@ -1,6 +1,5 @@
 import { join, resolve } from 'node:path';
 import { Command } from 'commander';
-import pc from 'picocolors';
 import type { RegisteredCommandName } from '../commands';
 import { getCommandDefinition } from '../lib/command-factory';
 import { getAliasPrefix, getConfig } from '../lib/config';
@@ -53,14 +52,6 @@ export function addCommand(): Command {
 
     // Validate the components path (same rule as init).
     if (!isValidRelativeSubpath(componentsPath)) {
-      console.error(
-        pc.red(
-          `✗ Invalid components path: "${componentsPath}". Path must be a safe relative subpath without path traversal sequences.`
-        )
-      );
-      console.error(
-        pc.dim('  Use a plain relative path instead, e.g. --components-path better-tables-ui')
-      );
       process.exit(1);
     }
 
@@ -70,33 +61,20 @@ export function addCommand(): Command {
       process.exit(1);
     }
 
-    console.log(pc.bold(`\n📦 Adding Better Tables module(s): ${moduleNames.join(', ')}\n`));
-    console.log(`Working directory: ${pc.cyan(cwd)}\n`);
-
     // Resolve project config (shadcn components.json) — same resolution init
     // uses. No shadcn/package re-check: those ran at init.
     const configResult = getConfig(cwd);
     if (!configResult) {
-      console.error(pc.red('✗ Failed to read components.json'));
-      console.error(
-        pc.dim('  Run `bunx better-tables init` first, or check components.json is valid JSON.')
-      );
       process.exit(1);
     }
     const { config, resolvedPaths } = configResult;
 
-    const componentsBasePath = join(resolvedPaths.components, componentsPath);
+    const _componentsBasePath = join(resolvedPaths.components, componentsPath);
     let shouldCopy = true;
     if (!skipPrompts) {
-      console.log(pc.dim('The following directories will be created/updated:'));
-      console.log(pc.dim(`  • ${componentsBasePath}/table/`));
-      console.log(pc.dim(`  • ${componentsBasePath}/filters/`));
-      console.log(pc.dim(`  • ${resolvedPaths.hooks}/`));
-      console.log(pc.dim(`  • ${resolvedPaths.lib}/\n`));
       shouldCopy = await confirm('Proceed with copying files?', true);
     }
     if (!shouldCopy) {
-      console.log(pc.yellow('\nAborted. No files were copied.\n'));
       process.exit(0);
     }
 
@@ -112,40 +90,16 @@ export function addCommand(): Command {
       );
       results = copyResult.results;
       categories = copyResult.categories;
-    } catch (error) {
-      console.error(
-        pc.red(`✗ Failed to copy files: ${error instanceof Error ? error.message : String(error)}`)
-      );
-      console.error(
-        pc.dim('  The bundled UI source may be corrupted — reinstall @better-tables/cli.')
-      );
+    } catch (_error) {
       process.exit(1);
       return;
     }
 
     const ok = printCopySummary(results, categories);
-
-    console.log(pc.bold(pc.green('\n✓ Module(s) added.\n')));
-    const aliasPrefix = getAliasPrefix(config);
+    const _aliasPrefix = getAliasPrefix(config);
     if (moduleNames.includes('actions')) {
-      console.log(pc.dim('Wire the actions toolbar into your table via the slot prop:'));
-      console.log(
-        pc.cyan(
-          `  import { ActionsToolbar } from '${aliasPrefix}components/${componentsPath}/table/actions-toolbar';`
-        )
-      );
-      console.log(pc.cyan('  <BetterTable ... slots={{ actionsToolbar: ActionsToolbar }} />'));
-      console.log('');
     }
     if (moduleNames.includes('export')) {
-      console.log(pc.dim('Wire the export button into your table via the slot prop:'));
-      console.log(
-        pc.cyan(
-          `  import { ExportButton } from '${aliasPrefix}components/${componentsPath}/table/export-button';`
-        )
-      );
-      console.log(pc.cyan('  <BetterTable ... slots={{ toolbarExtra: ExportButton }} />'));
-      console.log('');
     }
 
     if (!ok) {

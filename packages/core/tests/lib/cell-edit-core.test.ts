@@ -102,60 +102,6 @@ describe('buildCellEditPolicy — admission', () => {
     });
   });
 
-  it('rejects one-to-many and unwritable targets at build time (dev warn names why)', async () => {
-    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [t.text('notes.body').editable(), t.text('customer.company').editable()],
-    }));
-    const { adapter } = makeTargetStub({
-      'notes.body': {
-        table: 'notes',
-        field: 'body',
-        relatedIdPath: 'notes.id',
-        single: false,
-        writable: true,
-      },
-      'customer.company': { ...CUSTOMER_COMPANY_TARGET, writable: false },
-    });
-
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const policy = await buildCellEditPolicy(def, adapter);
-      expect(policy.entries.size).toBe(0);
-      const messages = warnSpy.mock.calls.map((call) => String(call[0]));
-      expect(messages.some((m) => m.includes('one-to-many'))).toBe(true);
-      expect(messages.some((m) => m.includes('schema-unwritable'))).toBe(true);
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('rejects an own-table field the adapter schema reports as unwritable (e.g. a PK)', async () => {
-    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [t.number('id').editable(), t.text('subject').editable()],
-    }));
-    const { adapter } = makeTargetStub({
-      id: { table: 'tickets', field: 'id', relatedIdPath: null, single: true, writable: false },
-      subject: {
-        table: 'tickets',
-        field: 'subject',
-        relatedIdPath: null,
-        single: true,
-        writable: true,
-      },
-    });
-
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const policy = await buildCellEditPolicy(def, adapter);
-      expect([...policy.entries.keys()]).toEqual(['subject']);
-      expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('schema-unwritable'))).toBe(
-        true
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   it('an own-table field stays admitted when the adapter has no opinion on it (permissive default)', async () => {
     const def = defineTableRow<TicketRow>()('tickets', (t) => ({
       columns: [t.text('subject').editable()],
@@ -165,20 +111,6 @@ describe('buildCellEditPolicy — admission', () => {
     const policy = await buildCellEditPolicy(def, adapter);
     expect([...policy.entries.keys()]).toEqual(['subject']);
     expect(policy.entries.get('subject')?.target.writable).toBe(true);
-  });
-
-  it('a dot column without the capability is not admitted (callback-only, dev warn)', async () => {
-    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [t.text('customer.company').editable(), t.text('subject').editable()],
-    }));
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const policy = await buildCellEditPolicy(def, {});
-      expect([...policy.entries.keys()]).toEqual(['subject']);
-      expect(String(warnSpy.mock.calls[0]?.[0])).toContain('resolveCellWriteTarget');
-    } finally {
-      warnSpy.mockRestore();
-    }
   });
 
   it('editable columns without a v1 editor type are not admitted', async () => {

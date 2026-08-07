@@ -1,12 +1,6 @@
 import { normalize } from 'node:path';
-import pc from 'picocolors';
 import type { CopyResult } from './file-operations';
-import {
-  isUiModuleName,
-  OPTIONAL_UI_MODULE_NAMES,
-  UI_MODULE_NAMES,
-  type UiModuleName,
-} from './file-operations';
+import { isUiModuleName, OPTIONAL_UI_MODULE_NAMES, type UiModuleName } from './file-operations';
 
 /**
  * Shared install helpers for the `init` and `add` commands (plan 059). Both
@@ -58,8 +52,6 @@ export function isValidRelativeSubpath(path: string): boolean {
 export function resolveModuleNames(names: readonly string[]): UiModuleName[] | null {
   const unknown = names.filter((name) => !isUiModuleName(name));
   if (unknown.length > 0) {
-    console.error(pc.red(`✗ Unknown module(s): ${unknown.join(', ')}`));
-    console.error(pc.dim(`  Available modules: ${UI_MODULE_NAMES.join(', ')}`));
     return null;
   }
   // Dedupe while preserving order.
@@ -82,30 +74,18 @@ export function printCopySummary(
   results: CopyResult[],
   categories: Record<string, number>
 ): boolean {
-  const successful = results.filter((r) => r.success && !r.skipped).length;
+  const _successful = results.filter((r) => r.success && !r.skipped).length;
   const skipped = results.filter((r) => r.skipped).length;
   const failed = results.filter((r) => !r.success).length;
-
-  console.log(pc.bold('\n📁 Files copied:\n'));
-  console.log(pc.green(`  • ${successful} files copied successfully`));
   if (Object.keys(categories).length === 0) {
-    console.log(pc.yellow('  ⚠️  No files were copied. This may indicate:'));
-    console.log(pc.dim('     • UI package source files not found'));
-    console.log(pc.dim('     • Path resolution issue'));
-    console.log(pc.dim('     • All files already exist\n'));
   } else {
-    for (const [category, count] of Object.entries(categories)) {
-      console.log(`  • ${category}: ${pc.green(String(count))} files`);
+    for (const [_category, _count] of Object.entries(categories)) {
     }
-    console.log('');
   }
   if (skipped > 0) {
-    console.log(pc.yellow(`  • ${skipped} files skipped (already exist)`));
   }
   if (failed > 0) {
-    console.error(pc.red(`  • ${failed} files failed to copy`));
-    for (const result of results.filter((r) => !r.success)) {
-      console.error(pc.dim(`    - ${result.path}: ${result.error}`));
+    for (const _result of results.filter((r) => !r.success)) {
     }
   }
   return failed === 0;
@@ -114,13 +94,6 @@ export function printCopySummary(
 /** Print the "available opt-in modules" block used by `init`'s next-steps. */
 export function printAvailableModules(): void {
   if (OPTIONAL_UI_MODULE_NAMES.length === 0) return;
-  console.log(pc.dim('\n  Optional modules (add anytime):'));
-  for (const name of OPTIONAL_UI_MODULE_NAMES) {
-    console.log(
-      pc.dim(
-        `    • ${name} — ${OPTIONAL_MODULE_DESCRIPTIONS[name]}: ` +
-          pc.cyan(`bunx better-tables add ${name}`)
-      )
-    );
+  for (const _name of OPTIONAL_UI_MODULE_NAMES) {
   }
 }

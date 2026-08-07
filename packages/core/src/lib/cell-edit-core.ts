@@ -218,9 +218,8 @@ const POLICY_EDITABLE_TYPES = new Set<ColumnType>([
   'custom',
 ]);
 
-function devWarn(message: string): void {
+function devWarn(_message: string): void {
   if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') return;
-  console.warn(message);
 }
 
 /** The one adapter member the policy build needs (structural). */

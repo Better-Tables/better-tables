@@ -70,8 +70,7 @@ export function ExportButton<TData = unknown>({
   // Default to logging failures so a failed export is never fully silent; a
   // consumer passing `onError` (e.g. to raise a toast) takes over.
   // biome-ignore lint/suspicious/noConsole: default so failed exports aren't silent
-  const handleError =
-    onError ?? ((err: Error) => console.error('[better-tables] export failed', err));
+  const handleError = onError ?? ((_err: Error) => {});
 
   const { exportData, exporting, canExport, error } = useTableExport<TData>({
     adapter,

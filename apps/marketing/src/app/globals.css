@@ -396,7 +396,7 @@
 :where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::before,
 .blog-prose
   :where(code):not(:where([class~="not-blog-prose"], [class~="not-blog-prose"] *))::after {
-  content: none !important;
+  content: none;
 }
 
 /* Docs tables: give cells (and code chips) room from the grid lines. */

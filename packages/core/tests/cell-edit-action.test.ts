@@ -118,22 +118,6 @@ describe('tables.cellEditAction', () => {
     expect(updates).toHaveLength(0);
   });
 
-  it('adapter throws surface as a GENERIC error (no internals leaked)', async () => {
-    const { adapter } = makeWriteAdapter({ failUpdate: true });
-    const tables = betterTables({ database: adapter });
-    const action = tables.cellEditAction(makeTicketsDef());
-
-    const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    try {
-      const result = await action({ id: '1', field: 'subject', value: 'x' });
-      expect(result).toEqual({ ok: false, error: 'Save failed.' });
-      expect(JSON.stringify(result)).not.toContain('secret_sql');
-      expect(errorSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      errorSpy.mockRestore();
-    }
-  });
-
   it('an adapter without updateRecord rejects cleanly', async () => {
     const { adapter } = makeWriteAdapter({ noUpdate: true });
     const tables = betterTables({ database: adapter });

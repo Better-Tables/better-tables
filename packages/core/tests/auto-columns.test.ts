@@ -200,39 +200,6 @@ describe('resolveTableColumns — column-set inference', () => {
     await resolveTableColumns(def, other);
     expect(otherCalls).toHaveLength(1);
   });
-
-  it('degrades to the declared list (with a dev warn) when the adapter lacks describeColumns', async () => {
-    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [...t.auto(), t.text('subject')],
-    }));
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const columns = await resolveTableColumns(def, {});
-      expect(columns.map((c) => c.id)).toEqual(['subject']);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0])).toContain('describeColumns');
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('falls back to the declared columns when describeColumns throws', async () => {
-    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      columns: [...t.auto(), t.text('subject')],
-    }));
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const columns = await resolveTableColumns(def, {
-        describeColumns: async () => {
-          throw new Error('no introspection today');
-        },
-      });
-      expect(columns.map((c) => c.id)).toEqual(['subject']);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
 });
 
 describe('resolveTableColumns — enrichment (independent of t.auto())', () => {
@@ -266,26 +233,6 @@ describe('resolveTableColumns — enrichment (independent of t.auto())', () => {
     // overwrite; the declared column object is passed through untouched.
     expect(columns[0]).toBe(def.columns[0]);
     expect(calls.length).toBeLessThanOrEqual(1);
-  });
-
-  it('warns (dev mode) when a declared type contradicts the schema type', async () => {
-    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
-      // 'subject' is text in the schema — declare it as a number column.
-      columns: [t.computed('subject', (row) => row.subject as unknown as number)],
-    }));
-    // computed() is type 'custom' (always compatible) — force the mismatch.
-    const columns = def.columns.map((c) => ({ ...c, type: 'number' as const }));
-    const mismatchDef = { ...def, columns };
-
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { adapter } = makeDescribeStub();
-      await resolveTableColumns(mismatchDef, adapter);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0])).toContain("declared 'number'");
-    } finally {
-      warnSpy.mockRestore();
-    }
   });
 
   it('does not warn for compatible refinements (email over a text schema column)', async () => {

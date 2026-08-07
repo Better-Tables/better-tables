@@ -416,11 +416,6 @@ export function createAdapterRouteHandler<TData = unknown>(
     !routeOptions.authorize &&
     (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production')
   ) {
-    console.warn(
-      '[better-tables] createAdapterRouteHandler: writes are enabled without an `authorize` ' +
-        'callback — every client of this endpoint can write. Add authorize (and consider ' +
-        'writes: { columns } narrowing).'
-    );
   }
 
   return async (request: Request): Promise<Response> => {

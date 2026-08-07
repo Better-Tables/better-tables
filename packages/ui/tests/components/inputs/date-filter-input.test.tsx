@@ -50,7 +50,7 @@ describe('DateFilterInput (plan 042 step 1)', () => {
     const emitted = onChange.mock.calls.at(-1)?.[0] as Date[];
     expect(emitted[0]).toBeInstanceOf(Date);
     expect(emitted[1]).toBeInstanceOf(Date);
-    expect(emitted[0]!.getTime()).toBeLessThanOrEqual(emitted[1]!.getTime());
+    expect(emitted[0]?.getTime()).toBeLessThanOrEqual(emitted[1]?.getTime());
   });
 
   it('isToday renders without date controls and emits no values', () => {

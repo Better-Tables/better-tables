@@ -248,9 +248,7 @@ export function betterTables<TAdapter extends object>(
           { table: check.target.table }
         );
         return { ok: true, data };
-      } catch (error) {
-        // Never leak adapter/DB internals across the action boundary.
-        console.error('[better-tables] cellEditAction failed:', error);
+      } catch (_error) {
         return { ok: false, error: 'Save failed.' };
       }
     };
@@ -406,9 +404,8 @@ export function defineTableRow<TRow>(): DefineTableRowCurried<TRow> {
 // ============================================================================
 
 /** Dev-mode warn — advisory diagnostics only, silenced in production builds. */
-function devWarn(message: string): void {
+function devWarn(_message: string): void {
   if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') return;
-  console.warn(message);
 }
 
 /**

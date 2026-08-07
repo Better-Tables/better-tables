@@ -1065,12 +1065,11 @@ function BetterTableInner<TData = unknown>({
   // group node until the mutation lands.
   const warnedFilterTreeIdRef = useRef<string | null>(null);
   const warnFilterTreeDropped = useCallback(
-    (message: string) => {
+    (_message: string) => {
       if (process.env.NODE_ENV === 'production') return;
       if (warnedFilterTreeIdRef.current === id) return;
       if (!isFilterGroupNode(store.getState().manager.getFilterNode())) return;
       warnedFilterTreeIdRef.current = id;
-      console.warn(`[better-tables] table "${id}": ${message}`);
     },
     [id, store]
   );
@@ -1088,12 +1087,6 @@ function BetterTableInner<TData = unknown>({
     if (!hasActions || hasActionsSlot) return;
     if (warnedMissingActionsSlotIdRef.current === id) return;
     warnedMissingActionsSlotIdRef.current = id;
-    console.warn(
-      `[better-tables] table "${id}": \`actions\` were provided but no ` +
-        '`slots.actionsToolbar` is set, so the bulk-actions toolbar will not ' +
-        'render. Install the actions module (`bunx better-tables add actions`) ' +
-        'and pass `slots={{ actionsToolbar: ActionsToolbar }}`.'
-    );
   }, [id, hasActions, hasActionsSlot]);
 
   // Handle filter changes - just update store.
