@@ -1,3 +1,5 @@
+## [@better-tables/adapters-drizzle-v0.6.0](https://github.com/Better-Tables/better-tables/compare/%40better-tables%2Fadapters-drizzle-v0.5.31...%40better-tables%2Fadapters-drizzle-v0.6.0) (2026-08-08)
+
 # @better-tables/adapters-drizzle
 
 ## 0.5.31
