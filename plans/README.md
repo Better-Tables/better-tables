@@ -82,6 +82,19 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 |------|------|------------|--------|
 | [063](063-performance-test-harness.md) | Perf test harness: interaction/query-count gates, growth-ratio gates, mitata trend benches, type-gate automation, Playwright latency baselines | 042/043 helpers (done) | **DONE** (2026-07-23) — all 7 steps + the four lag fixes on the plan branch; baselines in [design/perf-baselines.md](design/perf-baselines.md). The one FINDING (empty-filter add cost a navigation) is now FIXED via `getEffectiveFilters` |
 
+### Wave G — MSSQL / metadata-driven admin exploration (2026-08-08)
+
+Originated from an architecture-evaluation request: can Better Tables
+become a generic, metadata-driven admin UI for SQL Server (browse/filter/
+sort/edit/insert/delete across hundreds of tables with no per-table React
+code)? Verdict: yes, without Core changes — see reasoning inlined in both
+plans' "Current state" sections.
+
+| Plan | What | Depends on | Status |
+|------|------|------------|--------|
+| [064](064-mssql-adapter.md) | `@better-tables/adapters-mssql` — schema-introspection-driven SQL Server adapter (sys.tables/sys.columns/sys.foreign_keys), no ORM underneath (Drizzle has no MSSQL dialect) | none hard; folds into 061's conformance suite if it lands first | **TODO** (P2) — maintainer sign-off recommended before Phase 0 (driver + CI service container choice) |
+| [065](065-metadata-admin-experience.md) | Table navigator, FK-click navigation, generic create/edit record form, per-table config overrides, PLUS a formalized language-agnostic wire-protocol doc + conformance suite for non-JS backends (e.g. an ASP.NET service in front of the DB that doesn't want to hand the frontend a DB connection string) | none hard on 064 — adapter-agnostic; Phase 1 (wire protocol doc) can land standalone immediately | **TODO** (P2) — Phase 1 is low-risk/high-value and doesn't need the rest scheduled first |
+
 ---
 
 ## Order notes (open plans only)
@@ -97,6 +110,14 @@ homepage `postsCount` dogfood. Design record: `plans/design/derived-columns.md`.
 - Capability asymmetry (from 060 design): Prisma can sort-by-count but
   not filter-by-count; Kysely/Drizzle do both — declare honestly in
   `AdapterMeta.capabilities.aggregates`.
+- **065 Phase 1** anytime, independent of everything else — documents the
+  existing (frozen, published) wire protocol; zero code changes.
+- **064** if picked up, treat Phase 0's driver/CI-service choice as a
+  sign-off point, not a unilateral pick — heavier CI cost than the
+  SQLite-only default path.
+- **065 Phases 2-6** benefit from 064 landing first only as a second real
+  adapter to validate `foreignKeyTarget`/`listTables?` against, not as a
+  hard dependency — Drizzle alone is enough to build and ship them.
 
 Standing product decisions that still constrain open work:
 
@@ -105,6 +126,11 @@ Standing product decisions that still constrain open work:
 - Core tier = “plugins”; copied UI tier = “modules” (059).
 - Aggregates: declare per-operation capability gaps honestly in
   `AdapterMeta` (061/062).
+- Changesets are retired — this repo runs semantic-release off
+  Conventional Commit messages (see `CLAUDE.md`'s Releases section).
+  Plans written before this migration (035, 061, and others) may still
+  reference `.changeset/*.md` — that guidance is stale; do not create
+  changeset files when executing any open plan, including old ones.
 
 Historical DX decisions for editable cells, auto columns, and direct save
 live in plans 053–055 — not repeated here.
