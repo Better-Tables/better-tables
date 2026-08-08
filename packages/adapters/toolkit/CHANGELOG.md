@@ -1,0 +1,1 @@
+## [@better-tables/adapters-toolkit-v0.2.0](https://github.com/Better-Tables/better-tables/compare/%40better-tables%2Fadapters-toolkit-v0.1.0...%40better-tables%2Fadapters-toolkit-v0.2.0) (2026-08-08)

@@ -1,6 +1,6 @@
 {
   "name": "@better-tables/adapters-toolkit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ORM-agnostic adapter toolkit for Better Tables - shared primitives for building table adapters",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
