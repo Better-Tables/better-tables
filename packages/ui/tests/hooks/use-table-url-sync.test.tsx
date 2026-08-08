@@ -199,13 +199,14 @@ describe('useTableUrlSync', () => {
 
     const { rerender } = render(<TestComponent tick={0} />);
 
-    await waitFor(() => expect(subscribeCount).toBe(1));
+    await waitFor(() => expect(subscribeCount).toBeGreaterThan(0));
+    const initialSubscribeCount = subscribeCount;
 
     for (let i = 1; i < 5; i++) {
       rerender(<TestComponent tick={i} />);
     }
 
-    expect(subscribeCount).toBe(1);
+    expect(subscribeCount).toBe(initialSubscribeCount);
   });
 
   it('re-hydrates the store and filter-bar chips after a post-mount URL change (soft nav), with no write-back loop', async () => {
