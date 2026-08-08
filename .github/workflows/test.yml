@@ -576,6 +576,12 @@ jobs:
           retention-days: 90
 
       - name: Store trend + alert on regression
+        # Non-blocking per the job name/comment above, but the action itself
+        # can hard-fail (e.g. no gh-pages branch yet to fetch history from
+        # on the very first run) without continue-on-error — which would
+        # fail this job, fail Test Suite, and block Release's workflow_run
+        # gate on an unrelated perf-tracking step.
+        continue-on-error: true
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'customSmallerIsBetter'
