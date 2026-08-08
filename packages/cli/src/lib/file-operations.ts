@@ -224,6 +224,10 @@ interface FileSlot {
   dest: (file: string, componentsBasePath: string, resolvedPaths: ResolvedPaths) => string;
 }
 
+function toPosixPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 // destPath is a real filesystem path (see copyAllFiles below), but it's also
 // displayed to users and asserted on in tests — Node's fs APIs accept `/` as
 // a separator on Windows too, so build it with `posix.join` to keep it
@@ -242,12 +246,12 @@ const FILE_SLOTS = {
   hooks: {
     category: 'hooks',
     source: (file: string) => `hooks/${file}`,
-    dest: (file, _base, paths) => posix.join(paths.hooks, file),
+    dest: (file, _base, paths) => posix.join(toPosixPath(paths.hooks), file),
   },
   lib: {
     category: 'lib',
     source: (file: string) => `lib/${file}`,
-    dest: (file, _base, paths) => posix.join(paths.lib, file),
+    dest: (file, _base, paths) => posix.join(toPosixPath(paths.lib), file),
   },
 } satisfies Record<string, FileSlot & { source: (file: string) => string }>;
 
@@ -302,7 +306,10 @@ export function generateFileMappings(
   moduleNames: readonly UiModuleName[] = UI_MODULE_NAMES
 ): FileMapping[] {
   const mappings: FileMapping[] = [];
-  const componentsBasePath = posix.join(resolvedPaths.components, componentsOutputPath);
+  const componentsBasePath = posix.join(
+    toPosixPath(resolvedPaths.components),
+    componentsOutputPath
+  );
   for (const moduleName of moduleNames) {
     const module = UI_MODULES[moduleName];
     if (!module) continue;

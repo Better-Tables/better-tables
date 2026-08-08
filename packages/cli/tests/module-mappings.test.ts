@@ -52,6 +52,22 @@ describe('UI module mappings', () => {
     }
   });
 
+  it('normalizes mixed-separator base paths to POSIX form', () => {
+    const windowsPaths: ResolvedPaths = {
+      components: 'C:\\proj\\src\\components',
+      utils: 'C:\\proj\\src\\lib\\utils',
+      ui: 'C:\\proj\\src\\components\\ui',
+      lib: 'C:\\proj\\src\\lib',
+      hooks: 'C:\\proj\\src\\hooks',
+    };
+
+    const mappings = generateFileMappings(windowsPaths, 'better-tables-ui', ['actions']);
+    for (const m of mappings) {
+      expect(m.destPath).not.toContain('\\');
+      expect(m.destPath).toContain('C:/proj/src/components/better-tables-ui/table/');
+    }
+  });
+
   it('every module is disjoint and their union is the full source set', () => {
     const core = new Set(getModuleSourceFilePaths('core'));
     const actions = getModuleSourceFilePaths('actions');
