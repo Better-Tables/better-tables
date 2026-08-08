@@ -31,13 +31,18 @@ function createReleaseConfig({ name }) {
       ['@semantic-release/commit-analyzer', { preset: COMMIT_ANALYZER_PRESET }],
       ['@semantic-release/release-notes-generator', { preset: COMMIT_ANALYZER_PRESET }],
       '@semantic-release/changelog',
-      // Only bump package.json's version field here; the actual publish is
-      // done via `bun publish` below so bun can resolve `workspace:*"`
-      // dependency ranges to real semver before the tarball is packed.
-      ['@semantic-release/npm', { npmPublish: false }],
       [
         '@semantic-release/exec',
         {
+          // Bump package.json's version field via a plain JSON read/write
+          // (bump-version.cjs) rather than `@semantic-release/npm`'s
+          // `prepare` step, which shells out to the real `npm` CLI — `npm`
+          // can't parse this repo's Bun workspace-catalog dependency specs
+          // ("typescript": "catalog:", etc.) and fails with
+          // EUNSUPPORTEDPROTOCOL. The actual publish is done via
+          // `bun publish` below, which does understand `catalog:` and
+          // `workspace:*` and resolves them to real semver before packing.
+          prepareCmd: `node "$(git rev-parse --show-toplevel)/scripts/release/bump-version.cjs" \${nextRelease.version}`,
           publishCmd: 'bun publish --access public',
         },
       ],
