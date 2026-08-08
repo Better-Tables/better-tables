@@ -29,7 +29,7 @@
       "recommended": true,
       "suspicious": {
         "noExplicitAny": "error",
-        "noConsole": "off",
+        "noConsole": "warn",
         "noDoubleEquals": "error"
       },
       "style": {
