@@ -137,18 +137,6 @@ live in plans 053–055 — not repeated here.
 
 ---
 
-## Pre-publish runbook (0.6)
-
-1. Follow the maintainer runbook in `MIGRATION.md` (restore the file onto
-   `main` first if absent).
-2. Toolkit version: if `package.json` says `0.1.0` *and* a minor changeset
-   exists, `changeset version` publishes `0.2.0`. Set `0.0.0` pre-release
-   if you want `0.1.0` as the first published version.
-3. One changeset train — do not partially publish.
-4. Script name is `release` (not `changeset:release` — fixed in 039).
-
----
-
 ## Ops notes
 
 - Root `lint` **mutates** (`biome check --write --unsafe .`). Check-only:

@@ -6647,8 +6647,6 @@ The root `package.json` contains scripts managed by Turbo to run tasks across th
 | `format` | Formats all code using Biome. |
 | `lint` | Checks for linting errors using Biome. |
 | `lint:fix` | Fixes linting errors automatically. |
-| `changeset` | Creates a new changeset for versioning. |
-| `release` | Builds packages and publishes them based on changesets. |
 
 Sources: [package.json:18-27]()
 
