@@ -1,3 +1,5 @@
+## [@better-tables/core-v0.6.0](https://github.com/Better-Tables/better-tables/compare/%40better-tables%2Fcore-v0.5.6...%40better-tables%2Fcore-v0.6.0) (2026-08-08)
+
 # @better-tables/core
 
 ## 0.5.6
