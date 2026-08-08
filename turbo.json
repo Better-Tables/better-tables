@@ -9,22 +9,12 @@
     "test": {
       "dependsOn": ["build"],
       "outputs": [],
-      "inputs": [
-        "src/**/*.tsx",
-        "src/**/*.ts",
-        "tests/**/*.ts",
-        "tests/**/*.tsx"
-      ]
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "tests/**/*.ts", "tests/**/*.tsx"]
     },
     "@better-tables/site#test": {
       "dependsOn": [],
       "outputs": [],
-      "inputs": [
-        "src/**/*.tsx",
-        "src/**/*.ts",
-        "tests/**/*.ts",
-        "tests/**/*.tsx"
-      ]
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "tests/**/*.ts", "tests/**/*.tsx"]
     },
     "typecheck": {
       "dependsOn": ["build", "^build"],

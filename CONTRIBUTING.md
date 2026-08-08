@@ -49,8 +49,12 @@ before opening a PR. Each published package
 (`@better-tables/core`, `@better-tables/cli`,
 `@better-tables/adapters-drizzle`, `@better-tables/adapters-toolkit`) is
 versioned independently from the Conventional Commits that touched its
-directory: `feat` → minor, `fix`/`perf` → patch, a breaking-change commit
-→ major. `@better-tables/ui` and `apps/marketing` are private and never
+directory: 
+- `feat` → minor,
+- `fix`/`perf` → patch,
+- `major`→ a breaking-change commit. 
+
+`@better-tables/ui` and `apps/marketing` are private and never
 published. See [`CLAUDE.md`](CLAUDE.md#releases) for how the pipeline
 works, and `bun run release:dry-run` to preview what would be released
 without publishing anything.

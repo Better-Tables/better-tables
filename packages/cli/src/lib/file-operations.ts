@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ResolvedPaths, ShadcnConfig } from './config';
 import { getAliasPrefix } from './config';
@@ -26,6 +26,22 @@ export interface CopyResult {
 }
 
 let cachedUiSourceRoot: string | null = null;
+let forceMissingBundledRootForTests = false;
+
+/**
+ * Simulates the bundled `ui-src` directory being absent (the fallback-to-
+ * workspace path), without touching the real directory on disk. Tests used
+ * to rename the actual `ui-src` folder to hide it, but that made them flaky
+ * on Windows — the OS can hold a brief directory handle open (editor file
+ * watchers, AV scanning) that turns the rename into a hard, non-transient
+ * EPERM/EBUSY for the life of the test process — and a crash mid-test could
+ * leave the real package directory renamed.
+ *
+ * @internal Exported for tests only.
+ */
+export function setForceMissingBundledRootForTests(value: boolean): void {
+  forceMissingBundledRootForTests = value;
+}
 
 function findCliPackageRoot(startDir: string): string {
   let dir = startDir;
@@ -61,7 +77,7 @@ export function resolveUiSourceRoot(): string {
   const startDir = dirname(fileURLToPath(import.meta.url));
   const pkgRoot = findCliPackageRoot(startDir);
   const bundled = join(pkgRoot, 'ui-src');
-  if (existsSync(bundled)) {
+  if (!forceMissingBundledRootForTests && existsSync(bundled)) {
     cachedUiSourceRoot = bundled;
     return bundled;
   }
@@ -208,26 +224,34 @@ interface FileSlot {
   dest: (file: string, componentsBasePath: string, resolvedPaths: ResolvedPaths) => string;
 }
 
+function toPosixPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+// destPath is a real filesystem path (see copyAllFiles below), but it's also
+// displayed to users and asserted on in tests — Node's fs APIs accept `/` as
+// a separator on Windows too, so build it with `posix.join` to keep it
+// consistent across platforms instead of leaking OS-native backslashes.
 const FILE_SLOTS = {
   table: {
     category: 'table',
     source: (file: string) => `components/table/${file}`,
-    dest: (file, base) => join(base, 'table', file),
+    dest: (file, base) => posix.join(base, 'table', file),
   },
   filters: {
     category: 'filters',
     source: (file: string) => `components/filters/${file}`,
-    dest: (file, base) => join(base, 'filters', file),
+    dest: (file, base) => posix.join(base, 'filters', file),
   },
   hooks: {
     category: 'hooks',
     source: (file: string) => `hooks/${file}`,
-    dest: (file, _base, paths) => join(paths.hooks, file),
+    dest: (file, _base, paths) => posix.join(toPosixPath(paths.hooks), file),
   },
   lib: {
     category: 'lib',
     source: (file: string) => `lib/${file}`,
-    dest: (file, _base, paths) => join(paths.lib, file),
+    dest: (file, _base, paths) => posix.join(toPosixPath(paths.lib), file),
   },
 } satisfies Record<string, FileSlot & { source: (file: string) => string }>;
 
@@ -282,7 +306,10 @@ export function generateFileMappings(
   moduleNames: readonly UiModuleName[] = UI_MODULE_NAMES
 ): FileMapping[] {
   const mappings: FileMapping[] = [];
-  const componentsBasePath = join(resolvedPaths.components, componentsOutputPath);
+  const componentsBasePath = posix.join(
+    toPosixPath(resolvedPaths.components),
+    componentsOutputPath
+  );
   for (const moduleName of moduleNames) {
     const module = UI_MODULES[moduleName];
     if (!module) continue;
