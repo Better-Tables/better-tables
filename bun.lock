@@ -77,7 +77,7 @@
     },
     "packages/adapters/drizzle": {
       "name": "@better-tables/adapters-drizzle",
-      "version": "0.5.31",
+      "version": "0.6.0",
       "dependencies": {
         "@better-tables/adapters-toolkit": "workspace:*",
       },
@@ -112,7 +112,7 @@
     },
     "packages/adapters/toolkit": {
       "name": "@better-tables/adapters-toolkit",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "devDependencies": {
         "@better-tables/core": "workspace:*",
         "drizzle-orm": "catalog:",
@@ -126,7 +126,7 @@
     },
     "packages/cli": {
       "name": "@better-tables/cli",
-      "version": "0.1.5",
+      "version": "0.2.0",
       "bin": {
         "better-tables": "./dist/cli.mjs",
       },
@@ -144,7 +144,7 @@
     },
     "packages/core": {
       "name": "@better-tables/core",
-      "version": "0.5.6",
+      "version": "0.6.0",
       "dependencies": {
         "@date-fns/tz": "catalog:",
         "date-fns": "catalog:",

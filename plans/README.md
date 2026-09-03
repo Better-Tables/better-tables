@@ -93,7 +93,7 @@ plans' "Current state" sections.
 | Plan | What | Depends on | Status |
 |------|------|------------|--------|
 | [064](064-mssql-adapter.md) | `@better-tables/adapters-mssql` — schema-introspection-driven SQL Server adapter (sys.tables/sys.columns/sys.foreign_keys), no ORM underneath (Drizzle has no MSSQL dialect) | none hard; folds into 061's conformance suite if it lands first | **TODO** (P2) — maintainer sign-off recommended before Phase 0 (driver + CI service container choice) |
-| [065](065-metadata-admin-experience.md) | Table navigator, FK-click navigation, generic create/edit record form, per-table config overrides, PLUS a formalized language-agnostic wire-protocol doc + conformance suite for non-JS backends (e.g. an ASP.NET service in front of the DB that doesn't want to hand the frontend a DB connection string) | none hard on 064 — adapter-agnostic; Phase 1 (wire protocol doc) can land standalone immediately | **TODO** (P2) — Phase 1 is low-risk/high-value and doesn't need the rest scheduled first |
+| [065](065-metadata-admin-experience.md) | Table navigator, FK-click navigation, generic create/edit record form, per-table config overrides, PLUS a formalized language-agnostic wire-protocol doc + conformance suite for non-JS backends (e.g. an ASP.NET service in front of the DB that doesn't want to hand the frontend a DB connection string) | none hard on 064 — adapter-agnostic; Phase 1 (wire protocol doc) can land standalone immediately | Phase 1 **DONE** (2026-09-03): `packages/core/docs/ADAPTER_WIRE_PROTOCOL.md` + `wire-protocol-conformance.test.ts` (`WIRE_PROTOCOL_TEST_URL`-parameterized), linked from `packages/core/README.md`. Phases 2-7 **TODO** (P2) |
 
 ---
 
