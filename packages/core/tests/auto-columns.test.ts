@@ -306,3 +306,77 @@ describe('resolveTableColumns — enrichment (independent of t.auto())', () => {
     }
   });
 });
+
+describe('resolveTableColumns — foreignKeyTarget (plan 065 Phase 2/3)', () => {
+  const SPECS_WITH_FK: InferredColumnSpec[] = [
+    ...TICKET_SPECS,
+    {
+      field: 'customerId',
+      columnType: 'number',
+      label: 'Customer Id',
+      nullable: false,
+      primaryKey: false,
+      foreignKey: true,
+      foreignKeyTarget: { table: 'customers', field: 'id' },
+      writable: true,
+    },
+  ];
+
+  it('inferred (t.auto()) columns carry foreignKeyTarget straight through', async () => {
+    const def = defineTableRow<TicketRow>()('tickets');
+    const { adapter } = makeDescribeStub(SPECS_WITH_FK);
+
+    const columns = await resolveTableColumns(def, adapter);
+    const customerId = columns.find((c) => c.id === 'customerId');
+    expect(customerId?.foreignKeyTarget).toEqual({ table: 'customers', field: 'id' });
+    // A column with no FK metadata stays without the field entirely (not
+    // `undefined` — exactOptionalPropertyTypes discipline).
+    expect(columns.find((c) => c.id === 'subject')?.foreignKeyTarget).toBeUndefined();
+  });
+
+  it('enriches an explicit column with foreignKeyTarget when resolution runs for another reason', async () => {
+    // `status` (an option column with no declared options) is the gap that
+    // forces resolution to run at all; `customerId` piggybacks on that same
+    // pass purely for foreignKeyTarget enrichment.
+    const def = defineTableRow<TicketRow & { customerId: number }>()('tickets', (t) => ({
+      columns: [t.option('status'), t.number('customerId')],
+    }));
+    const { adapter } = makeDescribeStub(SPECS_WITH_FK);
+
+    const columns = await resolveTableColumns(def, adapter);
+    expect(columns.find((c) => c.id === 'customerId')?.foreignKeyTarget).toEqual({
+      table: 'customers',
+      field: 'id',
+    });
+  });
+
+  it('an explicitly declared foreignKeyTarget always wins over the schema-derived one', async () => {
+    const def = defineTableRow<TicketRow & { customerId: number }>()('tickets', (t) => ({
+      columns: [
+        t.option('status'),
+        {
+          ...t.number('customerId').build(),
+          foreignKeyTarget: { table: 'accounts', field: 'uuid' },
+        },
+      ],
+    }));
+    const { adapter } = makeDescribeStub(SPECS_WITH_FK);
+
+    const columns = await resolveTableColumns(def, adapter);
+    expect(columns.find((c) => c.id === 'customerId')?.foreignKeyTarget).toEqual({
+      table: 'accounts',
+      field: 'uuid',
+    });
+  });
+
+  it('a purely-declared table with no enrichable gap at all skips resolution — foreignKeyTarget stays absent', () => {
+    const def = defineTableRow<TicketRow & { customerId: number }>()('tickets', (t) => ({
+      columns: [
+        t.text('subject'),
+        t.option('status').options([{ value: 'open', label: 'Open' }]),
+        t.number('customerId'),
+      ],
+    }));
+    expect(tableNeedsColumnResolution(def)).toBe(false);
+  });
+});
