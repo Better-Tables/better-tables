@@ -63,6 +63,15 @@ export interface RecordFormDialogProps<TData = unknown> {
   getRowId?: (row: TData) => string;
   /** Adapter write methods — only the one `mode` needs is ever called. */
   adapter: Pick<TableAdapter<TData>, 'createRecord' | 'updateRecord'>;
+  /**
+   * Explicit mutation target — forwarded as `{ table }` to `createRecord`/
+   * `updateRecord`. REQUIRED for a multi-table adapter (e.g. `<TableNavigator>`,
+   * plan 065 Phase 6): without it, a multi-table adapter has no way to know
+   * which table this dialog is editing and either throws on ambiguity or
+   * silently falls back to some `defaultMutationTable`. Single-table
+   * adapters/schemas can omit it.
+   */
+  table?: string;
   /** Defaults to "Create record" / "Edit record" based on `mode`. */
   title?: string;
   description?: string;
@@ -88,6 +97,7 @@ export function RecordFormDialog<TData = unknown>({
   row,
   getRowId = defaultGetRowId,
   adapter,
+  table,
   title,
   description,
   onSuccess,
@@ -134,12 +144,18 @@ export function RecordFormDialog<TData = unknown>({
         writableFields.map((c) => [c.id, formData[c.id]])
       ) as Partial<TData>;
 
+      // Only pass `options` at all when `table` is actually set — an
+      // explicit `undefined` second argument is a different call shape than
+      // omitting it entirely (matters for adapters that branch on arity).
       let result: TData;
       if (mode === 'create') {
         if (!adapter.createRecord) {
           throw new Error('This adapter does not support createRecord.');
         }
-        result = await adapter.createRecord(payload);
+        result =
+          table !== undefined
+            ? await adapter.createRecord(payload, { table })
+            : await adapter.createRecord(payload);
       } else {
         if (!adapter.updateRecord) {
           throw new Error('This adapter does not support updateRecord.');
@@ -147,7 +163,10 @@ export function RecordFormDialog<TData = unknown>({
         if (row == null) {
           throw new Error('<RecordFormDialog>: mode "edit" requires a `row`.');
         }
-        result = await adapter.updateRecord(getRowId(row), payload);
+        result =
+          table !== undefined
+            ? await adapter.updateRecord(getRowId(row), payload, { table })
+            : await adapter.updateRecord(getRowId(row), payload);
       }
       onSuccess?.(result);
       onOpenChange(false);
