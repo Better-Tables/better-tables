@@ -125,6 +125,19 @@ thousands of queries).
 Response `result` is an array of column descriptions — see the response
 section below for the shape.
 
+### `listTables` — table catalog (plan 065)
+
+```json
+{ "method": "listTables" }
+```
+
+No fields at all — always the whole catalog. Response `result` is an array
+of `{ table, label, rowCountEstimate? }` entries, one per table the
+endpoint can serve; `rowCountEstimate` is a display hint only (e.g. a
+sidebar badge), never a guarantee of exactness — a server may omit it
+rather than pay for a `COUNT(*)` on every table. Powers a "browse any
+table" admin UI (`<TableNavigator>`) with no per-table code.
+
 ### `resolveCellWriteTarget` — read-only, relationship-aware write target lookup
 
 ```json
@@ -193,7 +206,8 @@ internals to the client — log the real exception server-side instead.
 | `getFacetedValues` | `[value, count][]` — see Serialization rules (Map → entries) |
 | `getMinMaxValues` | `[min, max]` |
 | `getFacets` | `{ values: { [columnId]: [value, count][] }, ranges: { [columnId]: [min, max] } }` — only requested columns appear |
-| `describeColumns` | `{ field, columnType, label, options?: {value,label}[], nullable, primaryKey, foreignKey, writable }[]` — one entry per own-table column |
+| `describeColumns` | `{ field, columnType, label, options?: {value,label}[], nullable, primaryKey, foreignKey, foreignKeyTarget?: {table,field}, writable }[]` — one entry per own-table column |
+| `listTables` | `{ table: string, label: string, rowCountEstimate?: number }[]` |
 | `resolveCellWriteTarget` | `{ table: string, field: string, relatedIdPath: string \| null, single: boolean, writable: boolean } \| null` |
 | `cellEdit` | the updated row object (whatever your `updateRecord` equivalent returns) |
 

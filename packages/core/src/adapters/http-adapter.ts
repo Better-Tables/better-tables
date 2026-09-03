@@ -489,6 +489,15 @@ export function httpAdapter<TData = unknown>(config: HttpAdapterConfig): TableAd
       return result as InferredColumnSpec[];
     },
 
+    async listTables(): Promise<
+      Array<{ table: string; label: string; rowCountEstimate?: number }>
+    > {
+      // A schema answer is stable — route through the same TTL cache/dedup
+      // as describeColumns (plan 065 Phase 7).
+      const result = await sendCacheable({ method: 'listTables' as const });
+      return result as Array<{ table: string; label: string; rowCountEstimate?: number }>;
+    },
+
     async resolveCellWriteTarget(
       columnId: string,
       table?: string

@@ -621,6 +621,31 @@ describe('httpAdapter <-> handleAdapterRequest round-trip', () => {
     });
   });
 
+  it('proxies listTables (plan 065 Phase 7)', async () => {
+    const { adapter: server } = makeServerAdapter();
+    const tables = [
+      { table: 'tickets', label: 'Tickets' },
+      { table: 'customers', label: 'Customers', rowCountEstimate: 42 },
+    ];
+    server.listTables = async () => tables;
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+
+    expect(await client.listTables?.()).toEqual(tables);
+  });
+
+  it('listTables on an adapter without the capability is a bad_request', async () => {
+    const { adapter: server } = makeServerAdapter();
+    expect(server.listTables).toBeUndefined();
+    expect(await handleAdapterRequest(server, { method: 'listTables' })).toEqual({
+      ok: false,
+      error: 'Adapter does not support listTables.',
+      kind: 'bad_request',
+    });
+
+    const client = httpAdapter({ url: '/api/tables', fetch: loopbackFetch(server) });
+    await expect(client.listTables?.()).rejects.toThrow('Adapter does not support listTables.');
+  });
+
   it('caches describeColumns within cacheTtlMs (schema answers are stable)', async () => {
     let fetchCount = 0;
     const { adapter: server } = makeServerAdapter();

@@ -20,6 +20,7 @@ export type AdapterMethod =
   | 'getMinMaxValues'
   | 'getFacets'
   | 'describeColumns'
+  | 'listTables'
   | 'resolveCellWriteTarget'
   | 'cellEdit';
 
@@ -34,7 +35,8 @@ export const MAX_FACET_BATCH_SIZE = 50;
  * A single request over the wire. `fetchData` carries a `params` object
  * (minus the non-serializable `AbortSignal`); the three column-scoped facet
  * methods carry a `columnId` plus optional `params`; `describeColumns`
- * (plan 054) carries an optional `table` — a plain-JSON read, same envelope.
+ * (plan 054) carries an optional `table`; `listTables` (plan 065) carries
+ * no fields at all — each a plain-JSON read, same envelope.
  */
 export type AdapterRequestBody =
   | {
@@ -63,6 +65,10 @@ export type AdapterRequestBody =
       method: 'describeColumns';
       /** Table to describe — same resolution as `FetchDataParams.primaryTable`. */
       table?: string;
+    }
+  | {
+      /** List every table the adapter can serve (plan 065 Phase 5/7) — no arguments. */
+      method: 'listTables';
     }
   | {
       method: 'resolveCellWriteTarget';
