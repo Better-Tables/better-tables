@@ -120,6 +120,7 @@ function isValidBody(body: unknown): body is AdapterRequestBody {
     const table = (body as { table?: unknown }).table;
     return table === undefined || typeof table === 'string';
   }
+  if (method === 'listTables') return true;
   if (method === 'resolveCellWriteTarget') {
     const table = (body as { table?: unknown }).table;
     return (
@@ -253,6 +254,20 @@ export async function handleAdapterRequest<TData = unknown>(
           };
         }
         const result = await adapter.describeColumns(body.table);
+        return { ok: true, result };
+      }
+      case 'listTables': {
+        // Optional capability (plan 065 Phase 5): an adapter without it is a
+        // caller mistake (mounting <TableNavigator> over a non-introspectable
+        // adapter), not a server failure — report it as such.
+        if (!adapter.listTables) {
+          return {
+            ok: false,
+            error: 'Adapter does not support listTables.',
+            kind: 'bad_request',
+          };
+        }
+        const result = await adapter.listTables();
         return { ok: true, result };
       }
       case 'resolveCellWriteTarget': {
