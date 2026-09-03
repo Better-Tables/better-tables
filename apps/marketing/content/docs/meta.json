@@ -20,6 +20,7 @@
     "---Adapters & UI---",
     "adapters",
     "ui-and-cli",
+    "admin-ui",
     "---Reference---",
     "better-table",
     "packages",
