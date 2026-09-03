@@ -86,7 +86,7 @@ const CUSTOMERS_SPECS: InferredColumnSpec[] = [
   },
 ];
 
-function makeAdapter() {
+function makeAdapter(options?: { writes?: boolean }) {
   const fetchCalls: Array<{ table: string; params: unknown }> = [];
   const rowsByTable: Record<string, Array<Record<string, unknown>>> = {
     users: [{ id: 1, name: 'Alice', customerId: 42 }],
@@ -96,6 +96,22 @@ function makeAdapter() {
     users: USERS_SPECS,
     customers: CUSTOMERS_SPECS,
   };
+  const createRecord = options?.writes
+    ? async (data: Partial<Record<string, unknown>>) => ({
+        id: 2,
+        name: '',
+        customerId: 0,
+        ...data,
+      })
+    : undefined;
+  const updateRecord = options?.writes
+    ? async (id: string, data: Partial<Record<string, unknown>>) => ({
+        id: Number(id),
+        name: 'Alice',
+        customerId: 42,
+        ...data,
+      })
+    : undefined;
 
   const adapter: StubAdapter = {
     meta: META,
@@ -117,6 +133,8 @@ function makeAdapter() {
       { table: 'users', label: 'Users' },
       { table: 'customers', label: 'Customers' },
     ],
+    ...(createRecord ? { createRecord } : {}),
+    ...(updateRecord ? { updateRecord } : {}),
   };
 
   return { adapter, fetchCalls };
@@ -219,4 +237,106 @@ describe('TableNavigator', () => {
       'cannot introspect schema'
     );
   });
+});
+
+describe('TableNavigator overrides (plan 065 Phase 6)', () => {
+  it('a table marked hidden does not appear in the navigator (and auto-selects the next visible one)', async () => {
+    const { adapter } = makeAdapter();
+    render(<TableNavigator adapter={adapter} overrides={{ users: { hidden: true } }} />);
+
+    expect(await screen.findByRole('button', { name: 'Customers' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Users' })).toBeNull();
+    // Auto-selected the one visible table, not the hidden 'users'.
+    await waitFor(() => {
+      expect(screen.getByText('Acme')).toBeTruthy();
+    });
+  });
+
+  it('an overridden label replaces the sidebar entry text', async () => {
+    const { adapter } = makeAdapter();
+    render(<TableNavigator adapter={adapter} overrides={{ users: { label: 'Team Members' } }} />);
+
+    expect(await screen.findByRole('button', { name: 'Team Members' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Users' })).toBeNull();
+  });
+
+  it('a columnOverrides entry renames a column label without touching describeColumns', async () => {
+    const { adapter } = makeAdapter();
+    render(
+      <TableNavigator
+        adapter={adapter}
+        overrides={{ users: { columnOverrides: [{ id: 'name', displayName: 'Full Name' }] } }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Full Name')).toBeTruthy();
+    });
+    expect(screen.queryByText('Name')).toBeNull();
+    // The row data itself is unaffected — only the column's own displayName changed.
+    expect(screen.getByText('Alice')).toBeTruthy();
+  });
+
+  it('a columnOverrides entry with hidden: true drops that column from the grid', async () => {
+    const { adapter } = makeAdapter();
+    render(
+      <TableNavigator
+        adapter={adapter}
+        overrides={{ users: { columnOverrides: [{ id: 'customerId', hidden: true }] } }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+    });
+    expect(screen.queryByText('Customer Id')).toBeNull();
+  });
+
+  it('readOnly hides the "+ New" trigger and disables row-click-to-edit for that table', async () => {
+    const { adapter } = makeAdapter({ writes: true });
+    render(<TableNavigator adapter={adapter} overrides={{ users: { readOnly: true } }} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+    });
+    expect(screen.queryByRole('button', { name: '+ New' })).toBeNull();
+
+    fireEvent.click(screen.getByText('Alice'));
+    // No edit dialog opens — readOnly suppresses the row-click trigger.
+    expect(screen.queryByText('Edit record')).toBeNull();
+  });
+
+  it('a non-readOnly table with write support shows "+ New" and opens a create dialog', async () => {
+    const { adapter } = makeAdapter({ writes: true });
+    render(<TableNavigator adapter={adapter} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New' }));
+    expect(await screen.findByText('Create record')).toBeTruthy();
+  });
+
+  it('clicking a row opens the edit dialog pre-filled, and saving calls updateRecord', async () => {
+    const { adapter } = makeAdapter({ writes: true });
+    render(<TableNavigator adapter={adapter} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText('Alice'));
+    expect(await screen.findByText('Edit record')).toBeTruthy();
+    expect(screen.getByDisplayValue('Alice')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Edit record')).toBeNull();
+      },
+      { timeout: 15000 }
+    );
+  }, 20000);
 });
