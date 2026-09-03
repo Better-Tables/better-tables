@@ -64,6 +64,73 @@ export interface ColumnInfo {
   isNullable: boolean;
   dataType: string;
   isArray: boolean;
+  /** Raw Drizzle table object this column's FK constraint references. Present iff `isForeignKey`. */
+  foreignKeyTable?: unknown;
+  /** Raw Drizzle column object this column's FK constraint references. Present iff `isForeignKey`. */
+  foreignKeyColumn?: unknown;
+}
+
+/**
+ * Table-level inline-FK metadata symbols across the dialects this adapter
+ * supports. Real Drizzle Postgres/MySQL/SQLite columns store `.references()`
+ * constraints HERE (on the table object), not on the column object itself —
+ * shared with {@link RelationshipDetector}'s `getColumnForeignKeyTarget`
+ * (which resolves the same metadata for a different purpose: `many()`
+ * relationship key inference).
+ */
+export const INLINE_FOREIGN_KEY_SYMBOLS = [
+  Symbol.for('drizzle:SQLiteInlineForeignKeys'),
+  Symbol.for('drizzle:PgInlineForeignKeys'),
+  Symbol.for('drizzle:MySqlInlineForeignKeys'),
+];
+
+/**
+ * Find the table-level inline FK constraint whose local column is `column`,
+ * and return the raw Drizzle table/column objects it references.
+ *
+ * @description
+ * `column.references(...)` is a schema-DEFINITION-time builder method; the
+ * BUILT column object it produces carries no FK data of its own (verified
+ * empirically against drizzle-orm — `'references' in column` is always
+ * `false` on a real column instance). The constraint instead lives on the
+ * owning TABLE object, under one of {@link INLINE_FOREIGN_KEY_SYMBOLS},
+ * as a `ForeignKey` whose `.reference()` returns `{ columns, foreignTable,
+ * foreignColumns }` — `columns` and `foreignColumns` are index-aligned, so
+ * matching `column`'s position in `columns` gives the referenced column at
+ * the same position in `foreignColumns`.
+ *
+ * @returns `null` when `column` carries no FK constraint on this table.
+ */
+function findForeignKeyReference(
+  tableObj: Record<string, unknown>,
+  column: unknown
+): { foreignTable: unknown; foreignColumn: unknown } | null {
+  for (const symbol of INLINE_FOREIGN_KEY_SYMBOLS) {
+    const inlineForeignKeys = (tableObj as Record<symbol, unknown>)[symbol];
+    if (!Array.isArray(inlineForeignKeys)) continue;
+
+    for (const fk of inlineForeignKeys) {
+      if (!fk || typeof fk !== 'object') continue;
+      const fkObj = fk as Record<string, unknown>;
+      if (typeof fkObj.reference !== 'function') continue;
+
+      try {
+        const ref = (fkObj.reference as () => unknown)();
+        if (!ref || typeof ref !== 'object') continue;
+        const refObj = ref as Record<string, unknown>;
+        const localColumns = Array.isArray(refObj.columns) ? refObj.columns : [];
+        const index = localColumns.indexOf(column);
+        if (index === -1) continue;
+        const foreignColumns = Array.isArray(refObj.foreignColumns) ? refObj.foreignColumns : [];
+        const foreignColumn = foreignColumns[index];
+        if (!refObj.foreignTable || foreignColumn === undefined) continue;
+        return { foreignTable: refObj.foreignTable, foreignColumn };
+      } catch {
+        // Malformed reference() -- treat as no usable metadata from this entry.
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -131,15 +198,25 @@ export function getTableColumns(tableSchema: AnyTableType): ColumnInfo[] {
 
     if (typeof column === 'object' && column !== null) {
       const drizzleColumn = column as AnyColumn;
+      const fkReference = findForeignKeyReference(
+        tableSchema as unknown as Record<string, unknown>,
+        column
+      );
 
       columns.push({
         name: columnName,
         column: column,
         isPrimaryKey: drizzleColumn.primary === true,
-        isForeignKey: 'references' in drizzleColumn && drizzleColumn.references !== undefined,
+        isForeignKey: fkReference !== null,
         isNullable: drizzleColumn.notNull !== true,
         dataType: drizzleColumn.dataType || 'unknown',
         isArray: isArrayColumn(column),
+        ...(fkReference
+          ? {
+              foreignKeyTable: fkReference.foreignTable,
+              foreignKeyColumn: fkReference.foreignColumn,
+            }
+          : {}),
       });
     }
   }
@@ -615,39 +692,69 @@ function cloneInferredColumnSpec(spec: InferredColumnSpec): InferredColumnSpec {
  * columns (plan 054).
  *
  * @param tableSchema - The Drizzle table schema to describe
+ * @param resolveForeignKeyTarget - Optional (plan 065 Phase 2): given the raw
+ *   Drizzle table/column objects an FK column references (as surfaced by
+ *   {@link getTableColumns}), resolve them to `{ table: schemaKey, field }`.
+ *   Pass `DrizzleAdapter`'s `relationshipDetector.resolveForeignKeyTarget`
+ *   bound method to populate `foreignKeyTarget`; omit to leave it absent
+ *   (the safe default — same as pre-Phase-2 behavior). Applied fresh on
+ *   every call, never cached, since the resolver is adapter-instance-scoped
+ *   while the base spec cache below is keyed by table object identity alone.
  * @returns One spec per column, in stable schema order. Empty array for
  *   invalid/malformed schemas (never throws).
  */
-export function describeTableColumns(tableSchema: AnyTableType): InferredColumnSpec[] {
+export function describeTableColumns(
+  tableSchema: AnyTableType,
+  resolveForeignKeyTarget?: (
+    foreignTable: unknown,
+    foreignColumn: unknown
+  ) => { table: string; field: string } | null
+): InferredColumnSpec[] {
   try {
     if (!tableSchema || typeof tableSchema !== 'object') {
       return [];
     }
 
+    const columnInfos = getTableColumns(tableSchema);
+
     const cached = describeColumnsCache.get(tableSchema as object);
-    if (cached) {
-      return cached.map(cloneInferredColumnSpec);
+    const baseSpecs = cached
+      ? cached.map(cloneInferredColumnSpec)
+      : (() => {
+          const specs = columnInfos.map((info): InferredColumnSpec => {
+            const columnType = mapColumnInfoToColumnType(info);
+            const enumValues = info.isArray ? null : getEnumValues(info.column);
+            return {
+              field: info.name,
+              columnType,
+              label: humanize(info.name),
+              ...(enumValues
+                ? { options: enumValues.map((value) => ({ value, label: humanize(value) })) }
+                : {}),
+              nullable: info.isNullable,
+              primaryKey: info.isPrimaryKey,
+              foreignKey: info.isForeignKey,
+              writable: !info.isPrimaryKey,
+            };
+          });
+          describeColumnsCache.set(tableSchema as object, specs);
+          return specs.map(cloneInferredColumnSpec);
+        })();
+
+    if (!resolveForeignKeyTarget) {
+      return baseSpecs;
     }
 
-    const specs = getTableColumns(tableSchema).map((info): InferredColumnSpec => {
-      const columnType = mapColumnInfoToColumnType(info);
-      const enumValues = info.isArray ? null : getEnumValues(info.column);
-      return {
-        field: info.name,
-        columnType,
-        label: humanize(info.name),
-        ...(enumValues
-          ? { options: enumValues.map((value) => ({ value, label: humanize(value) })) }
-          : {}),
-        nullable: info.isNullable,
-        primaryKey: info.isPrimaryKey,
-        foreignKey: info.isForeignKey,
-        writable: !info.isPrimaryKey,
-      };
+    const infoByField = new Map(columnInfos.map((info) => [info.name, info]));
+    return baseSpecs.map((spec) => {
+      if (!spec.foreignKey) return spec;
+      const info = infoByField.get(spec.field);
+      if (!info || info.foreignKeyTable === undefined || info.foreignKeyColumn === undefined) {
+        return spec;
+      }
+      const target = resolveForeignKeyTarget(info.foreignKeyTable, info.foreignKeyColumn);
+      return target ? { ...spec, foreignKeyTarget: target } : spec;
     });
-
-    describeColumnsCache.set(tableSchema as object, specs);
-    return specs.map(cloneInferredColumnSpec);
   } catch {
     return [];
   }

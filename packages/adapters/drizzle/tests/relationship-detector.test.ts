@@ -1282,3 +1282,30 @@ describe('RelationshipDetector - mergeManualRelationships', () => {
     expect(manualRelationships['events.tags']?.isArray).toBe(true);
   });
 });
+
+describe('resolveForeignKeyTarget (plan 065 Phase 2)', () => {
+  it('resolves a raw FK table/column pair back to a schema key + field name', () => {
+    const detector = new RelationshipDetector();
+    detector.detectFromSchema(relationsSchema, schema);
+
+    // `posts.userId` genuinely references `users.id` — resolve the raw
+    // Drizzle objects getTableColumns would surface for that constraint.
+    const target = detector.resolveForeignKeyTarget(schema.users, schema.users.id);
+    expect(target).toEqual({ table: 'users', field: 'id' });
+  });
+
+  it('returns null when the target table is not part of the schema this detector ran against', () => {
+    const detector = new RelationshipDetector();
+    detector.detectFromSchema(relationsSchema, schema);
+
+    const strayTable = sqliteTable('stray', { id: integer('id').primaryKey() });
+    const target = detector.resolveForeignKeyTarget(strayTable, strayTable.id);
+    expect(target).toBeNull();
+  });
+
+  it('returns null before detectFromSchema has ever run (no schema to resolve against)', () => {
+    const detector = new RelationshipDetector();
+    const target = detector.resolveForeignKeyTarget(schema.users, schema.users.id);
+    expect(target).toBeNull();
+  });
+});

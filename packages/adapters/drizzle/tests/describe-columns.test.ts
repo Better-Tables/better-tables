@@ -20,8 +20,13 @@ import {
 } from 'drizzle-orm/pg-core';
 import { blob, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { AnyColumnType, AnyTableType } from '../src/types';
-import { describeTableColumns, isTimestampDrizzleColumn } from '../src/utils/drizzle-schema-utils';
+import {
+  describeTableColumns,
+  getTableColumns,
+  isTimestampDrizzleColumn,
+} from '../src/utils/drizzle-schema-utils';
 import { closeDatabase, createTestAdapter, createTestDatabase } from './helpers/test-fixtures';
+import { posts, users } from './helpers/test-schema';
 
 // ---------------------------------------------------------------------------
 // Fixtures: one table with enum + timestamp + array (pg), one sqlite table
@@ -175,6 +180,71 @@ describe('describeTableColumns (plan 054)', () => {
   });
 });
 
+describe('getTableColumns FK detection (plan 065 Phase 2)', () => {
+  it('finds a real .references() constraint via table-level inline-FK metadata', () => {
+    // `posts.userId` genuinely references `users.id` (test-schema.ts). The
+    // constraint lives on the TABLE object (Symbol(drizzle:SQLiteInlineForeignKeys)),
+    // never on the column itself — this is what getTableColumns now scans.
+    const columns = getTableColumns(posts as unknown as AnyTableType);
+    const userId = columns.find((c) => c.name === 'userId');
+    expect(userId?.isForeignKey).toBe(true);
+    expect(userId?.foreignKeyTable).toBe(users as unknown as AnyTableType);
+    // The referenced column is `users.id` itself (reference equality).
+    expect(userId?.foreignKeyColumn).toBe((users as unknown as Record<string, unknown>).id);
+  });
+
+  it('reports isForeignKey: false for a column with no .references() constraint', () => {
+    const columns = getTableColumns(posts as unknown as AnyTableType);
+    const title = columns.find((c) => c.name === 'title');
+    expect(title?.isForeignKey).toBe(false);
+    expect(title?.foreignKeyTable).toBeUndefined();
+    expect(title?.foreignKeyColumn).toBeUndefined();
+  });
+});
+
+describe('describeTableColumns foreignKeyTarget resolution (plan 065 Phase 2)', () => {
+  it('leaves foreignKeyTarget absent when no resolver is passed (back-compat)', () => {
+    const specs = describeTableColumns(posts as unknown as AnyTableType);
+    const byField = bySpecField(specs);
+    expect(byField.userId?.foreignKey).toBe(true);
+    expect(byField.userId?.foreignKeyTarget).toBeUndefined();
+  });
+
+  it('populates foreignKeyTarget when the resolver resolves a target', () => {
+    const specs = describeTableColumns(posts as unknown as AnyTableType, () => ({
+      table: 'users',
+      field: 'id',
+    }));
+    expect(bySpecField(specs).userId?.foreignKeyTarget).toEqual({ table: 'users', field: 'id' });
+  });
+
+  it('leaves foreignKeyTarget absent when the resolver returns null', () => {
+    const specs = describeTableColumns(posts as unknown as AnyTableType, () => null);
+    expect(bySpecField(specs).userId?.foreignKeyTarget).toBeUndefined();
+  });
+
+  it('re-resolves foreignKeyTarget on every call even though the base specs are cached', () => {
+    // Regression guard: the base-spec cache is keyed by table object identity
+    // alone, so a different resolver passed for the SAME table must still
+    // produce a different foreignKeyTarget rather than returning a stale
+    // cached one from an earlier (or absent) resolver.
+    const withoutResolver = describeTableColumns(posts as unknown as AnyTableType);
+    expect(bySpecField(withoutResolver).userId?.foreignKeyTarget).toBeUndefined();
+
+    const withResolver = describeTableColumns(posts as unknown as AnyTableType, () => ({
+      table: 'users',
+      field: 'id',
+    }));
+    expect(bySpecField(withResolver).userId?.foreignKeyTarget).toEqual({
+      table: 'users',
+      field: 'id',
+    });
+
+    const withoutResolverAgain = describeTableColumns(posts as unknown as AnyTableType);
+    expect(bySpecField(withoutResolverAgain).userId?.foreignKeyTarget).toBeUndefined();
+  });
+});
+
 describe('isTimestampDrizzleColumn (shared with the predicate emitter)', () => {
   it('recognizes pg and sqlite timestamp columns, rejects plain columns', () => {
     const asColumn = (column: unknown) => column as AnyColumnType;
@@ -206,11 +276,13 @@ describe('DrizzleAdapter.describeColumns (read-table resolution)', () => {
 
     expect(specs.map((s) => s.field)).toEqual(['id', 'userId', 'title', 'content', 'published']);
     expect(byField.id?.writable).toBe(false);
-    // `foreignKey` carries through the EXISTING getTableColumns introspection
-    // (drizzle-orm keeps FK metadata off the runtime column object, so it
-    // reports false here — pre-existing behavior, asserted so a drizzle
-    // upgrade that starts surfacing it shows up as a deliberate change).
-    expect(byField.userId?.foreignKey).toBe(false);
+    // `posts.userId` genuinely references `users.id` (plan 065 Phase 2):
+    // `getTableColumns` now finds the constraint via the TABLE-level inline-FK
+    // metadata real Drizzle columns actually use (not the column object
+    // itself, which never carried it), and `describeColumns` resolves it
+    // through `relationshipDetector` back to a schema key + field name.
+    expect(byField.userId?.foreignKey).toBe(true);
+    expect(byField.userId?.foreignKeyTarget).toEqual({ table: 'users', field: 'id' });
     expect(byField.title?.columnType).toBe('text');
     expect(byField.title?.nullable).toBe(false);
     expect(byField.published?.columnType).toBe('boolean');
