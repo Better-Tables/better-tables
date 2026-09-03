@@ -66,4 +66,13 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     href: '/examples/export',
     chips: ['exportData', 'toolbarExtra slot', 'CSV / JSON', 'row cap'],
   },
+  {
+    id: '06',
+    title: 'Admin navigator',
+    demonstrates:
+      'Browse every table in the schema with zero per-table code — click a customer or assignee id to jump to that row, and create or edit records through a generic form.',
+    dataset: '3 tables · SQLite',
+    href: '/examples/admin-navigator',
+    chips: ['listTables', 'TableNavigator', 'RecordFormDialog', 'FK-click navigation'],
+  },
 ];

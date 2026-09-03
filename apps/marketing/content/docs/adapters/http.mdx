@@ -56,6 +56,8 @@ function collectColumnIds(body: AdapterRequestBody): string[] {
       return [body.columnId, ...collectFilterColumnIds(body.params?.filters)];
     case 'describeColumns':
       return []; // no column ids — pinned to a table in constrainRequest
+    case 'listTables':
+      return []; // no column ids, no table at all
     case 'resolveCellWriteTarget':
       return [body.columnId];
     case 'cellEdit':
@@ -103,6 +105,10 @@ A bare `createAdapterRouteHandler(adapter)` exposes the entire read surface (`fe
 </Callout>
 
 Reference guard used by the marketing demo: `apps/marketing/src/lib/demo/support/tickets-adapter-guard.ts`.
+
+<Callout type="info" title="Implementing a non-JS backend?">
+This page covers the JS-side `httpAdapter`/`createAdapterRouteHandler` helpers. For a language-agnostic specification of the wire format itself (request/response shapes as plain JSON, no TypeScript required) — aimed at teams implementing their own endpoint in ASP.NET, Java, Python, Go, etc. — see `packages/core/docs/ADAPTER_WIRE_PROTOCOL.md` in the repo. It ships with a self-service conformance test suite you can point at your own endpoint (`WIRE_PROTOCOL_TEST_URL=... bun test wire-protocol-conformance.test.ts`).
+</Callout>
 
 ## Wire contract
 

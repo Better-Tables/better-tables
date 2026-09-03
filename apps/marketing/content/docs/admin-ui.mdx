@@ -1,0 +1,109 @@
+---
+title: Admin UI
+description: Instant admin UI from live DB metadata — TableNavigator, FK-click navigation, and RecordFormDialog.
+---
+
+Three pieces turn Better Tables into a generic, metadata-driven admin UI for browsing (and editing) an entire schema, with zero per-table code:
+
+- **`<TableNavigator>`** lists every table from `adapter.listTables()` and mounts a fully-typed `<BetterTable>` for whichever one is selected, using `t.auto()` (see [Columns](/docs/columns)) — the same auto-column pipeline any single table can use.
+- **FK-click navigation** — a resolved foreign-key column renders as a clickable link; clicking switches `<TableNavigator>`'s selection to the related table.
+- **`<RecordFormDialog>`** — a generic create/edit form built from the same resolved columns the grid renders, reusing the exact per-type field editors inline cell editing already has.
+
+## `listTables` — the adapter capability this needs
+
+```ts
+listTables?(): Promise<Array<{ table: string; label: string; rowCountEstimate?: number }>>;
+```
+
+Implemented by `@better-tables/adapters-drizzle` out of the box (one entry per schema key, humanized label, no row-count query). It's proxied over HTTP the same way `describeColumns` is — see the [wire protocol reference](/docs/adapters/http) if you're implementing a non-JS backend.
+
+## `<TableNavigator>`
+
+```tsx
+'use client';
+
+import { httpAdapter } from '@better-tables/core';
+import { TableNavigator } from '@better-tables/ui';
+import { useMemo } from 'react';
+
+export function AdminBrowser() {
+  const adapter = useMemo(() => httpAdapter({ url: '/api/tables/admin' }), []);
+  return <TableNavigator adapter={adapter} />;
+}
+```
+
+Each table selection gets its own store (keyed by table name — `<BetterTable>`'s own `id` default) and its own fresh filter/sort/pagination state, so switching tables can never leak the previous one's UI state into the new one.
+
+### Per-table overrides
+
+```tsx
+import type { TableOverrides } from '@better-tables/ui';
+
+const overrides: TableOverrides = {
+  auditLog: { hidden: true },
+  roles: { readOnly: true },
+  users: {
+    columnOverrides: [
+      { id: 'internalNotes', hidden: true },
+      { id: 'createdAt', displayName: 'Joined' },
+    ],
+  },
+};
+
+<TableNavigator adapter={adapter} overrides={overrides} />;
+```
+
+| Field | Effect |
+|---|---|
+| `hidden` | Table excluded from the sidebar entirely (and skipped by auto-selection) |
+| `readOnly` | Grid still renders; the "+ New" toolbar action and row-click-to-edit are suppressed for that table |
+| `label` | Overrides the sidebar entry's display text |
+| `columnOverrides` | `Partial<ColumnDefinition>[]`, matched by `id`, shallow-merged onto the auto-resolved column — override wins per field. `{ id, hidden: true }` drops that column from the grid entirely (`ColumnDefinition.defaultVisible` alone does not hide a column here) |
+
+## FK-click navigation
+
+A column whose schema-derived `foreignKeyTarget` is set (an own-table foreign key, e.g. `customerId → customers.id`) renders as a link when `onNavigateToRelated` is provided on `<BetterTable>` — `<TableNavigator>` wires this automatically, switching its own selection to the target table. Using `<BetterTable>` directly:
+
+```tsx
+<BetterTable
+  table={ticketsTable}
+  data={data}
+  adapter={adapter}
+  onNavigateToRelated={(target) => router.push(`/${target.table}/${target.id}`)}
+/>
+```
+
+Omit the prop to keep every column rendered as plain text (the default, unchanged from before this existed).
+
+## `<RecordFormDialog>`
+
+One field per writable column (`ColumnDefinition.writable`, `false` for primary keys and anything the adapter can't write back — rendered disabled, not editable), built from the exact same resolved `columns` the grid uses:
+
+```tsx
+import { RecordFormDialog } from '@better-tables/ui';
+
+<RecordFormDialog
+  open={open}
+  onOpenChange={setOpen}
+  mode="create" // or "edit"
+  columns={resolvedColumns}
+  row={editingRow} // required for mode="edit"
+  table="users" // REQUIRED for a multi-table adapter — see below
+  adapter={adapter} // needs createRecord / updateRecord
+  onSuccess={(record) => refetch()}
+/>
+```
+
+<Callout type="warn" title="Pass `table` for a multi-table adapter">
+Without it, a multi-table adapter has no way to know which table a save belongs to, and typically throws on the ambiguity rather than guessing. `<TableNavigator>` always passes it for you; wiring `<RecordFormDialog>` up yourself against a multi-table schema needs it too.
+</Callout>
+
+`createRecord`/`updateRecord` send the FULL record (every writable field at once) — this is a different write shape than `cellEdit` (the HTTP wire protocol's single-field write). `httpAdapter` does not proxy `createRecord`/`updateRecord`; wire them to a Server Action that calls your real adapter directly (the same "monolith path" `tables.cellEditAction` already uses for single-cell saves), or to your own write endpoint.
+
+## Live example
+
+<Cards>
+  <Card title="Admin navigator example" href="/examples/admin-navigator" description="Browse tickets/customers/assignees with FK navigation, per-table overrides, and create/edit." />
+</Cards>
+
+Source: `apps/marketing/src/components/sections/admin-navigator-client.tsx`.

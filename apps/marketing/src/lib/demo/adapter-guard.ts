@@ -40,6 +40,11 @@ export function collectAdapterColumnIds(body: AdapterRequestBody): string[] {
     return ids;
   }
 
+  // listTables (plan 065) references no column ids and no table at all.
+  if (body.method === 'listTables') {
+    return ids;
+  }
+
   if (body.method === 'resolveCellWriteTarget') {
     ids.push(body.columnId);
     return ids;
