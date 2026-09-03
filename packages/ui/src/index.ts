@@ -28,6 +28,7 @@ export * from './components/table/sort-order-list';
 // Export table components
 export * from './components/table/table';
 export * from './components/table/table-header-context-menu';
+export * from './components/table/table-navigator';
 export * from './components/table/table-pagination';
 export * from './components/table/table-providers';
 export * from './components/table/virtualized-table';

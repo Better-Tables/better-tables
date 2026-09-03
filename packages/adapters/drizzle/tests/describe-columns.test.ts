@@ -303,4 +303,15 @@ describe('DrizzleAdapter.describeColumns (read-table resolution)', () => {
       /Primary table 'nope' not found in schema/
     );
   });
+
+  it('listTables (plan 065 Phase 5) lists every table in the schema with a humanized label', async () => {
+    const tables = await adapter.listTables?.();
+    expect(tables).toEqual(
+      expect.arrayContaining([
+        { table: 'users', label: 'Users' },
+        { table: 'posts', label: 'Posts' },
+      ])
+    );
+    expect(tables?.every((t) => t.rowCountEstimate === undefined)).toBe(true);
+  });
 });
