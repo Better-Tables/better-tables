@@ -531,6 +531,20 @@ export interface TableAdapter<TData = unknown> {
   describeColumns?(table?: string): Promise<InferredColumnSpec[]>;
 
   /**
+   * Optional: list every table this adapter can serve — powers
+   * `<TableNavigator>` (plan 065 Phase 5), a generic "browse any table"
+   * admin UI that needs no per-table code. Mirrors `describeColumns`'s
+   * shape: additive, schema-introspection-only, no query execution
+   * required to answer it.
+   *
+   * @returns One entry per table, in the adapter's own stable order.
+   *   `rowCountEstimate` is a hint for display only (e.g. a sidebar badge)
+   *   — never a guarantee of exactness, and adapters may omit it entirely
+   *   rather than pay for a `COUNT(*)` on every table.
+   */
+  listTables?(): Promise<Array<{ table: string; label: string; rowCountEstimate?: number }>>;
+
+  /**
    * Optional: resolve where a cell edit for `columnId` actually lands
    * (plan 055) — the own table for flat ids, the RELATED table for
    * relationship-path ids ('customer.company'). Returns `null` when the
