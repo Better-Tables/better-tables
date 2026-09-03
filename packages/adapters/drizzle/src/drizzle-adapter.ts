@@ -1029,7 +1029,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * `options.defaultPrimaryTable` or throw a `SchemaError`.
    *
    * Results are memoized per table object ({@link describeTableColumns}'s
-   * WeakMap, mirroring plan 040's caches).
+   * WeakMap, mirroring plan 040's caches). `foreignKeyTarget` (plan 065
+   * Phase 2) is resolved fresh on every call via `relationshipDetector`,
+   * which already has this schema's FK metadata from construction-time
+   * `detectFromSchema`.
    */
   async describeColumns(table?: string): Promise<InferredColumnSpec[]> {
     const primaryTable = this.resolvePrimaryTableForRead(undefined, table);
@@ -1040,7 +1043,9 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
         availableTables: Object.keys(this.schema),
       });
     }
-    return describeTableColumns(tableSchema);
+    return describeTableColumns(tableSchema, (foreignTable, foreignColumn) =>
+      this.relationshipDetector.resolveForeignKeyTarget(foreignTable, foreignColumn)
+    );
   }
 
   /** Memoized {@link resolveCellWriteTarget} results per `${table}:${columnId}`. */

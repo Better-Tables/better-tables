@@ -267,6 +267,14 @@ export interface InferredColumnSpec {
   nullable: boolean;
   primaryKey: boolean;
   foreignKey: boolean;
+  /**
+   * When `foreignKey` is true and the target is resolvable, the specific
+   * table + field it references — lets the UI render a navigable link
+   * instead of just knowing "this is a foreign key" (plan 065 Phase 2).
+   * Absent when the adapter can't resolve a target; a safe default matching
+   * pre-Phase-2 behavior everywhere.
+   */
+  foreignKeyTarget?: { table: string; field: string };
   /** False for PKs and anything the adapter cannot write back. */
   writable: boolean;
 }

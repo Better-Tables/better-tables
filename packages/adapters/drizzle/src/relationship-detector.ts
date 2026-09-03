@@ -54,7 +54,7 @@
 import type { Relations } from 'drizzle-orm';
 import type { AnyTableType, RelationshipMap, RelationshipPath } from './types';
 import { RelationshipError } from './types';
-import { getPrimaryKeyColumns } from './utils/drizzle-schema-utils';
+import { getPrimaryKeyColumns, INLINE_FOREIGN_KEY_SYMBOLS } from './utils/drizzle-schema-utils';
 
 // Type for the actual relation object returned by Drizzle's config() function
 type DrizzleRelationConfig = {
@@ -889,6 +889,32 @@ export class RelationshipDetector {
   }
 
   /**
+   * Resolve a raw Drizzle table/column pair — as surfaced by
+   * {@link getTableColumns}'s table-level inline-FK scan
+   * (`ColumnInfo.foreignKeyTable`/`foreignKeyColumn`) — back to a
+   * `{ table: schemaKey, field }` pair against the schema this detector was
+   * built from. This is the missing piece `InferredColumnSpec.foreignKeyTarget`
+   * needs (plan 065 Phase 2): `getTableColumns` only has the raw Drizzle
+   * objects a `.references()` constraint points at, not which schema key
+   * they live under or what field name they resolve to — this detector
+   * already has both (`resolveSchemaKey` / `getFieldName`, used elsewhere
+   * for array-FK and `many()` relationship detection).
+   *
+   * @returns `null` when either side can't be resolved back to a schema
+   *   key/field name (e.g. the target table isn't part of this schema).
+   */
+  resolveForeignKeyTarget(
+    foreignTable: unknown,
+    foreignColumn: unknown
+  ): { table: string; field: string } | null {
+    if (!this.schema) return null;
+    const targetTableKey = this.resolveSchemaKey(foreignTable, this.schema);
+    if (!targetTableKey) return null;
+    const field = this.getFieldName(foreignColumn, targetTableKey);
+    return field ? { table: targetTableKey, field } : null;
+  }
+
+  /**
    * Check if two tables are related
    */
   areTablesRelated(table1: string, table2: string): boolean {
@@ -1158,13 +1184,6 @@ export class RelationshipDetector {
     return 'id' in sourceTableObj ? 'id' : null;
   }
 
-  /** Table-level inline-FK symbols across the dialects this adapter supports. */
-  private static readonly INLINE_FOREIGN_KEY_SYMBOLS = [
-    Symbol.for('drizzle:SQLiteInlineForeignKeys'),
-    Symbol.for('drizzle:PgInlineForeignKeys'),
-    Symbol.for('drizzle:MySqlInlineForeignKeys'),
-  ];
-
   /**
    * Determine which table (by DB name) `column` on `targetTableObj` has real
    * FK metadata pointing at, if any. Checks both column-level metadata
@@ -1184,7 +1203,7 @@ export class RelationshipDetector {
       return this.getTableName(fkInfo.table);
     }
 
-    for (const symbol of RelationshipDetector.INLINE_FOREIGN_KEY_SYMBOLS) {
+    for (const symbol of INLINE_FOREIGN_KEY_SYMBOLS) {
       const inlineForeignKeys = (targetTableObj as Record<symbol, unknown>)[symbol];
       if (!Array.isArray(inlineForeignKeys)) {
         continue;
