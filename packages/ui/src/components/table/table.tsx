@@ -283,6 +283,20 @@ export interface BetterTableProps<TData = unknown>
   /** Additional UI event handlers */
   onRowClick?: (row: TData) => void;
 
+  /**
+   * FK-click navigation (plan 065 Phase 3). When a resolved column carries
+   * `foreignKeyTarget` (schema-derived — see `describeColumns`/auto columns)
+   * AND this prop is provided, that column's cell renders as a clickable
+   * link instead of plain text; clicking calls back with the related row's
+   * table + id (the cell's own value — an own-table FK column's value IS
+   * the related row's id) so the CONSUMER decides what navigation means
+   * (route to another page, swap the mounted table in a `<TableNavigator>`,
+   * open a side panel). No router dependency here, consistent with
+   * `onRowClick`. Omit to keep FK columns rendered as plain text
+   * (back-compat).
+   */
+  onNavigateToRelated?: (target: { table: string; id: string }) => void;
+
   /** Custom empty message override */
   emptyMessage?: string;
 
@@ -382,6 +396,8 @@ interface TableRowComponentProps<TData> {
     value: unknown;
     previousValue: unknown;
   }) => void;
+  /** FK-click navigation (plan 065 Phase 3) — see `BetterTableProps.onNavigateToRelated`. */
+  onNavigateToRelated?: ((target: { table: string; id: string }) => void) | undefined;
 }
 
 function TableRowComponent<TData>({
@@ -403,6 +419,7 @@ function TableRowComponent<TData>({
   onBeginCellEdit,
   onCancelCellEdit,
   onCommitCellEdit,
+  onNavigateToRelated,
 }: TableRowComponentProps<TData>) {
   return (
     <TableRow
@@ -447,6 +464,35 @@ function TableRowComponent<TData>({
             })
           : (() => {
               const formatted = getFormatterForType(column.type, value, column.meta);
+
+              // FK-click navigation (plan 065 Phase 3): a navigable link only
+              // when the column resolved a schema-derived target, the
+              // consumer opted in, and there's a real value to navigate to.
+              // Not combined with `cellEditable` — an editable cell's own
+              // click-to-edit affordance takes precedence over navigation,
+              // and inferred (schema-derived) columns are read-only by
+              // default anyway.
+              if (
+                !cellEditable &&
+                column.foreignKeyTarget &&
+                onNavigateToRelated &&
+                value != null
+              ) {
+                const target = column.foreignKeyTarget;
+                return (
+                  <button
+                    type="button"
+                    className="text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigateToRelated({ table: target.table, id: String(value) });
+                    }}
+                  >
+                    {formatted}
+                  </button>
+                );
+              }
+
               const truncateConfig = column.meta?.truncate as
                 | { maxLength?: number; suffix?: string; showTooltip?: boolean }
                 | undefined;
@@ -725,6 +771,7 @@ function BetterTableInner<TData = unknown>({
   // UI props
   className,
   onRowClick,
+  onNavigateToRelated,
   emptyMessage,
   onRetry,
 
@@ -1662,6 +1709,7 @@ function BetterTableInner<TData = unknown>({
                   onBeginCellEdit={handleBeginCellEdit}
                   onCancelCellEdit={handleCancelCellEdit}
                   onCommitCellEdit={handleCommitCellEdit}
+                  onNavigateToRelated={onNavigateToRelated}
                 />
               );
             })}
