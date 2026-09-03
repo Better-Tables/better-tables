@@ -215,13 +215,21 @@ function OptionEditor<TValue>({
   options,
   onCommit,
   onCancel,
+  defaultOpen = true,
 }: {
   value: TValue;
   options: { value: string; label: string }[];
   onCommit: (value: TValue) => void;
   onCancel: () => void;
+  /**
+   * Whether the popover starts open. `true` (default) matches inline-cell
+   * editing, where the user just clicked to edit and opening immediately
+   * saves a click. `<RecordFormDialog>` (plan 065 Phase 4) passes `false` —
+   * a form with many fields must not force every picker open on mount.
+   */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(defaultOpen);
   const committedRef = React.useRef(false);
   const stringValue = value == null ? '' : String(value);
   const selectedLabel = options.find((o) => o.value === stringValue)?.label ?? 'Select…';
@@ -290,11 +298,13 @@ function OptionEditorWithFallback<TData, TValue>({
   value,
   onCommit,
   onCancel,
+  defaultOpen = true,
 }: {
   column: ColumnDefinition<TData, TValue>;
   value: TValue;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
+  defaultOpen?: boolean;
 }) {
   const { options, loading } = useColumnOptions(column as ColumnDefinition<TData, unknown>);
 
@@ -331,6 +341,7 @@ function OptionEditorWithFallback<TData, TValue>({
       options={options.map((o) => ({ value: String(o.value), label: o.label }))}
       onCommit={onCommit}
       onCancel={onCancel}
+      defaultOpen={defaultOpen}
     />
   );
 }
@@ -368,12 +379,15 @@ function DateEditor<TValue>({
   value,
   onCommit,
   onCancel,
+  defaultOpen = true,
 }: {
   value: TValue;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
+  /** See {@link OptionEditor}'s `defaultOpen` doc. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(defaultOpen);
   const committedRef = React.useRef(false);
   const selected = toDate(value);
 
@@ -422,15 +436,7 @@ function DateEditor<TValue>({
   );
 }
 
-function CellEditor<TData, TValue>({
-  column,
-  row,
-  value,
-  config,
-  onCommit,
-  onCancel,
-  onInvalid,
-}: {
+export interface FieldEditorProps<TData, TValue> {
   column: ColumnDefinition<TData, TValue>;
   row: TData;
   value: TValue;
@@ -438,7 +444,31 @@ function CellEditor<TData, TValue>({
   onCommit: (value: TValue) => void;
   onCancel: () => void;
   onInvalid: (message: string) => void;
-}) {
+  /**
+   * Whether an `option`/`date` field's popover starts open. `true` (default)
+   * matches inline-cell editing (see {@link OptionEditor}'s doc);
+   * `<RecordFormDialog>` (plan 065 Phase 4) passes `false`.
+   */
+  defaultOpen?: boolean;
+}
+
+/**
+ * Per-`ColumnType` field editor dispatch — the ONE place that maps a column
+ * type to its editor component. Used by {@link EditableCell} for inline
+ * cell editing AND by `<RecordFormDialog>` (plan 065 Phase 4) for the
+ * generic create/edit record form, so there is exactly one implementation
+ * of each type's editing UI, never two.
+ */
+export function FieldEditor<TData, TValue>({
+  column,
+  row,
+  value,
+  config,
+  onCommit,
+  onCancel,
+  onInvalid,
+  defaultOpen = true,
+}: FieldEditorProps<TData, TValue>) {
   if (config.editRenderer) {
     const props: EditRendererProps<TData, TValue> = {
       value,
@@ -483,12 +513,20 @@ function CellEditor<TData, TValue>({
           value={value}
           onCommit={onCommit}
           onCancel={onCancel}
+          defaultOpen={defaultOpen}
         />
       );
     case 'boolean':
       return <BooleanEditor value={value} onCommit={onCommit} onCancel={onCancel} />;
     case 'date':
-      return <DateEditor value={value} onCommit={onCommit} onCancel={onCancel} />;
+      return (
+        <DateEditor
+          value={value}
+          onCommit={onCommit}
+          onCancel={onCancel}
+          defaultOpen={defaultOpen}
+        />
+      );
     default:
       return null;
   }
@@ -548,7 +586,7 @@ export function EditableCell<TData = unknown, TValue = unknown>({
         onDoubleClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <CellEditor
+        <FieldEditor
           column={column}
           row={row}
           value={value}
