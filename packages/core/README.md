@@ -514,6 +514,7 @@ const restoredFilters = deserializeFiltersFromURL(urlParams);
 For detailed documentation, see:
 
 - **[HTTP Adapter](./docs/HTTP_ADAPTER.md)** - Browser `httpAdapter` + server `createAdapterRouteHandler`
+- **[Adapter Wire Protocol](./docs/ADAPTER_WIRE_PROTOCOL.md)** - Language-agnostic wire-format spec for implementing a Better Tables-compatible endpoint in a non-JS backend, plus a self-service conformance test suite
 - **[wiki.md](../../wiki.md)** - Lean 0.6 handbook
 - **[Drizzle adapter](../adapters/drizzle/README.md)** - Database adapter reference
 
