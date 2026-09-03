@@ -307,6 +307,7 @@ export function TableNavigator<TData = Record<string, unknown>>({
           mode={formState.mode}
           columns={resolvedColumns}
           {...(formState.mode === 'edit' ? { row: formState.row } : {})}
+          {...(selectedTable ? { table: selectedTable } : {})}
           adapter={adapter}
           onSuccess={() => {
             setFormState(null);

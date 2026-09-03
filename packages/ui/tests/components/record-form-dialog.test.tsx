@@ -88,6 +88,34 @@ describe('RecordFormDialog — edit mode', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('passes an explicit table as { table } to updateRecord — required for a multi-table adapter', async () => {
+    const row: Row = { id: 1, name: 'Alice', age: 30 };
+    const updateRecord = mock(async (id: string, data: Partial<Row>) => ({
+      ...row,
+      ...data,
+      id: Number(id),
+    }));
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="edit"
+        row={row}
+        columns={columns()}
+        table="users"
+        adapter={{ updateRecord } as Pick<TableAdapter<Row>, 'updateRecord'>}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(updateRecord).toHaveBeenCalledTimes(1);
+    });
+    expect(updateRecord).toHaveBeenCalledWith('1', { name: 'Alice', age: 30 }, { table: 'users' });
+  });
+
   it('resets to a fresh draft every time the dialog re-opens for a different row', () => {
     const rowA: Row = { id: 1, name: 'Alice', age: 30 };
     const rowB: Row = { id: 2, name: 'Bob', age: 40 };
@@ -169,6 +197,40 @@ describe('RecordFormDialog — create mode', () => {
     });
     expect(createRecord).toHaveBeenCalledWith({ name: 'Charlie', age: 25 });
     expect(onSuccess).toHaveBeenCalledWith({ id: 99, name: 'Charlie', age: 25 });
+  });
+
+  it('passes an explicit table as { table } to createRecord — required for a multi-table adapter', async () => {
+    const createRecord = mock(async (data: Partial<Row>) => ({
+      id: 99,
+      name: '',
+      age: 0,
+      ...data,
+    }));
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="create"
+        columns={columns()}
+        table="users"
+        adapter={{ createRecord } as Pick<TableAdapter<Row>, 'createRecord'>}
+      />
+    );
+
+    const [nameInput, ageInput] = screen.getAllByRole('textbox', { name: /edit cell/i });
+    if (!nameInput || !ageInput) throw new Error('unreachable');
+    fireEvent.change(nameInput, { target: { value: 'Dana' } });
+    fireEvent.blur(nameInput);
+    fireEvent.change(ageInput, { target: { value: '19' } });
+    fireEvent.blur(ageInput);
+
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+    await waitFor(() => {
+      expect(createRecord).toHaveBeenCalledTimes(1);
+    });
+    expect(createRecord).toHaveBeenCalledWith({ name: 'Dana', age: 19 }, { table: 'users' });
   });
 
   it('shows a field error and disables Save on an invalid number, until fixed', () => {
