@@ -70,6 +70,7 @@ import type {
 import {
   DEFAULT_EXPORT_ROW_CAP,
   DEFAULT_MAX_PAGE_SIZE,
+  humanize,
   isFilterGroupNode,
   normalizeFilterNode,
 } from '@better-tables/core';
@@ -1046,6 +1047,16 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
     return describeTableColumns(tableSchema, (foreignTable, foreignColumn) =>
       this.relationshipDetector.resolveForeignKeyTarget(foreignTable, foreignColumn)
     );
+  }
+
+  /**
+   * List every table in this adapter's schema — powers `<TableNavigator>`
+   * (plan 065 Phase 5). Pure schema introspection: no query, safe without a
+   * live connection. No `rowCountEstimate` — a `COUNT(*)` per table on every
+   * call isn't a cost this adapter imposes by default.
+   */
+  async listTables(): Promise<Array<{ table: string; label: string; rowCountEstimate?: number }>> {
+    return Object.keys(this.schema).map((table) => ({ table, label: humanize(table) }));
   }
 
   /** Memoized {@link resolveCellWriteTarget} results per `${table}:${columnId}`. */
