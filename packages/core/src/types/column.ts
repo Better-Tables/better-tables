@@ -103,6 +103,15 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown, TId extends
    */
   derived?: DerivedColumnSpec;
 
+  /**
+   * Schema-derived FK navigation target (plan 065 Phase 2/3) — mirrors
+   * {@link InferredColumnSpec.foreignKeyTarget}. When set, the column's own
+   * value IS the related row's id (own-table FK), letting the UI render a
+   * navigable link. Filled in by `resolveTableColumns`'s enrichment pass for
+   * schema-derived columns; an explicitly declared value always wins.
+   */
+  foreignKeyTarget?: { table: string; field: string };
+
   /** Column metadata - strongly typed */
   meta?: ColumnMeta;
 }
