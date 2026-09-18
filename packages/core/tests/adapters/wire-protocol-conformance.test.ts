@@ -248,19 +248,6 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
       kind: 'bad_request',
     });
   });
-
-  it('listTables on an adapter without the capability is a bad_request (plan 065 Phase 7)', async () => {
-    // memoryAdapter (the in-process reference server's adapter) has no
-    // listTables — same "optional capability, caller mistake" shape
-    // describeColumns already exercises above.
-    const { status, json } = await post({ method: 'listTables' });
-    expect(status).toBe(400);
-    expect(json).toEqual({
-      ok: false,
-      error: 'Adapter does not support listTables.',
-      kind: 'bad_request',
-    });
-  });
 });
 
 describe('reference-server-only checks (server-config specific, skipped against WIRE_PROTOCOL_TEST_URL)', () => {
@@ -383,6 +370,24 @@ describe('reference-server-only checks (server-config specific, skipped against 
       expect(status).toBe(200);
       if (!json.ok) throw new Error('unreachable');
       expect(json.result).toEqual([{ table: 'items', label: 'Items' }]);
+    }
+  );
+
+  referenceOnly(
+    'listTables on an adapter without the capability is a bad_request (plan 065 Phase 7)',
+    async () => {
+      // This is a property of THIS repo's reference adapter (memoryAdapter
+      // has no listTables — single-table by design), not a wire-format
+      // guarantee: a compliant external server that DOES implement
+      // listTables (the goal of plan 065) returns 200 and would fail this
+      // assertion, so it belongs here rather than in the universal block.
+      const { status, json } = await post({ method: 'listTables' });
+      expect(status).toBe(400);
+      expect(json).toEqual({
+        ok: false,
+        error: 'Adapter does not support listTables.',
+        kind: 'bad_request',
+      });
     }
   );
 });
