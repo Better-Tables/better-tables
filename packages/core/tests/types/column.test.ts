@@ -78,6 +78,35 @@ describe('Column Types', () => {
       expectTypeOf(column.align).toEqualTypeOf<'left' | 'center' | 'right' | undefined>();
     });
 
+    it('should support the optional writable flag (plan 065 Phase 4)', () => {
+      const readOnly: ColumnDefinition<{ id: number }, number> = {
+        id: 'id',
+        displayName: 'Id',
+        accessor: (row) => row.id,
+        type: 'number',
+        writable: false,
+      };
+      const writable: ColumnDefinition<{ name: string }, string> = {
+        id: 'name',
+        displayName: 'Name',
+        accessor: (row) => row.name,
+        type: 'text',
+        writable: true,
+      };
+      const unset: ColumnDefinition<{ name: string }, string> = {
+        id: 'name',
+        displayName: 'Name',
+        accessor: (row) => row.name,
+        type: 'text',
+      };
+
+      expectTypeOf(readOnly.writable).toEqualTypeOf<boolean | undefined>();
+      expect(readOnly.writable).toBe(false);
+      expect(writable.writable).toBe(true);
+      // Absent means "assume writable" — matches pre-Phase-4 behavior.
+      expect(unset.writable).toBeUndefined();
+    });
+
     it('should support custom renderers', () => {
       const column: ColumnDefinition<{ value: string }, string> = {
         id: 'custom',

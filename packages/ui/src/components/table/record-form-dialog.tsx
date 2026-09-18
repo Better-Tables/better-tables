@@ -1,7 +1,12 @@
 'use client';
 
 import type { ColumnDefinition, TableAdapter } from '@better-tables/core';
-import { getFormatterForType, normalizeEditableConfig } from '@better-tables/core';
+import {
+  getFormatterForType,
+  normalizeEditableConfig,
+  resolveEditableField,
+  runValidationRules,
+} from '@better-tables/core';
 import * as React from 'react';
 import { V1_EDITABLE_TYPES } from '../../hooks/use-editable-cells';
 import { Button } from '../ui/button';
@@ -41,8 +46,13 @@ function isEditableColumn<TData>(
   type: string,
   editable: ColumnDefinition<TData>['editable']
 ): boolean {
-  if (V1_EDITABLE_TYPES.has(type)) return true;
-  return normalizeEditableConfig(editable)?.editRenderer != null;
+  const hasEditRenderer = normalizeEditableConfig(editable)?.editRenderer != null;
+  if (hasEditRenderer) return true;
+  // 'custom' is in V1_EDITABLE_TYPES (it ships an inline editing AFFORDANCE),
+  // but FieldEditor's type switch has no built-in editor for it — without an
+  // editRenderer it falls through to `default: return null`, rendering
+  // nothing. Every OTHER v1 type does have a built-in editor.
+  return type !== 'custom' && V1_EDITABLE_TYPES.has(type);
 }
 
 export interface RecordFormDialogProps<TData = unknown> {
@@ -106,19 +116,34 @@ export function RecordFormDialog<TData = unknown>({
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  // Bumped every time the dialog transitions closed -> open; used as the
+  // `<FieldGroup>` key below to force every field's editor to remount fresh.
+  const [formKey, setFormKey] = React.useState(0);
 
   // Reset local state every time the dialog is (re)opened — a stale draft
-  // from a previous open (a different row, or a cancelled create) must
-  // never leak into this one. Deliberately keyed on `open` alone: this must
-  // NOT re-run just because `row`/`fields` changed while the dialog stays
-  // open (that would wipe an in-progress edit out from under the user).
-  React.useEffect(() => {
+  // from a previous open (a different row, or a cancelled create) must never
+  // leak into this one. Deliberately keyed on the closed->open TRANSITION,
+  // not `row`/`fields` changing while the dialog stays open (that would wipe
+  // an in-progress edit out from under the user).
+  //
+  // This runs synchronously during render (the "adjusting state on a prop
+  // change" pattern), not a post-commit `useEffect`: each `FieldEditor`
+  // (TextEditor et al. in editable-cell.tsx) seeds its own internal draft
+  // via `useState(value)` ONLY at mount, so a `setFormData` that lands after
+  // the editors already mounted for a new row can't reach them — they'd
+  // keep showing the PREVIOUS row's values. Resetting `formData` here AND
+  // bumping `formKey` (which remounts the editors below) in the same render
+  // ensures the editors that mount on this pass already see the fresh data.
+  const wasOpenRef = React.useRef(open);
+  if (open !== wasOpenRef.current) {
+    wasOpenRef.current = open;
     if (open) {
       setFormData(buildInitialData());
       setFieldErrors({});
       setSubmitError(null);
+      setFormKey((k) => k + 1);
     }
-  }, [open]);
+  }
 
   const liveRow = React.useMemo(
     () => ({ ...(row as object), ...formData }) as TData,
@@ -126,15 +151,55 @@ export function RecordFormDialog<TData = unknown>({
   );
 
   async function handleSubmit() {
-    setSubmitting(true);
     setSubmitError(null);
-    try {
-      const writableFields = fields.filter((c) => c.writable !== false);
-      const payload = Object.fromEntries(
-        writableFields.map((c) => [c.id, formData[c.id]])
-      ) as Partial<TData>;
 
-      let result: TData;
+    const writableFields = fields.filter((c) => c.writable !== false);
+
+    // Run each column's ValidationRules before touching the adapter — inline
+    // cell editing enforces these (cell-edit-core.ts); this form must reject
+    // the same invalid values instead of forwarding them straight through.
+    const validationErrors: Record<string, string> = {};
+    for (const c of writableFields) {
+      const message = runValidationRules(c.validation, formData[c.id]);
+      if (message) validationErrors[c.id] = message;
+    }
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      for (const c of writableFields) {
+        const message = validationErrors[c.id];
+        if (message) {
+          next[c.id] = message;
+        } else {
+          delete next[c.id];
+        }
+      }
+      return next;
+    });
+    if (Object.keys(validationErrors).length > 0) return;
+
+    // Payload keys are the column's CONFIGURED storage field (`editable:
+    // { field: '...' }`), not the column id — they diverge for mapped
+    // columns. A relationship-path column with no field override
+    // (resolveEditableField returns null) has no flat key a create/update
+    // payload can address; skip it. Skip untouched fields too: option/date/
+    // boolean editors only commit on an explicit selection/toggle, so an
+    // untouched field's `formData[c.id]` is `undefined` — including it would
+    // send an explicit `undefined` (or null, for a cleared number) that can
+    // override an adapter/server default. Text/number fields auto-commit on
+    // blur and are never `undefined` here unless genuinely untouched too.
+    const payloadEntries: [string, unknown][] = [];
+    for (const c of writableFields) {
+      const field = resolveEditableField(c.id, normalizeEditableConfig(c.editable));
+      if (field == null) continue;
+      const value = formData[c.id];
+      if (value === undefined) continue;
+      payloadEntries.push([field, value]);
+    }
+    const payload = Object.fromEntries(payloadEntries) as Partial<TData>;
+
+    setSubmitting(true);
+    let result: TData;
+    try {
       if (mode === 'create') {
         if (!adapter.createRecord) {
           throw new Error('This adapter does not support createRecord.');
@@ -149,14 +214,24 @@ export function RecordFormDialog<TData = unknown>({
         }
         result = await adapter.updateRecord(getRowId(row), payload);
       }
-      onSuccess?.(result);
-      onOpenChange(false);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : String(error));
       onError?.(error);
-    } finally {
       setSubmitting(false);
+      return;
     }
+    // Outside the try/catch on purpose: a throw from the CONSUMER's
+    // onSuccess is not an adapter/mutation failure and must not be reported
+    // as one (which would also incorrectly leave the dialog open).
+    setSubmitting(false);
+    try {
+      onSuccess?.(result);
+    } catch (callbackError) {
+      // Never leak this across the write boundary as a (false) "Save
+      // failed" — the mutation itself already succeeded.
+      console.error('[better-tables] RecordFormDialog onSuccess threw:', callbackError);
+    }
+    onOpenChange(false);
   }
 
   return (
@@ -169,15 +244,16 @@ export function RecordFormDialog<TData = unknown>({
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
 
-        <FieldGroup>
+        <FieldGroup key={formKey}>
           {fields.map((column) => {
             const value = formData[column.id];
             const writable = column.writable !== false;
             const editable = writable && isEditableColumn(column.type, column.editable);
+            const fieldId = `record-form-${column.id}`;
 
             return (
               <Field key={column.id} data-invalid={fieldErrors[column.id] ? true : undefined}>
-                <FieldLabel htmlFor={`record-form-${column.id}`}>{column.displayName}</FieldLabel>
+                <FieldLabel htmlFor={fieldId}>{column.displayName}</FieldLabel>
                 <FieldContent>
                   {editable ? (
                     <FieldEditor
@@ -186,6 +262,8 @@ export function RecordFormDialog<TData = unknown>({
                       value={value}
                       config={normalizeEditableConfig(column.editable) ?? {}}
                       defaultOpen={false}
+                      id={fieldId}
+                      ariaLabel={column.displayName}
                       onCommit={(next) => {
                         setFieldErrors((prev) => {
                           if (!(column.id in prev)) return prev;
@@ -201,13 +279,15 @@ export function RecordFormDialog<TData = unknown>({
                     />
                   ) : (
                     <Input
-                      id={`record-form-${column.id}`}
+                      id={fieldId}
                       disabled
                       readOnly
                       value={
                         value == null
                           ? ''
-                          : String(getFormatterForType(column.type, value, column.meta))
+                          : column.type === 'boolean'
+                            ? String(Boolean(value))
+                            : String(getFormatterForType(column.type, value, column.meta))
                       }
                     />
                   )}

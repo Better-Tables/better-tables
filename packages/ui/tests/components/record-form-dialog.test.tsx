@@ -152,10 +152,10 @@ describe('RecordFormDialog — create mode', () => {
       />
     );
 
-    const textInputs = screen.getAllByRole('textbox', { name: /edit cell/i });
-    expect(textInputs).toHaveLength(2); // name (text) + age (number, decimal text input)
-    const [nameInput, ageInput] = textInputs;
-    if (!nameInput || !ageInput) throw new Error('unreachable');
+    // Each field's editor is labeled by the column's displayName (plan 065
+    // Phase 4 accessibility fix), not a generic "Edit cell" shared by all.
+    const nameInput = screen.getByRole('textbox', { name: 'Name' });
+    const ageInput = screen.getByRole('textbox', { name: 'Age' });
 
     fireEvent.change(nameInput, { target: { value: 'Charlie' } });
     fireEvent.blur(nameInput);
@@ -182,9 +182,7 @@ describe('RecordFormDialog — create mode', () => {
       />
     );
 
-    const textInputs = screen.getAllByRole('textbox', { name: /edit cell/i });
-    const ageInput = textInputs[1];
-    if (!ageInput) throw new Error('unreachable');
+    const ageInput = screen.getByRole('textbox', { name: 'Age' });
 
     fireEvent.change(ageInput, { target: { value: 'not a number' } });
     fireEvent.blur(ageInput);
@@ -252,5 +250,198 @@ describe('RecordFormDialog — create mode', () => {
     );
 
     expect(screen.queryByText('Post Count')).toBeNull();
+  });
+
+  it('runs column ValidationRules before submitting and blocks an invalid value', () => {
+    const createRecord = mock(async (data: Partial<Row>) => ({ id: 1, name: '', age: 0, ...data }));
+    const withValidation: ColumnDefinition<Row>[] = columns().map((c) =>
+      c.id === 'name'
+        ? {
+            ...c,
+            validation: [
+              {
+                id: 'required',
+                validate: (v: unknown) => typeof v === 'string' && v.length > 0,
+                message: 'Name is required',
+              },
+            ],
+          }
+        : c
+    );
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="create"
+        columns={withValidation}
+        adapter={{ createRecord } as Pick<TableAdapter<Row>, 'createRecord'>}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+    expect(screen.getByText('Name is required')).toBeTruthy();
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it('sends editable.field as the payload key, not the column id, for a mapped column', async () => {
+    const createRecord = mock(async (data: Record<string, unknown>) => ({ id: 1, ...data }));
+    const mapped: ColumnDefinition<Row>[] = columns().map((c) =>
+      c.id === 'name' ? { ...c, editable: { field: 'fullName' } } : c
+    );
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="create"
+        columns={mapped}
+        adapter={{ createRecord } as unknown as Pick<TableAdapter<Row>, 'createRecord'>}
+      />
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Dana' } });
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Name' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Age' }), { target: { value: '22' } });
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Age' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+    await waitFor(() => {
+      expect(createRecord).toHaveBeenCalledTimes(1);
+    });
+    expect(createRecord).toHaveBeenCalledWith({ fullName: 'Dana', age: 22 });
+  });
+
+  it('omits an untouched field from the create payload instead of sending explicit undefined', async () => {
+    // A single boolean-only field (no sibling text/number field competing
+    // for `autoFocus`, which would otherwise blur-and-commit it) isolates
+    // the fix: an untouched boolean editor never calls onCommit, so
+    // `formData['active']` stays `undefined` and must be left out of the
+    // payload entirely, not sent as an explicit `undefined`.
+    const createRecord = mock(async (data: Record<string, unknown>) => ({
+      id: 1,
+      active: false,
+      ...data,
+    }));
+    const boolOnly: ColumnDefinition<{ id: number; active: boolean }>[] = [
+      { id: 'id', displayName: 'Id', type: 'number', accessor: (r) => r.id, writable: false },
+      {
+        id: 'active',
+        displayName: 'Active',
+        type: 'boolean',
+        accessor: (r) => r.active,
+        writable: true,
+      },
+    ];
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="create"
+        columns={boolOnly}
+        adapter={
+          { createRecord } as Pick<TableAdapter<{ id: number; active: boolean }>, 'createRecord'>
+        }
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+    await waitFor(() => {
+      expect(createRecord).toHaveBeenCalledTimes(1);
+    });
+    expect(createRecord).toHaveBeenCalledWith({});
+  });
+
+  it('renders a writable custom-type column without an editRenderer as disabled, not blank', () => {
+    const withCustom: ColumnDefinition<Row & { note: string }>[] = [
+      ...columns(),
+      {
+        id: 'note',
+        displayName: 'Note',
+        type: 'custom',
+        accessor: (r) => r.note,
+        writable: true,
+      },
+    ];
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="create"
+        columns={withCustom}
+        adapter={{}}
+      />
+    );
+
+    const noteInput = document.querySelector('#record-form-note') as HTMLInputElement;
+    expect(noteInput).toBeTruthy();
+    expect(noteInput.disabled).toBe(true);
+  });
+
+  it('renders a read-only boolean field as "false", not blank', () => {
+    const withBoolean: ColumnDefinition<Row & { active: boolean }>[] = [
+      ...columns(),
+      {
+        id: 'active',
+        displayName: 'Active',
+        type: 'boolean',
+        accessor: (r) => r.active,
+        writable: false,
+      },
+    ];
+    const row: Row & { active: boolean } = { id: 1, name: 'Alice', age: 30, active: false };
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={() => {}}
+        mode="edit"
+        row={row}
+        columns={withBoolean}
+        adapter={{}}
+      />
+    );
+
+    const activeInput = document.querySelector('#record-form-active') as HTMLInputElement;
+    expect(activeInput.value).toBe('false');
+  });
+
+  it('does not report a write as failed when onSuccess throws after a successful mutation', async () => {
+    const updateRecord = mock(async (id: string, data: Partial<Row>) => ({
+      id: Number(id),
+      name: 'Alice',
+      age: 30,
+      ...data,
+    }));
+    const onOpenChange = mock((_open: boolean) => {});
+    const onSuccess = mock(() => {
+      throw new Error('boom in consumer callback');
+    });
+    const row: Row = { id: 1, name: 'Alice', age: 30 };
+
+    render(
+      <RecordFormDialog
+        open
+        onOpenChange={onOpenChange}
+        mode="edit"
+        row={row}
+        columns={columns()}
+        adapter={{ updateRecord } as Pick<TableAdapter<Row>, 'updateRecord'>}
+        onSuccess={onSuccess}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(updateRecord).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
