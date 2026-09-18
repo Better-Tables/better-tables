@@ -19,14 +19,20 @@ import {
   timestamp as pgTimestamp,
 } from 'drizzle-orm/pg-core';
 import { blob, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { AnyColumnType, AnyTableType } from '../src/types';
+import { DrizzleAdapter } from '../src/drizzle-adapter';
+import type {
+  AnyColumnType,
+  AnyTableType,
+  DrizzleAdapterConfig,
+  DrizzleDatabase,
+} from '../src/types';
 import {
   describeTableColumns,
   getTableColumns,
   isTimestampDrizzleColumn,
 } from '../src/utils/drizzle-schema-utils';
 import { closeDatabase, createTestAdapter, createTestDatabase } from './helpers/test-fixtures';
-import { posts, users } from './helpers/test-schema';
+import { posts, schema, users } from './helpers/test-schema';
 
 // ---------------------------------------------------------------------------
 // Fixtures: one table with enum + timestamp + array (pg), one sqlite table
@@ -293,6 +299,29 @@ describe('DrizzleAdapter.describeColumns (read-table resolution)', () => {
     const specs = await adapter.describeColumns();
     expect(specs.map((s) => s.field)).toEqual(['id', 'name', 'email', 'age', 'createdAt']);
     expect(bySpecField(specs).createdAt?.columnType).toBe('date');
+  });
+
+  it('resolves foreignKeyTarget even when autoDetectRelationships is false', async () => {
+    // The detector is never fed the schema via detectFromSchema() when
+    // auto-detection is off (plan 065 Phase 2 fix) — resolveForeignKeyTarget
+    // must still work off a schema reference set independently.
+    const { db, sqlite: sqliteDb } = createTestDatabase();
+    try {
+      const config: DrizzleAdapterConfig<typeof schema, 'sqlite'> = {
+        db: db as unknown as DrizzleDatabase<'sqlite'>,
+        schema,
+        driver: 'sqlite',
+        autoDetectRelationships: false,
+        options: { defaultPrimaryTable: 'users' },
+      };
+      const noAutoDetectAdapter = new DrizzleAdapter(config);
+      const specs = await noAutoDetectAdapter.describeColumns('posts');
+      const byField = bySpecField(specs);
+      expect(byField.userId?.foreignKey).toBe(true);
+      expect(byField.userId?.foreignKeyTarget).toEqual({ table: 'users', field: 'id' });
+    } finally {
+      closeDatabase(sqliteDb);
+    }
   });
 
   it('throws a schema error for a table absent from the schema', async () => {

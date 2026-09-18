@@ -124,6 +124,16 @@ export class RelationshipDetector {
   }
 
   /**
+   * Give this detector the adapter's schema without running relationship
+   * detection — for callers that skip `detectFromSchema` entirely (e.g.
+   * `autoDetectRelationships: false`) but still need schema-dependent
+   * lookups like {@link resolveForeignKeyTarget} to work.
+   */
+  setSchema(schema: Record<string, unknown>): void {
+    this.schema = schema;
+  }
+
+  /**
    * Detect relationships from Drizzle schema
    */
   detectFromSchema(
