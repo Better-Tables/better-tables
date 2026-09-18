@@ -109,16 +109,26 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
     expect(status).toBe(200);
     expect(json.ok).toBe(true);
     if (!json.ok) throw new Error('unreachable');
-    const result = json.result as { data: unknown[]; total: number; pagination: object };
-    expect(result.total).toBe(3);
-    expect(result.data).toHaveLength(3);
-    expect(result.pagination).toEqual({
-      page: 1,
-      limit: 10,
-      totalPages: 1,
-      hasNext: false,
-      hasPrev: false,
-    });
+    const result = json.result as {
+      data: unknown[];
+      total: number;
+      pagination: {
+        page: number;
+        limit: number;
+        totalPages: number;
+        hasNext: boolean;
+        hasPrev: boolean;
+      };
+    };
+    expect(Array.isArray(result.data)).toBe(true);
+    expect(typeof result.total).toBe('number');
+    // page/limit echo the request; totalPages/hasNext/hasPrev are derived
+    // from however many rows this server's data actually has.
+    expect(result.pagination.page).toBe(1);
+    expect(result.pagination.limit).toBe(10);
+    expect(typeof result.pagination.totalPages).toBe('number');
+    expect(typeof result.pagination.hasNext).toBe('boolean');
+    expect(typeof result.pagination.hasPrev).toBe('boolean');
   });
 
   it('serialization rule: Date row values cross the wire as ISO strings', async () => {
@@ -134,8 +144,8 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
     expect(new Date(createdAt).toISOString()).toBe(createdAt);
   });
 
-  it('a date filter value sent as an ISO string round-trips correctly', async () => {
-    const { json } = await post({
+  it('a date filter value sent as an ISO string is accepted and returns a valid envelope', async () => {
+    const { status, json } = await post({
       method: 'fetchData',
       params: {
         pagination: { page: 1, limit: 10 },
@@ -149,9 +159,10 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
         ],
       },
     });
+    expect(status).toBe(200);
     if (!json.ok) throw new Error('unreachable');
     const result = json.result as { data: Array<{ id: string }> };
-    expect(result.data.map((r) => r.id).sort()).toEqual(['2', '3']);
+    expect(Array.isArray(result.data)).toBe(true);
   });
 
   it('getFilterOptions: envelope is an array of {value, label}', async () => {
@@ -176,9 +187,6 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
       expect(Array.isArray(entry)).toBe(true);
       expect((entry as unknown[]).length).toBe(2);
     }
-    const map = new Map(entries as [string, number][]);
-    expect(map.get('open')).toBe(2);
-    expect(map.get('closed')).toBe(1);
   });
 
   it("facet self-exclusion: faceting a column ignores that column's own filter", async () => {
@@ -201,7 +209,11 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
     const { status, json } = await post({ method: 'getMinMaxValues', columnId: 'reopens' });
     expect(status).toBe(200);
     if (!json.ok) throw new Error('unreachable');
-    expect(json.result).toEqual([0, 5]);
+    const tuple = json.result as unknown[];
+    expect(Array.isArray(tuple)).toBe(true);
+    expect(tuple).toHaveLength(2);
+    expect(typeof tuple[0]).toBe('number');
+    expect(typeof tuple[1]).toBe('number');
   });
 
   it('getFacets: batches values + ranges in one response, only requested columns appear', async () => {
@@ -242,15 +254,75 @@ describe('wire protocol conformance (universal — runs against WIRE_PROTOCOL_TE
   it('status mapping: a malformed body is rejected as 400 bad_request', async () => {
     const { status, json } = await post({ method: 'nope' });
     expect(status).toBe(400);
-    expect(json).toEqual({
-      ok: false,
-      error: 'Malformed adapter request body.',
-      kind: 'bad_request',
-    });
+    expect(json.ok).toBe(false);
+    if (json.ok) throw new Error('unreachable');
+    // `error` is a free-form human-readable message per
+    // ADAPTER_WIRE_PROTOCOL.md, not part of the wire contract — only `kind`
+    // is guaranteed.
+    expect(typeof json.error).toBe('string');
+    expect(json.kind).toBe('bad_request');
   });
 });
 
-describe('reference-server-only checks (server-config specific, skipped against WIRE_PROTOCOL_TEST_URL)', () => {
+describe('reference-server-only checks (server-config and reference-dataset specific, skipped against WIRE_PROTOCOL_TEST_URL)', () => {
+  referenceOnly(
+    'fetchData against the reference dataset: total/data/pagination match ITEMS',
+    async () => {
+      const { json } = await post({
+        method: 'fetchData',
+        params: { pagination: { page: 1, limit: 10 } },
+      });
+      if (!json.ok) throw new Error('unreachable');
+      const result = json.result as { data: unknown[]; total: number; pagination: object };
+      expect(result.total).toBe(3);
+      expect(result.data).toHaveLength(3);
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
+    }
+  );
+
+  referenceOnly(
+    'a date filter value sent as an ISO string round-trips correctly against ITEMS',
+    async () => {
+      const { json } = await post({
+        method: 'fetchData',
+        params: {
+          pagination: { page: 1, limit: 10 },
+          filters: [
+            {
+              columnId: 'createdAt',
+              type: 'date',
+              operator: 'after',
+              values: ['2026-02-01T00:00:00.000Z'],
+            },
+          ],
+        },
+      });
+      if (!json.ok) throw new Error('unreachable');
+      const result = json.result as { data: Array<{ id: string }> };
+      expect(result.data.map((r) => r.id).sort()).toEqual(['2', '3']);
+    }
+  );
+
+  referenceOnly('getFacetedValues against the reference dataset: exact counts', async () => {
+    const { json } = await post({ method: 'getFacetedValues', columnId: 'status' });
+    if (!json.ok) throw new Error('unreachable');
+    const map = new Map(json.result as [string, number][]);
+    expect(map.get('open')).toBe(2);
+    expect(map.get('closed')).toBe(1);
+  });
+
+  referenceOnly('getMinMaxValues against the reference dataset: exact tuple', async () => {
+    const { json } = await post({ method: 'getMinMaxValues', columnId: 'reopens' });
+    if (!json.ok) throw new Error('unreachable');
+    expect(json.result).toEqual([0, 5]);
+  });
+
   referenceOnly('cellEdit is forbidden when the endpoint has writes disabled', async () => {
     const handler = createAdapterRouteHandler(() => memoryAdapter(ITEMS, { tableName: 'items' }));
     const { status, json } = await post(
