@@ -98,7 +98,7 @@ import { RecordFormDialog } from '@better-tables/ui';
 Without it, a multi-table adapter has no way to know which table a save belongs to, and typically throws on the ambiguity rather than guessing. `<TableNavigator>` always passes it for you; wiring `<RecordFormDialog>` up yourself against a multi-table schema needs it too.
 </Callout>
 
-`createRecord`/`updateRecord` send the FULL record (every writable field at once) — this is a different write shape than `cellEdit` (the HTTP wire protocol's single-field write). `httpAdapter` does not proxy `createRecord`/`updateRecord`; wire them to a Server Action that calls your real adapter directly (the same "monolith path" `tables.cellEditAction` already uses for single-cell saves), or to your own write endpoint.
+`createRecord`/`updateRecord` send the FULL record (every writable field at once) — this is a different write shape than `cellEdit` (the HTTP wire protocol's single-field write). `httpAdapter` does not proxy full-record `createRecord`/`updateRecord`; with `writes: true`, its `updateRecord` supports only one field through `cellEdit`. Wire full-record writes to a Server Action that calls your real adapter directly (the same "monolith path" `tables.cellEditAction` already uses for single-cell saves), or to your own write endpoint.
 
 ## Live example
 
