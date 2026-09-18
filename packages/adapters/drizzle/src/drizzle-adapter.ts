@@ -75,7 +75,7 @@ import {
   normalizeFilterNode,
 } from '@better-tables/core';
 import type { Relations, SQL, SQLWrapper } from 'drizzle-orm';
-import { and, or } from 'drizzle-orm';
+import { and, getTableName, or } from 'drizzle-orm';
 import { AdapterCache } from './adapter-cache';
 import { buildAdapterMeta } from './adapter-meta';
 import { lowerDerivedAggregateSpecs } from './derived-aggregates';
@@ -1054,9 +1054,17 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
    * (plan 065 Phase 5). Pure schema introspection: no query, safe without a
    * live connection. No `rowCountEstimate` — a `COUNT(*)` per table on every
    * call isn't a cost this adapter imposes by default.
+   *
+   * `table` stays the schema key (consistent with every other read/write
+   * entry point, which all resolve tables by schema key), but `label` is
+   * humanized from the PHYSICAL db table name (`getTableName`), not the
+   * schema key — for the common `const usersTable = pgTable('users', ...)`
+   * shape, that's "Users" rather than the awkward "Users Table".
    */
   async listTables(): Promise<Array<{ table: string; label: string; rowCountEstimate?: number }>> {
-    return Object.keys(this.schema).map((table) => ({ table, label: humanize(table) }));
+    return Object.entries(this.schema as Record<string, AnyTableType>).map(
+      ([table, tableSchema]) => ({ table, label: humanize(getTableName(tableSchema)) })
+    );
   }
 
   /** Memoized {@link resolveCellWriteTarget} results per `${table}:${columnId}`. */

@@ -76,6 +76,30 @@ export function TableNavigator<TData = Record<string, unknown>>({
   > | null>(null);
   const [listError, setListError] = React.useState<Error | null>(null);
   const [selectedTable, setSelectedTable] = React.useState<string | null>(null);
+  const [filters, setFilters] = React.useState<FilterState[]>([]);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [pagination, setPagination] = React.useState<PaginationState>(DEFAULT_PAGINATION);
+
+  // Reset the per-table filter/sort/page state IN THE SAME state update as
+  // the selection change (never a separate post-commit `useEffect` keyed on
+  // `selectedTable`) — `BetterTable` seeds its Zustand store from
+  // `initialFilters`/`initialSorting`/`initialPagination` synchronously
+  // during the render that first mounts it for the new table, so a reset
+  // that lands one render later is already too late to stop that store
+  // from being seeded with the previous table's state.
+  const resetTableState = React.useCallback(() => {
+    setFilters([]);
+    setSorting([]);
+    setPagination(DEFAULT_PAGINATION);
+  }, []);
+
+  const selectTable = React.useCallback(
+    (next: string | null) => {
+      setSelectedTable(next);
+      resetTableState();
+    },
+    [resetTableState]
+  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -84,7 +108,15 @@ export function TableNavigator<TData = Record<string, unknown>>({
       .then((list) => {
         if (cancelled) return;
         setTables(list);
-        setSelectedTable((prev) => prev ?? list[0]?.table ?? null);
+        setListError(null);
+        setSelectedTable((prev) => {
+          // Retain the current selection only if the new catalog still
+          // serves it (e.g. the adapter changed) — otherwise fall back to
+          // the first entry (or null for an empty catalog).
+          if (prev != null && list.some((t) => t.table === prev)) return prev;
+          return list[0]?.table ?? null;
+        });
+        resetTableState();
       })
       .catch((err: unknown) => {
         if (!cancelled) setListError(err instanceof Error ? err : new Error(String(err)));
@@ -92,19 +124,7 @@ export function TableNavigator<TData = Record<string, unknown>>({
     return () => {
       cancelled = true;
     };
-  }, [adapter]);
-
-  const [filters, setFilters] = React.useState<FilterState[]>([]);
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [pagination, setPagination] = React.useState<PaginationState>(DEFAULT_PAGINATION);
-
-  // A table switch must never leak the previous table's filter/sort/page
-  // state into the newly selected one.
-  React.useEffect(() => {
-    setFilters([]);
-    setSorting([]);
-    setPagination(DEFAULT_PAGINATION);
-  }, [selectedTable]);
+  }, [adapter, resetTableState]);
 
   // Always an object (never `undefined`) — `enabled` below gates whether a
   // fetch happens at all while `selectedTable` is still null, so an empty
@@ -147,7 +167,7 @@ export function TableNavigator<TData = Record<string, unknown>>({
                     'w-full rounded-md px-2 py-1 text-left text-xs hover:bg-muted/60',
                     t.table === selectedTable && 'bg-muted font-medium'
                   )}
-                  onClick={() => setSelectedTable(t.table)}
+                  onClick={() => selectTable(t.table)}
                 >
                   {t.label}
                   {t.rowCountEstimate != null ? (
@@ -179,7 +199,7 @@ export function TableNavigator<TData = Record<string, unknown>>({
             onFiltersChange={setFilters}
             onSortingChange={setSorting}
             onPaginationChange={setPagination}
-            onNavigateToRelated={(target) => setSelectedTable(target.table)}
+            onNavigateToRelated={(target) => selectTable(target.table)}
             {...tableProps}
           />
         ) : null}
