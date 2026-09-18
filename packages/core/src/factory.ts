@@ -461,6 +461,14 @@ function columnHasEnrichableGap(column: ColumnDefinition<unknown, unknown>): boo
  * a gap enrichment can fill (an option column without options). Fully
  * declared tables return `false` — they must not pay a resolution
  * round-trip (plan 054).
+ *
+ * Deliberately NOT a gap trigger: `foreignKeyTarget` (plan 065). Whether a
+ * column even HAS a schema-derived FK target can only be known by asking the
+ * adapter, so treating "any column without one" as a gap would force every
+ * explicit-only table through a resolution round-trip it would otherwise
+ * skip entirely — defeating the point of this function. `foreignKeyTarget`
+ * still gets enriched onto explicit columns whenever resolution runs for
+ * another reason (`autoColumns`, or a genuine option gap elsewhere).
  */
 export function tableNeedsColumnResolution<TName extends string, TRow>(
   def: TableDefinition<TName, TRow>
@@ -498,17 +506,18 @@ function enrichExplicitColumn(
     );
   }
 
-  // Fill gaps only — declared values always win. Today the only enrichable
-  // gap is option choices (plan 054); schema enum values back an
-  // option/multiOption column that declared none.
+  // Fill gaps only — declared values always win. Option choices (plan 054)
+  // and a navigable FK target (plan 065) are independent gaps; apply
+  // whichever the spec can fill.
+  const enrichment: Partial<ColumnDefinition<unknown, unknown>> = {};
   if (columnHasEnrichableGap(column) && spec.options && spec.options.length > 0) {
-    return {
-      ...column,
-      filter: { ...column.filter, options: spec.options },
-    };
+    enrichment.filter = { ...column.filter, options: spec.options };
+  }
+  if (!column.foreignKeyTarget && spec.foreignKeyTarget) {
+    enrichment.foreignKeyTarget = spec.foreignKeyTarget;
   }
 
-  return column;
+  return Object.keys(enrichment).length > 0 ? { ...column, ...enrichment } : column;
 }
 
 function buildInferredColumn(spec: InferredColumnSpec): ColumnDefinition<unknown, unknown> {
@@ -524,6 +533,7 @@ function buildInferredColumn(spec: InferredColumnSpec): ColumnDefinition<unknown
     // NOT editable: inferred columns are read-only until explicitly
     // overridden (`[...t.auto(), t.text('subject').editable()]`).
     ...(spec.options && spec.options.length > 0 ? { filter: { options: spec.options } } : {}),
+    ...(spec.foreignKeyTarget ? { foreignKeyTarget: spec.foreignKeyTarget } : {}),
   };
 }
 
@@ -583,9 +593,12 @@ async function resolveTableColumnsUncached(
  * ONE lazy resolver behind both auto-column halves:
  *
  * 1. **Enrichment** (always): explicit columns matching a schema field get
- *    config the user didn't declare filled in — today, enum options on an
- *    `option`/`multiOption` column with no `.options()`. Declared values
- *    always win; a declared-vs-schema type contradiction is a dev warn.
+ *    config the user didn't declare filled in — enum options on an
+ *    `option`/`multiOption` column with no `.options()`, and a navigable
+ *    `foreignKeyTarget` (plan 065) when the column doesn't already declare
+ *    one. Declared values always win — an explicit `.options()` or
+ *    `foreignKeyTarget` on the column is never overwritten by the schema —
+ *    and a declared-vs-schema type contradiction is a dev warn.
  * 2. **Column-set inference** (only when the definition carries the
  *    `autoColumns` marker — `t.auto()` or the no-factory `define`): the
  *    remaining schema fields become real, read-only column definitions,
