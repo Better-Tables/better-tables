@@ -291,6 +291,10 @@ export class DrizzleAdapter<TSchema extends Record<string, unknown>, TDriver ext
       }
     } else {
       this.relationships = config.relationships || {};
+      // detectFromSchema() is skipped when auto-detection is off, but
+      // resolveForeignKeyTarget() (used by describeColumns()) still needs
+      // the detector's schema reference to resolve FK targets.
+      this.relationshipDetector.setSchema(this.schema as Record<string, unknown>);
     }
 
     // Initialize managers - they will be configured per query
