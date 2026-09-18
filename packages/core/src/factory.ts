@@ -462,13 +462,14 @@ function columnHasEnrichableGap(column: ColumnDefinition<unknown, unknown>): boo
  * declared tables return `false` — they must not pay a resolution
  * round-trip (plan 054).
  *
- * Deliberately NOT a gap trigger: `foreignKeyTarget` (plan 065). Whether a
- * column even HAS a schema-derived FK target can only be known by asking the
- * adapter, so treating "any column without one" as a gap would force every
- * explicit-only table through a resolution round-trip it would otherwise
- * skip entirely — defeating the point of this function. `foreignKeyTarget`
- * still gets enriched onto explicit columns whenever resolution runs for
- * another reason (`autoColumns`, or a genuine option gap elsewhere).
+ * Deliberately NOT a gap trigger: `foreignKeyTarget`/`writable` (plan 065).
+ * Whether a column even HAS a schema-derived FK target (or a real
+ * writability answer) can only be known by asking the adapter, so treating
+ * "any column without one" as a gap would force every explicit-only table
+ * through a resolution round-trip it would otherwise skip entirely —
+ * defeating the point of this function. Both still get enriched onto
+ * explicit columns whenever resolution runs for another reason
+ * (`autoColumns`, or a genuine option gap elsewhere).
  */
 export function tableNeedsColumnResolution<TName extends string, TRow>(
   def: TableDefinition<TName, TRow>
@@ -506,15 +507,18 @@ function enrichExplicitColumn(
     );
   }
 
-  // Fill gaps only — declared values always win. Option choices (plan 054)
-  // and a navigable FK target (plan 065) are independent gaps; apply
-  // whichever the spec can fill.
+  // Fill gaps only — declared values always win. Option choices (plan 054),
+  // a navigable FK target, and writability (plan 065) are independent
+  // gaps; apply whichever the spec can fill.
   const enrichment: Partial<ColumnDefinition<unknown, unknown>> = {};
   if (columnHasEnrichableGap(column) && spec.options && spec.options.length > 0) {
     enrichment.filter = { ...column.filter, options: spec.options };
   }
   if (!column.foreignKeyTarget && spec.foreignKeyTarget) {
     enrichment.foreignKeyTarget = spec.foreignKeyTarget;
+  }
+  if (column.writable === undefined) {
+    enrichment.writable = spec.writable;
   }
 
   return Object.keys(enrichment).length > 0 ? { ...column, ...enrichment } : column;
@@ -534,6 +538,7 @@ function buildInferredColumn(spec: InferredColumnSpec): ColumnDefinition<unknown
     // overridden (`[...t.auto(), t.text('subject').editable()]`).
     ...(spec.options && spec.options.length > 0 ? { filter: { options: spec.options } } : {}),
     ...(spec.foreignKeyTarget ? { foreignKeyTarget: spec.foreignKeyTarget } : {}),
+    writable: spec.writable,
   };
 }
 

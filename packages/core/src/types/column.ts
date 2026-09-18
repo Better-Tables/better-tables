@@ -112,6 +112,16 @@ export interface ColumnDefinition<TData = unknown, TValue = unknown, TId extends
    */
   foreignKeyTarget?: { table: string; field: string };
 
+  /**
+   * Schema-derived writability (plan 065 Phase 4) — mirrors
+   * {@link InferredColumnSpec.writable}. `false` for primary keys and
+   * anything the adapter can't write back; `<RecordFormDialog>` renders
+   * such a field disabled rather than editable. Absent means "assume
+   * writable" (the safe default for hand-declared columns, matching
+   * pre-Phase-4 behavior everywhere `writable` was never tracked).
+   */
+  writable?: boolean;
+
   /** Column metadata - strongly typed */
   meta?: ColumnMeta;
 }
