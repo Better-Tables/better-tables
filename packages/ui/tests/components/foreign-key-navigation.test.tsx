@@ -93,7 +93,7 @@ describe('BetterTable FK-click navigation (plan 065 Phase 3) — explicit column
     expect(screen.queryByRole('button', { name: 'Login broken' })).toBeNull();
   });
 
-  it('does not render a link (or call back) for a falsy FK value (0)', () => {
+  it('renders a link and calls back for a falsy FK value (0)', () => {
     const onNavigateToRelated = mock((_target: { table: string; id: string }) => {});
     render(
       <BetterTable
@@ -127,6 +127,25 @@ describe('BetterTable FK-click navigation (plan 065 Phase 3) — explicit column
     fireEvent.click(screen.getByRole('button', { name: '42' }));
 
     expect(onNavigateToRelated).toHaveBeenCalledTimes(1);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('activating the FK link via keyboard reaches onNavigateToRelated without also triggering onRowClick', () => {
+    const onNavigateToRelated = mock((_target: { table: string; id: string }) => {});
+    const onRowClick = mock((_row: TicketRow) => {});
+    render(
+      <BetterTable
+        id="fk-nav-keyboard"
+        columns={fkColumns()}
+        data={ROWS}
+        onNavigateToRelated={onNavigateToRelated}
+        onRowClick={onRowClick}
+      />
+    );
+
+    const link = screen.getByRole('button', { name: '42' });
+    fireEvent.keyDown(link, { key: 'Enter' });
+
     expect(onRowClick).not.toHaveBeenCalled();
   });
 });

@@ -487,6 +487,14 @@ function TableRowComponent<TData>({
                       e.stopPropagation();
                       onNavigateToRelated({ table: target.table, id: String(value) });
                     }}
+                    onKeyDown={(e) => {
+                      // Enter/Space would otherwise bubble to the row's own
+                      // onKeyDown, which calls preventDefault() + activates
+                      // onRowClick and swallows the button's synthetic click.
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                      }
+                    }}
                   >
                     {formatted}
                   </button>
