@@ -151,6 +151,15 @@ export function TableNavigator<TData = Record<string, unknown>>({
     // wasteful and pointless.
   }, [adapter]);
 
+  // If `overrides` hides the CURRENTLY selected table (e.g. its identity or
+  // contents change after mount), re-select the first still-visible table
+  // rather than leaving a hidden table's grid active with no sidebar entry.
+  React.useEffect(() => {
+    if (selectedTable != null && !visibleTables.some((t) => t.table === selectedTable)) {
+      setSelectedTable(visibleTables[0]?.table ?? null);
+    }
+  }, [selectedTable, visibleTables]);
+
   const [filters, setFilters] = React.useState<FilterState[]>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState<PaginationState>(DEFAULT_PAGINATION);
@@ -194,6 +203,19 @@ export function TableNavigator<TData = Record<string, unknown>>({
     ColumnDefinition<TData, unknown>[] | null
   >(null);
 
+  // Render-time reset (React "adjusting state during render" pattern,
+  // mirroring `useResolvedTableColumns` in table.tsx): a plain effect-only
+  // reset still lets THIS render commit once with `resolvedColumns` holding
+  // the PREVIOUS table's columns, and `<BetterTable key={selectedTable}>`
+  // mount with them (baking them into the new table's Zustand store, which
+  // never updates its columns after creation) before the effect below has a
+  // chance to clear it. Clearing synchronously here closes that window.
+  const prevSelectedTableRef = React.useRef(selectedTable);
+  if (prevSelectedTableRef.current !== selectedTable) {
+    prevSelectedTableRef.current = selectedTable;
+    if (resolvedColumns !== null) setResolvedColumns(null);
+  }
+
   React.useEffect(() => {
     if (!tableDef || !selectedTable) {
       setResolvedColumns(null);
@@ -225,6 +247,34 @@ export function TableNavigator<TData = Record<string, unknown>>({
   }, [tableDef, selectedTable, adapter, overrides]);
 
   const readOnly = selectedTable ? overrides?.[selectedTable]?.readOnly === true : false;
+
+  // <RecordFormDialog> is mounted OUTSIDE `tableProps`'s spread onto
+  // <BetterTable>, so `tableProps.rowConfig.getId` — the row-id resolver a
+  // consumer already configures for the grid itself (selection, row click)
+  // — never reaches it. Without this, the dialog's own default resolver
+  // (id/_id/uuid only) throws on any other row-key shape, and Save always
+  // fails. Reuse the SAME resolver here.
+  const getRowId = tableProps?.rowConfig?.getId;
+
+  // createRecord/updateRecord route by JS schema key for a multi-table
+  // adapter (MutationOptions.table) — the dialog itself has no notion of
+  // "which table is selected", so bind that here rather than teach it one.
+  const formAdapter = React.useMemo((): Pick<
+    TableAdapter<TData>,
+    'createRecord' | 'updateRecord'
+  > => {
+    const create = adapter.createRecord;
+    const update = adapter.updateRecord;
+    const mutationOptions = selectedTable != null ? { table: selectedTable } : undefined;
+    return {
+      ...(create && {
+        createRecord: (data: Partial<TData>) => create(data, mutationOptions),
+      }),
+      ...(update && {
+        updateRecord: (id: string, data: Partial<TData>) => update(id, data, mutationOptions),
+      }),
+    };
+  }, [adapter, selectedTable]);
 
   return (
     <div className={cn('flex h-full min-h-0 gap-4', className)}>
@@ -307,7 +357,8 @@ export function TableNavigator<TData = Record<string, unknown>>({
           mode={formState.mode}
           columns={resolvedColumns}
           {...(formState.mode === 'edit' ? { row: formState.row } : {})}
-          adapter={adapter}
+          {...(getRowId ? { getRowId } : {})}
+          adapter={formAdapter}
           onSuccess={() => {
             setFormState(null);
             void refetch();

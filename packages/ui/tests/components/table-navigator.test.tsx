@@ -88,6 +88,11 @@ const CUSTOMERS_SPECS: InferredColumnSpec[] = [
 
 function makeAdapter(options?: { writes?: boolean }) {
   const fetchCalls: Array<{ table: string; params: unknown }> = [];
+  const updateCalls: Array<{
+    id: string;
+    data: Partial<Record<string, unknown>>;
+    options: { table?: string } | undefined;
+  }> = [];
   const rowsByTable: Record<string, Array<Record<string, unknown>>> = {
     users: [{ id: 1, name: 'Alice', customerId: 42 }],
     customers: [{ id: 42, company: 'Acme' }],
@@ -105,12 +110,19 @@ function makeAdapter(options?: { writes?: boolean }) {
       })
     : undefined;
   const updateRecord = options?.writes
-    ? async (id: string, data: Partial<Record<string, unknown>>) => ({
-        id: Number(id),
-        name: 'Alice',
-        customerId: 42,
-        ...data,
-      })
+    ? async (
+        id: string,
+        data: Partial<Record<string, unknown>>,
+        updateOptions?: { table?: string }
+      ) => {
+        updateCalls.push({ id, data, options: updateOptions });
+        return {
+          id: Number(id),
+          name: 'Alice',
+          customerId: 42,
+          ...data,
+        };
+      }
     : undefined;
 
   const adapter: StubAdapter = {
@@ -137,7 +149,7 @@ function makeAdapter(options?: { writes?: boolean }) {
     ...(updateRecord ? { updateRecord } : {}),
   };
 
-  return { adapter, fetchCalls };
+  return { adapter, fetchCalls, updateCalls };
 }
 
 afterEach(() => {
@@ -319,7 +331,7 @@ describe('TableNavigator overrides (plan 065 Phase 6)', () => {
   });
 
   it('clicking a row opens the edit dialog pre-filled, and saving calls updateRecord', async () => {
-    const { adapter } = makeAdapter({ writes: true });
+    const { adapter, updateCalls } = makeAdapter({ writes: true });
     render(<TableNavigator adapter={adapter} />);
 
     await waitFor(() => {
@@ -331,6 +343,17 @@ describe('TableNavigator overrides (plan 065 Phase 6)', () => {
     expect(screen.getByDisplayValue('Alice')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(updateCalls).toHaveLength(1);
+    });
+    // `{ table: selectedTable }` must reach the adapter call (multi-table
+    // routing) alongside the row id and payload.
+    expect(updateCalls[0]).toEqual({
+      id: '1',
+      data: { name: 'Alice', customerId: 42 },
+      options: { table: 'users' },
+    });
 
     await waitFor(
       () => {
