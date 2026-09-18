@@ -593,9 +593,12 @@ async function resolveTableColumnsUncached(
  * ONE lazy resolver behind both auto-column halves:
  *
  * 1. **Enrichment** (always): explicit columns matching a schema field get
- *    config the user didn't declare filled in — today, enum options on an
- *    `option`/`multiOption` column with no `.options()`. Declared values
- *    always win; a declared-vs-schema type contradiction is a dev warn.
+ *    config the user didn't declare filled in — enum options on an
+ *    `option`/`multiOption` column with no `.options()`, and a navigable
+ *    `foreignKeyTarget` (plan 065) when the column doesn't already declare
+ *    one. Declared values always win — an explicit `.options()` or
+ *    `foreignKeyTarget` on the column is never overwritten by the schema —
+ *    and a declared-vs-schema type contradiction is a dev warn.
  * 2. **Column-set inference** (only when the definition carries the
  *    `autoColumns` marker — `t.auto()` or the no-factory `define`): the
  *    remaining schema fields become real, read-only column definitions,
