@@ -7,7 +7,7 @@ import { constructMetadata } from '@/lib/utils';
 export const metadata = constructMetadata({
   title: 'Examples',
   description:
-    'Six live Better Tables examples across backends: homepage users on Postgres (Neon) or SQLite fallback, plus ticket demos on in-memory SQLite — facets, query groups, virtualization, a live SQL readout, and a metadata-driven admin navigator.',
+    'Seven live Better Tables examples across backends: homepage users on Postgres (Neon) or SQLite fallback, plus ticket demos on in-memory SQLite — relationship filtering, query groups, virtualization, facets, CSV export, and a metadata-driven admin navigator.',
 });
 
 export default function ExamplesIndexPage() {

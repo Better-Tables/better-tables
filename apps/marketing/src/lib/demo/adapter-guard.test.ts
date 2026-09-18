@@ -71,6 +71,12 @@ describe('createAdapterGuard', () => {
     ).toBe(false);
   });
 
+  it('listTables references no column ids and is always allowed', () => {
+    const body: AdapterRequestBody = { method: 'listTables' };
+    expect(collectAdapterColumnIds(body)).toEqual([]);
+    expect(guard.isAllowed(body)).toBe(true);
+  });
+
   it('pins fetchData / describeColumns / resolveCellWriteTarget to the table', () => {
     const fetchConstrained = guard.constrain({
       method: 'fetchData',

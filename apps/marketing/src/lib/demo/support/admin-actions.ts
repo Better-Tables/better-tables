@@ -1,5 +1,6 @@
 'use server';
 
+import { coerceCellValue, type TableAdapter } from '@better-tables/core';
 import { getSupportTables } from './db';
 
 const ALLOWED_TABLES = new Set(['tickets', 'customers', 'assignees', 'bulkTickets']);
@@ -15,7 +16,39 @@ const ALLOWED_TABLES = new Set(['tickets', 'customers', 'assignees', 'bulkTicket
  *
  * Row-level authorization stays the app's concern, same note as
  * `saveTicketCell` — a real app would check the caller's session here.
+ * Unlike `saveTicketCell`'s single-column `cellEditAction` path (which gets
+ * field allow-listing and type coercion for free from `.editable()` +
+ * `coerceCellValue`), `data` here is a caller-supplied full record — without
+ * `sanitizeWriteData` below, ANY column (including primary/foreign keys)
+ * could be set to an unvalidated value.
  */
+
+/**
+ * Drop any key `data` doesn't declare writable in `table`'s OWN schema, and
+ * coerce each remaining value per its column type. Mirrors the protection
+ * `cellEditAction`/the `cellEdit` wire method already give single-field
+ * writes, applied across a full record.
+ */
+async function sanitizeWriteData(
+  adapter: TableAdapter<Record<string, unknown>>,
+  table: string,
+  data: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  if (!adapter.describeColumns) {
+    throw new Error('This adapter does not support describeColumns.');
+  }
+  const specs = await adapter.describeColumns(table);
+  const sanitized: Record<string, unknown> = {};
+  for (const spec of specs) {
+    if (spec.writable === false || !(spec.field in data)) continue;
+    const coerced = coerceCellValue(spec.columnType, data[spec.field], spec.options, spec.nullable);
+    if (!coerced.ok) {
+      throw new Error(`Field "${spec.field}": ${coerced.error}`);
+    }
+    sanitized[spec.field] = coerced.value;
+  }
+  return sanitized;
+}
 
 export async function createSupportRecord(
   table: string,
@@ -29,7 +62,8 @@ export async function createSupportRecord(
   if (!adapter.createRecord) {
     throw new Error('This adapter does not support createRecord.');
   }
-  return adapter.createRecord(data, { table }) as Promise<Record<string, unknown>>;
+  const sanitized = await sanitizeWriteData(adapter, table, data);
+  return adapter.createRecord(sanitized, { table }) as Promise<Record<string, unknown>>;
 }
 
 export async function updateSupportRecord(
@@ -45,5 +79,6 @@ export async function updateSupportRecord(
   if (!adapter.updateRecord) {
     throw new Error('This adapter does not support updateRecord.');
   }
-  return adapter.updateRecord(id, data, { table }) as Promise<Record<string, unknown>>;
+  const sanitized = await sanitizeWriteData(adapter, table, data);
+  return adapter.updateRecord(id, sanitized, { table }) as Promise<Record<string, unknown>>;
 }
