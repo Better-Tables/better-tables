@@ -177,7 +177,7 @@ drives the HTTP status code:
 |---|---|---|---|
 | 200 | `true` | — | Success |
 | 400 | `false` | `bad_request` | Malformed body, unknown/unwritable column, failed value coercion, an allow-list miss, a method the adapter doesn't support (e.g. `describeColumns` on a schema-less adapter) |
-| 403 | `false` | `forbidden` | `authorize` rejected the request, or `cellEdit` arrived at an endpoint with writes disabled |
+| 403 | `false` | `bad_request` | `authorize` rejected the request, or `cellEdit` arrived at an endpoint with writes disabled |
 | 500 | `false` | `server_error` | The adapter or database threw |
 
 **Server error messages must stay generic** (`"Adapter request failed."`,
