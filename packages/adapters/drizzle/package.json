@@ -61,7 +61,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "better-sqlite3": "catalog:",
-    "dotenv": "^17.2.3",
+    "dotenv": "^18.0.0",
     "drizzle-orm": "catalog:",
     "mitata": "catalog:",
     "mysql2": "^3.12.0",
