@@ -332,4 +332,42 @@ describe('DrizzleAdapter.describeColumns (read-table resolution)', () => {
       /Primary table 'nope' not found in schema/
     );
   });
+
+  it('listTables (plan 065 Phase 5) lists every table in the schema with a humanized label', async () => {
+    const tables = await adapter.listTables?.();
+    expect(tables).toEqual(
+      expect.arrayContaining([
+        { table: 'users', label: 'Users' },
+        { table: 'posts', label: 'Posts' },
+      ])
+    );
+    expect(tables?.every((t) => t.rowCountEstimate === undefined)).toBe(true);
+  });
+
+  it('listTables labels from the physical db table name, not the schema key, when they differ', async () => {
+    // `const usersTable = sqliteTable('users', ...)` — a common naming
+    // convention where the schema-key variable name and the actual db
+    // table name diverge.
+    const usersTable = sqliteTable('users', {
+      id: integer('id').primaryKey(),
+      name: text('name').notNull(),
+    });
+    const { db, sqlite: sqliteDb } = createTestDatabase();
+    try {
+      const config: DrizzleAdapterConfig<{ usersTable: typeof usersTable }, 'sqlite'> = {
+        db: db as unknown as DrizzleDatabase<'sqlite'>,
+        schema: { usersTable },
+        driver: 'sqlite',
+        options: { defaultPrimaryTable: 'usersTable' },
+      };
+      const namingMismatchAdapter = new DrizzleAdapter(config);
+      const tables = await namingMismatchAdapter.listTables();
+      // `table` stays the schema key (consistent with every other
+      // table-resolution entry point); only `label` is derived from the
+      // physical name.
+      expect(tables).toEqual([{ table: 'usersTable', label: 'Users' }]);
+    } finally {
+      closeDatabase(sqliteDb);
+    }
+  });
 });
