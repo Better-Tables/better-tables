@@ -261,10 +261,15 @@ describe('resolveTableColumns — enrichment (independent of t.auto())', () => {
     const { adapter, calls } = makeDescribeStub();
 
     const columns = await resolveTableColumns(def, adapter);
+    const declaredColumn = def.columns[0];
+    if (!declaredColumn) throw new Error('unreachable');
+    // The declared options survive untouched — the options gap was already
+    // filled, so enrichment never replaces it.
     expect(columns[0]?.filter?.options).toEqual(declaredOptions);
-    // The resolver may have been called (caller's choice) but must not
-    // overwrite; the declared column object is passed through untouched.
-    expect(columns[0]).toBe(def.columns[0]);
+    // `writable` (plan 065 Phase 4) is a SEPARATE, still-open gap on this
+    // same column (the schema says `status` is writable) — a new column
+    // object is expected here, but only that one additional field changes.
+    expect(columns[0]).toEqual({ ...declaredColumn, writable: true });
     expect(calls.length).toBeLessThanOrEqual(1);
   });
 
@@ -378,5 +383,43 @@ describe('resolveTableColumns — foreignKeyTarget (plan 065 Phase 2/3)', () => 
       ],
     }));
     expect(tableNeedsColumnResolution(def)).toBe(false);
+  });
+});
+
+describe('resolveTableColumns — writable (plan 065 Phase 4)', () => {
+  it('inferred (t.auto()) columns carry writable straight through, including false for PKs', async () => {
+    const def = defineTableRow<TicketRow>()('tickets');
+    const { adapter } = makeDescribeStub();
+
+    const columns = await resolveTableColumns(def, adapter);
+    expect(columns.find((c) => c.id === 'id')?.writable).toBe(false);
+    expect(columns.find((c) => c.id === 'subject')?.writable).toBe(true);
+  });
+
+  it('enriches an explicit column with writable when resolution runs for another reason', async () => {
+    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
+      columns: [t.option('status'), t.number('id')],
+    }));
+    const { adapter } = makeDescribeStub();
+
+    const columns = await resolveTableColumns(def, adapter);
+    expect(columns.find((c) => c.id === 'id')?.writable).toBe(false);
+  });
+
+  it('an explicitly declared writable always wins over the schema-derived one', async () => {
+    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
+      columns: [t.option('status'), { ...t.number('id').build(), writable: true }],
+    }));
+    const { adapter } = makeDescribeStub();
+
+    const columns = await resolveTableColumns(def, adapter);
+    expect(columns.find((c) => c.id === 'id')?.writable).toBe(true);
+  });
+
+  it('stays absent (not enriched) for a fully-declared table with no enrichable gap', () => {
+    const def = defineTableRow<TicketRow>()('tickets', (t) => ({
+      columns: [t.text('subject'), t.option('status').options([{ value: 'open', label: 'Open' }])],
+    }));
+    expect(def.columns.every((c) => c.writable === undefined)).toBe(true);
   });
 });

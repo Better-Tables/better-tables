@@ -42,12 +42,16 @@ function TextEditor<TValue>({
   value,
   multiline,
   placeholder,
+  id,
+  ariaLabel,
   onCommit,
   onCancel,
 }: {
   value: TValue;
   multiline?: boolean;
   placeholder?: string;
+  id: string | undefined;
+  ariaLabel: string | undefined;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
 }) {
@@ -69,9 +73,10 @@ function TextEditor<TValue>({
     return (
       <Textarea
         autoFocus
+        id={id}
         value={draft}
         placeholder={placeholder}
-        aria-label="Edit cell"
+        aria-label={ariaLabel ?? 'Edit cell'}
         className="min-h-16 w-full text-sm"
         onChange={(e) => {
           committedRef.current = false;
@@ -98,9 +103,10 @@ function TextEditor<TValue>({
   return (
     <Input
       autoFocus
+      id={id}
       value={draft}
       placeholder={placeholder}
-      aria-label="Edit cell"
+      aria-label={ariaLabel ?? 'Edit cell'}
       className="h-7 w-full"
       onChange={(e) => {
         committedRef.current = false;
@@ -127,12 +133,16 @@ function TextEditor<TValue>({
 function NumberEditor<TValue>({
   value,
   placeholder,
+  id,
+  ariaLabel,
   onCommit,
   onCancel,
   onInvalid,
 }: {
   value: TValue;
   placeholder?: string;
+  id: string | undefined;
+  ariaLabel: string | undefined;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
   onInvalid: (message: string) => void;
@@ -177,9 +187,10 @@ function NumberEditor<TValue>({
       // (blocking our NaN guard) and adds spinner UX that fights dense cells.
       type="text"
       inputMode="decimal"
+      id={id}
       value={draft}
       placeholder={placeholder}
-      aria-label="Edit cell"
+      aria-label={ariaLabel ?? 'Edit cell'}
       className="h-7 w-full"
       onChange={(e) => {
         committedRef.current = false;
@@ -213,15 +224,27 @@ function NumberEditor<TValue>({
 function OptionEditor<TValue>({
   value,
   options,
+  id,
+  ariaLabel,
   onCommit,
   onCancel,
+  defaultOpen = true,
 }: {
   value: TValue;
   options: { value: string; label: string }[];
+  id: string | undefined;
+  ariaLabel: string | undefined;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
+  /**
+   * Whether the popover starts open. `true` (default) matches inline-cell
+   * editing, where the user just clicked to edit and opening immediately
+   * saves a click. `<RecordFormDialog>` (plan 065 Phase 4) passes `false` —
+   * a form with many fields must not force every picker open on mount.
+   */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(defaultOpen);
   const committedRef = React.useRef(false);
   const stringValue = value == null ? '' : String(value);
   const selectedLabel = options.find((o) => o.value === stringValue)?.label ?? 'Select…';
@@ -237,11 +260,16 @@ function OptionEditor<TValue>({
       <PopoverTrigger
         render={
           <Button
+            id={id}
             variant="outline"
             size="sm"
             className="h-7 w-full min-w-28 justify-between px-2 font-normal"
-            aria-label="Edit cell"
-            autoFocus
+            aria-label={ariaLabel ?? 'Edit cell'}
+            // Only steal focus for inline single-cell editing (`defaultOpen`
+            // true, the default) — a form rendering many option fields at
+            // once (`<RecordFormDialog>`, `defaultOpen={false}`) must not
+            // have every field's trigger fight over focus on mount.
+            autoFocus={defaultOpen}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
@@ -288,13 +316,19 @@ function OptionEditor<TValue>({
 function OptionEditorWithFallback<TData, TValue>({
   column,
   value,
+  id,
+  ariaLabel,
   onCommit,
   onCancel,
+  defaultOpen = true,
 }: {
   column: ColumnDefinition<TData, TValue>;
   value: TValue;
+  id: string | undefined;
+  ariaLabel: string | undefined;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
+  defaultOpen?: boolean;
 }) {
   const { options, loading } = useColumnOptions(column as ColumnDefinition<TData, unknown>);
 
@@ -307,10 +341,11 @@ function OptionEditorWithFallback<TData, TValue>({
         <span>No options</span>
         <Button
           type="button"
+          id={id}
           variant="ghost"
           size="sm"
           className="h-6 px-2 text-xs"
-          autoFocus
+          autoFocus={defaultOpen}
           onClick={onCancel}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -328,19 +363,26 @@ function OptionEditorWithFallback<TData, TValue>({
   return (
     <OptionEditor
       value={value}
+      id={id}
+      ariaLabel={ariaLabel}
       options={options.map((o) => ({ value: String(o.value), label: o.label }))}
       onCommit={onCommit}
       onCancel={onCancel}
+      defaultOpen={defaultOpen}
     />
   );
 }
 
 function BooleanEditor<TValue>({
   value,
+  id,
+  ariaLabel,
   onCommit,
   onCancel,
 }: {
   value: TValue;
+  id: string | undefined;
+  ariaLabel: string | undefined;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
 }) {
@@ -348,8 +390,9 @@ function BooleanEditor<TValue>({
   return (
     <Switch
       autoFocus
+      id={id}
       checked={checked}
-      aria-label="Edit cell"
+      aria-label={ariaLabel ?? 'Edit cell'}
       onCheckedChange={(next) => {
         onCommit(next as TValue);
       }}
@@ -366,14 +409,21 @@ function BooleanEditor<TValue>({
 
 function DateEditor<TValue>({
   value,
+  id,
+  ariaLabel,
   onCommit,
   onCancel,
+  defaultOpen = true,
 }: {
   value: TValue;
+  id: string | undefined;
+  ariaLabel: string | undefined;
   onCommit: (value: TValue) => void;
   onCancel: () => void;
+  /** See {@link OptionEditor}'s `defaultOpen` doc. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(defaultOpen);
   const committedRef = React.useRef(false);
   const selected = toDate(value);
 
@@ -388,10 +438,11 @@ function DateEditor<TValue>({
       <PopoverTrigger
         render={
           <Button
+            id={id}
             variant="outline"
             size="sm"
             className="h-7 px-2 font-normal"
-            aria-label="Edit cell"
+            aria-label={ariaLabel ?? 'Edit cell'}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
@@ -422,15 +473,7 @@ function DateEditor<TValue>({
   );
 }
 
-function CellEditor<TData, TValue>({
-  column,
-  row,
-  value,
-  config,
-  onCommit,
-  onCancel,
-  onInvalid,
-}: {
+export interface FieldEditorProps<TData, TValue> {
   column: ColumnDefinition<TData, TValue>;
   row: TData;
   value: TValue;
@@ -438,7 +481,47 @@ function CellEditor<TData, TValue>({
   onCommit: (value: TValue) => void;
   onCancel: () => void;
   onInvalid: (message: string) => void;
-}) {
+  /**
+   * Whether an `option`/`date` field's popover starts open. `true` (default)
+   * matches inline-cell editing (see {@link OptionEditor}'s doc);
+   * `<RecordFormDialog>` (plan 065 Phase 4) passes `false`.
+   */
+  defaultOpen?: boolean;
+  /**
+   * DOM id for the editor's underlying input/trigger, so a `<label htmlFor>`
+   * can associate with it. Omitted for inline cell editing (no visible
+   * label there); `<RecordFormDialog>` passes `record-form-${column.id}`.
+   */
+  id?: string;
+  /**
+   * Accessible name for the editor's control. Defaults to the generic "Edit
+   * cell" (fine for inline cell editing, where only one editor is ever on
+   * screen at a time); `<RecordFormDialog>` passes the column's display
+   * name so a multi-field form's editors are each distinguishable to a
+   * screen reader.
+   */
+  ariaLabel?: string;
+}
+
+/**
+ * Per-`ColumnType` field editor dispatch — the ONE place that maps a column
+ * type to its editor component. Used by {@link EditableCell} for inline
+ * cell editing AND by `<RecordFormDialog>` (plan 065 Phase 4) for the
+ * generic create/edit record form, so there is exactly one implementation
+ * of each type's editing UI, never two.
+ */
+export function FieldEditor<TData, TValue>({
+  column,
+  row,
+  value,
+  config,
+  onCommit,
+  onCancel,
+  onInvalid,
+  defaultOpen = true,
+  id,
+  ariaLabel,
+}: FieldEditorProps<TData, TValue>) {
   if (config.editRenderer) {
     const props: EditRendererProps<TData, TValue> = {
       value,
@@ -458,6 +541,8 @@ function CellEditor<TData, TValue>({
       return (
         <TextEditor
           value={value}
+          id={id}
+          ariaLabel={ariaLabel}
           {...(config.multiline ? { multiline: true } : {})}
           {...(config.placeholder != null ? { placeholder: config.placeholder } : {})}
           onCommit={onCommit}
@@ -470,6 +555,8 @@ function CellEditor<TData, TValue>({
       return (
         <NumberEditor
           value={value}
+          id={id}
+          ariaLabel={ariaLabel}
           {...(config.placeholder != null ? { placeholder: config.placeholder } : {})}
           onCommit={onCommit}
           onCancel={onCancel}
@@ -481,14 +568,34 @@ function CellEditor<TData, TValue>({
         <OptionEditorWithFallback
           column={column}
           value={value}
+          id={id}
+          ariaLabel={ariaLabel}
+          onCommit={onCommit}
+          onCancel={onCancel}
+          defaultOpen={defaultOpen}
+        />
+      );
+    case 'boolean':
+      return (
+        <BooleanEditor
+          value={value}
+          id={id}
+          ariaLabel={ariaLabel}
           onCommit={onCommit}
           onCancel={onCancel}
         />
       );
-    case 'boolean':
-      return <BooleanEditor value={value} onCommit={onCommit} onCancel={onCancel} />;
     case 'date':
-      return <DateEditor value={value} onCommit={onCommit} onCancel={onCancel} />;
+      return (
+        <DateEditor
+          value={value}
+          id={id}
+          ariaLabel={ariaLabel}
+          onCommit={onCommit}
+          onCancel={onCancel}
+          defaultOpen={defaultOpen}
+        />
+      );
     default:
       return null;
   }
@@ -548,7 +655,7 @@ export function EditableCell<TData = unknown, TValue = unknown>({
         onDoubleClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <CellEditor
+        <FieldEditor
           column={column}
           row={row}
           value={value}
